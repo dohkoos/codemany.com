@@ -91,9 +91,10 @@
   </header>
 
 
-<div class="entry-content"><p><p>UC Browser保存的书签后缀名是aucf，不能直接导入到Firefox中，必须要把aucf格式转成Firefox的html格式才行。</p>
+<div class="entry-content"><p>UC Browser保存的书签后缀名是aucf，不能直接导入到Firefox中，必须要把aucf格式转成Firefox的html格式才行。</p>
 
-<p><p>先把UC Browser和Firefox的书签格式都分析了一下。Firefox的是纯html文本格式，非常简单。UC的是二进制格式，文件以字符串android开头，接着是n个byte的信息，没有分析出来是啥，然后4个byte是书签的数目，再接着的n个byte没去分析，再下来就是每个书签的信息了。书签信息分两部分：名称和地址。都是第1个byte说明后面字符串的长度，字符串以00结尾。<br />
+<p>先把UC Browser和Firefox的书签格式都分析了一下。Firefox的是纯html文本格式，非常简单。UC的是二进制格式，文件以字符串android开头，接着是n个byte的信息，没有分析出来是啥，然后4个byte是书签的数目，再接着的n个byte没去分析，再下来就是每个书签的信息了。书签信息分两部分：名称和地址。都是第1个byte说明后面字符串的长度，字符串以00结尾。<br /></p>
+
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
@@ -102,16 +103,18 @@
 <span class='line-number'>6</span>
 <span class='line-number'>7</span>
 <span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>android &lt;&ndash; 文件头&lt;br /&gt;
-</span><span class='line'>xxx&hellip;   &lt;&ndash; n个byte&lt;br /&gt;
-</span><span class='line'>xxxx    &lt;&ndash; 保存的书签数目&lt;br /&gt;
-</span><span class='line'>xxx&hellip;   &lt;&ndash; n个byte&lt;br /&gt;
-</span><span class='line'>xx       &lt;&ndash; 书签名称长度&lt;br /&gt;
-</span><span class='line'>xxx&hellip;   &lt;&ndash; 书签名称&lt;br /&gt;
-</span><span class='line'>xx       &lt;&ndash; 书签地址长度&lt;br /&gt;
-</span><span class='line'>xxx&hellip;   &lt;&ndash; 书签地址&lt;br /&gt;</span></code></pre></td></tr></table></div></figure></p>
+</pre></td><td class='code'><pre><code class=''><span class='line'>android &lt;- 文件头&lt;br /&gt;
+</span><span class='line'>xxx...   &lt;- n个byte&lt;br /&gt;
+</span><span class='line'>xxxx    &lt;- 保存的书签数目&lt;br /&gt;
+</span><span class='line'>xxx...   &lt;- n个byte&lt;br /&gt;
+</span><span class='line'>xx       &lt;- 书签名称长度&lt;br /&gt;
+</span><span class='line'>xxx...   &lt;- 书签名称&lt;br /&gt;
+</span><span class='line'>xx       &lt;- 书签地址长度&lt;br /&gt;
+</span><span class='line'>xxx...   &lt;- 书签地址&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p><p>用文本文件打开时可以查看英文字符。书签的地址通常由英文字母组成，所以我们不需要再去分析整个aucf文件的格式，只要把所有书签地址提取出来就行了。下面就是完整的Ruby代码：<br />
+
+<p>用文本文件打开时可以查看英文字符。书签的地址通常由英文字母组成，所以我们不需要再去分析整个aucf文件的格式，只要把所有书签地址提取出来就行了。下面就是完整的Ruby代码：<br /></p>
+
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
@@ -156,48 +159,49 @@
 <span class='line-number'>42</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'># aucf2ff.rb&lt;br /&gt;
 </span><span class='line'>if ARGV.length != 1 then&lt;br /&gt;
-</span><span class='line'>  puts &ldquo;USAGE: ruby aucf2ff.rb ucfavorite&rdquo;&lt;br /&gt;
+</span><span class='line'>  puts "USAGE: ruby aucf2ff.rb ucfavorite"&lt;br /&gt;
 </span><span class='line'>  exit&lt;br /&gt;
 </span><span class='line'>end
 </span><span class='line'>
-</span><span class='line'>&lt;p&gt;ucfavorite = ARGV[0]&lt;br /&gt;
+</span><span class='line'>ucfavorite = ARGV[0]&lt;br /&gt;
 </span><span class='line'>if !FileTest.exist?(ucfavorite) then&lt;br /&gt;
-</span><span class='line'>  puts &ldquo;File #{ucfavorite} was not found&rdquo;&lt;br /&gt;
+</span><span class='line'>  puts "File #{ucfavorite} was not found"&lt;br /&gt;
 </span><span class='line'>  exit&lt;br /&gt;
 </span><span class='line'>end
 </span><span class='line'>
-</span><span class='line'>&lt;p&gt;ff = File.new(ucfavorite.gsub(&ldquo;.aucf&rdquo;, &ldquo;_ff.html&rdquo;), &ldquo;w&rdquo;)&lt;br /&gt;
-</span><span class='line'>ff.puts &lsquo;&lt;!DOCTYPE NETSCAPE-Bookmark-file-1&gt;&rsquo;&lt;br /&gt;
-</span><span class='line'>ff.puts &lsquo;&lt;!&mdash; This is an automatically generated file.&rsquo;&lt;br /&gt;
-</span><span class='line'>ff.puts &lsquo;     It will be read and overwritten.&rsquo;&lt;br /&gt;
-</span><span class='line'>ff.puts &lsquo;     DO NOT EDIT! &mdash;&gt;&rsquo;&lt;br /&gt;
-</span><span class='line'>ff.puts &lsquo;&lt;META HTTP-EQUIV=&ldquo;Content-Type&rdquo; CONTENT=&ldquo;text/html; charset=utf-8&rdquo;&gt;&rsquo;&lt;br /&gt;
-</span><span class='line'>ff.puts &lsquo;&lt;TITLE&gt;Bookmarks&lt;/TITLE&gt;&rsquo;&lt;br /&gt;
-</span><span class='line'>ff.puts &lsquo;&lt;H1&gt;Bookmarks Menu&lt;/H1&gt;&rsquo;&lt;br /&gt;
+</span><span class='line'>ff = File.new(ucfavorite.gsub(".aucf", "_ff.html"), "w")&lt;br /&gt;
+</span><span class='line'>ff.puts '&lt;!DOCTYPE NETSCAPE-Bookmark-file-1&gt;'&lt;br /&gt;
+</span><span class='line'>ff.puts '&lt;!-- This is an automatically generated file.'&lt;br /&gt;
+</span><span class='line'>ff.puts '     It will be read and overwritten.'&lt;br /&gt;
+</span><span class='line'>ff.puts '     DO NOT EDIT! --&gt;'&lt;br /&gt;
+</span><span class='line'>ff.puts '&lt;META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8"&gt;'&lt;br /&gt;
+</span><span class='line'>ff.puts '&lt;TITLE&gt;Bookmarks&lt;/TITLE&gt;'&lt;br /&gt;
+</span><span class='line'>ff.puts '&lt;H1&gt;Bookmarks Menu&lt;/H1&gt;'&lt;br /&gt;
 </span><span class='line'>ff.puts&lt;br /&gt;
-</span><span class='line'>ff.puts &lsquo;&lt;DL&gt;&lt;p&gt;&rsquo;&lt;br /&gt;
-</span><span class='line'>ff.puts &lsquo;    &lt;DT&gt;&lt;H3&gt;UC Bookmarks&lt;/H3&gt;&rsquo;&lt;br /&gt;
-</span><span class='line'>ff.puts &lsquo;    &lt;DL&gt;&lt;p&gt;&rsquo;
+</span><span class='line'>ff.puts '&lt;DL&gt;&lt;p&gt;'&lt;br /&gt;
+</span><span class='line'>ff.puts '    &lt;DT&gt;&lt;H3&gt;UC Bookmarks&lt;/H3&gt;'&lt;br /&gt;
+</span><span class='line'>ff.puts '    &lt;DL&gt;&lt;p&gt;'
 </span><span class='line'>
-</span><span class='line'>&lt;p&gt;buffer = IO.read(ucfavorite)&lt;br /&gt;
-</span><span class='line'>index = buffer.index(&ldquo;<a href="http://">http://</a>&rdquo;)&lt;br /&gt;
-</span><span class='line'>favorites = buffer.slice(index, buffer.length &ndash; index)&lt;br /&gt;
-</span><span class='line'>favorites.split(&ldquo;<a href="http://">http://</a>&rdquo;).each do |fav|&lt;br /&gt;
-</span><span class='line'>  uri = &lsquo;&rsquo;&lt;br /&gt;
+</span><span class='line'>buffer = IO.read(ucfavorite)&lt;br /&gt;
+</span><span class='line'>index = buffer.index("http://")&lt;br /&gt;
+</span><span class='line'>favorites = buffer.slice(index, buffer.length - index)&lt;br /&gt;
+</span><span class='line'>favorites.split("http://").each do |fav|&lt;br /&gt;
+</span><span class='line'>  uri = ''&lt;br /&gt;
 </span><span class='line'>  fav.each_byte do |c|&lt;br /&gt;
 </span><span class='line'>    break if c == 00&lt;br /&gt;
 </span><span class='line'>    uri += c.chr&lt;br /&gt;
 </span><span class='line'>  end&lt;br /&gt;
 </span><span class='line'>  if (!uri.empty?) then&lt;br /&gt;
-</span><span class='line'>    ff.puts &lsquo;&lt;DT&gt;&lt;A HREF=&ldquo;<a href="http://">http://</a>&rsquo; + uri + &lsquo;&rdquo; LAST_CHARSET=&ldquo;utf-8&rdquo;&gt;&rsquo; + uri + &lsquo;&lt;/A&gt;&rsquo;&lt;br /&gt;
+</span><span class='line'>    ff.puts '&lt;DT&gt;&lt;A HREF="http://' + uri + '" LAST_CHARSET="utf-8"&gt;' + uri + '&lt;/A&gt;'&lt;br /&gt;
 </span><span class='line'>  end&lt;br /&gt;
 </span><span class='line'>end
 </span><span class='line'>
-</span><span class='line'>&lt;p&gt;ff.puts &lsquo;    &lt;/DL&gt;&lt;p&gt;&rsquo;&lt;br /&gt;
-</span><span class='line'>ff.puts &lsquo;&lt;/DL&gt;&lt;p&gt;&rsquo;&lt;br /&gt;
-</span><span class='line'>ff.close&lt;br /&gt;</span></code></pre></td></tr></table></div></figure></p>
+</span><span class='line'>ff.puts '    &lt;/DL&gt;&lt;p&gt;'&lt;br /&gt;
+</span><span class='line'>ff.puts '&lt;/DL&gt;&lt;p&gt;'&lt;br /&gt;
+</span><span class='line'>ff.close&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p><p>通过上面的程序就可以将UC Browser的书签转成Firefox格式，然后在Firefox中导入书签就可以了。</p></p>
+
+<p>通过上面的程序就可以将UC Browser的书签转成Firefox格式，然后在Firefox中导入书签就可以了。</p></p>
 </div>
 
 

@@ -91,96 +91,116 @@
   </header>
 
 
-<div class="entry-content"><p><p>从2.2版本起Rails开始内置支持i18n，因此以后实现国际化/本地化就可以不再需要各种各样的插件了。</p>
+<div class="entry-content"><p>从2.2版本起Rails开始内置支持i18n，因此以后实现国际化/本地化就可以不再需要各种各样的插件了。</p>
 
-<p><p>Rails默认的locale文件夹是config/locales，假设你要支持中文和英文，那么你需要在这个文件夹下放置zh.yml和en.yml两个文件。</p>
+<p>Rails默认的locale文件夹是config/locales，假设你要支持中文和英文，那么你需要在这个文件夹下放置zh.yml和en.yml两个文件。</p>
 
-<p><p>相应的入门教程网上有不少，我也就不多讲了。这里主要说一下如何在记账应用中实现可以让用户指定语言的i18n实现，即当用户选择English，那么界面就切换成英文界面，并且以后打开的页面也是以英文出现，反之亦如此。</p>
+<p>相应的入门教程网上有不少，我也就不多讲了。这里主要说一下如何在记账应用中实现可以让用户指定语言的i18n实现，即当用户选择English，那么界面就切换成英文界面，并且以后打开的页面也是以英文出现，反之亦如此。</p>
 
-<p><p>首先在header区添加以下代码：<br />
-[code lang=&ldquo;ruby&rdquo;]
-&lt; %= link_to &lsquo;Chinese&rsquo;, :locale => &lsquo;zh&rsquo; %>
-&lt; %= link_to &lsquo;English&rsquo;, :locale => &lsquo;en&rsquo; %>
+<p>首先在header区添加以下代码：<br /></p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt; %= link_to 'Chinese', :locale =&gt; 'zh' %&gt;
+</span><span class='line'>&lt; %= link_to 'English', :locale =&gt; 'en' %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>点击其中某个链接后，浏览器就会传递对应的参数zh或en到后台。</p>
+
+<p>然后在app/controllers/application_controller.rb中添加以下代码：<br /></p>
+
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>
-</span><span class='line'>&lt;p&gt;点击其中某个链接后，浏览器就会传递对应的参数zh或en到后台。
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>before_filter :set_locale
 </span><span class='line'>
-</span><span class='line'>&lt;p&gt;然后在app/controllers/application_controller.rb中添加以下代码：&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
-before_filter :set_locale</p>
+</span><span class='line'>def set_locale&lt;br /&gt;
+</span><span class='line'>  I18n.locale = params[:locale]&lt;br /&gt;
+</span><span class='line'>end&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p><p>def set_locale<br />
-  I18n.locale = params[:locale]<br />
-end<br />
+
+<p>不过这里有个问题就是url中必须得带着参数，不然的话用户的选择就会失效。要想使选择达到持续的效果，可以考虑把这些信息保存在session中，改进后的代码如下：<br /></p>
+
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>
-</span><span class='line'>&lt;p&gt;不过这里有个问题就是url中必须得带着参数，不然的话用户的选择就会失效。要想使选择达到持续的效果，可以考虑把这些信息保存在session中，改进后的代码如下：&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
-def set_locale<br />
-  I18n.locale = params[:locale] || session[:locale]<br />
-  session[:locale] = I18n.locale<br />
-end<br />
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def set_locale&lt;br /&gt;
+</span><span class='line'>  I18n.locale = params[:locale] || session[:locale]&lt;br /&gt;
+</span><span class='line'>  session[:locale] = I18n.locale&lt;br /&gt;
+</span><span class='line'>end&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>现在这样就基本上差不多了。剩下的就是处理第一次访问时的语言，这个可以从http头中的ACCEPT_LANGUAGE参数获取。最终实现的代码：<br /></p>
+
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>
-</span><span class='line'>&lt;p&gt;现在这样就基本上差不多了。剩下的就是处理第一次访问时的语言，这个可以从http头中的ACCEPT_LANGUAGE参数获取。最终实现的代码：&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
-def set_locale<br />
-  accept_lang = request.env[&lsquo;HTTP_ACCEPT_LANGUAGE&rsquo;].scan(/^[a-z]{2}/).first<br />
-  I18n.locale = params[:locale] || session[:locale] || accept_lang || &lsquo;zh&rsquo;<br />
-  session[:locale] = I18n.locale<br />
-end<br />
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def set_locale&lt;br /&gt;
+</span><span class='line'>  accept_lang = request.env['HTTP_ACCEPT_LANGUAGE'].scan(/^[a-z]{2}/).first&lt;br /&gt;
+</span><span class='line'>  I18n.locale = params[:locale] || session[:locale] || accept_lang || 'zh'&lt;br /&gt;
+</span><span class='line'>  session[:locale] = I18n.locale&lt;br /&gt;
+</span><span class='line'>end&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>不过当用户设置locale后，在新建Entry时会报出以下的异常：<br /></p>
+
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>
-</span><span class='line'>&lt;p&gt;不过当用户设置locale后，在新建Entry时会报出以下的异常：&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
-can&rsquo;t convert Symbol into String</p>
-
-<p><p>Extracted source (around line #8):</p>
-
-<p><p>    6:   <p></p>
-
-<pre><code>7:     &lt; %= t(:effective_date) %&gt;&lt;br /&gt;
-8:     &lt; %= f.date_select :effective_date %&gt;
-</code></pre>
-
-<p><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
 <span class='line-number'>6</span>
 <span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>
-</span><span class='line'>&lt;p&gt;查找资料后发现可以通过在date_select中加入order来解决。但日期下拉列表中的月份还有问题，出现的不是正常月份，而是一些随机数。这个可以在locale文件中加入month_names。&lt;br /&gt;
-</span><span class='line'>new.html.erb&lt;br /&gt;
-</span><span class='line'>[code lang=&ldquo;ruby&rdquo;]
-</span><span class='line'>&lt;/p&gt;&lt;p&gt;
+</pre></td><td class='code'><pre><code class=''><span class='line'>can't convert Symbol into String
+</span><span class='line'>
+</span><span class='line'>Extracted source (around line #8):
+</span><span class='line'>
+</span><span class='line'>    6:   &lt;p&gt;
+</span><span class='line'>    7:     &lt; %= t(:effective_date) %&gt;&lt;br /&gt;
+</span><span class='line'>    8:     &lt; %= f.date_select :effective_date %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>查找资料后发现可以通过在date_select中加入order来解决。但日期下拉列表中的月份还有问题，出现的不是正常月份，而是一些随机数。这个可以在locale文件中加入month_names。<br />
+new.html.erb<br /></p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;/p&gt;&lt;p&gt;
 </span><span class='line'>  &lt; %= t(:effective_date) %&gt;&lt;br /&gt;
 </span><span class='line'>  &lt; %= f.date_select :effective_date %&gt;
-</span><span class='line'>&lt;/p&gt;</span></code></pre></td></tr></table></div></figure></p>
+</span><span class='line'>&lt;/p&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p><p>en.yml<br />
+
+<p>en.yml<br /></p>
+
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'>en:&lt;br /&gt;
 </span><span class='line'>  date:&lt;br /&gt;
-</span><span class='line'>    month_names: [~, January, February, &hellip;, November, December]&lt;br /&gt;
-</span><span class='line'>    order: [ :year, :month, :day ]&lt;br /&gt;</span></code></pre></td></tr></table></div></figure></p>
+</span><span class='line'>    month_names: [~, January, February, ..., November, December]&lt;br /&gt;
+</span><span class='line'>    order: [ :year, :month, :day ]&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p><p>zh.yml<br />
+
+<p>zh.yml<br /></p>
+
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'>zh:&lt;br /&gt;
 </span><span class='line'>  date:&lt;br /&gt;
-</span><span class='line'>    month_names: [~, 一月, 二月, &hellip;, 十一月, 十二月]&lt;br /&gt;
-</span><span class='line'>    order: [ :year, :month, :day ]&lt;br /&gt;</span></code></pre></td></tr></table></div></figure></p>
+</span><span class='line'>    month_names: [~, 一月, 二月, ..., 十一月, 十二月]&lt;br /&gt;
+</span><span class='line'>    order: [ :year, :month, :day ]&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+
 </div>
 
 
