@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Tag: Heroku | 乐者为王]]></title>
+  <link href="http://codemany.com/tags/heroku/atom.xml" rel="self"/>
+  <link href="http://codemany.com/"/>
+  <updated>2014-08-03T22:17:08+08:00</updated>
+  <id>http://codemany.com/</id>
+  <author>
+    <name><![CDATA[dohkoos]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[部署Qianbao到Heroku时遇到的一些问题]]></title>
+    <link href="http://codemany.com/blog/2013/05/19/some-problems-when-deploying-qianbao-to-heroku/"/>
+    <updated>2013-05-19T06:25:33+08:00</updated>
+    <id>http://codemany.com/blog/2013/05/19/some-problems-when-deploying-qianbao-to-heroku</id>
+    <content type="html"><![CDATA[<p>Heroku现在已经是纯粹的只读PaaS了，也就是说以前还支持的SQlite现在也不能使用了。因此部署到Heroku上的Rails应用需要把使用的数据库改成PostgreSQL，并且要关闭assets的预编译功能。</p>
+
+<p>修改Gemfile，将SQLite换成PostgreSQL：
+```</p>
+
+<h1>gem &lsquo;sqlite3&rsquo;</h1>
+
+<p>gem &lsquo;pg&rsquo;
+```</p>
+
+<p>在config/application.rb中添加：
+<code>
+config.assets.initialize_on_precompile = false
+</code></p>
+
+<p>股票功能需要导入交割单文件。因为导入后的文本文件不再使用，所以可以把上传路径由public/uploads改为tmp。这样就避免了不能写文件到public目录的问题。</p>
+
+<p>应用上传后运行时出现异常，使用heroku logs -t命令查看日志发现有如下错误：
+<code>
+Error: column "stocks.share_name" must appear in the GROUP BY clause or be used in an aggregate function
+</code></p>
+
+<p>这是因为在controller中有这么一行代码：
+<code>
+current_user.stocks.select("share_code, share_name, sum(actual_amount) as amount").group("share_code")
+</code></p>
+
+<p>在PostgreSQL中这会有问题。比如下面的数据表：
+<img src="/uploads/qianbao-stocks-table.png" title="qianbao-stocks-table" ></p>
+
+<p>执行上面的SQL语句后，share_name的值到底是取Ruby呢还是ST Ruby？解决这个问题的方法是使用aggregate函数。
+<code>
+current_user.stocks.select("share_code, max(share_name) as share_name, sum(actual_amount) as amount").group("share_code")
+</code></p>
+
+<p>PostgreSQL还有个问题，就是decimal类型的字段，取出来的值是字符串类型。例如：
+<code>
+if stock.amount &lt; 0
+</code></p>
+
+<p>它会报以下错误：
+<code>
+ArgumentError (comparison of String with 0 failed)
+</code></p>
+
+<p>这个可以通过to_f函数解决：
+<code>
+if stock.amount.to_f &lt; 0
+</code></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[no such file to load -- xxxxxx (MissingSourceFile) on Heroku]]></title>
+    <link href="http://codemany.com/blog/2011/05/28/no-such-file-to-load-xxxxxx-missingsourcefile-on-heroku/"/>
+    <updated>2011-05-28T23:08:16+08:00</updated>
+    <id>http://codemany.com/blog/2011/05/28/no-such-file-to-load-xxxxxx-missingsourcefile-on-heroku</id>
+    <content type="html"><![CDATA[<p>终于解决掉了困扰我多日的一个问题。</p>
+
+<p>部署在Heroku上的项目，在controller中require某个文件时总是出现no such file to load &mdash; idcard (MissingSourceFile)。</p>
+
+<p>本地机器上运行的好好的，在Heroku上就出现Application error，百思不得其解，网上也没有找到类似问题的解决方法。</p>
+
+<p>咨询Heroku的技术支持，几封邮件交流下来对方也没有办法（感觉Heroku的技术支持不咋的）。</p>
+
+<p>今天把问题解决掉后再回过头来看，发现这其实是个非常简单的问题，就是Linux和Windows对待文件名大小写的差异。因为在Windows上是不区分大小写的，所以在controller中用require &lsquo;calc'来引入Calc.rb时是成功的，但是在Linux下就不可以。将文件名Calc.rb改成calc.rb再push到Heroku就把问题解决了。</p>
+
+<p>就这么个问题竟然让我思考了几天，还真是郁闷啊！</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[如何导入/导出Heroku中应用的数据]]></title>
+    <link href="http://codemany.com/blog/2009/12/27/how-to-import-or-export-data-from-the-application-in-heroku/"/>
+    <updated>2009-12-27T20:43:03+08:00</updated>
+    <id>http://codemany.com/blog/2009/12/27/how-to-import-or-export-data-from-the-application-in-heroku</id>
+    <content type="html"><![CDATA[<p>导入/导出Heroku上的数据需要安装Taps包：
+<code>
+gem install taps
+</code></p>
+
+<p>导入数据到Heroku里：
+<code>
+heroku db:push
+</code></p>
+
+<p>导出数据到本地：
+<code>
+heroku db:pull
+</code></p>
+
+<p>其中导入/导出数据由config/database.yml配置设定。</p>
+
+<p>Heroku还支持主机到主机的数据库传输，具体细节可以参考<a href="http://docs.heroku.com/taps">这里</a>。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[如何在Heroku上托管Rails应用]]></title>
+    <link href="http://codemany.com/blog/2009/12/18/how-to-host-rails-applications-in-heroku/"/>
+    <updated>2009-12-18T14:27:21+08:00</updated>
+    <id>http://codemany.com/blog/2009/12/18/how-to-host-rails-applications-in-heroku</id>
+    <content type="html"><![CDATA[<p>要使用Heroku，必须先在其官网注册一个账号。</p>
+
+<p>1、在本机上安装Heroku的gem包：
+<code>
+gem install heroku
+</code></p>
+
+<p>2、提交代码到Heroku需要ssh，可以使用ssh-keygen先产生一个公钥：
+<code>
+ssh-keygen -t rsa
+</code></p>
+
+<p>3、然后通过下面的命令把公钥加入到Heroku：
+<code>
+heroku keys:add
+</code></p>
+
+<p>4、创建Rails项目并加入Git版本控制：
+<code>
+rails appname # 不要使用MySQL数据库，因为Heroku暂时还不支持它
+cd appname
+git init
+git add .
+git commit -m "Initial project"
+</code></p>
+
+<p>5、在Heroku上创建这个项目：
+<code>
+heroku create [appname]
+</code></p>
+
+<p>注意：在创建项目时会要求输入Email和密码（即注册Heroku时输入的Email和密码），以便创建~/.heroku/credentials文件，这个文件记录了你输入的用户名和密码。</p>
+
+<p>如果已经在Heroku上创建了这个项目，那么可以使用下列命令来增加一个远程服务器端，以后提交代码的时候只需要使用heroku别名即可：
+<code>
+git remote add heroku git@heroku.com:appname.git
+</code></p>
+
+<p>6、将本地的代码部署到Heroku上：
+<code>
+git push heroku master
+</code></p>
+
+<p>7、最后做一个数据库迁移：
+<code>
+heroku rake db:migrate
+</code></p>
+
+<p>现在就可以在浏览器里输入<a href="http://appname.heroku.com%E6%9D%A5%E8%AE%BF%E9%97%AE%E4%BD%A0%E7%9A%84%E5%BA%94%E7%94%A8%E4%BA%86%E3%80%82">http://appname.heroku.com%E6%9D%A5%E8%AE%BF%E9%97%AE%E4%BD%A0%E7%9A%84%E5%BA%94%E7%94%A8%E4%BA%86%E3%80%82</a></p>
+]]></content>
+  </entry>
+  
+</feed>

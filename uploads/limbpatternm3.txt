@@ -1,0 +1,74 @@
+下面的算法的源程序，是针对Bayer表的，因为它是个常用的表，我们不再利用Limb公式，而是直接给出。针对M4阵的算法是类似的，不同的地方在于，要用Limb公式得到M4阵，灰度也不用右移2位。 
+要注意的是，为了处理的方便，我们的结果图仍采用256级灰度图，不过只用到了0和255两种灰度。
+BYTE BayerPattern[8][8]={0,32,8,40,2,34,10,42,
+					 48,16,56,24,50,18,58,26,
+					 12,44,4,36,14,46,6,38,
+					 60,28,52,20,62,30,54,22,
+					 3,35,11,43,1,33,9,41,
+					 51,19,59,27,49,17,57,25,
+					 15,47,7,39,13,45,5,37,
+					 63,31,55,23,61,29,53,21};
+BOOL LimbPatternM3(HWND hWnd)
+{
+DWORD                BufSize;
+LPBITMAPINFOHEADER  lpImgData;
+LPSTR                  lpPtr;
+HLOCAL                hTempImgData;
+LPBITMAPINFOHEADER  lpTempImgData;
+LPSTR                  lpTempPtr;
+HDC                    hDc;
+HFILE                  hf;
+LONG                  x,y;
+unsigned char            num;
+	
+BufSize=bf.bfSize-sizeof(BITMAPFILEHEADER);//要开的缓冲区大小
+if((hTempImgData=LocalAlloc(LHND,BufSize))==NULL)
+{
+    	MessageBox(hWnd,"Error alloc memory!","Error 
+Message",MB_OK|
+MB_ICONEXCLAMATION);
+    return FALSE;
+}
+lpImgData=(LPBITMAPINFOHEADER)GlobalLock(hImgData);    
+lpTempImgData=(LPBITMAPINFOHEADER)LocalLock(hTempIm
+gData);
+//拷贝头信息和位图数据
+memcpy(lpTempImgData,lpImgData,BufSize);
+
+for(y=0;y<bi.biHeight;y++){
+	//lpPtr为指向原图位图数据的指针
+	lpPtr=(char *)lpImgData+(BufSize-LineBytes-y*LineBytes);
+	//lpTempPtr为指向新图位图数据的指针
+	lpTempPtr=(char *)lpTempImgData+(BufSize-LineBytes-
+y*LineBytes);
+	for(x=0;x<bi.biWidth;x++){
+		num=(unsigned char)*lpPtr++;
+		if ( (num>>2) > BayerPattern[y&7][x&7]) //右移两位后做
+比较
+			*(lpTempPtr++)=(unsigned char)255; //打白点
+		else *(lpTempPtr++)=(unsigned char)0; //打黑点
+	}
+}
+	
+if(hBitmap!=NULL)
+    DeleteObject(hBitmap);
+hDc=GetDC(hWnd);	
+//形成新的位图
+hBitmap=CreateDIBitmap(hDc,
+	(LPBITMAPINFOHEADER)lpTempI
+mgData, (LONG)CBM_INIT,
+(LPSTR)lpTempImgData+sizeof(BITMAPINFOHEADER) 
++NumColors*sizeof(RGBQUAD),
+   				(LPBITMAPINFO)lpTempImgData, 
+DIB_RGB_COLORS);
+hf=_lcreat("c:\\limbm3.bmp",0);
+_lwrite(hf,(LPSTR)&bf,sizeof(BITMAPFILEHEADER)); 
+_lwrite(hf,(LPSTR)lpTempImgData,BufSize);
+_lclose(hf);
+//释放内存和资源
+ReleaseDC(hWnd,hDc);
+LocalUnlock(hTempImgData);
+LocalFree(hTempImgData);
+GlobalUnlock(hImgData);
+return TRUE;
+}

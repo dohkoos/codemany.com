@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Tag: OAuth | 乐者为王]]></title>
+  <link href="http://codemany.com/tags/oauth/atom.xml" rel="self"/>
+  <link href="http://codemany.com/"/>
+  <updated>2014-08-03T22:17:08+08:00</updated>
+  <id>http://codemany.com/</id>
+  <author>
+    <name><![CDATA[dohkoos]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[构建支持OAuth的新浪微博桌面客户端]]></title>
+    <link href="http://codemany.com/blog/2011/05/08/sina-build-support-for-oauth-microblogging-desktop-clients/"/>
+    <updated>2011-05-08T15:22:11+08:00</updated>
+    <id>http://codemany.com/blog/2011/05/08/sina-build-support-for-oauth-microblogging-desktop-clients</id>
+    <content type="html"><![CDATA[<p><p>要使用OAuth，首先要去新浪微博注册一个自己的微博应用。注册之后，会得到微博应用的Consumer key和Consumer secret，都是一个字符串。之后就可以进行OAuth的认证过程了。</p>
+
+<p><p>从<a href="http://code.google.com/p/sina-weibo4j/"><a href="http://code.google.com/p/sina-weibo4j/">http://code.google.com/p/sina-weibo4j/</a></a>下载新浪微博的Java SDK包，当然也可以在<a href="http://open.weibo.com/wiki/index.php/SDK"><a href="http://open.weibo.com/wiki/index.php/SDK">http://open.weibo.com/wiki/index.php/SDK</a></a>下载。推荐使用前者，已经打好包了。</p>
+
+<p>```
+import java.io.BufferedReader;<br />
+import java.io.File;<br />
+import java.io.FileInputStream;<br />
+import java.io.FileOutputStream;<br />
+import java.io.IOException;<br />
+import java.io.InputStream;<br />
+import java.io.InputStreamReader;<br />
+import java.io.OutputStream;<br />
+import java.util.Properties;<br />
+import java.util.PropertyResourceBundle;</p>
+
+<p><p>import weibo4j.Weibo;<br />
+import weibo4j.WeiboException;<br />
+import weibo4j.http.AccessToken;<br />
+import weibo4j.http.RequestToken;</p>
+
+<p><p>public class UpdateStatus {<br />
+  private static final String ACCESS_SECRET = &ldquo;access_secret&rdquo;;<br />
+  private static final String ACCESS_TOKEN = &ldquo;access_token&rdquo;;<br />
+  private static final String FILE_NAME = &ldquo;sina_token.properties&rdquo;;</p>
+
+<p><p>  public static void main(String[] args) {<br /></p>
+
+<pre><code>// 在这里填写在应用申请中得到的App Key和App Secret&lt;br /&gt;
+System.setProperty("weibo4j.oauth.consumerKey", YOUR_CONSUMER_KEY);&lt;br /&gt;
+System.setProperty("weibo4j.oauth.consumerSecret", YOUR_CONSUMER_SECRET);
+</code></pre>
+
+<p><p>    Weibo weibo = new Weibo();</p>
+
+<p><p>    try {<br /></p>
+
+<pre><code>  // 读取存储起来的Access Token &lt;br /&gt;
+  AccessToken accessToken = loadAccessToken();&lt;br /&gt;
+  if (accessToken == null) {&lt;br /&gt;
+    String backUrl = "http://zhubabo.appspot.com";
+</code></pre>
+
+<p><p>        // 请求Request Token（未授权令牌）<br /></p>
+
+<pre><code>    RequestToken requestToken = weibo.getOAuthRequestToken(backUrl);&lt;br /&gt;
+    System.out.println("Got request token...");&lt;br /&gt;
+    System.out.println("Request token: " + requestToken.getToken());&lt;br /&gt;
+    System.out.println("Request token secret: " + requestToken.getTokenSecret());
+</code></pre>
+
+<p><p>        // 将以下打印出的授权链接在浏览器中打开，完成应用授权，会自动跳转到<br /></p>
+
+<pre><code>    // 指定的callback url，并将oauth_verifier一起返回&lt;br /&gt;
+    System.out.println("Open the following url in a browser");&lt;br /&gt;
+    System.out.println(" http://api.t.sina.com.cn/oauth/authorize?oauth_token=" + requestToken.getToken());
+</code></pre>
+
+<p><p>        // 输入上面得到的oauth_verifier的值，取得Access Token，这个Token是长期有效的<br /></p>
+
+<pre><code>    System.out.println("please input verifier:");&lt;br /&gt;
+    String verifier = readLine();&lt;br /&gt;
+    accessToken = weibo.getOAuthAccessToken(&lt;br /&gt;
+        requestToken.getToken(),&lt;br /&gt;
+        requestToken.getTokenSecret(),&lt;br /&gt;
+        verifier);
+</code></pre>
+
+<p><p>        // 将Access Token保存下来，以后就可以直接通过此Token向新浪围脖发消息了<br /></p>
+
+<pre><code>    storeAccessToken(accessToken.getToken(), accessToken.getTokenSecret());&lt;br /&gt;
+  }
+</code></pre>
+
+<p><p>      weibo.setToken(accessToken.getToken(), accessToken.getTokenSecret());</p>
+
+<p><p>      System.out.println(&ldquo;Input message to sina:&rdquo;);<br /></p>
+
+<pre><code>  String message = readLine();&lt;br /&gt;
+  while (!"exit".equals(message.trim())) {&lt;br /&gt;
+    weibo.updateStatus(message);&lt;br /&gt;
+    System.out.println("Input message to sina:");&lt;br /&gt;
+    message = readLine();&lt;br /&gt;
+  }&lt;br /&gt;
+} catch (WeiboException e) {&lt;br /&gt;
+  e.printStackTrace();&lt;br /&gt;
+} catch (IOException e) {&lt;br /&gt;
+  e.printStackTrace();&lt;br /&gt;
+}&lt;br /&gt;
+</code></pre>
+
+<p>  }</p>
+
+<p><p>  private static void storeAccessToken(String token, String tokenSecret) throws IOException {<br /></p>
+
+<pre><code>OutputStream out = new FileOutputStream(new File(FILE_NAME));&lt;br /&gt;
+Properties p = new Properties();&lt;br /&gt;
+p.setProperty(ACCESS_TOKEN, token);&lt;br /&gt;
+p.setProperty(ACCESS_SECRET, tokenSecret);&lt;br /&gt;
+p.store(out, "sina access token");&lt;br /&gt;
+out.flush();&lt;br /&gt;
+out.close();&lt;br /&gt;
+</code></pre>
+
+<p>  }</p>
+
+<p><p>  private static AccessToken loadAccessToken() throws IOException {<br /></p>
+
+<pre><code>File f = new File(FILE_NAME);&lt;br /&gt;
+if (!f.exists()) {&lt;br /&gt;
+  return null;&lt;br /&gt;
+}&lt;br /&gt;
+InputStream in = new FileInputStream(f);&lt;br /&gt;
+PropertyResourceBundle bundle = new PropertyResourceBundle(in);&lt;br /&gt;
+in.close();&lt;br /&gt;
+return new AccessToken(bundle.getString(ACCESS_TOKEN), bundle.getString(ACCESS_SECRET));&lt;br /&gt;
+</code></pre>
+
+<p>  }</p>
+
+<p><p>  private static String readLine() throws IOException {<br /></p>
+
+<pre><code>BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));&lt;br /&gt;
+byte[] bs = reader.readLine().getBytes("gbk");&lt;br /&gt;
+return new String(bs);&lt;br /&gt;
+</code></pre>
+
+<p>  }<br />
+}
+```</p>
+
+<p><p>参考资料：
+<a href="http://www.ibm.com/developerworks/cn/web/wa-oauth1">通过OAuth访问社会网络Web站点，第1部分: 构建支持OAuth的桌面Twitter客户端</a>
+<a href="http://www.williamlong.info/archives/2185.html">在Twitter应用中使用OAuth</a>
+<a href="http://tigerszdf.blog.163.com/blog/static/459551332010725772998/">Java程序向新浪微博发送图片</a>
+<a href="http://bbs.chinaunix.net/viewthread.php?tid=1871053">使用OAuth向新浪微博发消息</a>
+<a href="http://www.cnblogs.com/liuxinet/archive/2011/01/25/1944752.html">新浪微博开放平台OAuth授权解决方案（含代码）</a></p></p>
+]]></content>
+  </entry>
+  
+</feed>

@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Tag: devise | 乐者为王]]></title>
+  <link href="http://codemany.com/tags/devise/atom.xml" rel="self"/>
+  <link href="http://codemany.com/"/>
+  <updated>2014-08-03T22:17:08+08:00</updated>
+  <id>http://codemany.com/</id>
+  <author>
+    <name><![CDATA[dohkoos]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[用Rails 3.2打造简单记账应用]]></title>
+    <link href="http://codemany.com/blog/2012/04/18/to-create-a-simple-accounting-application-a-using-rails-32/"/>
+    <updated>2012-04-18T07:49:27+08:00</updated>
+    <id>http://codemany.com/blog/2012/04/18/to-create-a-simple-accounting-application-a-using-rails-32</id>
+    <content type="html"><![CDATA[<p><p>Rails已经到3.2版本了，和以前2.3版本有了很大的不同，决定把原来老版本的记账应用重新写一遍。</p>
+
+<p><p>我们先来定义一下什么是最简单的记账应用：<br />
+1. 可以输入花钱的记录<br />
+2. 可以修改输入了的记录<br />
+3. 可以删除输入了的记录<br />
+4. 可以显示所有的记录</p>
+
+<p><p>下面我们就开始动手吧！<br />
+<code>
+rails new qianbao&lt;br /&gt;
+cd qianbao&lt;br /&gt;
+rails g scaffold entry amount:decimal tags:string effective_date:date&lt;br /&gt;
+rails g controller home index&lt;br /&gt;
+</code></p>
+
+<p><p>删除public/index.html，在config/routes.rb中添加根路由：<br />
+<code>
+root :to =&gt; 'home#index'&lt;br /&gt;
+</code></p>
+
+<p><p>现在要给应用加上一个认证系统（注册、激活、登录、登出），通过devise（<a href="https://github.com/plataformatec/devise%EF%BC%89%E6%8F%92%E4%BB%B6%E5%AE%9E%E7%8E%B0%E3%80%82">https://github.com/plataformatec/devise%EF%BC%89%E6%8F%92%E4%BB%B6%E5%AE%9E%E7%8E%B0%E3%80%82</a></p>
+
+<p><p>在Gemfile中添加：<br />
+<code>
+gem 'devise'&lt;br /&gt;
+</code></p>
+
+<p><p>然后执行下列命令：<br />
+<code>
+bundle install&lt;br /&gt;
+rails g devise:install&lt;br /&gt;
+rails g devise user&lt;br /&gt;
+rails g devise:views&lt;br /&gt;
+</code></p>
+
+<p><p>创建一个migration，把user和entry关联起来：<br />
+```
+class AddUserToEntry &lt; ActiveRecord::Migration<br />
+  def change<br /></p>
+
+<pre><code>add_column :entries, :user_id, :integer
+</code></pre>
+
+<p><p>    add_index :entries, :user_id<br />
+  end<br />
+end<br />
+```</p>
+
+<p><p>修改Entry和User模型：<br />
+```
+class Entry &lt; ActiveRecord::Base<br />
+  &hellip;<br />
+  validates :effective_date, :presence => true<br />
+  validates :amount,         :presence => true,<br /></p>
+
+<pre><code>                         :numericality =&gt; {:greater_than =&gt; 0.0},&lt;br /&gt;
+                         :format =&gt; {:with =&gt; /^\d+??(?:\.\d{0,2})?$/}&lt;br /&gt;
+</code></pre>
+
+<p>  validates :tags,           :presence => true,<br /></p>
+
+<pre><code>                         :length =&gt; { :within =&gt; 1..255 }&lt;br /&gt;
+                         &lt;br /&gt;
+</code></pre>
+
+<p>  belongs_to :user<br />
+```</p>
+
+<p><code>
+class User &lt; ActiveRecord::Base&lt;br /&gt;
+  ...&lt;br /&gt;
+  has_many :users&lt;br /&gt;
+</code></p>
+
+<p><p>修改app/views/home/index.html.erb为如下内容：<br />
+```
+<h1>Welcom to Qianbao!</h1></p>
+
+<p><p>&lt;% if user_signed_in? %><br />
+  <p><br /></p>
+
+<pre><code>&lt;strong&gt;&lt;%=link_to current_user.email, edit_user_registration_path %&gt;&lt;/strong&gt;&lt;br /&gt;
+&lt;%= link_to 'Logout', destroy_user_session_path, :method =&gt; :delete %&gt;&lt;br /&gt;
+</code></pre>
+
+<p>  </p><br />
+  &lt;%= link_to &ldquo;All Entries&rdquo;, entries_path %><br />
+&lt;% else %><br />
+  <p><br /></p>
+
+<pre><code>&lt;strong&gt;You are currently not logged in.&lt;/strong&gt;&lt;br /&gt;
+&lt;%= link_to 'Login', new_user_session_path %&gt; or&lt;br /&gt;
+&lt;%= link_to 'Sign up', new_user_registration_path %&gt;&lt;br /&gt;
+</code></pre>
+
+<p>  </p><br />
+&lt;% end %><br />
+```</p>
+
+<p><p>修改app/controller/entries_controller.rb：<br />
+```
+class EntriesController &lt; ApplicationController<br />
+  before_filter :authenticate_user!</p>
+
+<p><p>  # GET /entries<br />
+  # GET /entries.json<br />
+  def index<br /></p>
+
+<pre><code>@entries = current_user.entries
+</code></pre>
+
+<p><p>    respond_to do |format|<br /></p>
+
+<pre><code>  format.html # index.html.erb&lt;br /&gt;
+  format.json { render json: @entries }&lt;br /&gt;
+end&lt;br /&gt;
+</code></pre>
+
+<p>  end</p>
+
+<p><p>  # GET /entries/1<br />
+  # GET /entries/1.json<br />
+  def show<br /></p>
+
+<pre><code>@entry = current_user.entries.find(params[:id])
+</code></pre>
+
+<p><p>    respond_to do |format|<br /></p>
+
+<pre><code>  format.html # show.html.erb&lt;br /&gt;
+  format.json { render json: @entry }&lt;br /&gt;
+end&lt;br /&gt;
+</code></pre>
+
+<p>  end</p>
+
+<p><p>  # GET /entries/new<br />
+  # GET /entries/new.json<br />
+  def new<br /></p>
+
+<pre><code>@entry = current_user.entries.new
+</code></pre>
+
+<p><p>    respond_to do |format|<br /></p>
+
+<pre><code>  format.html # new.html.erb&lt;br /&gt;
+  format.json { render json: @entry }&lt;br /&gt;
+end&lt;br /&gt;
+</code></pre>
+
+<p>  end</p>
+
+<p><p>  # GET /entries/1/edit<br />
+  def edit<br /></p>
+
+<pre><code>@entry = current_user.entries.find(params[:id])&lt;br /&gt;
+</code></pre>
+
+<p>  end</p>
+
+<p><p>  # POST /entries<br />
+  # POST /entries.json<br />
+  def create<br /></p>
+
+<pre><code>@entry = current_user.entries.new(params[:entry])&lt;br /&gt;
+@entry.user = current_user
+</code></pre>
+
+<p><p>    respond_to do |format|<br /></p>
+
+<pre><code>  if @entry.save&lt;br /&gt;
+    format.html { redirect_to @entry, notice: 'Entry was successfully created.' }&lt;br /&gt;
+    format.json { render json: @entry, status: :created, location: @entry }&lt;br /&gt;
+  else&lt;br /&gt;
+    format.html { render action: "new" }&lt;br /&gt;
+    format.json { render json: @entry.errors, status: :unprocessable_entity }&lt;br /&gt;
+  end&lt;br /&gt;
+end&lt;br /&gt;
+</code></pre>
+
+<p>  end</p>
+
+<p><p>  # PUT /entries/1<br />
+  # PUT /entries/1.json<br />
+  def update<br /></p>
+
+<pre><code>@entry = current_user.entries.find(params[:id])
+</code></pre>
+
+<p><p>    respond_to do |format|<br /></p>
+
+<pre><code>  if @entry.update_attributes(params[:entry])&lt;br /&gt;
+    format.html { redirect_to @entry, notice: 'Entry was successfully updated.' }&lt;br /&gt;
+    format.json { head :no_content }&lt;br /&gt;
+  else&lt;br /&gt;
+    format.html { render action: "edit" }&lt;br /&gt;
+    format.json { render json: @entry.errors, status: :unprocessable_entity }&lt;br /&gt;
+  end&lt;br /&gt;
+end&lt;br /&gt;
+</code></pre>
+
+<p>  end</p>
+
+<p><p>  # DELETE /entries/1<br />
+  # DELETE /entries/1.json<br />
+  def destroy<br /></p>
+
+<pre><code>@entry = current_user.entries.find(params[:id])&lt;br /&gt;
+@entry.destroy
+</code></pre>
+
+<p><p>    respond_to do |format|<br /></p>
+
+<pre><code>  format.html { redirect_to entries_url }&lt;br /&gt;
+  format.json { head :no_content }&lt;br /&gt;
+end&lt;br /&gt;
+</code></pre>
+
+<p>  end<br />
+end<br />
+```</p>
+
+<p><p>执行以下命令启动应用：<br />
+<code>
+rake db:migrate&lt;br /&gt;
+rails s&lt;br /&gt;
+</code></p>
+
+<p><p>以前的版本用的css框架是<a href="http://blueprintcss.org/">Blueprint</a>，这次使用比它更方便快捷的<a href="https://github.com/twitter/bootstrap">Bootstrap</a>。Bootstrap建立在less上，有个<a href="https://github.com/metaskills/less-rails-bootstrap">less-rails-bootstrap</a>，不过在安装libv8时竟然要提示缺少Python，拜托！我用的是Ruby，要我装Python，啥意思啊！还是找个sass版的Bootstrap吧。</p>
+
+<p><p>下载<a href="https://github.com/jlong/sass-twitter-bootstrap">sass-twitter-bootstrap</a>：<br />
+<code>
+git clone https://github.com/jlong/sass-twitter-bootstrap.git&lt;br /&gt;
+</code></p>
+
+<p><p>将sass-twitter-bootstrap/lib中的文件拷贝到app/assets/stylesheets/twitter目录下。然后将app/assets/stylesheets/application.css中的<br />
+<code>
+*= require_tree .&lt;br /&gt;
+[/code]&lt;br /&gt;
+修改成&lt;br /&gt;
+</code>
+*= require twitter/bootstrap<br />
+```</p>
+
+<p><p>再在文件末尾添加：<br />
+<code>
+body { padding-top: 60px; }&lt;br /&gt;
+</code></p>
+
+<p><p>现在就可以使用Bootstrap来布局美化应用了。</p>
+
+<p><p><a href="https://github.com/dohkoos/qianbao">代码下载</a>
+</p></p>
+]]></content>
+  </entry>
+  
+</feed>

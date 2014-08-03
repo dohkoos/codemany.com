@@ -1,0 +1,58 @@
+下面的这段程序实现了bmp2txt的功能，结果存到文件bmp2txt.txt中。
+////////////////////////////////////////////////////////////////
+BOOL Bmp2Txt(HWND hWnd)
+{
+DWORD              OffBits,BufSize;
+LPBITMAPINFOHEADER lpImgData;
+LPSTR              lpPtr;
+HFILE              hf;
+int				   i, j, k,h,tint,grayindex;
+char               tchar;
+int	               TransHeight, TransWidth;
+
+//先用起泡排序，将灰度值按从小到大的顺序排列，同时调整对应的字符位置
+for(i=0;i<94;i++)
+for(j=i+1;j<95;j++){
+			if(gr[i]>gr[j]){
+				tchar=ch[i],tint=gr[i];
+				ch[i]=ch[j],gr[i]=gr[j];
+				ch[j]=tchar,gr[j]=tint;
+			}
+		}
+//OffBits为BITMAPINFOHEADER结构长度加调色板的大小
+OffBits=bf.bfOffBits-sizeof(BITMAPFILEHEADER);
+BufSize=bf.bfSize-sizeof(BITMAPFILEHEADER); //要开的缓冲区
+的大小
+lpImgData=(LPBITMAPINFOHEADER)GlobalLock(hImgData);
+	
+TransWidth = bi.biWidth/8; //每行字符的个数
+TransHeight = bi.biHeight/16;  //共有多少行字符
+hf=_lcreat("c:\\bmp2txt.txt",0);
+
+for(i=0;i<TransHeight;i++){	
+		for(j=0;j<TransWidth;j++){
+			grayindex=0;
+			for(k=0;k<16;k++)
+				for(h=0;h<8;h++){ //求出8*16小块中各像素灰度之和
+					lpPtr=(char *)lpImgData+BufSize-LineBytes-
+(i*16+k)*LineBytes+
+j*8+h;
+					grayindex+=(unsigned char)*lpPtr;
+				}
+			grayindex/=16*8; //除以整个面积
+			grayindex=gr[94]*grayindex/255;
+			k=0;
+			while(gr[k+1]<grayindex)
+				k++;  //寻找灰度最接近的字符
+			_lwrite(hf,(char *)&ch[k],sizeof(char));   //将该字符写入文件中
+		}
+		tchar=(char)13;
+		_lwrite(hf,(char *)&tchar,sizeof(char)); 
+		tchar=(char)10;
+		_lwrite(hf,(char *)&tchar,sizeof(char));  //每行加一个回车换行符
+	}
+	_lclose(hf);
+	GlobalUnlock(hImgData);
+	return TRUE;
+}
+上面的程序中，只考虑了8*16小块的平均灰度，而没有考虑小块内部像素的灰度分布。更精确的方法是将图象8*16小块和字符8*16小块每两个对应点之间相减，做平方误差计算，找出有最小平方误差的那个字符，来代表这一小块图象。显然，计算量要比刚才的大得多。这里我们就不给出程序了，有兴趣的读者可以自己实现。

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Tag: Firefox | 乐者为王]]></title>
+  <link href="http://codemany.com/tags/firefox/atom.xml" rel="self"/>
+  <link href="http://codemany.com/"/>
+  <updated>2014-08-03T22:17:08+08:00</updated>
+  <id>http://codemany.com/</id>
+  <author>
+    <name><![CDATA[dohkoos]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[导入UC Browser书签到Firefox中]]></title>
+    <link href="http://codemany.com/blog/2011/07/02/import-bookmarks-into-firefox-uc-browser/"/>
+    <updated>2011-07-02T16:03:41+08:00</updated>
+    <id>http://codemany.com/blog/2011/07/02/import-bookmarks-into-firefox-uc-browser</id>
+    <content type="html"><![CDATA[<p><p>UC Browser保存的书签后缀名是aucf，不能直接导入到Firefox中，必须要把aucf格式转成Firefox的html格式才行。</p>
+
+<p><p>先把UC Browser和Firefox的书签格式都分析了一下。Firefox的是纯html文本格式，非常简单。UC的是二进制格式，文件以字符串android开头，接着是n个byte的信息，没有分析出来是啥，然后4个byte是书签的数目，再接着的n个byte没去分析，再下来就是每个书签的信息了。书签信息分两部分：名称和地址。都是第1个byte说明后面字符串的长度，字符串以00结尾。<br />
+<code>
+android &lt;- 文件头&lt;br /&gt;
+xxx...   &lt;- n个byte&lt;br /&gt;
+xxxx    &lt;- 保存的书签数目&lt;br /&gt;
+xxx...   &lt;- n个byte&lt;br /&gt;
+xx       &lt;- 书签名称长度&lt;br /&gt;
+xxx...   &lt;- 书签名称&lt;br /&gt;
+xx       &lt;- 书签地址长度&lt;br /&gt;
+xxx...   &lt;- 书签地址&lt;br /&gt;
+</code></p>
+
+<p><p>用文本文件打开时可以查看英文字符。书签的地址通常由英文字母组成，所以我们不需要再去分析整个aucf文件的格式，只要把所有书签地址提取出来就行了。下面就是完整的Ruby代码：<br />
+```</p>
+
+<h1>aucf2ff.rb<br /></h1>
+
+<p>if ARGV.length != 1 then<br />
+  puts &ldquo;USAGE: ruby aucf2ff.rb ucfavorite&rdquo;<br />
+  exit<br />
+end</p>
+
+<p><p>ucfavorite = ARGV[0]<br />
+if !FileTest.exist?(ucfavorite) then<br />
+  puts &ldquo;File #{ucfavorite} was not found&rdquo;<br />
+  exit<br />
+end</p>
+
+<p><p>ff = File.new(ucfavorite.gsub(&ldquo;.aucf&rdquo;, &ldquo;_ff.html&rdquo;), &ldquo;w&rdquo;)<br />
+ff.puts &lsquo;&lt;!DOCTYPE NETSCAPE-Bookmark-file-1>&rsquo;<br />
+ff.puts &lsquo;<!-- This is an automatically generated file.'<br />
+ff.puts &rsquo;     It will be read and overwritten.&lsquo;<br />
+ff.puts &rsquo;     DO NOT EDIT! &mdash;>&lsquo;<br />
+ff.puts &rsquo;<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">&lsquo;<br />
+ff.puts &rsquo;<TITLE>Bookmarks</TITLE>&lsquo;<br />
+ff.puts &rsquo;<H1>Bookmarks Menu</H1>&lsquo;<br />
+ff.puts<br />
+ff.puts &rsquo;<DL><p>&lsquo;<br />
+ff.puts &rsquo;    <DT><H3>UC Bookmarks</H3>&lsquo;<br />
+ff.puts &rsquo;    <DL><p>'</p>
+
+<p><p>buffer = IO.read(ucfavorite)<br />
+index = buffer.index(&ldquo;<a href="http://">http://</a>&rdquo;)<br />
+favorites = buffer.slice(index, buffer.length &ndash; index)<br />
+favorites.split(&ldquo;<a href="http://">http://</a>&rdquo;).each do |fav|<br />
+  uri = &lsquo;&rsquo;<br />
+  fav.each_byte do |c|<br /></p>
+
+<pre><code>break if c == 00&lt;br /&gt;
+uri += c.chr&lt;br /&gt;
+</code></pre>
+
+<p>  end<br />
+  if (!uri.empty?) then<br /></p>
+
+<pre><code>ff.puts '&lt;DT&gt;&lt;A HREF="http://' + uri + '" LAST_CHARSET="utf-8"&gt;' + uri + '&lt;/A&gt;'&lt;br /&gt;
+</code></pre>
+
+<p>  end<br />
+end</p>
+
+<p><p>ff.puts &lsquo;    </DL><p>&rsquo;<br />
+ff.puts &lsquo;</DL><p>&rsquo;<br />
+ff.close<br />
+```</p>
+
+<p><p>通过上面的程序就可以将UC Browser的书签转成Firefox格式，然后在Firefox中导入书签就可以了。</p></p>
+]]></content>
+  </entry>
+  
+</feed>

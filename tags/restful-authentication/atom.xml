@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Tag: restful_authentication | 乐者为王]]></title>
+  <link href="http://codemany.com/tags/restful-authentication/atom.xml" rel="self"/>
+  <link href="http://codemany.com/"/>
+  <updated>2014-08-03T22:17:08+08:00</updated>
+  <id>http://codemany.com/</id>
+  <author>
+    <name><![CDATA[dohkoos]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[修改restful_authentication实现用email登录]]></title>
+    <link href="http://codemany.com/blog/2011/03/08/login-with-the-email-changes-to-achieve-restful-authentication/"/>
+    <updated>2011-03-08T04:02:36+08:00</updated>
+    <id>http://codemany.com/blog/2011/03/08/login-with-the-email-changes-to-achieve-restful-authentication</id>
+    <content type="html"><![CDATA[<p><p>如果要使用用户名和email并行的登录方式，那么只要在models/user.rb中添加一行代码就可以了（粗体为添加部分）：<br />
+<code>
+def self.authenticate(login, password)&lt;br /&gt;
+  return nil if login.blank? || password.blank?&lt;br /&gt;
+  u = find_by_login(login.downcase) # need to get the salt&lt;br /&gt;
+  u ||= find_by_email(login.downcase)&lt;br /&gt;
+  u &amp;&amp; u.authenticated?(password) ? u : nil&lt;br /&gt;
+end&lt;br /&gt;
+</code></p>
+
+<p><p>假如要使只能用email登录，就要先移除models/user.rb中的下列代码：<br />
+<code>
+validates_presence_of :login&lt;br /&gt;
+validates_length_of :login&lt;br /&gt;
+validates_uniqueness_of :login&lt;br /&gt;
+</code></p>
+
+<p><p>然后修改self.authenticate方法为：<br />
+<code>
+def self.authenticate(email, password)&lt;br /&gt;
+  return nil if email.blank? || password.blank?&lt;br /&gt;
+  u = find_by_email(email.downcase) # need to get the salt&lt;br /&gt;
+  u &amp;&amp; u.authenticated?(password) ? u : nil&lt;br /&gt;
+end&lt;br /&gt;
+</code></p>
+
+<p><p>接着将注册页面views/users/new.html.erb中的login块移除，还有就是要将忘记密码邮件中的@user.login改为@user.email。</p>
+
+<p><p>经过这些修改后就实现只能使用email登录了。</p></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[用Rails 2.3打造todolist]]></title>
+    <link href="http://codemany.com/blog/2010/10/04/using-rails23-to-create-a-todolist-app/"/>
+    <updated>2010-10-04T12:27:38+08:00</updated>
+    <id>http://codemany.com/blog/2010/10/04/using-rails23-to-create-a-todolist-app</id>
+    <content type="html"><![CDATA[<p><p>首先生成项目骨架：<br />
+<code>
+rails todolist&lt;br /&gt;
+cd todolist&lt;br /&gt;
+script/generate scaffold Todo title:string description:text done:boolean due_date:datetime user:references&lt;br /&gt;
+rake db:migrate&lt;br /&gt;
+</code></p>
+
+<p><p><img src="/uploads/todolist-user-todo-association.png" title="todolist-user-todo-association" ></p>
+
+<p><p>安装认证和授权插件：<br />
+```
+script/plugin install git://github.com/technoweenie/restful-authentication.git<br />
+script/generate authenticated user sessions</p>
+
+<p><p>script/plugin install git://github.com/greenisus/forgot_password.git<br />
+script/generate forgot_password password user<br />
+```</p>
+
+<p><p>然后将include AuthenticatedSystem移到ApplicationController中：<br />
+<code>
+class ApplicationController &lt; ActionController::Base&lt;br /&gt;
+  include AuthenticatedSystem&lt;br /&gt;
+</code></p>
+
+<p><p>添加Todo和User的关联：<br />
+```
+class Todo &lt; ActiveRecord::Base<br />
+  belongs_to :user</p>
+
+<p><p>class User &lt; ActiveRecord::Base<br />
+  has_many :todos<br />
+```</p>
+
+<p><p>修改TodosController将todo和user绑定：<br />
+```
+class TodosController &lt; ApplicationController<br />
+  before_filter :login_required</p>
+
+<p><p>  def index<br /></p>
+
+<pre><code>@todos = current_user.todos
+</code></pre>
+
+<p><p>  def show<br /></p>
+
+<pre><code>@todo = current_user.todos.find(params[:id])
+</code></pre>
+
+<p><p>  def new<br /></p>
+
+<pre><code>@todo = current_user.todos.create
+</code></pre>
+
+<p><p>  def edit<br /></p>
+
+<pre><code>@todo = current_user.todos.find(params[:id])
+</code></pre>
+
+<p><p>  def create<br /></p>
+
+<pre><code>@todo = current_user.todos.create(params[:todo])&lt;br /&gt;
+@todo.user = current_user
+</code></pre>
+
+<p><p>  def update<br /></p>
+
+<pre><code>@todo = current_user.todos.find(params[:id])
+</code></pre>
+
+<p><p>  def destroy<br /></p>
+
+<pre><code>@todo = current_user.todos.find(params[:id])&lt;br /&gt;
+</code></pre>
+
+<p>```</p>
+
+<p><p>创建一个应用的首页：<br />
+<code>
+script/generate controller home index&lt;br /&gt;
+</code></p>
+
+<p><p>为了可以访问到应用首页，需要删除public/index.html文件，并且在routes.rb中添加：<br />
+<code>
+map.root :controller =&gt; 'home'&lt;br /&gt;
+</code></p>
+
+<p><p>将app/views/layouts下的todos.html.erb改名为application.html.erb，然后添加下面的代码：<br />
+```
+&lt;% if logged_in? &ndash;%><br />
+  <div id="user-bar-greeting">Logged in as &lt;%= link_to_current_user :content_method => :login %></div><br />
+  <div id="user-bar-action">(&lt;%= link_to &ldquo;Log out&rdquo;, logout_path, { :title => &ldquo;Log out&rdquo; } %>)</div><br />
+&lt;% else &ndash;%><br />
+  <div id="user-bar-greeting">&lt;%= link_to_login_with_IP &lsquo;Not logged in&rsquo;, :style => &lsquo;border: none;&rsquo; %></div><br />
+  <div id="user-bar-action"><br /></p>
+
+<pre><code>&lt;%= link_to "Log in", login_path, { :title =&gt; "Log in" } %&gt; /&lt;br /&gt;
+&lt;%= link_to "Sign up", signup_path, { :title =&gt; "Create an account" } %&gt;&lt;br /&gt;
+</code></pre>
+
+<p>  </div><br />
+&lt;% end &ndash;%><br />
+```</p>
+
+<p><p>模型todo的description字段是text类型，在页面上用textarea表示简单了一点，打算将它改成为TinyMCE编辑器，可以使用<a href="http://github.com/trevorrowe/tinymce_hammer.git">tinymce_hammer</a>插件来集成。<br />
+<code>
+script/plugin install git://github.com/trevorrowe/tinymce_hammer.git&lt;br /&gt;
+</code></p>
+
+<p><p>执行以下命令后，将会安装TinyMCE到public/javascript/tiny_mce目录<br />
+<code>
+script/generate tinymce_installation&lt;br /&gt;
+</code></p>
+
+<p><p>在layout下的模板中添加下面这条语句：<br />
+<code>
+&lt;%= init_tinymce_hammer_if_required %&gt;&lt;br /&gt;
+</code></p>
+
+<p><p>将app/views/todos下new.html.erb和edit.html.erb中的<br />
+<code>
+&lt;%= f.text_area :description %&gt;&lt;br /&gt;
+[/code]&lt;br /&gt;
+修改为&lt;br /&gt;
+</code>
+&lt;%= f.tinymce :description, :rows => 10, :cols => 40 %><br />
+```</p>
+
+<p><p>去除app/views/todos/index.html.erb中description字段的h方法：<br />
+<code>
+&lt;td&gt;&lt;%= todo.description %&gt;&lt;/td&gt;&lt;br /&gt;
+</code></p>
+
+<p><p>还有就是删除todo后记录就彻底地没了，不能恢复，需要给它加上一剂后悔药，使之可以重新被捞出，<a href="http://github.com/technoweenie/acts_as_paranoid.git">acts_as_paranoid</a>插件可以做到这点。<br />
+<code>
+script/plugin install git://github.com/technoweenie/acts_as_paranoid.git&lt;br /&gt;
+script/generate migration add_deleted_at_to_user deleted_at:datetime&lt;br /&gt;
+rake db:migrate&lt;br /&gt;
+</code></p>
+
+<p><p>添加acts_as_paranoid到模型中：<br />
+<code>
+class Todo &lt; ActiveRecord::Base&lt;br /&gt;
+  acts_as_paranoid&lt;br /&gt;
+</code></p>
+
+<p><p>现在，调用这个模型的destroy方法将不会真正地删除记录，只会将记录从视图上移除，在deleted_at里记录当前的时间。<del datetime="2013-05-10T02:05:05+00:00">当然，你可以在find中使用with_deleted或only_deleted参数得到被隐藏的记录。</del>在Rails 3中在find中使用参数会报ArgumentError异常，显示如下错误：<br />
+<code>
+Unknown key: only_deleted&lt;br /&gt;
+</code></p>
+
+<p><p>解决办法是使用以下格式的代码：<br />
+<code>
+current_user.todos.only_deleted.find(:all)&lt;br /&gt;
+</code></p>
+
+<p><p>至此，一个简单的todolist就算完成了。</p>
+
+<p><p>代码下载：<a href="https://github.com/dohkoos/tadalist"><a href="https://github.com/dohkoos/tadalist">https://github.com/dohkoos/tadalist</a></a>
+演示地址：<a href="http://tadalist.heroku.com/"><a href="http://tadalist.heroku.com/">http://tadalist.heroku.com/</a></a>
+</p></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[用Rails 2.3打造简单记账软件(3)]]></title>
+    <link href="http://codemany.com/blog/2009/11/15/using-the-rails23-to-create-a-simple-accounting-app-3/"/>
+    <updated>2009-11-15T16:21:33+08:00</updated>
+    <id>http://codemany.com/blog/2009/11/15/using-the-rails23-to-create-a-simple-accounting-app-3</id>
+    <content type="html"><![CDATA[<p><p>这次要给应用加上一个认证系统（注册、激活、登录、登出）。当用户输入注册信息时，必须输入有效的邮箱地址，注册成功后，用户并不能立即登录系统，而是要登录注册时输入的邮箱，通过该邮箱内的激活邮件来激活账户。通过这种方式可以防止用户的恶意注册。</p>
+
+<p><p><a href="http://github.com/technoweenie/restful-authentication">restful_authentication</a>是一个支持Rails 2.0的认证系统插件，它为你生成REST风格的认证系统模板，除了提供最基本的用户注册登录登出功能外，还有一个可选的邮件激活功能。只要一个命令，它就为你生成了User model、管理注册和登录的controller、相应的页面、mailer等等。</p>
+
+<p><p>安装插件和生成框架代码<br />
+<code>
+script/plugin install http://svn.techno-weenie.net/projects/plugins/restful_authentication&lt;br /&gt;
+script/generate authenticated user sessions --include-activation&lt;br /&gt;
+rake db:migrate&lt;br /&gt;
+</code></p>
+
+<p><p>&mdash;include-activation参数决定是否生成向新注册用户发送激活码邮件的代码</p>
+
+<p><p>这一步是可选的，如果你想你的URL看起来更符合惯例一些，那么可以在config/routes.rb中添加：<br />
+<code>
+map.signup '/signup', :controller =&gt; 'users', :action =&gt; 'new'&lt;br /&gt;
+map.login '/login', :controller =&gt; 'sessions', :action =&gt; 'new'&lt;br /&gt;
+map.logout '/logout', :controller =&gt; 'sessions', :action =&gt; 'destroy'&lt;br /&gt;
+</code></p>
+
+<p><p>因为使用了&mdash;include-activation参数，所以还要在config/routes.rb中增加：<br />
+<code>
+map.activate '/activate/:activation_code', :controller =&gt; 'users', :action =&gt; 'activate', :activation_code =&gt; nil&lt;br /&gt;
+</code></p>
+
+<p><p>最后，还需要添加一个observer到config/environment.rb的Rails::Initializer块中：<br />
+<code>
+config.active_record.observers = :user_observer&lt;br /&gt;
+</code></p>
+
+<p><p>设置ActionMailer，在config/environments/development.rb中添加：<br />
+```</p>
+
+<h1>Don&rsquo;t care if the mailer can&rsquo;t send<br /></h1>
+
+<p>config.action_mailer.raise_delivery_errors = true<br />
+config.action_mailer.perform_deliveries = true<br />
+config.action_mailer.delivery_method = :smtp<br />
+config.action_mailer.smtp_settings = {<br />
+  :address => &ldquo;smtp.example.com&rdquo;,<br />
+  :port => 25,<br />
+  :domain => &ldquo;codemany.com&rdquo;,<br />
+  :authentication => :login,<br />
+  :user_name => &ldquo;<a href="&#109;&#x61;&#x69;&#x6c;&#116;&#x6f;&#x3a;&#x75;&#x73;&#x65;&#114;&#110;&#97;&#x6d;&#101;&#64;&#x65;&#120;&#97;&#109;&#x70;&#x6c;&#101;&#46;&#99;&#111;&#x6d;">&#x75;&#x73;&#x65;&#x72;&#x6e;&#97;&#109;&#101;&#x40;&#101;&#120;&#x61;&#109;&#x70;&#108;&#101;&#46;&#99;&#111;&#x6d;</a>&rdquo;,<br />
+  :password => &ldquo;secret&rdquo;<br />
+}
+config.action_mailer.default_charset = &ldquo;utf-8&rdquo;</p>
+
+<p><p>SITE_URL = &ldquo;localhost:3000&rdquo;<br />
+ADMINEMAIL = &ldquo;<a href="&#109;&#x61;&#x69;&#108;&#x74;&#x6f;&#x3a;&#117;&#115;&#x65;&#x72;&#110;&#x61;&#x6d;&#101;&#64;&#101;&#120;&#97;&#109;&#x70;&#x6c;&#x65;&#46;&#x63;&#x6f;&#109;">&#x75;&#115;&#x65;&#x72;&#x6e;&#x61;&#109;&#x65;&#x40;&#101;&#x78;&#x61;&#x6d;&#112;&#x6c;&#101;&#46;&#x63;&#111;&#109;</a>&rdquo;<br />
+```</p>
+
+<p><p>打开app/models/user_mailer.rb，修改<br />
+<code>
+@body[:url]  = "http://YOURSITE/activate/#{user.activation_code}"&lt;br /&gt;
+@body[:url]  = "http://YOURSITE/"&lt;br /&gt;
+@subject     = "[YOURSITE] "&lt;br /&gt;
+@from        = "ADMINEMAIL"&lt;br /&gt;
+[/code]&lt;br /&gt;
+为
+</code>
+@body[:url]  = &ldquo;<a href="http://#">http://#</a>{SITE_URL}/activate/#{user.activation_code}&rdquo;<br />
+@body[:url]  = &ldquo;<a href="http://#">http://#</a>{SITE_URL}/&rdquo;<br />
+@subject     = &ldquo;[#{SITE_URL}] &rdquo;<br />
+@from        = &ldquo;#{ADMINEMAIL}&rdquo;<br />
+```</p>
+
+<p><p>注意：<br />
+smtp_settings中的domain必须填写，否则会出现以下警告<br />
+<code>
+Net::SMTPSyntaxError (500 Error: bad syntax):&lt;br /&gt;
+  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:679:in 'check_response'&lt;br /&gt;
+  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:652:in 'getok'&lt;br /&gt;
+  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:622:in 'helo'&lt;br /&gt;
+</code></p>
+
+<p><p>user_mailer.rb中的ADMINEMAIL必须是一个有效的163邮件账号，否则会出现<br />
+<code>
+Net::SMTPFatalError (550 Invalid User):&lt;br /&gt;
+  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:679:in 'check_response'&lt;br /&gt;
+  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:652:in 'getok'&lt;br /&gt;
+  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:630:in 'mailfrom'&lt;br /&gt;
+</code></p>
+]]></content>
+  </entry>
+  
+</feed>

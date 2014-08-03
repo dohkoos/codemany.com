@@ -1,0 +1,529 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Tag: Hibernate | 乐者为王]]></title>
+  <link href="http://codemany.com/tags/hibernate/atom.xml" rel="self"/>
+  <link href="http://codemany.com/"/>
+  <updated>2014-08-03T22:17:08+08:00</updated>
+  <id>http://codemany.com/</id>
+  <author>
+    <name><![CDATA[dohkoos]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Struts 2 + Spring 3 + Hibernate 4登录实例]]></title>
+    <link href="http://codemany.com/blog/2012/09/04/struts2-spring3-hibernate4-login-sample/"/>
+    <updated>2012-09-04T06:54:27+08:00</updated>
+    <id>http://codemany.com/blog/2012/09/04/struts2-spring3-hibernate4-login-sample</id>
+    <content type="html"><![CDATA[<p><p>在pom.xml中添加依赖包：<br />
+[code lang=&ldquo;xml&rdquo;]
+<dependency></p>
+
+<pre><code>&lt;groupId&gt;org.springframework&lt;/groupId&gt;
+&lt;artifactId&gt;spring-orm&lt;/artifactId&gt;
+&lt;version&gt;3.1.2.RELEASE&lt;/version&gt;
+</code></pre>
+
+<p></dependency>
+<dependency></p>
+
+<pre><code>&lt;groupId&gt;org.springframework&lt;/groupId&gt;
+&lt;artifactId&gt;spring-web&lt;/artifactId&gt;
+&lt;version&gt;3.1.2.RELEASE&lt;/version&gt;
+</code></pre>
+
+<p></dependency>
+<!-- 没有这个plugin包会导致Spring无法注入bean到Struts 2的Action中 -->
+<dependency></p>
+
+<pre><code>&lt;groupId&gt;org.apache.struts&lt;/groupId&gt;
+&lt;artifactId&gt;struts2-spring-plugin&lt;/artifactId&gt;
+&lt;version&gt;2.3.4.1&lt;/version&gt;
+</code></pre>
+
+<p></dependency>
+```</p>
+
+<p><p>配置web.xml文件：<br />
+[code lang=&ldquo;xml&rdquo;]
+&lt;context-param></p>
+
+<pre><code>&lt;param-name&gt;contextConfigLocation&lt;/param-name&gt;
+&lt;param-value&gt;classpath:applicationContext.xml&lt;/param-value&gt;
+</code></pre>
+
+<p>&lt;/context-param></p>
+
+<p><p><listener></p>
+
+<pre><code>&lt;listener-class&gt;org.springframework.web.context.ContextLoaderListener&lt;/listener-class&gt;
+</code></pre>
+
+<p></listener>
+```</p>
+
+<p><p>删除hibernate.cfg.xml，添加applicationContext.xml，内容为：<br />
+[code lang=&ldquo;xml&rdquo;]
+&lt;?xml version=&ldquo;1.0&rdquo; encoding=&ldquo;utf-8&rdquo;?>
+<beans xmlns="http://www.springframework.org/schema/beans"<br /></p>
+
+<pre><code>xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"&lt;br /&gt;
+xsi:schemaLocation="http://www.springframework.org/schema/beans&lt;br /&gt;
+    http://www.springframework.org/schema/beans/spring-beans.xsd"&gt;
+</code></pre>
+
+<p><p>    <!-- DriverManagerDataSource在每个连接请求时都新建一个connection。<br /></p>
+
+<pre><code>     与DBCP的BasicDataSource不同，DriverManagerDataSource提供的连接没有进行池管理 --&gt;
+&lt;bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource"&gt;
+    &lt;property name="driverClassName" value="com.mysql.jdbc.Driver" /&gt;
+    &lt;property name="url" value="jdbc:mysql://localhost:3306/jbookshelf" /&gt;
+    &lt;property name="username" value="root" /&gt;
+    &lt;property name="password" value="123456" /&gt;
+&lt;/bean&gt;
+</code></pre>
+
+<p><p>    <bean id="sessionFactory" class="org.springframework.orm.hibernate4.LocalSessionFactoryBean"></p>
+
+<pre><code>    &lt;property name="dataSource" ref="dataSource" /&gt;
+    &lt;property name="hibernateProperties"&gt;
+        &lt;props&gt;
+            &lt;prop key="hibernate.connection.pool_size"&gt;1&lt;/prop&gt;
+            &lt;prop key="hibernate.dialect"&gt;org.hibernate.dialect.MySQLDialect&lt;/prop&gt;
+            &lt;prop key="hibernate.cache.provider_class"&gt;org.hibernate.cache.internal.NoCacheProvider&lt;/prop&gt;
+            &lt;prop key="show_sql"&gt;true&lt;/prop&gt;
+        &lt;/props&gt;
+    &lt;/property&gt;
+    &lt;property name="mappingResources"&gt;
+        &lt;list&gt;
+            &lt;value&gt;com/codemany/account/model/User.hbm.xml&lt;/value&gt;
+        &lt;/list&gt;
+    &lt;/property&gt;
+&lt;/bean&gt;
+</code></pre>
+
+<p><p>    <bean id="userDao" class="com.codemany.account.dao.UserDao"></p>
+
+<pre><code>    &lt;property name="sessionFactory" ref="sessionFactory" /&gt;
+&lt;/bean&gt;
+</code></pre>
+
+<p><p>    <!-- Struts 2的action是有状态的，必须显示设置scope为prototype，每次请求过来都会创建一个action --></p>
+
+<pre><code>&lt;bean id="loginAction" class="com.codemany.account.action.LoginAction" scope="prototype"&gt;
+    &lt;property name="userDao" ref="userDao" /&gt;
+&lt;/bean&gt;
+</code></pre>
+
+<p></beans>
+```</p>
+
+<p><p>删除HibernateUtil.java，修改UserDao.java为以下内容：<br />
+```
+package com.codemany.account.dao;</p>
+
+<p><p>import org.hibernate.Query;<br />
+import org.hibernate.Session;<br />
+import org.hibernate.SessionFactory;</p>
+
+<p><p>import com.codemany.account.model.User;</p>
+
+<p><p>public class UserDao {<br /></p>
+
+<pre><code>// Spring 3集成Hibernate 4不再需要HibernateDaoSupport或HibernateTemplate了，&lt;br /&gt;
+// 直接使用原生API即可。&lt;br /&gt;
+private SessionFactory sessionFactory;
+</code></pre>
+
+<p><p>    public void setSessionFactory(SessionFactory sessionFactory) {<br /></p>
+
+<pre><code>    this.sessionFactory = sessionFactory;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public User getUser(String username) {<br /></p>
+
+<pre><code>    Session session = sessionFactory.openSession();&lt;br /&gt;
+    try {&lt;br /&gt;
+        Query query = session.createQuery("from User u where u.username = ?");&lt;br /&gt;
+        query.setString(0, username);&lt;br /&gt;
+        query.setMaxResults(1);&lt;br /&gt;
+        return (User)query.uniqueResult();&lt;br /&gt;
+    } finally {&lt;br /&gt;
+        session.close();&lt;br /&gt;
+    }&lt;br /&gt;
+}&lt;br /&gt;
+</code></pre>
+
+<p>}
+```</p>
+
+<p><p>在struts.xml中将action元素中login的class属性改为applicationContext.xml配置文件中的loginAction： <br />
+[code lang=&ldquo;xml&rdquo;]
+<action name="login" class="loginAction"></p>
+
+<pre><code>&lt;result name="success"&gt;/index.jsp&lt;/result&gt;
+&lt;result name="input"&gt;/index.jsp&lt;/result&gt;
+</code></pre>
+
+<p></action>
+```</p>
+
+<p><p>修改LoginAction.java的代码：<br />
+```
+package com.codemany.account.action;</p>
+
+<p><p>import com.codemany.account.dao.UserDao;<br />
+import com.codemany.account.model.User;</p>
+
+<p><p>import com.opensymphony.xwork2.ActionContext;<br />
+import com.opensymphony.xwork2.ActionSupport;</p>
+
+<p><p>public class LoginAction extends ActionSupport {<br /></p>
+
+<pre><code>private static final long serialVersionUID = -389833745243649130L;
+</code></pre>
+
+<p><p>    private String username;<br /></p>
+
+<pre><code>private String password;
+</code></pre>
+
+<p><p>    private UserDao userDao;</p>
+
+<p><p>    public String execute() throws Exception {<br /></p>
+
+<pre><code>    if (username == null || username.length() == 0&lt;br /&gt;
+            || password == null || password.length() == 0) {&lt;br /&gt;
+        return INPUT;&lt;br /&gt;
+    }
+</code></pre>
+
+<p><p>        User u = userDao.getUser(username);<br /></p>
+
+<pre><code>    if (u == null || !password.equals(u.getPassword())) {&lt;br /&gt;
+        return INPUT;&lt;br /&gt;
+    }
+</code></pre>
+
+<p><p>        ActionContext.getContext().getSession().put(&ldquo;logined&rdquo;, true);<br /></p>
+
+<pre><code>    return SUCCESS;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public void setUsername(String username) {<br /></p>
+
+<pre><code>    this.username = username;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public void setPassword(String password) {<br /></p>
+
+<pre><code>    this.password = password;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public void setUserDao(UserDao userDao) {<br /></p>
+
+<pre><code>    this.userDao = userDao;&lt;br /&gt;
+}&lt;br /&gt;
+</code></pre>
+
+<p>}
+```</p>
+
+<p><p>代码下载：<a href="https://github.com/dohkoos/JBookShelf"><a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></a></p></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Struts 2 + Hibernate 4登录实例]]></title>
+    <link href="http://codemany.com/blog/2012/08/31/struts2-hibernate4-login-sample/"/>
+    <updated>2012-08-31T07:41:05+08:00</updated>
+    <id>http://codemany.com/blog/2012/08/31/struts2-hibernate4-login-sample</id>
+    <content type="html"><![CDATA[<p><p>使用以下代码创建数据库：<br />
+```
+CREATE DATABASE IF NOT EXISTS jbookshelf;</p>
+
+<p><p>USE jbookshelf;</p>
+
+<p><p>DROP TABLE IF EXISTS users;</p>
+
+<p><p>CREATE TABLE users (<br /></p>
+
+<pre><code>id int NOT NULL AUTO_INCREMENT,&lt;br /&gt;
+username varchar(20) NOT NULL,&lt;br /&gt;
+password varchar(50) NOT NULL,&lt;br /&gt;
+PRIMARY KEY(id)&lt;br /&gt;
+</code></pre>
+
+<p>) ENGINE=InnoDB DEFAULT CHARSET=utf-8;<br />
+```</p>
+
+<p><p>在pom.xml中添加Hibernate的依赖配置：<br />
+[code lang=&ldquo;xml&rdquo;]
+<dependency></p>
+
+<pre><code>&lt;groupId&gt;org.hibernate&lt;/groupId&gt;
+&lt;artifactId&gt;hibernate-core&lt;/artifactId&gt;
+&lt;version&gt;4.1.6.Final&lt;/version&gt;
+</code></pre>
+
+<p></dependency>
+<dependency></p>
+
+<pre><code>&lt;groupId&gt;mysql&lt;/groupId&gt;
+&lt;artifactId&gt;mysql-connector-java&lt;/artifactId&gt;
+&lt;version&gt;5.1.21&lt;/version&gt;
+</code></pre>
+
+<p></dependency>
+```</p>
+
+<p><p>创建User.java类：<br />
+```
+package com.codemany.account.model;</p>
+
+<p><p>public class User {<br /></p>
+
+<pre><code>private Long id;
+</code></pre>
+
+<p><p>    private String username;<br /></p>
+
+<pre><code>private String password;
+</code></pre>
+
+<p><p>    public Long getId() {<br /></p>
+
+<pre><code>    return id;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public void setId(Long id) {<br /></p>
+
+<pre><code>    this.id = id;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public String getUsername() {<br /></p>
+
+<pre><code>    return username;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public void setUsername(String username) {<br /></p>
+
+<pre><code>    this.username = username;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public String getPassword() {<br /></p>
+
+<pre><code>    return password;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public void setPassword(String password) {<br /></p>
+
+<pre><code>    this.password = password;&lt;br /&gt;
+}&lt;br /&gt;
+</code></pre>
+
+<p>}
+```</p>
+
+<p><p>在同一目录下创建User.hbm.xml文件：<br />
+[code lang=&ldquo;xml&rdquo;]
+&lt;?xml version=&ldquo;1.0&rdquo; encoding=&ldquo;utf-8&rdquo;?>
+&lt;!DOCTYPE hibernate-mapping PUBLIC<br /></p>
+
+<pre><code>"-//Hibernate/Hibernate Mapping DTD 3.0//EN"&lt;br /&gt;
+"http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd"&gt;
+</code></pre>
+
+<p><p>&lt;hibernate-mapping package=&ldquo;com.codemany.account.model&rdquo;></p>
+
+<pre><code>&lt;class name="User" table="users"&gt;
+    &lt;id name="id"&gt;
+        &lt;generator class="increment" /&gt;
+    &lt;/id&gt;
+</code></pre>
+
+<p><p>        <property name="username" length="20" /></p>
+
+<pre><code>    &lt;property name="password" length="50" /&gt;
+&lt;/class&gt;
+</code></pre>
+
+<p>&lt;/hibernate-mapping>
+```</p>
+
+<p><p>在resources目录下创建hibernate.cfg.xml配置文件，内容如下：<br />
+[code lang=&ldquo;xml&rdquo;]
+&lt;?xml version=&lsquo;1.0&rsquo; encoding=&lsquo;utf-8&rsquo;?>
+&lt;!DOCTYPE hibernate-configuration PUBLIC<br /></p>
+
+<pre><code>"-//Hibernate/Hibernate Configuration DTD 3.0//EN"&lt;br /&gt;
+"http://www.hibernate.org/dtd/hibernate-configuration-3.0.dtd"&gt;
+</code></pre>
+
+<p><p>&lt;hibernate-configuration></p>
+
+<pre><code>&lt;session-factory&gt;
+    &lt;!-- MySQL connection settings --&gt;
+    &lt;property name="connection.driver_class"&gt;com.mysql.jdbc.Driver&lt;/property&gt;
+    &lt;property name="connection.url"&gt;jdbc:mysql://localhost:3306/jbookshelf&lt;/property&gt;
+    &lt;property name="connection.username"&gt;yourname&lt;/property&gt;
+    &lt;property name="connection.password"&gt;yourpassword&lt;/property&gt;
+</code></pre>
+
+<p><p>        <!-- JDBC connection pool (use the built-in) --></p>
+
+<pre><code>    &lt;property name="connection.pool_size"&gt;1&lt;/property&gt;
+</code></pre>
+
+<p><p>        <!-- SQL dialect --></p>
+
+<pre><code>    &lt;property name="dialect"&gt;org.hibernate.dialect.MySQLDialect&lt;/property&gt;
+</code></pre>
+
+<p><p>        <!-- Disable the second-level cache  --></p>
+
+<pre><code>    &lt;property name="cache.provider_class"&gt;org.hibernate.cache.internal.NoCacheProvider&lt;/property&gt;
+</code></pre>
+
+<p><p>        <!-- Echo all executed SQL to stdout --></p>
+
+<pre><code>    &lt;property name="show_sql"&gt;true&lt;/property&gt;
+</code></pre>
+
+<p><p>        <mapping resource="com/codemany/account/model/User.hbm.xml" /></p>
+
+<pre><code>&lt;/session-factory&gt;
+</code></pre>
+
+<p>&lt;/hibernate-configuration>
+```</p>
+
+<p><p>建立管理Session的HibernateUtil.java类：<br />
+```
+package com.codemany.account.dao.hibernate;</p>
+
+<p><p>import org.hibernate.Session;<br />
+import org.hibernate.SessionFactory;<br />
+import org.hibernate.cfg.Configuration;</p>
+
+<p><p>public class HibernateUtil {<br /></p>
+
+<pre><code>private static final SessionFactory sessionFactory;
+</code></pre>
+
+<p><p>    static {<br /></p>
+
+<pre><code>    try {&lt;br /&gt;
+        // Create the SessionFactory from hibernate.cfg.xml&lt;br /&gt;
+        Configuration configuration = new Configuration();&lt;br /&gt;
+        configuration.configure();&lt;br /&gt;
+        Properties props = configuration.getProperties();
+</code></pre>
+
+<p><p>            ServiceRegistry serviceRegistry =<br /></p>
+
+<pre><code>                new ServiceRegistryBuilder().applySettings(props).buildServiceRegistry();
+</code></pre>
+
+<p><p>            sessionFactory = configuration.buildSessionFactory(serviceRegistry);<br /></p>
+
+<pre><code>    } catch (Throwable ex) {&lt;br /&gt;
+        // Make sure you log the exception, as it might be swallowed&lt;br /&gt;
+        System.err.println("Initial SessionFactory creation failed." + ex);&lt;br /&gt;
+        throw new ExceptionInInitializerError(ex);&lt;br /&gt;
+    }&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public static Session getSession() {<br /></p>
+
+<pre><code>    return sessionFactory.openSession();&lt;br /&gt;
+}&lt;br /&gt;
+</code></pre>
+
+<p>}
+```</p>
+
+<p><p>在dao包创建数据访问对象：<br />
+```
+package com.codemany.account.dao;</p>
+
+<p><p>import org.hibernate.Query;<br />
+import org.hibernate.Session;<br />
+import org.hibernate.Transaction;</p>
+
+<p><p>import com.codemany.account.model.User;</p>
+
+<p><p>public class UserDao {<br /></p>
+
+<pre><code>public static User getUser(String username) {&lt;br /&gt;
+    Session session = HibernateUtil.getSession();&lt;br /&gt;
+    try {&lt;br /&gt;
+        Query query = session.createQuery("from User u where u.username = ?");&lt;br /&gt;
+        query.setMaxResults(1);&lt;br /&gt;
+        query.setString(0, username);&lt;br /&gt;
+        return (User)query.uniqueResult();&lt;br /&gt;
+    } finally {&lt;br /&gt;
+        session.close();&lt;br /&gt;
+    }&lt;br /&gt;
+}&lt;br /&gt;
+</code></pre>
+
+<p>}
+```</p>
+
+<p><p>现在可以访问数据库了，所以要修改LoginAction.java的execute方法：<br />
+```
+public String execute() throws Exception {<br /></p>
+
+<pre><code>if (username == null || username.length() == 0&lt;br /&gt;
+        || password == null || password.length() == 0) {&lt;br /&gt;
+    return INPUT;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    User u = UserDao.getUser(username);<br /></p>
+
+<pre><code>if (u == null) {&lt;br /&gt;
+    return INPUT;&lt;br /&gt;
+}&lt;br /&gt;
+if (username.equals(u.getUsername()) &amp;&amp; password.equals(u.getPassword())) {&lt;br /&gt;
+    ActionContext.getContext().getSession().put("logined", true);&lt;br /&gt;
+    return SUCCESS;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    return INPUT;<br />
+}
+```</p>
+
+<p><p>PS：如果显示jta-1.0.1b.jar缺失的错误，可以在pom.xml中添加以下语句：<br />
+[code lang=&ldquo;xml&rdquo;]
+<repositories></p>
+
+<pre><code>&lt;repository&gt;
+    &lt;id&gt;java.net&lt;/id&gt;
+    &lt;url&gt;http://download.java.net/maven/2/&lt;/url&gt;
+&lt;/repository&gt;
+</code></pre>
+
+<p></repositories>
+```</p>
+
+<p><p>代码下载：<a href="https://github.com/dohkoos/JBookShelf"><a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></a></p></p>
+]]></content>
+  </entry>
+  
+</feed>

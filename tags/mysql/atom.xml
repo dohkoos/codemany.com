@@ -1,0 +1,1100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Tag: MySQL | 乐者为王]]></title>
+  <link href="http://codemany.com/tags/mysql/atom.xml" rel="self"/>
+  <link href="http://codemany.com/"/>
+  <updated>2014-08-03T22:17:08+08:00</updated>
+  <id>http://codemany.com/</id>
+  <author>
+    <name><![CDATA[dohkoos]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[实现图书的增删查改（CRUD）]]></title>
+    <link href="http://codemany.com/blog/2012/12/22/book-additions-and-deletions-investigation-changed-crud/"/>
+    <updated>2012-12-22T14:25:20+08:00</updated>
+    <id>http://codemany.com/blog/2012/12/22/book-additions-and-deletions-investigation-changed-crud</id>
+    <content type="html"><![CDATA[<p><p>图书的MySQL数据库创建脚本：<br />
+<code>
+CREATE TABLE books (&lt;br /&gt;
+  id int NOT NULL AUTO_INCREMENT,&lt;br /&gt;
+  title varchar(255) NOT NULL,&lt;br /&gt;
+  description text,&lt;br /&gt;
+  image_url varchar(255),&lt;br /&gt;
+  price decimal(8, 2) NOT NULL,&lt;br /&gt;
+  author varchar(255) NOT NULL,&lt;br /&gt;
+  isbn varchar(255) NOT NULL,&lt;br /&gt;
+  publisher varchar(255) NOT NULL,&lt;br /&gt;
+  user_id int NOT NULL,&lt;br /&gt;
+  PRIMARY KEY (id)&lt;br /&gt;
+) ENGINE=InnoDB DEFAULT CHARSET=utf-8;&lt;br /&gt;
+</code></p>
+
+<p><p>图书实体类文件Book.java主要代码：<br />
+```
+public class Book {<br /></p>
+
+<pre><code>private Long id;&lt;br /&gt;
+private String title;&lt;br /&gt;
+private String description;&lt;br /&gt;
+private String image_url;&lt;br /&gt;
+private double price;&lt;br /&gt;
+private String author;&lt;br /&gt;
+private String isbn;&lt;br /&gt;
+private String publisher;&lt;br /&gt;
+private User user;&lt;br /&gt;
+...&lt;br /&gt;
+</code></pre>
+
+<p>}
+```</p>
+
+<p><p>在User类中添加集合变量books：<br />
+```
+public class User {<br /></p>
+
+<pre><code>...&lt;br /&gt;
+private Set&lt;Book&gt; books = new HashSet&lt;Book&gt;();&lt;br /&gt;
+...&lt;br /&gt;
+</code></pre>
+
+<p>}
+```</p>
+
+<p><p>在User.hbm.xml中配置和图书的一对多关联：<br />
+[code lang=&ldquo;xml&rdquo;]
+<!-- Bidirectional one-to-many association to Book -->
+<set name="books" inverse="true"></p>
+
+<pre><code>&lt;key column="user_id" not-null="true" /&gt;
+&lt;one-to-many class="com.codemany.book.model.Book" /&gt;
+</code></pre>
+
+<p></set>
+```</p>
+
+<p><p>图书的表映射文件Book.hbm.xml代码：<br />
+[code lang=&ldquo;xml&rdquo;]
+&lt;hibernate-mapping></p>
+
+<pre><code>&lt;class name="com.codemany.book.model.Book" table="books"&gt;
+    &lt;id name="id"&gt;
+        &lt;generator class="increment" /&gt;
+    &lt;/id&gt;
+</code></pre>
+
+<p><p>        <property name="title" not-null="true" /></p>
+
+<pre><code>    &lt;property name="description" /&gt;
+    &lt;property name="image_url" /&gt;
+    &lt;property name="price" not-null="true" /&gt;
+    &lt;property name="author" not-null="true" /&gt;
+    &lt;property name="isbn" not-null="true" /&gt;
+    &lt;property name="publisher" not-null="true" /&gt;
+</code></pre>
+
+<p><p>        &lt;many-to-one name=&ldquo;user&rdquo; column=&ldquo;user_id&rdquo; not-null=&ldquo;true&rdquo; /></p>
+
+<pre><code>&lt;/class&gt;
+</code></pre>
+
+<p>&lt;/hibernate-mapping>
+```</p>
+
+<p><p>BookService.java中的代码相对简单，因为没什么复杂的业务逻辑，只是负责把Action和Dao这两层连接起来。</p>
+
+<p><p>BookDao.java中的代码主要实现图书的读取，更新和删除：<br />
+```
+package com.codemany.book.dao;</p>
+
+<p><p>import java.util.List;</p>
+
+<p><p>import org.hibernate.Query;<br />
+import org.hibernate.Session;<br />
+import org.hibernate.SessionFactory;<br />
+import org.hibernate.Transaction;</p>
+
+<p><p>import com.codemany.book.model.Book;</p>
+
+<p><p>public class BookDao {<br /></p>
+
+<pre><code>private SessionFactory sessionFactory;
+</code></pre>
+
+<p><p>    public void setSessionFactory(SessionFactory sessionFactory) {<br /></p>
+
+<pre><code>    this.sessionFactory = sessionFactory;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public List<Book> getBookList() {<br /></p>
+
+<pre><code>    Session session = sessionFactory.openSession();&lt;br /&gt;
+    try {&lt;br /&gt;
+        Query query = session.createQuery("from Book b");&lt;br /&gt;
+        List&lt;Book&gt; bookList = query.list();&lt;br /&gt;
+        return bookList;&lt;br /&gt;
+    } finally {&lt;br /&gt;
+        session.close();&lt;br /&gt;
+    }&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public Book getBook(Long bookId) {<br /></p>
+
+<pre><code>    Session session = sessionFactory.openSession();&lt;br /&gt;
+    try {&lt;br /&gt;
+        Query query = session.createQuery("from Book b where b.id = :id");&lt;br /&gt;
+        query.setLong("id", bookId);&lt;br /&gt;
+        query.setMaxResults(1);&lt;br /&gt;
+        return (Book)query.uniqueResult();&lt;br /&gt;
+    } finally {&lt;br /&gt;
+        session.close();&lt;br /&gt;
+    }&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public void saveOrUpdateBook(Book book) {<br /></p>
+
+<pre><code>    Session session = sessionFactory.openSession();&lt;br /&gt;
+    Transaction ts = null;&lt;br /&gt;
+    try {&lt;br /&gt;
+        ts = session.beginTransaction();&lt;br /&gt;
+        session.saveOrUpdate(book);&lt;br /&gt;
+        ts.commit();&lt;br /&gt;
+    } finally {&lt;br /&gt;
+        session.close();&lt;br /&gt;
+    }&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public void deleteBook(Long bookId) {<br /></p>
+
+<pre><code>    Session session = sessionFactory.openSession();&lt;br /&gt;
+    Transaction ts = null;&lt;br /&gt;
+    try {&lt;br /&gt;
+        ts = session.beginTransaction();&lt;br /&gt;
+        Book book = (Book)session.get(Book.class, bookId);&lt;br /&gt;
+        session.delete(book);&lt;br /&gt;
+        ts.commit();&lt;br /&gt;
+    } finally {&lt;br /&gt;
+        session.close();&lt;br /&gt;
+    }&lt;br /&gt;
+}&lt;br /&gt;
+</code></pre>
+
+<p>}
+```</p>
+
+<p><p>BookAction.java负责协调图书应用程序间的运转。接收访问请求，与模型进行交互，将合适的视图展示给用户：<br />
+```
+package com.codemany.book.action;</p>
+
+<p><p>import java.util.List;</p>
+
+<p><p>import com.codemany.account.model.User;<br />
+import com.codemany.book.model.Book;<br />
+import com.codemany.book.service.BookService;</p>
+
+<p><p>import com.opensymphony.xwork2.ActionContext;<br />
+import com.opensymphony.xwork2.ActionSupport;</p>
+
+<p><p>public class BookAction extends ActionSupport {<br /></p>
+
+<pre><code>private static final long serialVersionUID = 2538923417705852774L;
+</code></pre>
+
+<p><p>    private Long bookId;<br /></p>
+
+<pre><code>private Book book;&lt;br /&gt;
+private List&lt;Book&gt; bookList;&lt;br /&gt;
+private BookService bookService;
+</code></pre>
+
+<p><p>    public String list() throws Exception {<br /></p>
+
+<pre><code>    bookList = bookService.getBookList();&lt;br /&gt;
+    return "list";&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public String show() throws Exception {<br /></p>
+
+<pre><code>    book = bookService.getBook(bookId);&lt;br /&gt;
+    return "show";&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public String input() throws Exception {<br /></p>
+
+<pre><code>    if (bookId != null) {&lt;br /&gt;
+        book = bookService.getBook(bookId);&lt;br /&gt;
+    }&lt;br /&gt;
+    return INPUT;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public String saveOrUpdate() throws Exception {<br /></p>
+
+<pre><code>    User user = (User)ActionContext.getContext().getSession().get("user");&lt;br /&gt;
+    book.setUser(user);&lt;br /&gt;
+    bookService.saveOrUpdateBook(book);&lt;br /&gt;
+    return SUCCESS;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public String delete() throws Exception {<br /></p>
+
+<pre><code>    bookService.deleteBook(bookId);&lt;br /&gt;
+    return SUCCESS;&lt;br /&gt;
+}&lt;br /&gt;
+...&lt;br /&gt;
+</code></pre>
+
+<p>}
+```</p>
+
+<p><p>在applicationContext.xml中添加Book的相关配置，如下面代码所示：<br />
+[code lang=&ldquo;xml&rdquo;]
+<bean id="sessionFactory" class="org.springframework.orm.hibernate4.LocalSessionFactoryBean"></p>
+
+<pre><code>...&lt;br /&gt;
+&lt;property name="mappingResources"&gt;
+    &lt;list&gt;
+        ...&lt;br /&gt;
+        &lt;value&gt;com/codemany/book/model/Book.hbm.xml&lt;/value&gt;
+    &lt;/list&gt;
+&lt;/property&gt;
+</code></pre>
+
+<p></bean>
+&hellip;</p>
+
+<p><p><!-- book -->
+<bean id="bookDao" class="com.codemany.book.dao.BookDao"></p>
+
+<pre><code>&lt;property name="sessionFactory" ref="sessionFactory" /&gt;
+</code></pre>
+
+<p></bean></p>
+
+<p><p><bean id="bookService" class="com.codemany.book.service.BookService"></p>
+
+<pre><code>&lt;property name="bookDao" ref="bookDao" /&gt;
+</code></pre>
+
+<p></bean></p>
+
+<p><p><bean id="bookAction" class="com.codemany.book.action.BookAction" scope="prototype"></p>
+
+<pre><code>&lt;property name="bookService" ref="bookService" /&gt;
+</code></pre>
+
+<p></bean>
+```</p>
+
+<p><p>在Struts 2配置文件struts.xml中include文件book.xml。以下是book.xml文件的内容：<br />
+[code lang=&ldquo;xml&rdquo;]
+&lt;?xml version=&ldquo;1.0&rdquo; encoding=&ldquo;utf-8&rdquo;?>
+&lt;!DOCTYPE struts PUBLIC<br /></p>
+
+<pre><code>"-//Apache Software Foundation//DTD Struts Configuration 2.0//EN"&lt;br /&gt;
+"http://struts.apache.org/dtds/struts-2.0.dtd"&gt;
+</code></pre>
+
+<p><p><struts></p>
+
+<pre><code>&lt;package name="book" extends="struts-default"&gt;
+    &lt;action name="*Book" method="{1}" class="bookAction"&gt;
+        &lt;result name="list"&gt;/books/list.jsp&lt;/result&gt;
+        &lt;result name="show"&gt;/books/show.jsp&lt;/result&gt;
+        &lt;result name="input"&gt;/books/form.jsp&lt;/result&gt;
+        &lt;result type="redirectAction"&gt;listBook&lt;/result&gt;
+    &lt;/action&gt;
+&lt;/package&gt;
+</code></pre>
+
+<p></struts>
+```</p>
+
+<p><p>视图文件show.jsp作为显示单本图书的信息，代码很简单，就不放出来了，只把list.jsp和form.jsp的代码列出来。</p>
+
+<p><p>list.jsp用来显示所有的图书：<br />
+[code lang=&ldquo;java&rdquo;]
+<body>
+<h1>Listing books</h1></p>
+
+<p><p><table></p>
+
+<pre><code>&lt;tr&gt;
+    &lt;th&gt;Title&lt;/th&gt;
+    &lt;th&gt;Description&lt;/th&gt;
+    &lt;th&gt;Image url&lt;/th&gt;
+    &lt;th&gt;Price&lt;/th&gt;
+    &lt;th&gt;Author&lt;/th&gt;
+    &lt;th&gt;ISBN&lt;/th&gt;
+    &lt;th&gt;Publisher&lt;/th&gt;
+    &lt;th&gt;Action&lt;/th&gt;
+&lt;/tr&gt;
+</code></pre>
+
+<p><p>    &lt;s:iterator value=&ldquo;bookList&rdquo;></p>
+
+<pre><code>&lt;tr&gt;
+    &lt;td&gt;&lt;s:property value="title" /&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;s:property value="description" /&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;s:property value="image_url" /&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;s:property value="price" /&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;s:property value="author" /&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;s:property value="isbn" /&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;s:property value="publisher" /&gt;&lt;/td&gt;
+    &lt;td&gt;
+        &lt;s:a href="showBook.action?bookId=%{id}"&gt;Show&lt;/s:a&gt;
+        &lt;s:a href="inputBook.action?bookId=%{id}"&gt;Edit&lt;/s:a&gt;
+        &lt;s:a href="deleteBook.action?bookId=%{id}" method="delete"&gt;Destroy&lt;/s:a&gt;
+    &lt;/td&gt;
+&lt;/tr&gt;
+&lt;/s:iterator&gt;
+</code></pre>
+
+<p></table></p>
+
+<p><p>&lt;s:a action=&ldquo;inputBook&rdquo;>Add&lt;/s:a>
+</body>
+```</p>
+
+<p><p>当用户新建或者更新图书时，视图form.jsp就上场了。因为被两个逻辑使用，显示的标题等信息也不相同，所以需要判断图书的id是否存在，如果不存在的话即是新建业务，否则就是更新操作。<br />
+[code lang=&ldquo;java&rdquo;]
+<body>
+&lt;s:if test=&ldquo;book.id != null&rdquo;></p>
+
+<pre><code>&lt;h1&gt;Editing book&lt;/h1&gt;
+</code></pre>
+
+<p>&lt;/s:if>
+&lt;s:else></p>
+
+<pre><code>&lt;h1&gt;Add book&lt;/h1&gt;
+</code></pre>
+
+<p>&lt;/s:else></p>
+
+<p><p>&lt;s:form action=&ldquo;saveOrUpdateBook&rdquo; method=&ldquo;post&rdquo;></p>
+
+<pre><code>&lt;div class="field"&gt;
+    &lt;s:hidden name="book.id" value="%{book.id}" /&gt;
+&lt;/div&gt;
+&lt;div class="field"&gt;
+    &lt;s:textfield name="book.title" label="Title" /&gt;
+&lt;/div&gt;
+&lt;div class="field"&gt;
+    &lt;s:textarea name="book.description" label="Description" rows="5" cols="25" /&gt;
+&lt;/div&gt;
+&lt;div class="field"&gt;
+    &lt;s:textfield name="book.image_url" label="Image URL" /&gt;
+&lt;/div&gt;
+&lt;div class="field"&gt;
+    &lt;s:textfield name="book.price" label="Price" /&gt;
+&lt;/div&gt;
+&lt;div class="field"&gt;
+    &lt;s:textfield name="book.author" label="Author" /&gt;
+&lt;/div&gt;
+&lt;div class="field"&gt;
+    &lt;s:textfield name="book.isbn" label="ISBN" /&gt;
+&lt;/div&gt;
+&lt;div class="field"&gt;
+    &lt;s:textfield name="book.publisher" label="Publisher" /&gt;
+&lt;/div&gt;
+&lt;div class="actions"&gt;
+    &lt;s:if test="book.id != null"&gt;
+    &lt;s:submit value="Update" /&gt;
+    &lt;/s:if&gt;
+    &lt;s:else&gt;
+    &lt;s:submit value="Save" /&gt;
+    &lt;/s:else&gt;
+</code></pre>
+
+<p>  </div>
+&lt;/s:form></p>
+
+<p><p>&lt;s:if test=&ldquo;book.id != null&rdquo;>
+&lt;s:a href=&ldquo;showBook.action?bookId=%{book.id}&rdquo;>Show&lt;/s:a> |
+&lt;/s:if>
+&lt;s:a action=&ldquo;listBook&rdquo;>Back&lt;/s:a>
+</body>
+```</p>
+
+<p><p>最后还要完成图书模型的服务端校验。Struts 2的校验文件有两种格式：ActionName-validation.xml和ActionName-alias-validation.xml。第一种会对该Action中的每个方法进行校验，不符合只对saveOrUpdate校验的要求。在BookAction.java同目录下创建BookAction-saveOrUpdateBook-validation.xml文件：<br />
+[code lang=&ldquo;xml&rdquo;]
+<validators></p>
+
+<pre><code>&lt;field name="book"&gt;
+    &lt;field-validator type="visitor"&gt;
+        &lt;param name="appendPrefix"&gt;true&lt;/param&gt;
+        &lt;message /&gt;
+    &lt;/field-validator&gt;
+&lt;/field&gt;
+</code></pre>
+
+<p></validators>
+```</p>
+
+<p><p>当然，还要在Book.java所在的位置创建Book-validation.xml文件：<br />
+[code lang=&ldquo;xml&rdquo;]
+<validators></p>
+
+<pre><code>&lt;field name="title"&gt;
+    &lt;field-validator type="required"&gt;
+        &lt;message&gt;Price is required&lt;/message&gt;
+    &lt;/field-validator&gt;
+&lt;/field&gt;
+...&lt;br /&gt;
+&lt;field name="price"&gt;
+    &lt;field-validator type="required"&gt;
+        &lt;message&gt;Price is required&lt;/message&gt;
+    &lt;/field-validator&gt;
+    &lt;field-validator type="double"&gt;
+        &lt;param name="minInclusive"&gt;0.01&lt;/param&gt;
+        &lt;message&gt;Price should be at least 0.01&lt;/message&gt;
+    &lt;/field-validator&gt;
+&lt;/field&gt;
+</code></pre>
+
+<p></validators>
+```</p>
+
+<p><p>看着BookAction-saveOrUpdateBook-validation.xml这么长的文件名是不是有点无语:)没关系，BookAction-validation.xml配置文件还是可以用的，只要在BookAction.java中那些不需要进行校验的方法上添加@SkipValidation；也可以在action配置中启用validation.excludeMethods参数：<br />
+[code lang=&ldquo;xml&rdquo;]
+<action name="*Book" method="{1}" class="bookAction"></p>
+
+<pre><code>&lt;interceptor-ref name="defaultStack"&gt;
+    &lt;param name="validation.excludeMethods"&gt;list,show,input,delete&lt;/param&gt;
+&lt;/interceptor-ref&gt;
+...
+</code></pre>
+
+<p></action>
+```</p>
+
+<p><p>代码下载：<a href="https://github.com/dohkoos/JBookShelf"><a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></a>
+</p></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Struts 2 + Spring 3 + Hibernate 4登录实例]]></title>
+    <link href="http://codemany.com/blog/2012/09/04/struts2-spring3-hibernate4-login-sample/"/>
+    <updated>2012-09-04T06:54:27+08:00</updated>
+    <id>http://codemany.com/blog/2012/09/04/struts2-spring3-hibernate4-login-sample</id>
+    <content type="html"><![CDATA[<p><p>在pom.xml中添加依赖包：<br />
+[code lang=&ldquo;xml&rdquo;]
+<dependency></p>
+
+<pre><code>&lt;groupId&gt;org.springframework&lt;/groupId&gt;
+&lt;artifactId&gt;spring-orm&lt;/artifactId&gt;
+&lt;version&gt;3.1.2.RELEASE&lt;/version&gt;
+</code></pre>
+
+<p></dependency>
+<dependency></p>
+
+<pre><code>&lt;groupId&gt;org.springframework&lt;/groupId&gt;
+&lt;artifactId&gt;spring-web&lt;/artifactId&gt;
+&lt;version&gt;3.1.2.RELEASE&lt;/version&gt;
+</code></pre>
+
+<p></dependency>
+<!-- 没有这个plugin包会导致Spring无法注入bean到Struts 2的Action中 -->
+<dependency></p>
+
+<pre><code>&lt;groupId&gt;org.apache.struts&lt;/groupId&gt;
+&lt;artifactId&gt;struts2-spring-plugin&lt;/artifactId&gt;
+&lt;version&gt;2.3.4.1&lt;/version&gt;
+</code></pre>
+
+<p></dependency>
+```</p>
+
+<p><p>配置web.xml文件：<br />
+[code lang=&ldquo;xml&rdquo;]
+&lt;context-param></p>
+
+<pre><code>&lt;param-name&gt;contextConfigLocation&lt;/param-name&gt;
+&lt;param-value&gt;classpath:applicationContext.xml&lt;/param-value&gt;
+</code></pre>
+
+<p>&lt;/context-param></p>
+
+<p><p><listener></p>
+
+<pre><code>&lt;listener-class&gt;org.springframework.web.context.ContextLoaderListener&lt;/listener-class&gt;
+</code></pre>
+
+<p></listener>
+```</p>
+
+<p><p>删除hibernate.cfg.xml，添加applicationContext.xml，内容为：<br />
+[code lang=&ldquo;xml&rdquo;]
+&lt;?xml version=&ldquo;1.0&rdquo; encoding=&ldquo;utf-8&rdquo;?>
+<beans xmlns="http://www.springframework.org/schema/beans"<br /></p>
+
+<pre><code>xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"&lt;br /&gt;
+xsi:schemaLocation="http://www.springframework.org/schema/beans&lt;br /&gt;
+    http://www.springframework.org/schema/beans/spring-beans.xsd"&gt;
+</code></pre>
+
+<p><p>    <!-- DriverManagerDataSource在每个连接请求时都新建一个connection。<br /></p>
+
+<pre><code>     与DBCP的BasicDataSource不同，DriverManagerDataSource提供的连接没有进行池管理 --&gt;
+&lt;bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource"&gt;
+    &lt;property name="driverClassName" value="com.mysql.jdbc.Driver" /&gt;
+    &lt;property name="url" value="jdbc:mysql://localhost:3306/jbookshelf" /&gt;
+    &lt;property name="username" value="root" /&gt;
+    &lt;property name="password" value="123456" /&gt;
+&lt;/bean&gt;
+</code></pre>
+
+<p><p>    <bean id="sessionFactory" class="org.springframework.orm.hibernate4.LocalSessionFactoryBean"></p>
+
+<pre><code>    &lt;property name="dataSource" ref="dataSource" /&gt;
+    &lt;property name="hibernateProperties"&gt;
+        &lt;props&gt;
+            &lt;prop key="hibernate.connection.pool_size"&gt;1&lt;/prop&gt;
+            &lt;prop key="hibernate.dialect"&gt;org.hibernate.dialect.MySQLDialect&lt;/prop&gt;
+            &lt;prop key="hibernate.cache.provider_class"&gt;org.hibernate.cache.internal.NoCacheProvider&lt;/prop&gt;
+            &lt;prop key="show_sql"&gt;true&lt;/prop&gt;
+        &lt;/props&gt;
+    &lt;/property&gt;
+    &lt;property name="mappingResources"&gt;
+        &lt;list&gt;
+            &lt;value&gt;com/codemany/account/model/User.hbm.xml&lt;/value&gt;
+        &lt;/list&gt;
+    &lt;/property&gt;
+&lt;/bean&gt;
+</code></pre>
+
+<p><p>    <bean id="userDao" class="com.codemany.account.dao.UserDao"></p>
+
+<pre><code>    &lt;property name="sessionFactory" ref="sessionFactory" /&gt;
+&lt;/bean&gt;
+</code></pre>
+
+<p><p>    <!-- Struts 2的action是有状态的，必须显示设置scope为prototype，每次请求过来都会创建一个action --></p>
+
+<pre><code>&lt;bean id="loginAction" class="com.codemany.account.action.LoginAction" scope="prototype"&gt;
+    &lt;property name="userDao" ref="userDao" /&gt;
+&lt;/bean&gt;
+</code></pre>
+
+<p></beans>
+```</p>
+
+<p><p>删除HibernateUtil.java，修改UserDao.java为以下内容：<br />
+```
+package com.codemany.account.dao;</p>
+
+<p><p>import org.hibernate.Query;<br />
+import org.hibernate.Session;<br />
+import org.hibernate.SessionFactory;</p>
+
+<p><p>import com.codemany.account.model.User;</p>
+
+<p><p>public class UserDao {<br /></p>
+
+<pre><code>// Spring 3集成Hibernate 4不再需要HibernateDaoSupport或HibernateTemplate了，&lt;br /&gt;
+// 直接使用原生API即可。&lt;br /&gt;
+private SessionFactory sessionFactory;
+</code></pre>
+
+<p><p>    public void setSessionFactory(SessionFactory sessionFactory) {<br /></p>
+
+<pre><code>    this.sessionFactory = sessionFactory;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public User getUser(String username) {<br /></p>
+
+<pre><code>    Session session = sessionFactory.openSession();&lt;br /&gt;
+    try {&lt;br /&gt;
+        Query query = session.createQuery("from User u where u.username = ?");&lt;br /&gt;
+        query.setString(0, username);&lt;br /&gt;
+        query.setMaxResults(1);&lt;br /&gt;
+        return (User)query.uniqueResult();&lt;br /&gt;
+    } finally {&lt;br /&gt;
+        session.close();&lt;br /&gt;
+    }&lt;br /&gt;
+}&lt;br /&gt;
+</code></pre>
+
+<p>}
+```</p>
+
+<p><p>在struts.xml中将action元素中login的class属性改为applicationContext.xml配置文件中的loginAction： <br />
+[code lang=&ldquo;xml&rdquo;]
+<action name="login" class="loginAction"></p>
+
+<pre><code>&lt;result name="success"&gt;/index.jsp&lt;/result&gt;
+&lt;result name="input"&gt;/index.jsp&lt;/result&gt;
+</code></pre>
+
+<p></action>
+```</p>
+
+<p><p>修改LoginAction.java的代码：<br />
+```
+package com.codemany.account.action;</p>
+
+<p><p>import com.codemany.account.dao.UserDao;<br />
+import com.codemany.account.model.User;</p>
+
+<p><p>import com.opensymphony.xwork2.ActionContext;<br />
+import com.opensymphony.xwork2.ActionSupport;</p>
+
+<p><p>public class LoginAction extends ActionSupport {<br /></p>
+
+<pre><code>private static final long serialVersionUID = -389833745243649130L;
+</code></pre>
+
+<p><p>    private String username;<br /></p>
+
+<pre><code>private String password;
+</code></pre>
+
+<p><p>    private UserDao userDao;</p>
+
+<p><p>    public String execute() throws Exception {<br /></p>
+
+<pre><code>    if (username == null || username.length() == 0&lt;br /&gt;
+            || password == null || password.length() == 0) {&lt;br /&gt;
+        return INPUT;&lt;br /&gt;
+    }
+</code></pre>
+
+<p><p>        User u = userDao.getUser(username);<br /></p>
+
+<pre><code>    if (u == null || !password.equals(u.getPassword())) {&lt;br /&gt;
+        return INPUT;&lt;br /&gt;
+    }
+</code></pre>
+
+<p><p>        ActionContext.getContext().getSession().put(&ldquo;logined&rdquo;, true);<br /></p>
+
+<pre><code>    return SUCCESS;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public void setUsername(String username) {<br /></p>
+
+<pre><code>    this.username = username;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public void setPassword(String password) {<br /></p>
+
+<pre><code>    this.password = password;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public void setUserDao(UserDao userDao) {<br /></p>
+
+<pre><code>    this.userDao = userDao;&lt;br /&gt;
+}&lt;br /&gt;
+</code></pre>
+
+<p>}
+```</p>
+
+<p><p>代码下载：<a href="https://github.com/dohkoos/JBookShelf"><a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></a></p></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Struts 2 + Hibernate 4登录实例]]></title>
+    <link href="http://codemany.com/blog/2012/08/31/struts2-hibernate4-login-sample/"/>
+    <updated>2012-08-31T07:41:05+08:00</updated>
+    <id>http://codemany.com/blog/2012/08/31/struts2-hibernate4-login-sample</id>
+    <content type="html"><![CDATA[<p><p>使用以下代码创建数据库：<br />
+```
+CREATE DATABASE IF NOT EXISTS jbookshelf;</p>
+
+<p><p>USE jbookshelf;</p>
+
+<p><p>DROP TABLE IF EXISTS users;</p>
+
+<p><p>CREATE TABLE users (<br /></p>
+
+<pre><code>id int NOT NULL AUTO_INCREMENT,&lt;br /&gt;
+username varchar(20) NOT NULL,&lt;br /&gt;
+password varchar(50) NOT NULL,&lt;br /&gt;
+PRIMARY KEY(id)&lt;br /&gt;
+</code></pre>
+
+<p>) ENGINE=InnoDB DEFAULT CHARSET=utf-8;<br />
+```</p>
+
+<p><p>在pom.xml中添加Hibernate的依赖配置：<br />
+[code lang=&ldquo;xml&rdquo;]
+<dependency></p>
+
+<pre><code>&lt;groupId&gt;org.hibernate&lt;/groupId&gt;
+&lt;artifactId&gt;hibernate-core&lt;/artifactId&gt;
+&lt;version&gt;4.1.6.Final&lt;/version&gt;
+</code></pre>
+
+<p></dependency>
+<dependency></p>
+
+<pre><code>&lt;groupId&gt;mysql&lt;/groupId&gt;
+&lt;artifactId&gt;mysql-connector-java&lt;/artifactId&gt;
+&lt;version&gt;5.1.21&lt;/version&gt;
+</code></pre>
+
+<p></dependency>
+```</p>
+
+<p><p>创建User.java类：<br />
+```
+package com.codemany.account.model;</p>
+
+<p><p>public class User {<br /></p>
+
+<pre><code>private Long id;
+</code></pre>
+
+<p><p>    private String username;<br /></p>
+
+<pre><code>private String password;
+</code></pre>
+
+<p><p>    public Long getId() {<br /></p>
+
+<pre><code>    return id;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public void setId(Long id) {<br /></p>
+
+<pre><code>    this.id = id;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public String getUsername() {<br /></p>
+
+<pre><code>    return username;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public void setUsername(String username) {<br /></p>
+
+<pre><code>    this.username = username;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public String getPassword() {<br /></p>
+
+<pre><code>    return password;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public void setPassword(String password) {<br /></p>
+
+<pre><code>    this.password = password;&lt;br /&gt;
+}&lt;br /&gt;
+</code></pre>
+
+<p>}
+```</p>
+
+<p><p>在同一目录下创建User.hbm.xml文件：<br />
+[code lang=&ldquo;xml&rdquo;]
+&lt;?xml version=&ldquo;1.0&rdquo; encoding=&ldquo;utf-8&rdquo;?>
+&lt;!DOCTYPE hibernate-mapping PUBLIC<br /></p>
+
+<pre><code>"-//Hibernate/Hibernate Mapping DTD 3.0//EN"&lt;br /&gt;
+"http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd"&gt;
+</code></pre>
+
+<p><p>&lt;hibernate-mapping package=&ldquo;com.codemany.account.model&rdquo;></p>
+
+<pre><code>&lt;class name="User" table="users"&gt;
+    &lt;id name="id"&gt;
+        &lt;generator class="increment" /&gt;
+    &lt;/id&gt;
+</code></pre>
+
+<p><p>        <property name="username" length="20" /></p>
+
+<pre><code>    &lt;property name="password" length="50" /&gt;
+&lt;/class&gt;
+</code></pre>
+
+<p>&lt;/hibernate-mapping>
+```</p>
+
+<p><p>在resources目录下创建hibernate.cfg.xml配置文件，内容如下：<br />
+[code lang=&ldquo;xml&rdquo;]
+&lt;?xml version=&lsquo;1.0&rsquo; encoding=&lsquo;utf-8&rsquo;?>
+&lt;!DOCTYPE hibernate-configuration PUBLIC<br /></p>
+
+<pre><code>"-//Hibernate/Hibernate Configuration DTD 3.0//EN"&lt;br /&gt;
+"http://www.hibernate.org/dtd/hibernate-configuration-3.0.dtd"&gt;
+</code></pre>
+
+<p><p>&lt;hibernate-configuration></p>
+
+<pre><code>&lt;session-factory&gt;
+    &lt;!-- MySQL connection settings --&gt;
+    &lt;property name="connection.driver_class"&gt;com.mysql.jdbc.Driver&lt;/property&gt;
+    &lt;property name="connection.url"&gt;jdbc:mysql://localhost:3306/jbookshelf&lt;/property&gt;
+    &lt;property name="connection.username"&gt;yourname&lt;/property&gt;
+    &lt;property name="connection.password"&gt;yourpassword&lt;/property&gt;
+</code></pre>
+
+<p><p>        <!-- JDBC connection pool (use the built-in) --></p>
+
+<pre><code>    &lt;property name="connection.pool_size"&gt;1&lt;/property&gt;
+</code></pre>
+
+<p><p>        <!-- SQL dialect --></p>
+
+<pre><code>    &lt;property name="dialect"&gt;org.hibernate.dialect.MySQLDialect&lt;/property&gt;
+</code></pre>
+
+<p><p>        <!-- Disable the second-level cache  --></p>
+
+<pre><code>    &lt;property name="cache.provider_class"&gt;org.hibernate.cache.internal.NoCacheProvider&lt;/property&gt;
+</code></pre>
+
+<p><p>        <!-- Echo all executed SQL to stdout --></p>
+
+<pre><code>    &lt;property name="show_sql"&gt;true&lt;/property&gt;
+</code></pre>
+
+<p><p>        <mapping resource="com/codemany/account/model/User.hbm.xml" /></p>
+
+<pre><code>&lt;/session-factory&gt;
+</code></pre>
+
+<p>&lt;/hibernate-configuration>
+```</p>
+
+<p><p>建立管理Session的HibernateUtil.java类：<br />
+```
+package com.codemany.account.dao.hibernate;</p>
+
+<p><p>import org.hibernate.Session;<br />
+import org.hibernate.SessionFactory;<br />
+import org.hibernate.cfg.Configuration;</p>
+
+<p><p>public class HibernateUtil {<br /></p>
+
+<pre><code>private static final SessionFactory sessionFactory;
+</code></pre>
+
+<p><p>    static {<br /></p>
+
+<pre><code>    try {&lt;br /&gt;
+        // Create the SessionFactory from hibernate.cfg.xml&lt;br /&gt;
+        Configuration configuration = new Configuration();&lt;br /&gt;
+        configuration.configure();&lt;br /&gt;
+        Properties props = configuration.getProperties();
+</code></pre>
+
+<p><p>            ServiceRegistry serviceRegistry =<br /></p>
+
+<pre><code>                new ServiceRegistryBuilder().applySettings(props).buildServiceRegistry();
+</code></pre>
+
+<p><p>            sessionFactory = configuration.buildSessionFactory(serviceRegistry);<br /></p>
+
+<pre><code>    } catch (Throwable ex) {&lt;br /&gt;
+        // Make sure you log the exception, as it might be swallowed&lt;br /&gt;
+        System.err.println("Initial SessionFactory creation failed." + ex);&lt;br /&gt;
+        throw new ExceptionInInitializerError(ex);&lt;br /&gt;
+    }&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    public static Session getSession() {<br /></p>
+
+<pre><code>    return sessionFactory.openSession();&lt;br /&gt;
+}&lt;br /&gt;
+</code></pre>
+
+<p>}
+```</p>
+
+<p><p>在dao包创建数据访问对象：<br />
+```
+package com.codemany.account.dao;</p>
+
+<p><p>import org.hibernate.Query;<br />
+import org.hibernate.Session;<br />
+import org.hibernate.Transaction;</p>
+
+<p><p>import com.codemany.account.model.User;</p>
+
+<p><p>public class UserDao {<br /></p>
+
+<pre><code>public static User getUser(String username) {&lt;br /&gt;
+    Session session = HibernateUtil.getSession();&lt;br /&gt;
+    try {&lt;br /&gt;
+        Query query = session.createQuery("from User u where u.username = ?");&lt;br /&gt;
+        query.setMaxResults(1);&lt;br /&gt;
+        query.setString(0, username);&lt;br /&gt;
+        return (User)query.uniqueResult();&lt;br /&gt;
+    } finally {&lt;br /&gt;
+        session.close();&lt;br /&gt;
+    }&lt;br /&gt;
+}&lt;br /&gt;
+</code></pre>
+
+<p>}
+```</p>
+
+<p><p>现在可以访问数据库了，所以要修改LoginAction.java的execute方法：<br />
+```
+public String execute() throws Exception {<br /></p>
+
+<pre><code>if (username == null || username.length() == 0&lt;br /&gt;
+        || password == null || password.length() == 0) {&lt;br /&gt;
+    return INPUT;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    User u = UserDao.getUser(username);<br /></p>
+
+<pre><code>if (u == null) {&lt;br /&gt;
+    return INPUT;&lt;br /&gt;
+}&lt;br /&gt;
+if (username.equals(u.getUsername()) &amp;&amp; password.equals(u.getPassword())) {&lt;br /&gt;
+    ActionContext.getContext().getSession().put("logined", true);&lt;br /&gt;
+    return SUCCESS;&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    return INPUT;<br />
+}
+```</p>
+
+<p><p>PS：如果显示jta-1.0.1b.jar缺失的错误，可以在pom.xml中添加以下语句：<br />
+[code lang=&ldquo;xml&rdquo;]
+<repositories></p>
+
+<pre><code>&lt;repository&gt;
+    &lt;id&gt;java.net&lt;/id&gt;
+    &lt;url&gt;http://download.java.net/maven/2/&lt;/url&gt;
+&lt;/repository&gt;
+</code></pre>
+
+<p></repositories>
+```</p>
+
+<p><p>代码下载：<a href="https://github.com/dohkoos/JBookShelf"><a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></a></p></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[创建视图时的with check option选项]]></title>
+    <link href="http://codemany.com/blog/2010/06/28/with-check-option-in-view/"/>
+    <updated>2010-06-28T04:33:27+08:00</updated>
+    <id>http://codemany.com/blog/2010/06/28/with-check-option-in-view</id>
+    <content type="html"><![CDATA[<p>通过有with check option选项的视图操作基表，有以下结论：<br />
+1、首先视图只操作它可以查询出来的数据，对于它查询不出的数据，即使基表有，也不可以通过视图来操作；<br />
+2、对于update，有with check option，要保证update后，数据能被视图查询出来；<br />
+3、对于delete，有无with check option都一样；<br />
+4、对于insert，有with check option，要保证insert后，数据要被视图查询出来。</p>
+
+<p>对于没有where子句的视图，使用with check option是多余的。</p>
+
+<p>下面用一个例子来说明下第4条：
+```
+CREATE TABLE students (</p>
+
+<pre><code>id int NOT NULL AUTO_INCREMENT,
+name varchar(50) NOT NULL,
+age int,
+sex char(1),
+PRIMARY KEY(id)
+</code></pre>
+
+<p>);</p>
+
+<p>CREATE VIEW male_students_view AS</p>
+
+<pre><code>SELECT name, age FROM students
+WHERE sex = 'M'
+WITH CHECK OPTION;
+</code></pre>
+
+<p>```</p>
+
+<p><code>
+-- 报CHECK OPTION failed错误，原因如4，插入数据后要还能被视图查询出来。
+INSERT INTO male_students_view values('WU', 18);
+</code></p>
+
+<p><code>
+-- 报Column count doesn't match value count错误，因为视图中根本没有sex列。
+INSERT INTO male_students_view values('WU', 18, 'M');
+</code></p>
+
+<p>将students.sex列改成默认值为M：
+<code>
+ALTER TABLE students MODIFY sex char(1) NOT NULL DEFAULT 'M'
+</code></p>
+
+<p><code>
+-- 执行成功，1 row affected。
+INSERT INTO male_students_view values('WU', 18);
+</code></p>
+
+<p><code>
+-- 还是同样的问题，Column count doesn't match value count。
+INSERT INTO male_students_view values('WU', 18, 'M');
+</code></p>
+
+<p>或者不修改students.sex的属性，将视图改成：
+```
+CREATE VIEW male_students_view AS</p>
+
+<pre><code>SELECT name, age, sex FROM students
+WHERE sex = 'M'
+WITH CHECK OPTION;
+</code></pre>
+
+<p>```</p>
+
+<p><code>
+-- 会报CHECK OPTION failed错误。
+INSERT INTO male_students_view values('WU', 18);
+</code></p>
+
+<p><code>
+-- 执行成功，1 row affected。
+INSERT INTO male_students_view values('WU', 18, 'M');
+</code></p>
+
+<p>以上例子都在MySQL上实际执行过，绝对不会像<a href="http://blog.csdn.net/kowity/article/details/1657899">这篇博文</a>中讲的某本教科书那样乱涂乱写。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[使用MySQL客户端远程连接Lunarpages数据库]]></title>
+    <link href="http://codemany.com/blog/2009/07/09/allow-client-connect-to-mysql-remotely-on-lunarpages/"/>
+    <updated>2009-07-09T14:54:05+08:00</updated>
+    <id>http://codemany.com/blog/2009/07/09/allow-client-connect-to-mysql-remotely-on-lunarpages</id>
+    <content type="html"><![CDATA[<p>Lunarpages虚拟主机上的MySQL服务默认仅有本机能访问。只有在cPanel中向某IP地址或地址段或者所有IP地址开放访问权限后，才可以从外部用客户端连接到数据库。</p>
+
+<p>如果想允许任何主机的访问，直接在Host处填写百分号%，然后Add Host即可。如果只想特定主机访问，就输入客户端机器的IP地址。
+<img src="/uploads/lunarpages-mysql-remote.png" title="lunarpages-mysql-remote" ></p>
+
+<p>还有就是客户端远程连接时使用的地址就是空间的IP地址，可以通过ping域名得到。</p>
+]]></content>
+  </entry>
+  
+</feed>

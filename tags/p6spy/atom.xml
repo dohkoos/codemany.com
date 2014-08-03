@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Tag: P6Spy | 乐者为王]]></title>
+  <link href="http://codemany.com/tags/p6spy/atom.xml" rel="self"/>
+  <link href="http://codemany.com/"/>
+  <updated>2014-08-03T22:12:07+08:00</updated>
+  <id>http://codemany.com/</id>
+  <author>
+    <name><![CDATA[dohkoos]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[集成P6Spy到Spring后没有产生log文件的问题的解决]]></title>
+    <link href="http://codemany.com/blog/2007/01/22/integrated-p6spy-to-spring-did-not-have-a-log-file-problem/"/>
+    <updated>2007-01-22T17:41:32+08:00</updated>
+    <id>http://codemany.com/blog/2007/01/22/integrated-p6spy-to-spring-did-not-have-a-log-file-problem</id>
+    <content type="html"><![CDATA[<p><p>网上关于集成p6spy到spring的帖子说：在spring的配置文件中添加<br /><bean id="dataSource" class="com.p6spy.engine.spy.P6DataSource" destroy-method="close"><br />    <constructor-arg ref="dataSourceTarget" /><br /></bean><br />然后将原来dataSource bean definition的id值改为dataSourceTarget，如下：<br /><bean id="myDataSourceTarget" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close"><br />    ...<br /></bean><br />但是照着这样做了以后却发现没有生成log文件。下载p6spy的源代码进行阅读之后终于找到了问题所在（我的<br />syp.properties放在了C:\Tomcat 5.5\webapps\p6spy\WEB-INF\classes目录下）。<br />打开P6Util.java文件，在classPathFile方法中有这样一条语句（file的值就是spy.properties）<br />fp = classLoadPropertyFile(Thread.currentThread().getContextClassLoader().getResource(file))<br />它调用web容器Tomcat的classloader来取得资源文件，通常web容器默认编码是iso-8859-1，<br />所以它返回的URL的file值是C:/Tomcat%205.5/webapps/netlink/WEB-INF/classes/spy.properties，<br />其中Tomcat 5.5中的空格被编码成了%20。<br />接着在classLoadPropertyFile方法中p6spy就直接使用了URL的file值来创建File对象，而没有使用任何的编码格式，</p><p>    public static File classLoadPropertyFile(java.net.URL purl) {<br />        try {<br />            if (purl != null) {<br />                // modified by jayakumar for JDK 1.2 support<br />                //return new File(purl.getPath());<br />                return new File(getPath(purl));<br />                // end of modification<br />            }<br />        } catch (Exception e) {<br />            // we ignore this, since JDK 1.2 does not suppport this method<br />        }<br />        return null;<br />    }</p><p>然后在classPathFile方法中通过判断fp.exists()来决定是否返回log文件的路径。因为使用的中文操作系统，<br />本地编码是gbk，可以知道fp.exists()肯定不可能为true了，因此log文件也就不可能被创建了。那么该怎样解<br />决这个问题呢？其实我们只要将classLoadPropertyFile()方法中的return new File(getPath(purl))改成<br />return new File(URLDecoder.decode(getPath(purl)))就可以了。</p></p>
+
+]]></content>
+  </entry>
+  
+</feed>

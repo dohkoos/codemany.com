@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Tag: Handler | 乐者为王]]></title>
+  <link href="http://codemany.com/tags/handler/atom.xml" rel="self"/>
+  <link href="http://codemany.com/"/>
+  <updated>2014-08-03T22:17:08+08:00</updated>
+  <id>http://codemany.com/</id>
+  <author>
+    <name><![CDATA[dohkoos]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[实现带icon的ListView（改进版）]]></title>
+    <link href="http://codemany.com/blog/2011/06/02/achieved-with-the-icon-of-the-listview-improved-version/"/>
+    <updated>2011-06-02T02:47:58+08:00</updated>
+    <id>http://codemany.com/blog/2011/06/02/achieved-with-the-icon-of-the-listview-improved-version</id>
+    <content type="html"><![CDATA[<p><p>带icon的ListView工作起来还不错，但是如果手机里安装的软件比较多的话就有问题了。在程序启动时会黑屏一段时间，就好像程序挂起了一样。所以这时需要显示一个对话框，告诉用户正在加载数据，最好还能准确告诉用户加载的进度。</p>
+
+<p><p>显示对话框用ProgressDialog，它有两种样式：HORIZONTAL和SPINNER。这里暂时选择SPINNER，等以后有机会再改成HORIZONTAL。</p>
+
+<p><p>我们在加载数据前显示ProgressDialog，在之后关闭对话框。示例代码如下：<br />
+```
+ProgressDialog pd = ProgressDialog.show(this, &ldquo;Wait&rdquo;, &ldquo;loading&hellip;&rdquo;);</p>
+
+<p><p>    ListView lv = (ListView)findViewById(R.id.list_view);<br /></p>
+
+<pre><code>adapter = new SimpleIconAdapter(this,&lt;br /&gt;
+        getInstalledApps(false),&lt;br /&gt;
+        R.layout.list_item,&lt;br /&gt;
+        new String[] {APP_ICON, APP_TITLE, APP_PACKAGE},&lt;br /&gt;
+        new int[] {R.id.app_icon, R.id.app_title, R.id.app_package});&lt;br /&gt;
+lv.setAdapter(adapter);
+</code></pre>
+
+<p><p>pd.dismiss();<br />
+```</p>
+
+<p><p>但结果ProgressDialog没有显示出来，因为加载数据的代码也执行在UI线程中，所以对话框的显示被阻塞了。怎么办呢？可以试着创建一个新线程，然后把加载数据这个耗时的操作放到这个非UI线程中去执行，这样不就可以了么：<br />
+```
+ProgressDialog pd = ProgressDialog.show(this, &ldquo;Wait&rdquo;, &ldquo;loading&hellip;&rdquo;);<br />
+new Thread() {<br /></p>
+
+<pre><code>public void run() {
+</code></pre>
+
+<p><p>        ListView lv = (ListView)findViewById(R.id.list_view);<br /></p>
+
+<pre><code>    adapter = new SimpleIconAdapter(Main.this,&lt;br /&gt;
+            getInstalledApps(false),&lt;br /&gt;
+            R.layout.list_item,&lt;br /&gt;
+            new String[] {APP_ICON, APP_TITLE, APP_PACKAGE},&lt;br /&gt;
+            new int[] {R.id.app_icon, R.id.app_title, R.id.app_package});&lt;br /&gt;
+    lv.setAdapter(adapter);
+</code></pre>
+
+<p><p>    }<br />
+}.start();<br />
+pd.dismiss();<br />
+```</p>
+
+<p><p>这下更惨了，直接报Runtime异常，连界面都打不开了。</p>
+
+<p><p>深入研究一下Android的线程模型，看看Android到底是怎么处理UI线程和其它线程的交互的，为什么上面的代码会报异常?</p>
+
+<p><p><blockquote>
+When an application is launched, the system creates a thread called &ldquo;main&rdquo; for the application. The main thread, also called the UI thread, is very important because it is in charge of dispatching the events to the appropriate widgets, including drawing events. It is also the thread where your application interacts with running components of the Android UI toolkit.</p>
+
+<p><p>For instance, if you touch the a button on screen, the UI thread dispatches the touch event to the widget, which in turn sets its pressed state and posts an invalidate request to the event queue. The UI thread dequeues the request and notifies the widget to redraw itself.</p>
+
+<p><p>This single-thread model can yield poor performance unless your application is implemented properly. Specifically, if everything is happening in a single thread, performing long operations such as network access or database queries on the UI thread will block the whole user interface. No event can be dispatched, including drawing events, while the long operation is underway. From the user&rsquo;s perspective, the application appears hung. Even worse, if the UI thread is blocked for more than a few seconds (about 5 seconds currently) the user is presented with the infamous &ldquo;application not responding&rdquo; (ANR) dialog.
+</blockquote></p>
+
+<p><p>看了上面这段话可以知道为啥程序一打开就黑屏，像挂掉了一样。</p>
+
+<p><p>那为什么用新建线程来执行耗时操作的代码也有问题呢？这是因为它虽然没有阻塞UI线程，但它违背了单线程模型，Android的UI操作并不是线程安全的，并且这些操作必须在UI线程中执行。在这段代码片段中，在另一个线程中执行数据加载，这会引起一些古怪的问题。</p>
+
+<p><p>Andriod提供了几种在其他线程中访问UI线程的方法。下面是所有这些方法的列表：
+<a href="http://developer.android.com/reference/android/app/Activity.html#runOnUiThread(java.lang.Runnable)">Activity.runOnUiThread(Runnable)</a>
+<a href="http://developer.android.com/reference/android/view/View.html#post(java.lang.Runnable)">View.post(Runnable)</a>
+<a href="http://developer.android.com/reference/android/view/View.html#postDelayed(java.lang.Runnable,%20long)">View.postDelayed(Runnable, long)</a>
+<a href="http://developer.android.com/reference/android/os/Handler.html">Hanlder</a></p>
+
+<p><p>上面的任何一个类或方法都可以修复我们前面代码中出现的问题，很不幸的是这些类或方法同样会使你的代码很复杂很难理解。然而当你需要实现一些很复杂的操作并需要频繁地更新UI时这会变得更糟糕。为了解决这个问题，Android 1.5提供了一个工具类AsyncTask，它使创建需要与用户界面交互的长时间运行的任务变得更简单。在Android 1.0和1.1中具有与AsyncTask相同功能的类UserTask。它提供了完全一样的API，你需要做的只是把它的代码拷贝的你的程序中。</p>
+
+<p><p>其实这些方案都是采用的Handler，所以这里仍然使用旧有的，复杂的Handler来修复上述问题。至于为什么和如何利用Handler更新UI就不讲了，也许以后会做这样的一个整理，而且网上有很多这样的内容。这里直接上代码：<br />
+```
+package com.codemany.apkmgt;</p>
+
+<p><p>import java.util.ArrayList;<br />
+import java.util.HashMap;<br />
+import java.util.List;</p>
+
+<p><p>import android.app.Activity;<br />
+import android.app.ProgressDialog;<br />
+import android.content.pm.ApplicationInfo;<br />
+import android.content.pm.PackageInfo;<br />
+import android.graphics.drawable.Drawable;<br />
+import android.os.Bundle;<br />
+import android.os.Handler;<br />
+import android.os.Message;<br />
+import android.widget.ListView;</p>
+
+<p><p>public class Main extends Activity {<br /></p>
+
+<pre><code>private static final String APP_ICON = "app_icon";&lt;br /&gt;
+private static final String APP_TITLE = "app_title";&lt;br /&gt;
+private static final String APP_PACKAGE = "app_package";
+</code></pre>
+
+<p><p>    private SimpleIconAdapter adapter;<br /></p>
+
+<pre><code>private List&lt;HashMap&lt;String, Object&gt;&gt; listData;&lt;br /&gt;
+private ProgressDialog pd;
+</code></pre>
+
+<p><p>    @Override<br /></p>
+
+<pre><code>public void onCreate(Bundle savedInstanceState) {&lt;br /&gt;
+    super.onCreate(savedInstanceState);&lt;br /&gt;
+    setContentView(R.layout.main);
+</code></pre>
+
+<p><p>        ListView lv = (ListView)findViewById(R.id.list_view);<br /></p>
+
+<pre><code>    listData = new ArrayList&lt;HashMap&lt;String, Object&gt;&gt;();&lt;br /&gt;
+    adapter = new SimpleIconAdapter(this,&lt;br /&gt;
+            listData,&lt;br /&gt;
+            R.layout.list_item,&lt;br /&gt;
+            new String[] {APP_ICON, APP_TITLE, APP_PACKAGE},&lt;br /&gt;
+            new int[] {R.id.app_icon, R.id.app_title, R.id.app_package});&lt;br /&gt;
+    lv.setAdapter(adapter);
+</code></pre>
+
+<p><p>        pd = ProgressDialog.show(this, &ldquo;Wait&rdquo;, &ldquo;loading&hellip;&rdquo;);<br /></p>
+
+<pre><code>    new Thread() {&lt;br /&gt;
+        @Override&lt;br /&gt;
+        public void run() {&lt;br /&gt;
+            // 耗时操作，加载数据&lt;br /&gt;
+            listData.addAll(getInstalledApps(false));&lt;br /&gt;
+            handler.sendEmptyMessage(0);&lt;br /&gt;
+        }&lt;br /&gt;
+    }.start();&lt;br /&gt;
+}
+</code></pre>
+
+<p><p>    private Handler handler = new Handler() {<br /></p>
+
+<pre><code>    @Override&lt;br /&gt;
+    public void handleMessage(Message msg) {&lt;br /&gt;
+        // 通知UI更新。必须要放在这里&lt;br /&gt;
+        adapter.notifyDataSetChanged();&lt;br /&gt;
+        pd.dismiss();&lt;br /&gt;
+    }&lt;br /&gt;
+};
+</code></pre>
+
+<p><p>    private List&lt;HashMap&lt;String, Object>> getInstalledApps(boolean getSysPackages) {<br /></p>
+
+<pre><code>    ...&lt;br /&gt;
+}&lt;br /&gt;
+</code></pre>
+
+<p>}
+```</p>
+
+<p><p>参考资料：
+<a href="http://developer.android.com/resources/articles/painless-threading.html"><a href="http://developer.android.com/resources/articles/painless-threading.html">http://developer.android.com/resources/articles/painless-threading.html</a></a>
+<a href="http://kiminotes.iteye.com/blog/382683"><a href="http://kiminotes.iteye.com/blog/382683">http://kiminotes.iteye.com/blog/382683</a></a> 这个实际上是上面文章的译文</p></p>
+]]></content>
+  </entry>
+  
+</feed>

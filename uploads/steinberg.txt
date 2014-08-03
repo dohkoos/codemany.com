@@ -1,0 +1,115 @@
+有一点要说明，我们原来介绍的程序都是先开一个char类型的缓冲区，用来存储新图数据，但在这个算法中，因为e有可能是负数，为了防止得到的值超出char能表示的范围，我们使用了一个int类型的缓冲区存储新值。另外，当按从左到右，从上到下的顺序处理像素时，处理过的像素以后不会再用到了，
+所以用这个int类型的缓冲区存储新值是可行的。全部像素处理完后，再将这些值拷贝到char类型的缓冲区去。
+BOOL Steinberg(HWND hWnd)
+{
+    DWORD              OffBits, BufSize, IntBufSize;
+    LPBITMAPINFOHEADER lpImgData;
+    HLOCAL             hTempImgData;
+    LPBITMAPINFOHEADER lpTempImgData;
+    LPSTR              lpPtr;
+    LPSTR              lpTempPtr;
+    HDC                hDc;
+    HFILE              hf;
+    LONG               x, y;
+    unsigned char      num;
+    float              e, f;
+    HLOCAL             hIntBuf;
+    int                *lpIntBuf, *lpIntPtr;
+    int                tempnum;
+    
+    // OffBits为BITMAPINFOHEADER结构长度加调色板的大小
+    OffBits = bf.bfOffBits - sizeof(BITMAPFILEHEADER);
+    BufSize = bf.bfSize - sizeof(BITMAPFILEHEADER); //要开的缓冲区的大小
+    if ((hTempImgData = LocalAlloc(LHND, BufSize)) == NULL) //char 类型的缓冲区
+    {
+        MessageBox(hWnd, "Error alloc memory!", "Error Message", MB_OK | MB_ICONEXCLAMATION);
+        return FALSE;
+    }
+    IntBufSize = (DWORD)bi.biHeight * LineBytes * sizeof(int); // int类型缓冲区的大小
+    if ((hIntBuf = LocalAlloc(LHND, IntBufSize)) == NULL) // int类型的缓冲区
+    {
+        MessageBox(hWnd, "Error alloc memory!", "Error Message", MB_OK | MB_ICONEXCLAMATION);
+        LocalFree(hTempImgData);
+        return FALSE;
+    }
+    lpImgData = (LPBITMAPINFOHEADER)GlobalLock(hImgData);    
+    lpTempImgData = (LPBITMAPINFOHEADER)LocalLock(hTempImgData);
+    lpIntBuf = (int *)LocalLock(hIntBuf);
+
+    // 拷贝头信息
+    memcpy(lpTempImgData, lpImgData, OffBits);
+    // 将图象数据拷贝到int类型的缓冲区中
+    for (y = 0; y < bi.biHeight; y++) {
+        lpPtr = (char *)lpImgData + (BufSize - LineBytes - y * LineBytes);
+        lpIntPtr = (int *)lpIntBuf + (bi.biHeight - 1 - y) * LineBytes;
+        for (x = 0; x < bi.biWidth; x++) {
+        	*(lpIntPtr++) = (unsigned char)*(lpPtr++);
+        }
+    }
+
+for(y=0;y<bi.biHeight;y++){
+for(x=0;x<bi.biWidth;x++){
+lpIntPtr=(int *)lpIntBuf+(bi.biHeight-1-y)*LineBytes+x;
+		num=(unsigned char)*lpIntPtr;
+		if ( num > 128 ){ //128是中值
+			*lpIntPtr=255; //打白点
+			e=(float)(num-255.0); //计算误差
+		}
+	else{
+			*lpIntPtr=0; //打黑点
+			e=(float)num; //计算误差
+		}
+		if(x<bi.biWidth-1){ //注意判断边界
+		f=(float)*(lpIntPtr+1);
+			f+=(float)( (3.0/8.0) * e);
+			*(lpIntPtr+1)=(int)f; //向左传播
+}
+		if(y<bi.biHeight-1){ //注意判断边界
+			f=(float)*(lpIntPtr-LineBytes);
+			f+=(float)( (3.0/8.0) * e);
+			*(lpIntPtr-LineBytes)=(int)f; //向下传播
+			f=(float)*(lpIntPtr-LineBytes+1);
+			f+=(float)( (1.0/4.0) * e);
+			*(lpIntPtr-LineBytes+1)=(int)f; //向右下传播
+		}
+	}
+}
+//从int类型的缓冲区拷贝到char类型的缓冲区
+for(y=0;y<bi.biHeight;y++){
+lpTempPtr=(char *)lpTempImgData+(BufSize-LineBytes-
+y*LineBytes);
+lpIntPtr=(int *)lpIntBuf+(bi.biHeight-1-y)*LineBytes;
+for(x=0;x<bi.biWidth;x++){
+	tempnum=*(lpIntPtr++);
+		if(tempnum>255) tempnum=255;
+		else if (tempnum<0) tempnum=0;
+		*(lpTempPtr++)=(unsigned char)tempnum;
+	}
+}
+if(hBitmap!=NULL)
+DeleteObject(hBitmap);
+hDc=GetDC(hWnd);
+//产生新的位图 
+hBitmap=CreateDIBitmap(hDc,
+	(LPBITMAPINFOHEADER)lpTempImgData, 
+(LONG)CBM_INIT,
+(LPSTR)lpTempImgData+sizeof(BITMAPI
+NFOHEADER) 
++NumColors*sizeof(RGBQUAD),
+   				(LPBITMAPINFO)lpTempImgData, 
+DIB_RGB_COLORS);
+hf=_lcreat("c:\\steinberg.bmp",0);
+_lwrite(hf,(LPSTR)&bf,sizeof(BITMAPFILEHEADER)); 
+_lwrite(hf,(LPSTR)lpTempImgData,BufSize);
+_lclose(hf);
+//释放内存和资源
+ReleaseDC(hWnd,hDc);
+GlobalUnlock(hImgData);
+LocalUnlock(hTempImgData);
+LocalFree(hTempImgData);
+LocalUnlock(hIntBuf);
+LocalFree(hIntBuf);
+return TRUE;
+}
+
+要注意的是，误差传播有时会引起流水效应，即误差不断向下，向右累加传播。解决的办法是：奇数行从左到右传播，偶数行从右到左传播。

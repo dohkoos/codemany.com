@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Tag: ActionMailer | 乐者为王]]></title>
+  <link href="http://codemany.com/tags/actionmailer/atom.xml" rel="self"/>
+  <link href="http://codemany.com/"/>
+  <updated>2014-08-03T22:17:08+08:00</updated>
+  <id>http://codemany.com/</id>
+  <author>
+    <name><![CDATA[dohkoos]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[用Rails 2.3打造简单记账软件(3)]]></title>
+    <link href="http://codemany.com/blog/2009/11/15/using-the-rails23-to-create-a-simple-accounting-app-3/"/>
+    <updated>2009-11-15T16:21:33+08:00</updated>
+    <id>http://codemany.com/blog/2009/11/15/using-the-rails23-to-create-a-simple-accounting-app-3</id>
+    <content type="html"><![CDATA[<p><p>这次要给应用加上一个认证系统（注册、激活、登录、登出）。当用户输入注册信息时，必须输入有效的邮箱地址，注册成功后，用户并不能立即登录系统，而是要登录注册时输入的邮箱，通过该邮箱内的激活邮件来激活账户。通过这种方式可以防止用户的恶意注册。</p>
+
+<p><p><a href="http://github.com/technoweenie/restful-authentication">restful_authentication</a>是一个支持Rails 2.0的认证系统插件，它为你生成REST风格的认证系统模板，除了提供最基本的用户注册登录登出功能外，还有一个可选的邮件激活功能。只要一个命令，它就为你生成了User model、管理注册和登录的controller、相应的页面、mailer等等。</p>
+
+<p><p>安装插件和生成框架代码<br />
+<code>
+script/plugin install http://svn.techno-weenie.net/projects/plugins/restful_authentication&lt;br /&gt;
+script/generate authenticated user sessions --include-activation&lt;br /&gt;
+rake db:migrate&lt;br /&gt;
+</code></p>
+
+<p><p>&mdash;include-activation参数决定是否生成向新注册用户发送激活码邮件的代码</p>
+
+<p><p>这一步是可选的，如果你想你的URL看起来更符合惯例一些，那么可以在config/routes.rb中添加：<br />
+<code>
+map.signup '/signup', :controller =&gt; 'users', :action =&gt; 'new'&lt;br /&gt;
+map.login '/login', :controller =&gt; 'sessions', :action =&gt; 'new'&lt;br /&gt;
+map.logout '/logout', :controller =&gt; 'sessions', :action =&gt; 'destroy'&lt;br /&gt;
+</code></p>
+
+<p><p>因为使用了&mdash;include-activation参数，所以还要在config/routes.rb中增加：<br />
+<code>
+map.activate '/activate/:activation_code', :controller =&gt; 'users', :action =&gt; 'activate', :activation_code =&gt; nil&lt;br /&gt;
+</code></p>
+
+<p><p>最后，还需要添加一个observer到config/environment.rb的Rails::Initializer块中：<br />
+<code>
+config.active_record.observers = :user_observer&lt;br /&gt;
+</code></p>
+
+<p><p>设置ActionMailer，在config/environments/development.rb中添加：<br />
+```</p>
+
+<h1>Don&rsquo;t care if the mailer can&rsquo;t send<br /></h1>
+
+<p>config.action_mailer.raise_delivery_errors = true<br />
+config.action_mailer.perform_deliveries = true<br />
+config.action_mailer.delivery_method = :smtp<br />
+config.action_mailer.smtp_settings = {<br />
+  :address => &ldquo;smtp.example.com&rdquo;,<br />
+  :port => 25,<br />
+  :domain => &ldquo;codemany.com&rdquo;,<br />
+  :authentication => :login,<br />
+  :user_name => &ldquo;<a href="&#x6d;&#97;&#x69;&#x6c;&#116;&#x6f;&#x3a;&#117;&#115;&#101;&#x72;&#110;&#97;&#x6d;&#101;&#64;&#101;&#120;&#x61;&#109;&#x70;&#108;&#101;&#46;&#x63;&#111;&#x6d;">&#x75;&#x73;&#x65;&#x72;&#x6e;&#97;&#109;&#101;&#x40;&#x65;&#120;&#97;&#109;&#112;&#x6c;&#101;&#x2e;&#99;&#111;&#109;</a>&rdquo;,<br />
+  :password => &ldquo;secret&rdquo;<br />
+}
+config.action_mailer.default_charset = &ldquo;utf-8&rdquo;</p>
+
+<p><p>SITE_URL = &ldquo;localhost:3000&rdquo;<br />
+ADMINEMAIL = &ldquo;<a href="&#x6d;&#x61;&#105;&#x6c;&#116;&#x6f;&#58;&#x75;&#x73;&#x65;&#x72;&#110;&#97;&#x6d;&#x65;&#64;&#x65;&#x78;&#x61;&#109;&#x70;&#x6c;&#101;&#x2e;&#99;&#x6f;&#x6d;">&#x75;&#x73;&#x65;&#x72;&#110;&#x61;&#x6d;&#x65;&#64;&#101;&#x78;&#x61;&#x6d;&#112;&#108;&#x65;&#x2e;&#x63;&#x6f;&#109;</a>&rdquo;<br />
+```</p>
+
+<p><p>打开app/models/user_mailer.rb，修改<br />
+<code>
+@body[:url]  = "http://YOURSITE/activate/#{user.activation_code}"&lt;br /&gt;
+@body[:url]  = "http://YOURSITE/"&lt;br /&gt;
+@subject     = "[YOURSITE] "&lt;br /&gt;
+@from        = "ADMINEMAIL"&lt;br /&gt;
+[/code]&lt;br /&gt;
+为
+</code>
+@body[:url]  = &ldquo;<a href="http://#">http://#</a>{SITE_URL}/activate/#{user.activation_code}&rdquo;<br />
+@body[:url]  = &ldquo;<a href="http://#">http://#</a>{SITE_URL}/&rdquo;<br />
+@subject     = &ldquo;[#{SITE_URL}] &rdquo;<br />
+@from        = &ldquo;#{ADMINEMAIL}&rdquo;<br />
+```</p>
+
+<p><p>注意：<br />
+smtp_settings中的domain必须填写，否则会出现以下警告<br />
+<code>
+Net::SMTPSyntaxError (500 Error: bad syntax):&lt;br /&gt;
+  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:679:in 'check_response'&lt;br /&gt;
+  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:652:in 'getok'&lt;br /&gt;
+  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:622:in 'helo'&lt;br /&gt;
+</code></p>
+
+<p><p>user_mailer.rb中的ADMINEMAIL必须是一个有效的163邮件账号，否则会出现<br />
+<code>
+Net::SMTPFatalError (550 Invalid User):&lt;br /&gt;
+  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:679:in 'check_response'&lt;br /&gt;
+  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:652:in 'getok'&lt;br /&gt;
+  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:630:in 'mailfrom'&lt;br /&gt;
+</code></p>
+]]></content>
+  </entry>
+  
+</feed>
