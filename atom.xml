@@ -4,7 +4,7 @@
   <title><![CDATA[乐者为王]]></title>
   <link href="http://codemany.com/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-08-05T01:06:47+08:00</updated>
+  <updated>2014-08-05T22:58:49+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,133 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Wordpress迁移到Octopress]]></title>
+    <link href="http://codemany.com/blog/2014/08/05/migrating-wordpress-to-octopress/"/>
+    <updated>2014-08-05T19:15:03+08:00</updated>
+    <id>http://codemany.com/blog/2014/08/05/migrating-wordpress-to-octopress</id>
+    <content type="html"><![CDATA[<p>GitHub Pages提供免费的静态站点托管服务，有两种类型：User/Organization Pages和Project Pages。前者是用户/组织的主页，一个用户/组织仅有一个；后者是每个项目的主页。</p>
+
+<p>安装Octopress时，rake setup_github_pages会要求输入Github Pages项目的URL，根据URL判断是哪种服务。如果是前者，会在新建的<em>deploy目录上创建master分支，用于存放发布的静态文件，并把原master分支改为source分支；后者则仅在</em>deploy目录上创建gh-pages分支。</p>
+
+<p>在Wordpress的Tools/Export页面选择导出文章内容，保存为wordpress.xml文件。然后使用工具把它转换成markdown格式。这里使用了YORKXIN的<a href="https://gist.github.com/chitsaou/1394128" title="wordpressdotcom.rb">修改版本</a>，将脚本和wordpress.xml放到Octopress根目录下，然后运行：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ruby -r ./wordpressdotcom.rb -e Jekyll::WordpressDotCom.process</span></code></pre></td></tr></table></div></figure>
+
+
+<p>这个脚本会把转换好的文章都放到source/_posts目录下，文件后缀是html，直接改成markdown就是。</p>
+
+<p>然后就是苦力活：修改文中的站内链接、上传的图片路径以及代码高亮语法。</p>
+
+<p>Octopress默认的permalink是/blog/:year/:month/:day/:title/，想把它改成/:title/这种格式，修改_config.yml中的permalink后，发现生成的文章都跑到了public目录下，默认应该是在public/blog目录里的。为了保持目录的简洁，放弃了permalink的修改。</p>
+
+<p>至于评论的迁移，不想费过多的手脚，直接使用Octopress自带的Disqus。在Wordpress中安装好Disqus插件，通过插件设置将现有的评论内容导入Disqus。不过Disqus处理导入数据的时间有点长，需要等待一段时间，可以在 <a href="http://import.disqus.com">http://import.disqus.com</a> 查看导入进度。导入完成后，把Wordpress文章的permalink改成和Octopress相同，登录Disqus后台，找到Migrate Threads栏目，在Domain Migration Wizard里把旧域名改成新域名，然后一路Next就大功告成了。</p>
+
+<p>在侧边栏添加最新评论也很简单，添加recent_comments.html到source/<em>includes/custom/asides目录下，在</em>config.yml的default_asides项做好配置，最近评论内容就会出现在侧边栏中了：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;section&gt;
+</span><span class='line'>  &lt;h1&gt;Recent Comments&lt;/h1&gt;
+</span><span class='line'>  &lt;div class="dsq-widget"&gt;
+</span><span class='line'>    &lt;script type="text/javascript" src="http://dohkoos.disqus.com/recent_comments_widget.js"&gt;&lt;/script&gt;
+</span><span class='line'>  &lt;/div&gt;
+</span><span class='line'>&lt;/section&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>不过在实践中碰到了问题，打开某篇有评论的文章，发现只有评论框，已有评论没有显示。查看页面源码，负责评论模块的代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;section id="comment"&gt;
+</span><span class='line'>&lt;h1 class="title"&gt;Comments&lt;/h1&gt;
+</span><span class='line'>&lt;div id="disqus_thread" aria-live="polite"&gt;
+</span><span class='line'>  &lt;noscript&gt;Please enable JavaScript to view the &lt;a href="http://disqus.com/?ref_noscript"&gt;comments powered by Disqus.&lt;/a&gt;&lt;/noscript&gt;
+</span><span class='line'>&lt;/div&gt;
+</span><span class='line'>&lt;/section&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>这段代码位于source/<em>includes/post/disqus_thread.html中，而真正的评论模块代码则是在source/</em>includes/disqus.html中，查看调用它的代码也没任何问题。苦恼中～～后来受到 <a href="http://www.ducea.com/2012/11/12/disqus-comments-not-visible-in-octopress/">http://www.ducea.com/2012/11/12/disqus-comments-not-visible-in-octopress/</a> 的启发，原来是_config.yml中的URL还是生成项目时的，与CNAME中配置的域名不一致，调整后就没问题了。</p>
+
+<p>在侧边栏显示Tag Cloud参照了 <a href="http://codemacro.com/2012/07/18/add-tag-to-octopress/">http://codemacro.com/2012/07/18/add-tag-to-octopress/</a> 教程，没几分钟就搞定了。</p>
+
+<p>分享使用的是JiaThis，只要把source/_includes/post/sharing.html中的代码替换成以下代码就可以：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div id="jiathis_style_32x32"&gt;
+</span><span class='line'>  &lt;a class="jiathis_button_qzone"&gt;&lt;/a&gt;
+</span><span class='line'>  &lt;a class="jiathis_button_tsina"&gt;&lt;/a&gt;
+</span><span class='line'>  &lt;a class="jiathis_button_tqq"&gt;&lt;/a&gt;
+</span><span class='line'>    &lt;a class="jiathis_button_weixin"&gt;&lt;/a&gt;
+</span><span class='line'>  &lt;a class="jiathis_button_renren"&gt;&lt;/a&gt;
+</span><span class='line'>  &lt;a href="http://www.jiathis.com/share/" class="jiathis jiathis_txt jtico jtico_jiathis" target="_blank"&gt;&lt;/a&gt;
+</span><span class='line'>  &lt;a class="jiathis_counter_style"&gt;&lt;/a&gt;
+</span><span class='line'>&lt;/div&gt;
+</span><span class='line'>&lt;script type="text/javascript" src="http://v2.jiathis.com/code/jia.js" charset="utf-8"&gt;&lt;/script&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>相关文章本想用Octopress自带的lsi模块实现，只是当文章较多时生成速度实在是巨慢，按照推荐安装gsl模块，结果在Windows 2008系统上死活装不上，采用手动编译方式也总是死在rb-gsl的安装上。失望之余终于找到 <a href="https://github.com/LawrenceWoodman/related_posts-jekyll_plugin">https://github.com/LawrenceWoodman/related_posts-jekyll_plugin</a> 这个插件，它使用起来非常简单，只需下载<em>plugins/related_posts.rb放在自己的plugins文件夹中，然后在source/</em>includes/post中新建related_posts.html文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>{ % if site.related_posts % }
+</span><span class='line'>  &lt;h3&gt;Related posts&lt;/h3&gt;
+</span><span class='line'>  &lt;ul class="posts"&gt;
+</span><span class='line'>  { % for post in site.related_posts limit:3 % }
+</span><span class='line'>    &lt;li class="related"&gt;
+</span><span class='line'>      &lt;a href=""&gt;&lt;/a&gt;
+</span><span class='line'>    &lt;/li&gt;
+</span><span class='line'>  { % endfor % }
+</span><span class='line'>  &lt;/ul&gt;
+</span><span class='line'>{ % endif % }</span></code></pre></td></tr></table></div></figure>
+
+
+<p>修改source/_layouts/post.html，在</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>{ % include post/author.html % }
+</span><span class='line'>{ % include post/date.html % }{ % if updated % }{ % else % }{ % endif % }
+</span><span class='line'>{ % include post/categories.html % }</span></code></pre></td></tr></table></div></figure>
+
+
+<p>后面添加</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>{ % include post/related_posts.html % }</span></code></pre></td></tr></table></div></figure>
+
+
+<p>就可以了。使用这个插件会有个小问题，就是它和Jekyll 2.1不兼容，rake generate时会报错，可以使用jumanji27提供的<a href="https://github.com/jumanji27/related_posts-jekyll_plugin" title="related_posts-jekyll_plugin">fork版本</a>。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Nokogiri抓取页面URL含有中文参数的问题]]></title>
@@ -65,9 +192,11 @@
     <id>http://codemany.com/blog/2014/07/09/logic-problems-how-many-sick-dogs</id>
     <content type="html"><![CDATA[<p>村子中有50个人，每人有一条狗，在这50条狗中有病狗（这种病不会传染），于是人们就要找出病狗，每个人可以观察其他49条狗，以判断它们是否生病，只有自己的狗不能看。观察后得到的结果不得交流，也不能通知病狗的主人。主人一旦推算出自己家的是病狗就要枪毙自己的狗，而且每个人只有权利枪毙自己的狗，没有权利打死其他人的狗。第一天，第二天都没有枪响，到了第三天传来一阵枪响，问有几条病狗？</p>
 
-<p>推论：<br />
-A、假设有1条病狗，病狗的主人会看到其他狗都没有病，那么就知道自己的狗有病，所以第一天晚上就会有枪响。因为没有枪响，说明病狗数大于1。<br />
-B、假设有2条病狗，病狗的主人会看到有1条病狗，因为第一天没有听到枪响，是病狗数大于1，所以病狗的主人会知道自己的狗是病狗，因而第二天会有枪响。既然第二天也没有枪响，说明病狗数大于2。</p>
+<p>推论：</p>
+
+<p>A、假设有1条病狗，病狗的主人会看到其他狗都没有病，那么就知道自己的狗有病，所以第一天晚上就会有枪响。因为没有枪响，说明病狗数大于1。</p>
+
+<p>B、假设有2条病狗，病狗的主人会看到有1条病狗，因为第一天没有听到枪响，是病狗数大于1，所以病狗的主人会知道自己的狗是病狗，因而第二天会有枪响。既然第二天也没有枪响，说明病狗数大于2。</p>
 
 <p>由此推理，如果第三天枪响，则有3条病狗，第n天枪响，则有n条病狗。</p>
 ]]></content>
@@ -80,8 +209,7 @@ B、假设有2条病狗，病狗的主人会看到有1条病狗，因为第一�
     <id>http://codemany.com/blog/2014/07/07/debugging-rails-with-pry</id>
     <content type="html"><![CDATA[<p>调试Rails程序的工具有ruby-debug、irb、rails-console等，不过现在这些工具都可以歇着了，因为有了Pry。</p>
 
-<p>安装
-在Gemfile中申明gem包：</p>
+<p>首先，在Gemfile中申明gem包：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'>gem 'pry', group: :development</span></code></pre></td></tr></table></div></figure>
@@ -93,8 +221,7 @@ B、假设有2条病狗，病狗的主人会看到有1条病狗，因为第一�
 </pre></td><td class='code'><pre><code class=''><span class='line'>bundle install</span></code></pre></td></tr></table></div></figure>
 
 
-<p>它可以这样用
-用Pry代替irb，直接运行：</p>
+<p>用Pry代替irb，直接运行：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'>pry</span></code></pre></td></tr></table></div></figure>
@@ -106,8 +233,7 @@ B、假设有2条病狗，病狗的主人会看到有1条病狗，因为第一�
 </pre></td><td class='code'><pre><code class=''><span class='line'>pry -r ./config/environment.rb</span></code></pre></td></tr></table></div></figure>
 
 
-<p>调试Rails项目
-在需要调试的地方添加binding.pry，当rails server运行到这行代码时会自动调出一个pry终端，可以在这里进行交互，退出调试用exit-all。例如：</p>
+<p>调试Rails项目时，在需要调试的地方添加binding.pry，当rails server运行到这行代码时会自动调出一个pry终端，可以在这里进行交互，退出调试用exit-all。例如：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -244,7 +370,7 @@ B、假设有2条病狗，病狗的主人会看到有1条病狗，因为第一�
 <p>运行结束后，会把统计信息输出到标准错误输出中。如下图所示：
 <img src="http://codemany.com/uploads/profile-before-tuning.png" title="profile-before-tuning" ></p>
 
-<p>profile统计的是各方法的运行时间，分为2类。第1种计算的是从方法调用到方法返回之间的时间，称为整体时间；第2种则是从整体时间中扣除在该方法中调用其它方法所耗费时间之后得到的时间，称为实际时间。</p>
+<p>profile统计的是各方法的运行时间，分为两类。一类是计算的是从方法调用到方法返回之间的时间，称为整体时间；另一类则是从整体时间中扣除在该方法中调用其它方法所耗费时间之后得到的时间，称为实际时间。</p>
 
 <p>上图输出信息每行中各字段含义如下（从左到右）：<br />
 该方法执行时间占整体时间的百分比，比例越高越说明这行代码可能需要优化<br />
@@ -1059,7 +1185,7 @@ B、假设有2条病狗，病狗的主人会看到有1条病狗，因为第一�
 
 <p>我想我同意James的观点。在过去的几年里，我已经听到了很多的人说他们在做敏捷开发，实际上，他们几乎都不是。引用James的话：</p>
 
-<blockquote><p>But guess which part people adopt? That&rsquo;s right&mdash;Sprints and Scrums. Rapid cycles, but none of the good stuff that makes rapid cycles sustainable.</p></blockquote>
+<blockquote><p>But guess which part people adopt? That&#8217;s right&#8211;Sprints and Scrums. Rapid cycles, but none of the good stuff that makes rapid cycles sustainable.</p></blockquote>
 
 <p>不幸的是，这是非常真实的。现在许多团队都在进行短迭代工作，很多团队也在做每日例会，或Scrum，或站立会议。但是，有多少人事实上致力于使敏捷开发成功的技术实践和原则呢？老实说，我一个也没见过。</p>
 
@@ -1140,13 +1266,13 @@ B、假设有2条病狗，病狗的主人会看到有1条病狗，因为第一�
     <id>http://codemany.com/blog/2013/04/25/manage-library-by-scanning-isbn-barcode</id>
     <content type="html"><![CDATA[<p>每个程序猿家里都有一堆技术书籍，偶也不例外，因此想写个Android应用来管理自己的藏书以及想买的书籍。在网上找到marshal的<a href="http://marshal.easymorse.com/archives/2745">识别图书ISBN号并输出查询结果的示例</a>和<a href="http://marshal.easymorse.com/archives/2756">完善图书查询原型，增加收藏夹功能</a>两篇文章，写的非常不错，还提供源代码。下载代码研究后发现已基本具备了想要的功能，决定在它的基础上做些修改供自己使用。</p>
 
-<p>把原来uses-sdk的minSdkVersion改成了9，增加android:targetSdkVersion=&ldquo;17&#8221;。然后使用手机测试程序时发现，在连接网络时后台会抛出了android.os.NetworkOnMainThreadException异常，并且应用崩溃打不开。通过查阅相关资料了解到，自从Android 2.3之后，系统增加了一个类StrictMode。这个类对网络的访问方式进行了一定的改变。官方文档给出了这个类设置的目的：</p>
+<p>把原来uses-sdk的minSdkVersion改成了9，增加android:targetSdkVersion=&#8221;17&#8221;。然后使用手机测试程序时发现，在连接网络时后台会抛出了android.os.NetworkOnMainThreadException异常，并且应用崩溃打不开。通过查阅相关资料了解到，自从Android 2.3之后，系统增加了一个类StrictMode。这个类对网络的访问方式进行了一定的改变。官方文档给出了这个类设置的目的：</p>
 
 <blockquote><p>StrictMode is a developer tool which detects things you might be doing by accident and brings them to your attention so you can fix them.</p>
 
-<p>StrictMode is most commonly used to catch accidental disk or network access on the application&rsquo;s main thread, where UI operations are received and animations take place. Keeping disk and network operations off the main thread makes for much smoother, more responsive applications. By keeping your application&rsquo;s main thread responsive, you also prevent ANR dialogs from being shown to users.</p>
+<p>StrictMode is most commonly used to catch accidental disk or network access on the application&#8217;s main thread, where UI operations are received and animations take place. Keeping disk and network operations off the main thread makes for much smoother, more responsive applications. By keeping your application&#8217;s main thread responsive, you also prevent ANR dialogs from being shown to users.</p>
 
-<p>Note that even though an Android device&rsquo;s disk is often on flash memory, many devices run a filesystem on top of that memory with very limited concurrency. It&rsquo;s often the case that almost all disk accesses are fast, but may in individual cases be dramatically slower when certain I/O is happening in the background from other processes. If possible, it&rsquo;s best to assume that such things are not fast.</p></blockquote>
+<p>Note that even though an Android device&#8217;s disk is often on flash memory, many devices run a filesystem on top of that memory with very limited concurrency. It&#8217;s often the case that almost all disk accesses are fast, but may in individual cases be dramatically slower when certain I/O is happening in the background from other processes. If possible, it&#8217;s best to assume that such things are not fast.</p></blockquote>
 
 <p>因为marshal把访问网络的代码直接放到UI线程中，造成和主线程的首要工作UI交互相矛盾。解决这类问题很容易，把访问网络的代码放到AsyncTask中就行了。官方有个<a href="http://developer.android.com/training/basics/network-ops/index.html">NetworkUsage</a>例子是个不错的参考。</p>
 
@@ -1570,12 +1696,12 @@ B、假设有2条病狗，病狗的主人会看到有1条病狗，因为第一�
 
 <p>设置可执行文件图标</p>
 
-<p>应用 &ndash;> 属性 &ndash;> General &ndash;> Additional Properties按钮 &ndash;> Icon页签 &ndash;> Icon Name</p>
+<p>应用 -> 属性 -> General -> Additional Properties按钮 -> Icon页签 -> Icon Name</p>
 
 <p>可执行文件所需的环境DLL</p>
 
 <p>最简便的方式是使用自带的打包程序PowerBuilder Runtime Packager。这个应用会自动把脱离环境运行所需的DLL等文件筛选出来。<br />
-Sybase &ndash;> PowerBuilder 9.0 &ndash;> PowerBuilder Runtime Packager</p>
+Sybase -> PowerBuilder 9.0 -> PowerBuilder Runtime Packager</p>
 
 <p>运行后会生成一个MSI应用，执行下就可以解压出需要的DLL文件了。</p>
 ]]></content>
@@ -1676,10 +1802,10 @@ Sybase &ndash;> PowerBuilder 9.0 &ndash;> PowerBuilder Runtime Packager</p>
     <updated>2013-03-13T10:01:28+08:00</updated>
     <id>http://codemany.com/blog/2013/03/13/logic-problems-the-teachers-birthday</id>
     <content type="html"><![CDATA[<p>小明和小强都是某老师的学生，老师的生日是M月N日，他们都知道老师的生日是以下十组中的一个。老师把M告诉了小明，把N告诉了小强，然后问他们是否知道自己的生日。小明说“如果我不知道小强也不知道”，小强说“本来我不知道，你说了这话我就知道了”，小明说“那我也知道了 ”。问老师的生日是以下的哪个？<br />
-&frac34;, 3/5, 3/8, 6/4, 6/7, 9/1, 9/5, 12/1, 12/2, 12/8</p>
+3/4, 3/5, 3/8, 6/4, 6/7, 9/1, 9/5, 12/1, 12/2, 12/8</p>
 
 <p>按M排：<br />
-&frac34;, 3/5, 3/8<br />
+3/4, 3/5, 3/8<br />
 6/4, 6/7<br />
 9/1, 9/5<br />
 12/1, 12/2, 12/8</p>
@@ -1687,7 +1813,7 @@ Sybase &ndash;> PowerBuilder 9.0 &ndash;> PowerBuilder Runtime Packager</p>
 <p>按N排：<br />
 9/1, 12/1<br />
 12/2<br />
-&frac34;, 6/4<br />
+3/4, 6/4<br />
 3/5, 9/5<br />
 6/7<br />
 3/8, 12/8</p>
@@ -1697,11 +1823,11 @@ Sybase &ndash;> PowerBuilder 9.0 &ndash;> PowerBuilder Runtime Packager</p>
 结果：3/4, 3/5, 3/8, 9/1, 9/5</p>
 
 <p>按M排：<br />
-&frac34;, 3/5, 3/8<br />
+3/4, 3/5, 3/8<br />
 9/1, 9/5</p>
 
 <p>按N排：<br />
-&frac34;<br />
+3/4<br />
 3/5, 9/5<br />
 3/8<br />
 9/1</p>
@@ -1711,11 +1837,11 @@ Sybase &ndash;> PowerBuilder 9.0 &ndash;> PowerBuilder Runtime Packager</p>
 结果：3/4, 3/8, 9/1</p>
 
 <p>按M排：<br />
-&frac34;, 3/8<br />
+3/4, 3/8<br />
 9/1</p>
 
 <p>按N排：<br />
-&frac34;<br />
+3/4<br />
 3/8<br />
 9/1</p>
 
@@ -1783,7 +1909,7 @@ A dash indicates that no substitution should be performed (the existing path is 
 
 
 <p>last|L
- Stop the rewriting process immediately and don&rsquo;t apply any more rules. Especially note caveats for per-directory and .htaccess context.</p></blockquote>
+ Stop the rewriting process immediately and don&#8217;t apply any more rules. Especially note caveats for per-directory and .htaccess context.</p></blockquote>
 
 <p>第3行是完全匹配index.php的URI，但不做替换，并且匹配成功后就停止执行重写过程。</p>
 
@@ -1794,12 +1920,12 @@ A dash indicates that no substitution should be performed (the existing path is 
 <p>REQUEST_FILENAME
  The full local filesystem path to the file or script matching the request, if this has already been determined by the server at the time REQUEST_FILENAME is referenced. Otherwise, such as when used in virtual host context, the same value as REQUEST_URI.</p>
 
-<p>You can prefix the pattern string with a &lsquo;!&rsquo; character (exclamation mark) to specify a non-matching pattern.</p>
+<p>You can prefix the pattern string with a &#8216;!&#8217; character (exclamation mark) to specify a non-matching pattern.</p>
 
-<p>&lsquo;-d&rsquo; (is directory)
+<p>&#8216;-d&#8217; (is directory)
  Treats the TestString as a pathname and tests whether or not it exists, and is a directory.</p>
 
-<p>&lsquo;-f&rsquo; (is regular file)
+<p>&#8216;-f&#8217; (is regular file)
  Treats the TestString as a pathname and tests whether or not it exists, and is a regular file.</p></blockquote>
 
 <p>第4和第5行是不去测试访问URI是否是目录或文件。其实有了第6行这两行基本就是摆设了。</p>
@@ -1817,7 +1943,7 @@ A dash indicates that no substitution should be performed (the existing path is 
 
 <p>译者：感觉这篇文章讲的不错，也不算太长，就翻译了过来。</p>
 
-<p>在过去的项目/审查中我发现了如下的接口及其实现的命名规范：<br /></p>
+<p>在过去的项目/审查中我发现了如下的接口及其实现的命名规范：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1828,12 +1954,12 @@ A dash indicates that no substitution should be performed (the existing path is 
 </span><span class='line'>
 </span><span class='line'>Service service = new ServiceImpl();
 </span><span class='line'>
-</span><span class='line'>ServiceIF service = new Service();&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>ServiceIF service = new Service();</span></code></pre></td></tr></table></div></figure>
 
 
 <p>每一条都含有多余信息。无论是强调接口或其实现，相关信息都已经包含在代码中，所以都是多余的。这种命名规范仅当你真的不知道如何命名实现的时候才需要，作为去思考一个名称的替代，它更容易依靠现有的模板。</p>
 
-<p>实现名称的缺乏可能也是作为它的非充分责任的一个指标（an indicator for it&rsquo;s unsufficient responsibilities）。因此，如果你找不到一个适当的实现名称，考虑移除接口直接暴露实现可能是个好主意－没有奇怪的规范。实际上JDK中没有这样的规范，接口及其实现也经常称为不同（are often even called differently）：<br /></p>
+<p>实现名称的缺乏可能也是作为它的非充分责任的一个指标（an indicator for it&#8217;s unsufficient responsibilities）。因此，如果你找不到一个适当的实现名称，考虑移除接口直接暴露实现可能是个好主意－没有奇怪的规范。实际上JDK中没有这样的规范，接口及其实现也经常称为不同（are often even called differently）：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1848,13 +1974,12 @@ A dash indicates that no substitution should be performed (the existing path is 
 </span><span class='line'>
 </span><span class='line'>TableModel t = new DefaultTableModel();
 </span><span class='line'>
-</span><span class='line'>Remote remote = new UnicastRemoteObject();&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>Remote remote = new UnicastRemoteObject();</span></code></pre></td></tr></table></div></figure>
 
 
 <p>接口的目的是抽象或从几个实现解耦。一个单一的实现并不需要通过接口来解耦。也有一些例外的规则，如需要使用动态代理等。</p>
 
-<p><strong>通过单个的，有着奇怪命名规范的实现（implementation）来实现（realize）一个接口不应该被认为是一般的最佳实践……</strong>
-</p></p>
+<p>通过单个的，有着奇怪命名规范的实现（implementation）来实现（realize）一个接口不应该被认为是一般的最佳实践&#8230;</p>
 ]]></content>
   </entry>
   
@@ -1863,8 +1988,9 @@ A dash indicates that no substitution should be performed (the existing path is 
     <link href="http://codemany.com/blog/2013/02/24/logic-problems-100-lamps/"/>
     <updated>2013-02-24T08:56:21+08:00</updated>
     <id>http://codemany.com/blog/2013/02/24/logic-problems-100-lamps</id>
-    <content type="html"><![CDATA[<p>房间里有100盏电灯，编号为1，2，3&hellip;100，每盏灯上有一个按钮，初始时灯全都是关的。<br />
-编好号的100位同学由房间外依次走进去，将自己编号的倍数的灯的按钮全部按一次，例如第一位同学把编号是1的倍数的灯的按钮按一下（此时100盏灯全亮），第二位同学把编号是2的倍数的灯的按钮按一下（此时只有50盏灯亮着，50盏被这个人按灭了）……第100位同学把编号是100的倍数的灯（即编号为100的灯）的按钮按一下，请问依次走完后，还有多少盏灯亮着？</p>
+    <content type="html"><![CDATA[<p>房间里有100盏电灯，编号为1，2，3&#8230;100，每盏灯上有一个按钮，初始时灯全都是关的。</p>
+
+<p>编好号的100位同学由房间外依次走进去，将自己编号的倍数的灯的按钮全部按一次，例如第一位同学把编号是1的倍数的灯的按钮按一下（此时100盏灯全亮），第二位同学把编号是2的倍数的灯的按钮按一下（此时只有50盏灯亮着，50盏被这个人按灭了）&#8230;第100位同学把编号是100的倍数的灯（即编号为100的灯）的按钮按一下，请问依次走完后，还有多少盏灯亮着？</p>
 
 <p>解题思路：<br />
 被按过奇数次的灯亮着，偶数次的灯关了。<br />
@@ -1873,8 +1999,9 @@ A dash indicates that no substitution should be performed (the existing path is 
 2号灯会被1，2号同学按下；<br />
 3号灯会被1，3号同学按下；<br />
 4号灯会被1，2，4号同学按下；<br />
-&hellip;<br />
-10号灯会被1，2，5，10号同学按下。</p>
+&#8230;<br />
+10号灯会被1，2，5，10号同学按下；<br />
+&#8230;</p>
 
 <p>从上面可以总结出n号灯会被以它所有约数为编号的同学按下。</p>
 
@@ -1907,387 +2034,10 @@ A dash indicates that no substitution should be performed (the existing path is 
 </span><span class='line'>lamps.each_index do |i|
 </span><span class='line'>  print "Light #{i + 1} is "
 </span><span class='line'>  puts lamps[i] ? "ON" : "OFF"
-</span><span class='line'>end&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
 
 
-<p>再然后，我们会发现编号1，4，9，16，25&hellip;100的灯是亮着的，其它都是灭的。即编号值可以开出整数平方根的灯是亮的。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[使用Interceptor禁止用户访问未授权的图书信息]]></title>
-    <link href="http://codemany.com/blog/2013/02/01/interceptor-prohibit-users-from-accessing-unauthorized-books/"/>
-    <updated>2013-02-01T02:50:02+08:00</updated>
-    <id>http://codemany.com/blog/2013/02/01/interceptor-prohibit-users-from-accessing-unauthorized-books</id>
-    <content type="html"><![CDATA[<p>现在的JBookShelf有两个问题：<br />
-1. 未登录的用户可以访问图书信息；<br />
-2. 登录后的用户可以访问其他用户的图书信息。</p>
-
-<p>第一个问题可以使用Struts 2的Interceptor来解决：<br />
-1. 创建一个实现了Interceptor接口的类；<br />
-2. 在struts.xml配置中定义这个拦截器；<br />
-3. 在struts.xml中定义一个使用了上面拦截器的拦截栈；<br />
-4. 在struts.xml中定义一个全局转向配置。</p>
-
-<p>实现自己的拦截器有点要注意的是，拦截器必须是无状态的，不要使用在API提供的ActionInvocation之外的任何东西。要求拦截器是无状态的原因是Struts 2不能保证为每一个请求或者action创建一个实例，所以如果拦截器带有状态，会引发并发问题。</p>
-
-<p>创建AuthorizationInterceptor类，继承类AbstractInterceptor。为什么继承它呢？而不是直接实现接口Interceptor。这是因为AbstractInterceptor已经实现了Interceptor接口，并且实现了接口中的init和destroy方法。而在这个拦截器中，我们并不需要使用这两个方法。下面上代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.account.interceptor;
-</span><span class='line'>
-</span><span class='line'>import java.util.Collections;
-</span><span class='line'>import java.util.Set;
-</span><span class='line'>
-</span><span class='line'>import com.codemany.account.model.User;
-</span><span class='line'>
-</span><span class='line'>import com.opensymphony.xwork2.Action;
-</span><span class='line'>import com.opensymphony.xwork2.ActionInvocation;
-</span><span class='line'>import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
-</span><span class='line'>import com.opensymphony.xwork2.util.TextParseUtil;
-</span><span class='line'>
-</span><span class='line'>public class AuthorizationInterceptor extends AbstractInterceptor {
-</span><span class='line'>    private static final long serialVersionUID = -5140884040684756043L;
-</span><span class='line'>
-</span><span class='line'>    protected Set&lt;String&gt; skipActions = Collections.emptySet();
-</span><span class='line'>
-</span><span class='line'>    public void setSkipActions(String skipActions) {
-</span><span class='line'>        this.skipActions = TextParseUtil.commaDelimitedStringToSet(skipActions);
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    @Override
-</span><span class='line'>    public String intercept(ActionInvocation invocation) throws Exception {
-</span><span class='line'>        User user = (User)invocation.getInvocationContext()
-</span><span class='line'>                .getSession().get(User.SESSION_KEY);
-</span><span class='line'>
-</span><span class='line'>        boolean isLogined = user != null;
-</span><span class='line'>        String action = invocation.getProxy().getActionName();
-</span><span class='line'>        // 如果用户未登录，并且访问的是需要登录权限的Action，就跳转到全局转向配置login上
-</span><span class='line'>        if (isLogined || skipActions.contains(action)) {
-</span><span class='line'>            return invocation.invoke();
-</span><span class='line'>        } else {
-</span><span class='line'>            return Action.LOGIN;
-</span><span class='line'>        }
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>这里的skipActions目的是为了跳过一些不需要拦截的Action。因为默认情况下，拦截器会拦截Action中的所有的方法。像login，register这类Action是任何用户在任何状态下都可以访问的，所以不需要拦截，这里就可以将这些Action放到skipActions中来跳过拦截。</p>
-
-<p>实现了拦截类后还要在struts.xml进行配置使它起作用，以下是struts.xml的完整代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
-</span><span class='line'>&lt;!DOCTYPE struts PUBLIC
-</span><span class='line'>    "-//Apache Software Foundation//DTD Struts Configuration 2.3//EN"
-</span><span class='line'>    "http://struts.apache.org/dtds/struts-2.3.dtd"&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;struts&gt;
-</span><span class='line'>    &lt;constant name="struts.enable.DynamicMethodInvocation" value="true" /&gt;
-</span><span class='line'>    &lt;constant name="struts.devMode" value="true" /&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;package name="default" extends="struts-default"&gt;
-</span><span class='line'>        &lt;interceptors&gt;
-</span><span class='line'>            &lt;interceptor name="authorization"
-</span><span class='line'>                class="com.codemany.account.interceptor.AuthorizationInterceptor" /&gt;
-</span><span class='line'>
-</span><span class='line'>            &lt;interceptor-stack name="authorizationStack"&gt;
-</span><span class='line'>                &lt;interceptor-ref name="authorization"&gt;
-</span><span class='line'>                    &lt;param name="skipActions"&gt;login, logout, register&lt;/param&gt;
-</span><span class='line'>                &lt;/interceptor-ref&gt;
-</span><span class='line'>                &lt;interceptor-ref name="defaultStack" /&gt;
-</span><span class='line'>            &lt;/interceptor-stack&gt;
-</span><span class='line'>        &lt;/interceptors&gt;
-</span><span class='line'>
-</span><span class='line'>        &lt;default-interceptor-ref name="authorizationStack" /&gt;
-</span><span class='line'>
-</span><span class='line'>        &lt;!-- 全局转向配置 --&gt;
-</span><span class='line'>        &lt;!-- 还记得拦截器里面的return Action.LOGIN这句吧，当程序执行完这一行后，--&gt;
-</span><span class='line'>        &lt;!-- 就会到struts.xml文件的global-results中找name为login的全局转向配置。--&gt;
-</span><span class='line'>        &lt;global-results&gt;
-</span><span class='line'>            &lt;result name="login" type="redirectAction"&gt;login!input&lt;/result&gt;
-</span><span class='line'>        &lt;/global-results&gt;
-</span><span class='line'>    &lt;/package&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;include file="account.xml" /&gt;
-</span><span class='line'>    &lt;include file="book.xml" /&gt;
-</span><span class='line'>&lt;/struts&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>然后将account.xml和book.xml中package继承的父包改成struts.xml配置中的default包：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;package name="xxx" extends="default"&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>第二个问题的解决就是重写BookAction.java的代码，不再从数据库中读取Book数据，而是从当前登录用户的books属性中查找Book信息。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-<span class='line-number'>44</span>
-<span class='line-number'>45</span>
-<span class='line-number'>46</span>
-<span class='line-number'>47</span>
-<span class='line-number'>48</span>
-<span class='line-number'>49</span>
-<span class='line-number'>50</span>
-<span class='line-number'>51</span>
-<span class='line-number'>52</span>
-<span class='line-number'>53</span>
-<span class='line-number'>54</span>
-<span class='line-number'>55</span>
-<span class='line-number'>56</span>
-<span class='line-number'>57</span>
-<span class='line-number'>58</span>
-<span class='line-number'>59</span>
-<span class='line-number'>60</span>
-<span class='line-number'>61</span>
-<span class='line-number'>62</span>
-<span class='line-number'>63</span>
-<span class='line-number'>64</span>
-<span class='line-number'>65</span>
-<span class='line-number'>66</span>
-<span class='line-number'>67</span>
-<span class='line-number'>68</span>
-<span class='line-number'>69</span>
-<span class='line-number'>70</span>
-<span class='line-number'>71</span>
-<span class='line-number'>72</span>
-<span class='line-number'>73</span>
-<span class='line-number'>74</span>
-<span class='line-number'>75</span>
-<span class='line-number'>76</span>
-<span class='line-number'>77</span>
-<span class='line-number'>78</span>
-<span class='line-number'>79</span>
-<span class='line-number'>80</span>
-<span class='line-number'>81</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.book.action;
-</span><span class='line'>
-</span><span class='line'>import java.util.ArrayList;
-</span><span class='line'>import java.util.List;
-</span><span class='line'>
-</span><span class='line'>import com.codemany.account.model.User;
-</span><span class='line'>import com.codemany.book.model.Book;
-</span><span class='line'>import com.codemany.book.service.BookService;
-</span><span class='line'>
-</span><span class='line'>import com.opensymphony.xwork2.ActionContext;
-</span><span class='line'>import com.opensymphony.xwork2.ActionSupport;
-</span><span class='line'>
-</span><span class='line'>public class BookAction extends ActionSupport {
-</span><span class='line'>    private static final long serialVersionUID = 2538923417705852774L;
-</span><span class='line'>
-</span><span class='line'>    private Long bookId;
-</span><span class='line'>    private Book book;
-</span><span class='line'>    private List&lt;Book&gt; bookList;
-</span><span class='line'>
-</span><span class='line'>    private BookService bookService;
-</span><span class='line'>
-</span><span class='line'>    public String list() throws Exception {
-</span><span class='line'>        if (bookList == null) {
-</span><span class='line'>            bookList = new ArrayList&lt;Book&gt;();
-</span><span class='line'>        }
-</span><span class='line'>        bookList.addAll(getCurrentUser().getBooks());
-</span><span class='line'>        return "list";
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public String show() throws Exception {
-</span><span class='line'>        book = getCurrentUser().getBook(bookId);
-</span><span class='line'>        return "show";
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public String input() throws Exception {
-</span><span class='line'>        if (bookId != null) {
-</span><span class='line'>            book = getCurrentUser().getBook(bookId);
-</span><span class='line'>        }
-</span><span class='line'>        return INPUT;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public String saveOrUpdate() throws Exception {
-</span><span class='line'>        book.setUser(getCurrentUser());
-</span><span class='line'>        bookService.saveOrUpdateBook(book);
-</span><span class='line'>        return SUCCESS;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public String delete() throws Exception {
-</span><span class='line'>        Book book = getCurrentUser().getBook(bookId);
-</span><span class='line'>        if (book != null) {
-</span><span class='line'>            bookService.deleteBook(bookId);
-</span><span class='line'>            getCurrentUser().getBooks().remove(book);
-</span><span class='line'>        }
-</span><span class='line'>        return SUCCESS;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public List&lt;Book&gt; getBookList() {
-</span><span class='line'>        return bookList;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public Book getBook() {
-</span><span class='line'>        return book;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void setBook(Book book) {
-</span><span class='line'>        this.book = book;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void setBookId(Long bookId) {
-</span><span class='line'>        this.bookId = bookId;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void setBookService(BookService bookService) {
-</span><span class='line'>        this.bookService = bookService;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    private User getCurrentUser() {
-</span><span class='line'>        return (User)ActionContext.getContext()
-</span><span class='line'>                .getSession().get(User.SESSION_KEY);
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>上面的代码会产生异常，提示取出的Book数据为空，所以要在User.hbm.xml中set标签后添加属性lazy=“false”，这样Hibernate从数据库中读取User数据时会连带取出对应的Book数据：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;set name="books" inverse="true" lazy="false"&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>下面是BookAction类中用到的User.getBook(bookId)代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class User {
-</span><span class='line'>
-</span><span class='line'>    public Book getBook(Long bookId) {
-</span><span class='line'>        for (Book book : books) {
-</span><span class='line'>            if (bookId != null && bookId.equals(book.getId())) {
-</span><span class='line'>                return book;
-</span><span class='line'>            }
-</span><span class='line'>        }
-</span><span class='line'>        return null;
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
+<p>最后，我们会发现编号1，4，9，16，25&#8230;100的灯是亮着的，其它都是灭的。即编号值可以开出整数平方根的灯是亮的。</p>
 ]]></content>
   </entry>
   

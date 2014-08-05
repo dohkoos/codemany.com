@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: C# | 乐者为王]]></title>
   <link href="http://codemany.com/tags/c-number/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-08-05T01:06:47+08:00</updated>
+  <updated>2014-08-05T22:58:49+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -58,44 +58,45 @@ ClassInterface(ClassInterfaceType.None)&lt;br /&gt;
 ]
 </code></p>
 
-<p>在UrlTrack.cs中，我们还需要写两个方法用来DLL注册和移除注册<br />
-```
-public static string BHOKEYNAME = @&ldquo;SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Browser Helper Objects&rdquo;;</p>
+<p>在UrlTrack.cs中，我们还需要写两个方法用来DLL注册和移除注册。</p>
 
-<p>[ComRegisterFunction]<br />
-public static void RegisterBHO(Type type)<br />
+<p>```
+public static string BHOKEYNAME = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Browser Helper Objects";</p>
+
+<p>[ComRegisterFunction]
+public static void RegisterBHO(Type type)
 {</p>
 
-<pre><code>RegistryKey registryKey = Registry.LocalMachine.OpenSubKey(BHO_KEY_NAME, true);&lt;br /&gt;
-if (registryKey == null)&lt;br /&gt;
-{&lt;br /&gt;
-    registryKey = Registry.LocalMachine.CreateSubKey(BHO_KEY_NAME);&lt;br /&gt;
+<pre><code>RegistryKey registryKey = Registry.LocalMachine.OpenSubKey(BHO_KEY_NAME, true);
+if (registryKey == null)
+{
+    registryKey = Registry.LocalMachine.CreateSubKey(BHO_KEY_NAME);
 }
 
-string guid = type.GUID.ToString("B");&lt;br /&gt;
-RegistryKey bhoKey = registryKey.OpenSubKey(guid, true);&lt;br /&gt;
-if (bhoKey == null)&lt;br /&gt;
-{&lt;br /&gt;
-    bhoKey = registryKey.CreateSubKey(guid);&lt;br /&gt;
-}&lt;br /&gt;
-// NoExplorer: dword = 1 prevents the BHO to be loaded by Explorer.exe&lt;br /&gt;
-bhoKey.SetValue("NoExplorer", 1);&lt;br /&gt;
+string guid = type.GUID.ToString("B");
+RegistryKey bhoKey = registryKey.OpenSubKey(guid, true);
+if (bhoKey == null)
+{
+    bhoKey = registryKey.CreateSubKey(guid);
+}
+// NoExplorer: dword = 1 prevents the BHO to be loaded by Explorer.exe
+bhoKey.SetValue("NoExplorer", 1);
 bhoKey.Close();
 
-registryKey.Close();&lt;br /&gt;
+registryKey.Close();
 </code></pre>
 
 <p>}</p>
 
-<p>[ComUnregisterFunction]<br />
-public static void UnregisterBHO(Type type)<br />
+<p>[ComUnregisterFunction]
+public static void UnregisterBHO(Type type)
 {</p>
 
-<pre><code>RegistryKey registryKey = Registry.LocalMachine.OpenSubKey(BHO_KEY_NAME, true);&lt;br /&gt;
+<pre><code>RegistryKey registryKey = Registry.LocalMachine.OpenSubKey(BHO_KEY_NAME, true);
 string guid = type.GUID.ToString("B");
 
-if (registryKey != null)&lt;br /&gt;
-    registryKey.DeleteSubKey(guid, false);&lt;br /&gt;
+if (registryKey != null)
+    registryKey.DeleteSubKey(guid, false);
 </code></pre>
 
 <p>}
@@ -103,51 +104,51 @@ if (registryKey != null)&lt;br /&gt;
 
 <p>接下来就是实现具体的统计功能了。考虑一下，当输入网址后，我们需要记录下网址以及当前的时间；当在同一浏览窗口中切换网址时，不仅需要记录下网址和当前时间，还要设置前一个浏览记录的结束时间；并且在关闭浏览器时，也要记下结束时间。所以在SetSite中需要挂载NavigateComplete2和OnQuit事件。<br />
 ```
-private void NavigateComplete2(object pDisp, ref object URL)<br />
+private void NavigateComplete2(object pDisp, ref object URL)
 {</p>
 
-<pre><code>string url = URL as string;&lt;br /&gt;
-if (url.IndexOf("about:blank") &gt;= 0)&lt;br /&gt;
-{&lt;br /&gt;
-    return;&lt;br /&gt;
-}&lt;br /&gt;
-if (visitHists.Count &gt; 0)&lt;br /&gt;
-{&lt;br /&gt;
-    VisitHist currentHist = visitHists[visitHists.Count - 1];&lt;br /&gt;
-    if (currentHist.VisitUrl != url)&lt;br /&gt;
-    {&lt;br /&gt;
-        currentHist.EndTime = System.DateTime.Now;&lt;br /&gt;
-    }&lt;br /&gt;
-    else&lt;br /&gt;
-    {&lt;br /&gt;
-        return;&lt;br /&gt;
-    }&lt;br /&gt;
-}&lt;br /&gt;
-VisitHist newHist = new VisitHist();&lt;br /&gt;
-newHist.StartTime = System.DateTime.Now;&lt;br /&gt;
-newHist.VisitUrl = url;&lt;br /&gt;
-visitHists.Add(newHist);&lt;br /&gt;
+<pre><code>string url = URL as string;
+if (url.IndexOf("about:blank") &gt;= 0)
+{
+    return;
+}
+if (visitHists.Count &gt; 0)
+{
+    VisitHist currentHist = visitHists[visitHists.Count - 1];
+    if (currentHist.VisitUrl != url)
+    {
+        currentHist.EndTime = System.DateTime.Now;
+    }
+    else
+    {
+        return;
+    }
+}
+VisitHist newHist = new VisitHist();
+newHist.StartTime = System.DateTime.Now;
+newHist.VisitUrl = url;
+visitHists.Add(newHist);
 </code></pre>
 
 <p>}</p>
 
-<p>private void OnQuit()<br />
+<p>private void OnQuit()
 {</p>
 
-<pre><code>if (visitHists.Count &gt; 0)&lt;br /&gt;
-{&lt;br /&gt;
-    VisitHist currentHist = visitHists[visitHists.Count - 1];&lt;br /&gt;
-    currentHist.EndTime = System.DateTime.Now;&lt;br /&gt;
+<pre><code>if (visitHists.Count &gt; 0)
+{
+    VisitHist currentHist = visitHists[visitHists.Count - 1];
+    currentHist.EndTime = System.DateTime.Now;
 }
 
-// 输出统计记录&lt;br /&gt;
-...&lt;br /&gt;
+// 输出统计记录
+...
 </code></pre>
 
 <p>}
 ```</p>
 
-<p>开始编译，然后就可以在bin目录下找到项目的dll文件了。在Console中使用regasm /codebase &ldquo;UrlTrack.dll"注册dll。打开注册表，在HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Browser Helper Objects可以看到多出了一个子项{E90DA13B-117A-4178-8111-0F712DA09FF9}。</p>
+<p>开始编译，然后就可以在bin目录下找到项目的dll文件了。在Console中使用regasm /codebase "UrlTrack.dll"注册dll。打开注册表，在HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Browser Helper Objects可以看到多出了一个子项{E90DA13B-117A-4178-8111-0F712DA09FF9}。</p>
 
 <p>需要注意的是，需要将AssemblyInfo.cs文件中的ComVisible属性设为true，否则在注册BHO时会得到这样的信息：<br />
 <code>
@@ -158,8 +159,7 @@ RegAsm : warning RA0000 : No types were registered.&lt;br /&gt;
 
 <p>[1] 在Windows操作系统上有两种浏览器：资源浏览器(explorer.exe，应用于文件系统)和Internet浏览器(IEXPLORE.EXE，应用于互联网资源)。</p>
 
-<p><a href="https://github.com/dohkoos/urltrack">代码下载</a>
-</p></p>
+<p>代码下载：<a href="https://github.com/dohkoos/urltrack">https://github.com/dohkoos/urltrack</a></p>
 ]]></content>
   </entry>
   

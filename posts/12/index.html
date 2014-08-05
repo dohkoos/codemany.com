@@ -9,8 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="记账应用的基本功能都已经实现了，现在来给它加上个首页。 1
-script/generate controller home index&lt;br /&gt; 上面的命令生成了控制器home，它有个动作index，并且在views目录下还生成了home/index.html.erb文件。 &hellip;">
+  <meta name="description" content="这次要给应用加上一个认证系统（注册、激活、登录、登出）。当用户输入注册信息时，必须输入有效的邮箱地址，注册成功后，用户并不能立即登录系统，而是要登录注册时输入的邮箱，通过该邮箱内的激活邮件来激活账户。通过这种方式可以防止用户的恶意注册。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -66,6 +65,160 @@ script/generate controller home index&lt;br /&gt; 上面的命令生成了控制
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2009/11/15/using-the-rails23-to-create-a-simple-accounting-app-3/">用Rails 2.3打造简单记账软件(3)</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2009-11-15T16:21:33+08:00" pubdate data-updated="true">Nov 15<sup>th</sup>, 2009</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>这次要给应用加上一个认证系统（注册、激活、登录、登出）。当用户输入注册信息时，必须输入有效的邮箱地址，注册成功后，用户并不能立即登录系统，而是要登录注册时输入的邮箱，通过该邮箱内的激活邮件来激活账户。通过这种方式可以防止用户的恶意注册。</p>
+
+<p><a href="http://github.com/technoweenie/restful-authentication">restful_authentication</a>是一个支持Rails 2.0的认证系统插件，它为你生成REST风格的认证系统模板，除了提供最基本的用户注册登录登出功能外，还有一个可选的邮件激活功能。只要一个命令，它就为你生成了User model、管理注册和登录的controller、相应的页面、mailer等等。</p>
+
+<p>安装插件和生成框架代码<br /></p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>script/plugin install http://svn.techno-weenie.net/projects/plugins/restful_authentication&lt;br /&gt;
+</span><span class='line'>script/generate authenticated user sessions --include-activation&lt;br /&gt;
+</span><span class='line'>rake db:migrate&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>&#8211;include-activation参数决定是否生成向新注册用户发送激活码邮件的代码</p>
+
+<p>这一步是可选的，如果你想你的URL看起来更符合惯例一些，那么可以在config/routes.rb中添加：<br /></p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>map.signup '/signup', :controller =&gt; 'users', :action =&gt; 'new'&lt;br /&gt;
+</span><span class='line'>map.login '/login', :controller =&gt; 'sessions', :action =&gt; 'new'&lt;br /&gt;
+</span><span class='line'>map.logout '/logout', :controller =&gt; 'sessions', :action =&gt; 'destroy'&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>因为使用了&#8211;include-activation参数，所以还要在config/routes.rb中增加：<br /></p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>map.activate '/activate/:activation_code', :controller =&gt; 'users', :action =&gt; 'activate', :activation_code =&gt; nil</span></code></pre></td></tr></table></div></figure>
+
+
+<p>最后，还需要添加一个observer到config/environment.rb的Rails::Initializer块中：<br /></p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>config.active_record.observers = :user_observer&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>设置ActionMailer，在config/environments/development.rb中添加：<br /></p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># Don't care if the mailer can't send&lt;br /&gt;
+</span><span class='line'>config.action_mailer.raise_delivery_errors = true&lt;br /&gt;
+</span><span class='line'>config.action_mailer.perform_deliveries = true&lt;br /&gt;
+</span><span class='line'>config.action_mailer.delivery_method = :smtp&lt;br /&gt;
+</span><span class='line'>config.action_mailer.smtp_settings = {&lt;br /&gt;
+</span><span class='line'>  :address =&gt; "smtp.example.com",&lt;br /&gt;
+</span><span class='line'>  :port =&gt; 25,&lt;br /&gt;
+</span><span class='line'>  :domain =&gt; "codemany.com",&lt;br /&gt;
+</span><span class='line'>  :authentication =&gt; :login,&lt;br /&gt;
+</span><span class='line'>  :user_name =&gt; "username@example.com",&lt;br /&gt;
+</span><span class='line'>  :password =&gt; "secret"&lt;br /&gt;
+</span><span class='line'>}
+</span><span class='line'>config.action_mailer.default_charset = "utf-8"
+</span><span class='line'>
+</span><span class='line'>SITE_URL = "localhost:3000"&lt;br /&gt;
+</span><span class='line'>ADMINEMAIL = "username@example.com"&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>打开app/models/user_mailer.rb，修改<br /></p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>@body[:url]  = "http://YOURSITE/activate/#{user.activation_code}"&lt;br /&gt;
+</span><span class='line'>@body[:url]  = "http://YOURSITE/"&lt;br /&gt;
+</span><span class='line'>@subject     = "[YOURSITE] "&lt;br /&gt;
+</span><span class='line'>@from        = "ADMINEMAIL"&lt;br /&gt;
+</span><span class='line'>[/code]&lt;br /&gt;
+</span><span class='line'>为</span></code></pre></td></tr></table></div></figure>
+
+
+<p>@body[:url]  = &#8221;<a href="http://#">http://#</a>{SITE_URL}/activate/#{user.activation_code}&#8221;<br />
+@body[:url]  = &#8221;<a href="http://#">http://#</a>{SITE_URL}/&#8221;<br />
+@subject     = &#8220;[#{SITE_URL}] &#8221;<br />
+@from        = &#8220;#{ADMINEMAIL}&#8221;<br /></p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>
+</span><span class='line'>注意：&lt;br /&gt;
+</span><span class='line'>smtp_settings中的domain必须填写，否则会出现以下警告&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Net::SMTPSyntaxError (500 Error: bad syntax):<br />
+  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:679:in &#8216;check_response&#8217;<br />
+  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:652:in &#8216;getok&#8217;<br />
+  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:622:in &#8216;helo&#8217;<br /></p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>
+</span><span class='line'>user_mailer.rb中的ADMINEMAIL必须是一个有效的163邮件账号，否则会出现&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Net::SMTPFatalError (550 Invalid User):<br />
+  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:679:in &#8216;check_response&#8217;<br />
+  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:652:in &#8216;getok&#8217;<br />
+  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:630:in &#8216;mailfrom&#8217;<br />
+&#8220;`</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -673,12 +826,12 @@ script/generate controller home index&lt;br /&gt; 上面的命令生成了控制
   <div class="entry-content"><p>一般我们开发一个网站，都是先在本地部署和调试，再上传到网上。假如Root目录是C:\www，当有两个或多个网站需要部署时，那么就会有<br />
 C:\www\site1<br />
 C:\www\site2<br />
-&hellip;</p>
+&#8230;</p>
 
 <p>它们可以通过如下方式来访问。<br />
 <a href="http://localhost/site1">http://localhost/site1</a><br />
 <a href="http://localhost/site2">http://localhost/site2</a><br />
-&hellip;</p>
+&#8230;</p>
 
 <p>这样当然没有问题，不过如果能在本地实现用域名访问，不是更方便，像这样：<br />
 <a href="http://www.site1.com">http://www.site1.com</a><br />
@@ -711,10 +864,10 @@ Allow from all
 <p><VirtualHost *:80>
 ServerName site1.com<br />
 Serveralias www.site1.com<br />
-ServerAdmin <a href="&#x6d;&#97;&#105;&#x6c;&#116;&#x6f;&#x3a;&#119;&#x65;&#x62;&#109;&#97;&#115;&#116;&#x65;&#114;&#64;&#115;&#x69;&#116;&#x65;&#49;&#46;&#x63;&#x6f;&#x6d;">&#x77;&#101;&#x62;&#109;&#97;&#x73;&#116;&#x65;&#x72;&#64;&#x73;&#x69;&#x74;&#101;&#49;&#46;&#99;&#111;&#109;</a><br />
-DocumentRoot &ldquo;C:/www/site1&rdquo;<br />
-ErrorLog &ldquo;logs/site1.com-error.log&rdquo;<br />
-CustomLog &ldquo;logs/site1.com-access.log&rdquo; common
+ServerAdmin <a href="&#109;&#x61;&#x69;&#x6c;&#x74;&#111;&#58;&#x77;&#101;&#98;&#x6d;&#x61;&#115;&#116;&#101;&#x72;&#x40;&#x73;&#105;&#x74;&#x65;&#49;&#x2e;&#99;&#x6f;&#x6d;">&#x77;&#x65;&#x62;&#x6d;&#x61;&#x73;&#x74;&#x65;&#114;&#x40;&#115;&#105;&#116;&#x65;&#49;&#46;&#x63;&#111;&#x6d;</a><br />
+DocumentRoot &#8220;C:/www/site1&#8221;<br />
+ErrorLog &#8220;logs/site1.com-error.log&#8221;<br />
+CustomLog &#8220;logs/site1.com-access.log&#8221; common
 </VirtualHost></p>
 
 <p><Directory "C:/www/site2">
@@ -727,56 +880,15 @@ Allow from all
 <p><VirtualHost *:80>
 ServerName site2.com<br />
 Serveralias www.site2.com<br />
-ServerAdmin <a href="&#109;&#97;&#x69;&#x6c;&#116;&#x6f;&#58;&#x77;&#x65;&#x62;&#109;&#x61;&#115;&#116;&#101;&#114;&#64;&#115;&#105;&#x74;&#101;&#50;&#x2e;&#99;&#111;&#109;">&#119;&#x65;&#98;&#x6d;&#x61;&#115;&#x74;&#x65;&#x72;&#64;&#115;&#105;&#116;&#101;&#x32;&#46;&#99;&#x6f;&#x6d;</a><br />
-DocumentRoot &ldquo;C:/www/site2&rdquo;<br />
-ErrorLog &ldquo;logs/site2.com-error.log&rdquo;<br />
-CustomLog &ldquo;logs/site2.com-access.log&rdquo; common
+ServerAdmin <a href="&#x6d;&#97;&#x69;&#x6c;&#x74;&#x6f;&#58;&#119;&#101;&#98;&#109;&#x61;&#115;&#x74;&#101;&#x72;&#x40;&#x73;&#105;&#116;&#101;&#x32;&#x2e;&#x63;&#x6f;&#109;">&#x77;&#101;&#x62;&#x6d;&#x61;&#x73;&#x74;&#101;&#114;&#x40;&#x73;&#105;&#116;&#101;&#x32;&#x2e;&#x63;&#111;&#x6d;</a><br />
+DocumentRoot &#8220;C:/www/site2&#8221;<br />
+ErrorLog &#8220;logs/site2.com-error.log&#8221;<br />
+CustomLog &#8220;logs/site2.com-access.log&#8221; common
 </VirtualHost></p>
 
 <p>这是最基本的配置，*号代表任何ip，也可以指定为本地ip：127.0.0.1。最好配置两个或两个以上，如果只有一个的话，那么其中的DocumentRoot就会覆盖httpd.conf文件里的DocumentRoot。</p>
 
 <p>重启Apache就大功告成了，以后访问www.site1.com或site1.com就会访问本地的C:\www\site1文件夹。</p></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2009/07/09/allow-client-connect-to-mysql-remotely-on-lunarpages/">使用MySQL客户端远程连接Lunarpages数据库</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2009-07-09T14:54:05+08:00" pubdate data-updated="true">Jul 9<sup>th</sup>, 2009</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Lunarpages虚拟主机上的MySQL服务默认仅有本机能访问。只有在cPanel中向某IP地址或地址段或者所有IP地址开放访问权限后，才可以从外部用客户端连接到数据库。</p>
-
-<p>如果想允许任何主机的访问，直接在Host处填写百分号%，然后Add Host即可。如果只想特定主机访问，就输入客户端机器的IP地址。
-<img src="/uploads/lunarpages-mysql-remote.png" title="lunarpages-mysql-remote" ></p>
-
-<p>还有就是客户端远程连接时使用的地址就是空间的IP地址，可以通过ping域名得到。</p>
 </div>
   
   
@@ -801,6 +913,10 @@ CustomLog &ldquo;logs/site2.com-access.log&rdquo; common
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/08/05/migrating-wordpress-to-octopress/">Wordpress迁移到Octopress</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/07/17/problem-with-nokogiri-when-url-containing-chinese-character/">Nokogiri抓取页面URL含有中文参数的问题</a>
       </li>
     
@@ -814,10 +930,6 @@ CustomLog &ldquo;logs/site2.com-access.log&rdquo; common
     
       <li class="post">
         <a href="/blog/2014/07/06/raspberry-pi-wifi-with-static-ip-address/">Raspberry Pi使用无线网卡</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/06/28/how-i-made-ruby-script-156x-faster/">我是如何让Ruby脚本速度提升156倍的</a>
       </li>
     
   </ul>

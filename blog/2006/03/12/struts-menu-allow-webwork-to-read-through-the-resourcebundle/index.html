@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="struts-menu&#40664;&#35748;是&#36890;过jstl&#25110;&#32773;struts来&#35835;取ResourceBundle的，&#36825;就&#38656;&#35201;在web.xml中&#37197;&#32622;&#35201;&# &hellip;">
+  <meta name="description" content="struts-menu默认是通过jstl或者struts来读取ResourceBundle的，&#36825;就&#38656;&#35201;在web.xml中&#37197;&#32622;&#35201;读取的properties文件&#65288;jstl&#65289;或在struts- &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -91,7 +91,94 @@
   </header>
 
 
-<div class="entry-content"><p>struts-menu&#40664;&#35748;是&#36890;过jstl&#25110;&#32773;struts来&#35835;取ResourceBundle的，&#36825;就&#38656;&#35201;在web.xml中&#37197;&#32622;&#35201;&#35835;取的properties文件&#65288;jstl&#65289;&#25110;在struts-config.xml中&#37197;&#32622;&#65288;struts&#65289;。<br />webwork&#20063;&#26377;&#33258;&#24049;的ResourceBundle&#37197;&#32622;&#26041;&#24335;，&#36825;样&#24863;&#35273;&#36215;来&#22826;不&#32479;&#19968;了，&#32780;&#19988;如果&#35201;&#35753;struts-menu&#36890;过spring&#20043;&#31867;的web&#26694;&#26550;来&#35835;ResourceBundle的&#35805;&#20063;&#20570;不到。&#25152;以&#21442;&#32771;&#30528;displaytag的&#23454;现&#23545;struts-menu&#36827;行了&#19968;&#30058;&#20462;改，&#23454;现了可&#36890;过web&#26694;&#26550;来&#35835;取ResourceBundle的&#21151;能。<br /><br />&#26242;时&#21482;是&#23454;现了webwork，下&#38754;是&#20462;改步骤<br />1&#12289;&#22686;加net.sf.navigator.localization&#21253;，将org.displaytag.localization中的*.java&#31227;到&#35813;&#21253;中<br />2&#12289;将org.displaytag下的Message.java&#21644;messages.properties&#31227;到net.sf.navigator目录下<br />3&#12289;&#32473;MenuDisplayerMapping添加&#20004;&#20010;&#23646;&#24615;localeResover&#21644;ResourceProvider，&#19988;&#37117;&#23454;现get&#21644;set&#26041;&#27861;<br />4&#12289;在struts-menu.xml的<Displayer>下添加<br />      <setProperty property="localeResover" value="net.sf.navigator.localization.I18nWebworkAdapter" /><br />      <setProperty property="resourceProvider" value="net.sf.navigator.localization.I18nWebworkAdapter" /><br />5&#12289;在MenuDisplayer添加&#22235;&#20010;&#25509;&#21475;&#26041;&#27861;<br />    public LocaleResolver getLocaleResolver();<br />      public void setLocaleResolver(LocaleResolver localeResolver);<br />      public I18nResourceProvider getResourceProvider();<br />      public void setResourceProvider(I18nResourceProvider resourceProvider);<br />       &#24182;在AbstractMenuDisplayer&#37324;&#23454;现&#36825;&#22235;&#20010;&#26041;&#27861;<br />6&#12289;在AbstractMenuDisplayer&#37324;添加protected的PageContext&#23545;&#35937;，&#24182;在init&#26041;&#27861;&#37324;&#21021;&#22987;&#21270;&#23427;<br />7&#12289;&#37325;写MessageResourcesMenuDisplayer.getMessage&#26041;&#27861;，&#20195;&#30721;如下<br />      public String getMessage(String key) {<br />          String message = null;<br /><br />          if (resourceProvider != null) {<br />              message = resourceProvider.getResource(key, &ldquo;???&rdquo;, null, pageContext);<br />          }<br />          if (message == null) {<br />              message = key;<br />          }<br /><br />          return message;<br />      }<br />8&#12289;在UseMenuDisplayerTag文件&#37324;添加&#20195;&#30721;&#65288;+后的&#20195;&#30721;是&#22686;加的&#65289;<br />      //get an instance of the menu displayer<br />      MenuDisplayer displayerInstance = null;<br />    + LocaleResolver localeResolver = null;<br />    + I18nResourceProvider resourceProvider = null;<br /><br />      // default to use the config on the mapping<br />      if (displayerMapping.getConfig() != null) {<br />          // this value (config) is set on the displayer below<br />          setConfig(displayerMapping.getConfig());<br />      }<br />    + localeResolver =<br />    +         (LocaleResolver) Class.forName(displayerMapping.getLocaleResover()).newInstance();<br />    + resourceProvider =<br />    +         (I18nResourceProvider) Class.forName(displayerMapping.getLocaleProvider()).newInstance();<br /><br />      displayerInstance.setConfig(config);<br />    + displayerInstance.setResourceProvider(resourceProvider);<br />    + displayerInstance.setLocaleResolver(localeResolver);<br /><br />如果&#35201;&#23454;现jstl&#12289;spring等&#26694;&#26550;的&#35805;，可以将org.displaytag.localization&#30456;&#24212;的java文件&#31227;到net.sf.navigator.localization目录下就可以了。</p></p>
+<div class="entry-content"><p>struts-menu默认是通过jstl或者struts来读取ResourceBundle的，&#36825;就&#38656;&#35201;在web.xml中&#37197;&#32622;&#35201;读取的properties文件&#65288;jstl&#65289;或在struts-config.xml中&#37197;&#32622;&#65288;struts&#65289;。<br />
+webwork&#20063;&#26377;&#33258;&#24049;的ResourceBundle&#37197;&#32622;&#26041;&#24335;，&#36825;样&#24863;&#35273;&#36215;来&#22826;不&#32479;&#19968;了，&#32780;&#19988;如果&#35201;&#35753;struts-menu通过spring&#20043;&#31867;的web&#26694;&#26550;来读ResourceBundle的&#35805;&#20063;&#20570;不到。&#25152;以&#21442;&#32771;&#30528;displaytag的&#23454;现&#23545;struts-menu&#36827;行了&#19968;&#30058;&#20462;改，&#23454;现了可通过web&#26694;&#26550;来读取ResourceBundle的&#21151;能。<br /></p>
+
+<br />
+
+
+<p>&#26242;时&#21482;是&#23454;现了webwork，下&#38754;是&#20462;改步骤<br />
+1、&#22686;加net.sf.navigator.localization&#21253;，将org.displaytag.localization中的*.java&#31227;到&#35813;&#21253;中<br />
+2、将org.displaytag下的Message.java&#21644;messages.properties&#31227;到net.sf.navigator目录下<br />
+3、&#32473;MenuDisplayerMapping添加&#20004;个&#23646;&#24615;localeResover&#21644;ResourceProvider，&#19988;&#37117;&#23454;现get&#21644;set&#26041;&#27861;<br />
+4、在struts-menu.xml的Displayer标签下添加：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;setProperty property="localeResover" value="net.sf.navigator.localization.I18nWebworkAdapter" /&gt;
+</span><span class='line'>&lt;setProperty property="resourceProvider" value="net.sf.navigator.localization.I18nWebworkAdapter" /&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>5、在MenuDisplayer添加四个&#25509;&#21475;&#26041;&#27861;</p>
+
+<p>&#8220;`</p>
+
+<pre><code>public LocaleResolver getLocaleResolver();&lt;br /&gt;
+  public void setLocaleResolver(LocaleResolver localeResolver);&lt;br /&gt;
+  public I18nResourceProvider getResourceProvider();&lt;br /&gt;
+  public void setResourceProvider(I18nResourceProvider resourceProvider);&lt;br /&gt;
+   &amp;#24182;在AbstractMenuDisplayer&amp;#37324;&amp;#23454;现&amp;#36825;四个&amp;#26041;&amp;#27861;&lt;br /&gt;
+</code></pre>
+
+<p>6、在AbstractMenuDisplayer&#37324;添加protected的PageContext&#23545;&#35937;，&#24182;在init&#26041;&#27861;&#37324;&#21021;&#22987;&#21270;&#23427;<br />
+7、&#37325;写MessageResourcesMenuDisplayer.getMessage&#26041;&#27861;，&#20195;&#30721;如下<br /></p>
+
+<pre><code>  public String getMessage(String key) {&lt;br /&gt;
+      String message = null;&lt;br /&gt;
+</code></pre>
+
+<br />
+
+
+<pre><code>      if (resourceProvider != null) {&lt;br /&gt;
+          message = resourceProvider.getResource(key, "???", null, pageContext);&lt;br /&gt;
+      }&lt;br /&gt;
+      if (message == null) {&lt;br /&gt;
+          message = key;&lt;br /&gt;
+      }&lt;br /&gt;
+</code></pre>
+
+<br />
+
+
+<pre><code>      return message;&lt;br /&gt;
+  }&lt;br /&gt;
+</code></pre>
+
+<p>8、在UseMenuDisplayerTag文件&#37324;添加&#20195;&#30721;&#65288;+后的&#20195;&#30721;是&#22686;加的&#65289;<br /></p>
+
+<pre><code>  //get an instance of the menu displayer&lt;br /&gt;
+  MenuDisplayer displayerInstance = null;&lt;br /&gt;
++ LocaleResolver localeResolver = null;&lt;br /&gt;
++ I18nResourceProvider resourceProvider = null;&lt;br /&gt;
+</code></pre>
+
+<br />
+
+
+<pre><code>  // default to use the config on the mapping&lt;br /&gt;
+  if (displayerMapping.getConfig() != null) {&lt;br /&gt;
+      // this value (config) is set on the displayer below&lt;br /&gt;
+      setConfig(displayerMapping.getConfig());&lt;br /&gt;
+  }&lt;br /&gt;
++ localeResolver =&lt;br /&gt;
++         (LocaleResolver) Class.forName(displayerMapping.getLocaleResover()).newInstance();&lt;br /&gt;
++ resourceProvider =&lt;br /&gt;
++         (I18nResourceProvider) Class.forName(displayerMapping.getLocaleProvider()).newInstance();&lt;br /&gt;
+</code></pre>
+
+<br />
+
+
+<pre><code>  displayerInstance.setConfig(config);&lt;br /&gt;
++ displayerInstance.setResourceProvider(resourceProvider);&lt;br /&gt;
++ displayerInstance.setLocaleResolver(localeResolver);&lt;br /&gt;
+</code></pre>
+
+<br />
+
+
+<p>如果&#35201;&#23454;现jstl、spring等&#26694;&#26550;的&#35805;，可以将org.displaytag.localization&#30456;&#24212;的java文件&#31227;到net.sf.navigator.localization目录下就可以了。</p></p>
 </div>
 
 
@@ -169,6 +256,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/08/05/migrating-wordpress-to-octopress/">Wordpress迁移到Octopress</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/07/17/problem-with-nokogiri-when-url-containing-chinese-character/">Nokogiri抓取页面URL含有中文参数的问题</a>
       </li>
     
@@ -182,10 +273,6 @@
     
       <li class="post">
         <a href="/blog/2014/07/06/raspberry-pi-wifi-with-static-ip-address/">Raspberry Pi使用无线网卡</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/06/28/how-i-made-ruby-script-156x-faster/">我是如何让Ruby脚本速度提升156倍的</a>
       </li>
     
   </ul>
