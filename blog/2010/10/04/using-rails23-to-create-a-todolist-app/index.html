@@ -253,61 +253,53 @@ script/generate scaffold Todo title:string description:text done:boolean &hellip
 </pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= init_tinymce_hammer_if_required %&gt;&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
 
 
-<p>将app/views/todos下new.html.erb和edit.html.erb中的<br /></p>
+<p>将app/views/todos下new.html.erb和edit.html.erb中的</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= f.text_area :description %&gt;&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>修改为</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= f.tinymce :description, :rows =&gt; 10, :cols =&gt; 40 %&gt;&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>去除app/views/todos/index.html.erb中description字段的h方法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;td&gt;&lt;%= todo.description %&gt;&lt;/td&gt;&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>还有就是删除todo后记录就彻底地没了，不能恢复，需要给它加上一剂后悔药，使之可以重新被捞出，<a href="http://github.com/technoweenie/acts_as_paranoid.git">acts_as_paranoid</a>插件可以做到这点。<br /></p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= f.text_area :description %&gt;&lt;br /&gt;
-</span><span class='line'>[/code]&lt;br /&gt;
-</span><span class='line'>修改为&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>script/plugin install git://github.com/technoweenie/acts_as_paranoid.git&lt;br /&gt;
+</span><span class='line'>script/generate migration add_deleted_at_to_user deleted_at:datetime&lt;br /&gt;
+</span><span class='line'>rake db:migrate&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
 
 
-<p>&lt;%= f.tinymce :description, :rows => 10, :cols => 40 %><br /></p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>
-</span><span class='line'>去除app/views/todos/index.html.erb中description字段的h方法：&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p><td>&lt;%= todo.description %></td><br /></p>
+<p>添加acts_as_paranoid到模型中：<br /></p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>
-</span><span class='line'>还有就是删除todo后记录就彻底地没了，不能恢复，需要给它加上一剂后悔药，使之可以重新被捞出，&lt;a href="http://github.com/technoweenie/acts_as_paranoid.git"&gt;acts_as_paranoid&lt;/a&gt;插件可以做到这点。&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class Todo &lt; ActiveRecord::Base&lt;br /&gt;
+</span><span class='line'>  acts_as_paranoid&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
 
 
-<p>script/plugin install git://github.com/technoweenie/acts_as_paranoid.git<br />
-script/generate migration add_deleted_at_to_user deleted_at:datetime<br />
-rake db:migrate<br /></p>
+<p>现在，调用这个模型的destroy方法将不会真正地删除记录，只会将记录从视图上移除，在deleted_at里记录当前的时间。<del datetime="2013-05-10T02:05:05+00:00">当然，你可以在find中使用with_deleted或only_deleted参数得到被隐藏的记录。</del>在Rails 3中在find中使用参数会报ArgumentError异常，显示如下错误：<br /></p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>
-</span><span class='line'>添加acts_as_paranoid到模型中：&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Unknown key: only_deleted&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
 
 
-<p>class Todo &lt; ActiveRecord::Base<br />
-  acts_as_paranoid<br /></p>
+<p>解决办法是使用以下格式的代码：<br /></p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>
-</span><span class='line'>现在，调用这个模型的destroy方法将不会真正地删除记录，只会将记录从视图上移除，在deleted_at里记录当前的时间。&lt;del datetime="2013-05-10T02:05:05+00:00"&gt;当然，你可以在find中使用with_deleted或only_deleted参数得到被隐藏的记录。&lt;/del&gt;在Rails 3中在find中使用参数会报ArgumentError异常，显示如下错误：&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>current_user.todos.only_deleted.find(:all)&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
 
-
-<p>Unknown key: only_deleted<br /></p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>
-</span><span class='line'>解决办法是使用以下格式的代码：&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>current_user.todos.only_deleted.find(:all)<br />
-&#8220;`</p>
 
 <p>至此，一个简单的todolist就算完成了。</p>
 
@@ -437,13 +429,13 @@ rake db:migrate<br /></p>
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 133%" href="/tags/android/">Android</a>
+    <a style="font-size: 97%" href="/tags/algorithm/">Algorithm</a>
+<a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 111%" href="/tags/crack/">Crack</a>
 <a style="font-size: 108%" href="/tags/database/">Database</a>
 <a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
 <a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
 <a style="font-size: 134%" href="/tags/java/">Java</a>
-<a style="font-size: 97%" href="/tags/listview/">ListView</a>
 <a style="font-size: 108%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 116%" href="/tags/powerbuilder/">PowerBuilder</a>
 <a style="font-size: 120%" href="/tags/qianbao/">Qianbao</a>
