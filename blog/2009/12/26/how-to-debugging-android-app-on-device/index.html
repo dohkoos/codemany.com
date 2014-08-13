@@ -5,15 +5,15 @@
 <!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  <title>使用ANTLR构建PowerScript语法分析器（2） - 乐者为王</title>
+  <title>如何联机调试Android应用 - 乐者为王</title>
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="在上篇文中写的词法分析文件存在有两个小问题：
-1、处理换行符和回车符的词法定义有重复，在WS和EndOfLine中都有出现；
-2、像/ comments / nested comments / /这种嵌套注释会被输出成： 1
-2
-bc&gt;/* comments /* nested &hellip;">
+  <meta name="description" content="首先你需要一台开发手机，如果不是的话可以刷ROM；
+在Settings -> Applications -> Development下激活USB debugging选项；
+下载并安装USB驱动程序；
+用USB数据线连接手机与电脑；
+在AndroidManifest.xml中的&lt; &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -22,7 +22,7 @@ bc&gt;/* comments /* nested &hellip;">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   
-  <link rel="canonical" href="http://codemany.com/blog/2007/09/02/using-antlr-to-build-powerscript-grammar-parser-2">
+  <link rel="canonical" href="http://codemany.com/blog/2009/12/26/how-to-debugging-android-app-on-device">
   <link href="/favicon.png" rel="icon">
   <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
   <link href="/atom.xml" rel="alternate" title="乐者为王" type="application/atom+xml">
@@ -72,7 +72,7 @@ bc&gt;/* comments /* nested &hellip;">
   
   <header>
     
-      <h1 class="entry-title">使用ANTLR构建PowerScript语法分析器（2）</h1>
+      <h1 class="entry-title">如何联机调试Android应用</h1>
     
     
       <p class="meta">
@@ -88,69 +88,21 @@ bc&gt;/* comments /* nested &hellip;">
   
 
 
-<time datetime="2007-09-02T16:44:22+08:00" pubdate data-updated="true">Sep 2<sup>nd</sup>, 2007</time>
+<time datetime="2009-12-26T03:54:41+08:00" pubdate data-updated="true">Dec 26<sup>th</sup>, 2009</time>
         
       </p>
     
   </header>
 
 
-<div class="entry-content"><p>在<a href="/blog/2007/08/23/using-antlr-to-build-powerscript-grammar-parser-1/">上篇</a>文中写的词法分析文件存在有两个小问题：<br />
-1、处理换行符和回车符的词法定义有重复，在WS和EndOfLine中都有出现；<br />
-2、像/<em> comments /</em> nested comments <em>/ </em>/这种嵌套注释会被输出成：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>bc&gt;/* comments /* nested comments */
-</span><span class='line'>bc&gt;/* comments /* nested comments */ */</span></code></pre></td></tr></table></div></figure>
-
-
-<p>第一个问题比较容易解决，只要将EndOfLine前的fragment去掉，再将WS改成下面这样就可以。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>WS
-</span><span class='line'>    : (' '|'\t'|'\u000C') {$channel=HIDDEN;}
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>第二个问题则可以通过计数器来处理。先初始化一个计数器变量depthOfComments来标记块注释的深度，当遇到“/<em>”时就加1，遇到“</em>/”时则减1。输出时只要判断depthOfComments是否等于0就行了。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>BLOCK_COMMENT
-</span><span class='line'>@init {
-</span><span class='line'>    int depthOfComments = 0;
-</span><span class='line'>}
-</span><span class='line'>    : '/*' {depthOfComments++;}
-</span><span class='line'>      ( options {greedy=false;}
-</span><span class='line'>      : ('/' '*')=&gt; BLOCK_COMMENT {depthOfComments++;}
-</span><span class='line'>      | '/' ~('*')
-</span><span class='line'>      | ~('/')
-</span><span class='line'>      )*
-</span><span class='line'>      '*/' {depthOfComments--;}
-</span><span class='line'>      {
-</span><span class='line'>          if (depthOfComments == 0) {
-</span><span class='line'>              System.out.println("bc&gt;" + getText());
-</span><span class='line'>          }
-</span><span class='line'>      }
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+<div class="entry-content"><ol>
+<li>首先你需要一台开发手机，如果不是的话可以刷ROM；</li>
+<li>在Settings -> Applications -> Development下激活USB debugging选项；</li>
+<li>下载并安装USB驱动程序；</li>
+<li>用USB数据线连接手机与电脑；</li>
+<li>在AndroidManifest.xml中的<code>&lt;application&gt;</code>里添加android:debuggable=&#8221;true&#8221;；</li>
+<li>然后你就可以像平常一样调试你的Android代码了。</li>
+</ol>
 
 </div>
 
@@ -174,7 +126,7 @@ bc&gt;/* comments /* nested &hellip;">
   
 
 
-<time datetime="2007-09-02T16:44:22+08:00" pubdate data-updated="true">Sep 2<sup>nd</sup>, 2007</time>
+<time datetime="2009-12-26T03:54:41+08:00" pubdate data-updated="true">Dec 26<sup>th</sup>, 2009</time>
       
 
 
@@ -184,23 +136,23 @@ bc&gt;/* comments /* nested &hellip;">
   <ul class="posts">
   
     <li class="related">
-      <a href="/blog/2008/04/26/using-antlr-to-build-powerscript-grammar-parser-4/">使用ANTLR构建PowerScript语法分析器（4）</a>
+      <a href="/blog/2013/04/25/manage-library-by-scanning-isbn-barcode/">扫描ISBN条码实现藏书管理</a>
     </li>
   
     <li class="related">
-      <a href="/blog/2007/09/07/using-antlr-to-build-powerscript-grammar-parser-3/">使用ANTLR构建PowerScript语法分析器（3）</a>
+      <a href="/blog/2012/05/16/using-fastboot-to-flash-galaxy-nexus-official-rom/">使用fastboot刷Galaxy Nexus官方系统</a>
     </li>
   
     <li class="related">
-      <a href="/blog/2007/08/22/using-antlr-to-build-powerscript-grammar-parser-1/">使用ANTLR构建PowerScript语法分析器（1）</a>
+      <a href="/blog/2012/04/15/the-using-showdialog-to-create-progressdialog-open-again-the-progress-bar-does-not-change-the-problem-resolution/">使用showDialog()创建的ProgressDialog再次打开时进度条不变化的问题解析</a>
     </li>
   
     <li class="related">
-      <a href="/blog/2006/12/13/powerscript-identifier/">PowerScript标识符</a>
+      <a href="/blog/2011/11/16/simple-to-make-android-the-bottom-toolbar/">简单实现Android底部工具栏</a>
     </li>
   
     <li class="related">
-      <a href="/blog/2008/04/25/cannot-launch-the-remote-parser-because-port-49153-is-already-in-use/">Cannot launch the remote parser because port 49153 is already in use</a>
+      <a href="/blog/2011/09/16/spinner-sqlite-implementation-with-provincial-and-county-levels-linkage/">用Spinner + SQLite实现省市县三级联动</a>
     </li>
   
   </ul>
@@ -221,10 +173,10 @@ bc&gt;/* comments /* nested &hellip;">
     
     <p class="meta">
       
-        <a class="basic-alignment left" href="/blog/2007/08/22/using-antlr-to-build-powerscript-grammar-parser-1/" title="Previous Post: 使用ANTLR构建PowerScript语法分析器（1）">&laquo; 使用ANTLR构建PowerScript语法分析器（1）</a>
+        <a class="basic-alignment left" href="/blog/2009/12/20/using-the-rails23-to-create-a-simple-accounting-app-9/" title="Previous Post: 用Rails 2.3打造简单记账软件(9)">&laquo; 用Rails 2.3打造简单记账软件(9)</a>
       
       
-        <a class="basic-alignment right" href="/blog/2007/09/04/install-and-use-ruby-dbi/" title="Next Post: Ruby DBI的安装和使用">Ruby DBI的安装和使用 &raquo;</a>
+        <a class="basic-alignment right" href="/blog/2009/12/27/how-to-import-or-export-data-from-the-application-in-heroku/" title="Next Post: 如何导入/导出Heroku中应用的数据">如何导入/导出Heroku中应用的数据 &raquo;</a>
       
     </p>
   </footer>
@@ -269,7 +221,7 @@ bc&gt;/* comments /* nested &hellip;">
 <section>
   <h1>Recent Comments</h1>
   <div class="dsq-widget">
-    <script type="text/javascript" src="http://dohkoos.disqus.com/recent_comments_widget.js"></script>
+    <script type="text/javascript" src="http://codemany.disqus.com/recent_comments_widget.js"></script>
   </div>
 </section>
 <section>
@@ -324,8 +276,8 @@ bc&gt;/* comments /* nested &hellip;">
       
         
         // var disqus_developer = 1;
-        var disqus_identifier = 'http://codemany.com/blog/2007/09/02/using-antlr-to-build-powerscript-grammar-parser-2/';
-        var disqus_url = 'http://codemany.com/blog/2007/09/02/using-antlr-to-build-powerscript-grammar-parser-2/';
+        var disqus_identifier = 'http://codemany.com/blog/2009/12/26/how-to-debugging-android-app-on-device/';
+        var disqus_url = 'http://codemany.com/blog/2009/12/26/how-to-debugging-android-app-on-device/';
         var disqus_script = 'embed.js';
       
     (function () {

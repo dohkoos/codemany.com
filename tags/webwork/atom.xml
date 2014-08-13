@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: WebWork | 乐者为王]]></title>
   <link href="http://codemany.com/tags/webwork/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-08-13T08:54:39+08:00</updated>
+  <updated>2014-08-13T18:49:25+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -18,13 +18,13 @@
     <link href="http://codemany.com/blog/2006/03/30/webwork-document-how-the-resources-to-obtain-verification-of-dynamic-field-values/"/>
     <updated>2006-03-30T14:56:37+08:00</updated>
     <id>http://codemany.com/blog/2006/03/30/webwork-document-how-the-resources-to-obtain-verification-of-dynamic-field-values</id>
-    <content type="html"><![CDATA[<p>WebWork是一个非常不错的MVC框架，有着众多的优点，不过也有许多的缺陷。在实现一个用户注册验证的例子时，发现在资源文件中不能动态的或的验证字段的值。只能每个字段一个message。<br />
-```
-class User {<br /></p>
+    <content type="html"><![CDATA[<p>WebWork是一个非常不错的MVC框架，有着众多的优点，不过也有许多的缺陷。在实现一个用户注册验证的例子时，发现在资源文件中不能动态的或的验证字段的值。只能每个字段一个message。</p>
 
-<pre><code>private String username;&lt;br /&gt;
-private String password;&lt;br /&gt;
-[...]&lt;br /&gt;
+<p>```
+class User {</p>
+
+<pre><code>private String username;
+private String password;
 </code></pre>
 
 <p>}
@@ -55,19 +55,15 @@ private String password;&lt;br /&gt;
 ```</p>
 
 <p><code>
-errors.username.range=${username} is not in the range ${minLength} through ${maxLength}.&lt;br /&gt;
-errors.password.range=${password} is not in the range ${minLength} through ${maxLength}.&lt;br /&gt;
+errors.username.range=${username} is not in the range ${minLength} through ${maxLength}.
+errors.password.range=${password} is not in the range ${minLength} through ${maxLength}.
 </code></p>
 
-<p>到xwork的站点上去查找解决方法，在Issue Tracker里看到有人提交了一个Feature，采用的办法是给<br />
-message传递参数(<a href="http://jira.opensymphony.com/browse/XW-184">http://jira.opensymphony.com/browse/XW-184</a>)，看了xwork的代码后，发现这样<br />
-子的做法要修改的代码量非常大，所以只能另外想办法解决。</p>
+<p>到xwork的站点上去查找解决方法，在Issue Tracker里看到有人提交了一个Feature，采用的办法是给message传递参数(<a href="http://jira.opensymphony.com/browse/XW-184">http://jira.opensymphony.com/browse/XW-184</a>)，看了xwork的代码后，发现这样子的做法要修改的代码量非常大，所以只能另外想办法解决。</p>
 
-<p>在资源文件中可以用${fieldName}来获取要验证的字段变量名，那是否可以用${fieldValue}来得到验<br />
-证字段的值呢？查看代码后发现这种办法也不可行。既然${fieldName}获得的是字段变量名，那么是否<br />
-可以用${${fieldName}}来获取字段变量的值呢？验证失败后会调用Validator.getMessage()方法，追<br />
-踪代码来到TextParseUtil.translateVariables()方法中，找到代码：<br />
-```
+<p>在资源文件中可以用${fieldName}来获取要验证的字段变量名，那是否可以用${fieldValue}来得到验证字段的值呢？查看代码后发现这种办法也不可行。既然${fieldName}获得的是字段变量名，那么是否可以用${${fieldName}}来获取字段变量的值呢？验证失败后会调用Validator.getMessage()方法，追踪代码来到TextParseUtil.translateVariables()方法中，找到代码：</p>
+
+<p>```
 while (start != -1 &amp;&amp; x &lt; length &amp;&amp; count != 0) { // 该部分代码负责查找变量，即${}包围的字符串</p>
 
 <pre><code>c = expression.charAt(x++);
@@ -94,26 +90,26 @@ String right = expression.substring(end + 1);
 
 <p>```</p>
 
-<p>由上面的代码可以看出WebWork只处理了最外围的${}，所以要让它处理像${${}}这样的格式就需要在<br />
-获取变量前再次处理变量。修改后的代码如下：<br />
-```
-if ((start != -1) &amp;&amp; (end != -1) &amp;&amp; (count == 0)) {<br /></p>
+<p>由上面的代码可以看出WebWork只处理了最外围的${}，所以要让它处理像${${}}这样的格式就需要在获取变量前再次处理变量。修改后的代码如下：</p>
 
-<pre><code>String nestedExpression = expression.substring(start + 2, end);&lt;br /&gt;
-String var = translateVariables(nestedExpression, stack);&lt;br /&gt;
+<p>```
+if ((start != -1) &amp;&amp; (end != -1) &amp;&amp; (count == 0)) {</p>
+
+<pre><code>String nestedExpression = expression.substring(start + 2, end);
+String var = translateVariables(nestedExpression, stack);
 //String var = expression.substring(start + 2, end);
 
-Object o = stack.findValue(var, asType);     --&gt; 此处就是获取变量值的地方
+Object o = stack.findValue(var, asType);    // 此处就是获取变量值的地方
 
-String left = expression.substring(0, start);&lt;br /&gt;
-String right = expression.substring(end + 1);&lt;br /&gt;
-[...]&lt;br /&gt;
+String left = expression.substring(0, start);
+String right = expression.substring(end + 1);
 </code></pre>
 
 <p>```</p>
 
-<p>现在就可以处理资源文件中的多重嵌套变量了。接着把修改验证文件和资源文件修改一下就可以了。<br />
-```
+<p>现在就可以处理资源文件中的多重嵌套变量了。接着把修改验证文件和资源文件修改一下就可以了。</p>
+
+<p>```
 <field name="username"></p>
 
 <pre><code>&lt;field-validator type="stringlength" short-circuit="true"&gt;
@@ -138,10 +134,10 @@ String right = expression.substring(end + 1);&lt;br /&gt;
 ```</p>
 
 <p><code>
-errors.range=${${fieldName}} is not in the range ${minLength} through ${maxLength}.&lt;br /&gt;
+errors.range=${${fieldName}} is not in the range ${minLength} through ${maxLength}.
 </code></p>
 
-<p>注：以上的解决方案只是权宜之计，可能会出现多重嵌套降低效率的问题。最好的方法我觉得还是<a href="http://jira.opensymphony.com/browse/XW-184" title="XW-184"><a href="http://jira.opensymphony.com/browse/XW-184">http://jira.opensymphony.com/browse/XW-184</a><a>建议的那样传递参数。</p></p>
+<p>注：以上的解决方案只是权宜之计，可能会出现多重嵌套降低效率的问题。最好的方法我觉得还是 <a href="http://jira.opensymphony.com/browse/XW-184">http://jira.opensymphony.com/browse/XW-184</a> 建议的那样传递参数。</p>
 ]]></content>
   </entry>
   

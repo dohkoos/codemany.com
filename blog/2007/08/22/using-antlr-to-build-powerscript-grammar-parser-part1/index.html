@@ -5,11 +5,11 @@
 <!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  <title>使用ANTLR构建PowerScript语法分析器（4） - 乐者为王</title>
+  <title>使用ANTLR构建PowerScript语法分析器（1） - 乐者为王</title>
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="什么是表达式 简单的来说，表达式就是操作数和操作符根据语法规则结合后的结果，它通常被用来执行在变量或值上的操作处理。 主表达式(Primary Expression) 到现在PowerScript的词法分析已经写的差不多了，接下来就要开始写语法分析。语法分析的主要组成部分是表达式（ &hellip;">
+  <meta name="description" content="首先，让我们从最简单的做起，先实现一个能正确分析PowerScript注释的词法文件。PowerScript支持两种注释形式：单行注释（//）和多行注释（/&#8230;/）。 单行注释以双斜杠（//）起头，直到遇到行结束符为止，所以在这里要先明确一下行结束符用什么表示。在DOS系统中行结束符用 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -18,7 +18,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   
-  <link rel="canonical" href="http://codemany.com/blog/2008/04/26/using-antlr-to-build-powerscript-grammar-parser-4">
+  <link rel="canonical" href="http://codemany.com/blog/2007/08/22/using-antlr-to-build-powerscript-grammar-parser-part1">
   <link href="/favicon.png" rel="icon">
   <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
   <link href="/atom.xml" rel="alternate" title="乐者为王" type="application/atom+xml">
@@ -68,7 +68,7 @@
   
   <header>
     
-      <h1 class="entry-title">使用ANTLR构建PowerScript语法分析器（4）</h1>
+      <h1 class="entry-title">使用ANTLR构建PowerScript语法分析器（1）</h1>
     
     
       <p class="meta">
@@ -84,20 +84,52 @@
   
 
 
-<time datetime="2008-04-26T22:17:05+08:00" pubdate data-updated="true">Apr 26<sup>th</sup>, 2008</time>
+<time datetime="2007-08-22T23:43:04+08:00" pubdate data-updated="true">Aug 22<sup>nd</sup>, 2007</time>
         
       </p>
     
   </header>
 
 
-<div class="entry-content"><p>什么是表达式</p>
+<div class="entry-content"><p>首先，让我们从最简单的做起，先实现一个能正确分析PowerScript注释的词法文件。PowerScript支持两种注释形式：单行注释（//）和多行注释（/<em>&#8230;</em>/）。</p>
 
-<p>简单的来说，表达式就是操作数和操作符根据语法规则结合后的结果，它通常被用来执行在变量或值上的操作处理。</p>
+<p>单行注释以双斜杠（//）起头，直到遇到行结束符为止，所以在这里要先明确一下行结束符用什么表示。在DOS系统中行结束符用“\r\n”表示，在Unix系统中行结束符用“\n”表示，现在的Mac系统也是以“\n”表示行结束符，但早期的Mac系统中行结束符则是以“\r”表示。所以兼容这几种操作系统的行结束符定义为：</p>
 
-<p>主表达式(Primary Expression)</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>fragment
+</span><span class='line'>EndOfLine
+</span><span class='line'>    : '\r' '\n' // DOS
+</span><span class='line'>    | '\r'      // Mac
+</span><span class='line'>    | '\n'      // Unix
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
 
-<p>到现在PowerScript的词法分析已经写的差不多了，接下来就要开始写语法分析。语法分析的主要组成部分是表达式（expression），而表达式的主要组成部分则是主表达式。主表达式包含了大部分简单的表达式，如文字量（literals），字段存取，方法调用和数组存取等。带圆括号的表达式通常也被认为是主表达式。其常见形式如下：</p>
+
+<p>现在，有了行结束符定义，就可以定义单行注释的词法规则了：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>LINE_COMMENT
+</span><span class='line'>    : '//' ~('\n'|'\r')* EndOfLine
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>通常的多行注释词法规则是这样的：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>BLOCK_COMMENT
+</span><span class='line'>    : '/*' ( options {greedy=false;} : . )* '*/'
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>但由于PowerScript支持嵌套注释，所以上面的规则无效，必须重新定义。当词法分析器遇到“/<em>”后就进入了多行注释。这时假如遇到了“/”符号，词法分析器必须预取一个字符，看这个字符是否是“</em>”。如果是的话，就进入了嵌套的多行注释，否则，则还是处在多行注释中。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -106,30 +138,30 @@
 <span class='line-number'>5</span>
 <span class='line-number'>6</span>
 <span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>(x)
-</span><span class='line'>x.y
-</span><span class='line'>f(x)
-</span><span class='line'>a[x]
-</span><span class='line'>x++
-</span><span class='line'>x--
-</span><span class='line'>new</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>BLOCK_COMMENT
+</span><span class='line'>    : '/*'
+</span><span class='line'>      ( options {greedy=false;}
+</span><span class='line'>      : ('/' '*')=&gt; BLOCK_COMMENT // 在多行注释中遇到“/*”，用语法断言确定是嵌套多行注释
+</span><span class='line'>      | '/' ~('*')                // 在多行注释中只遇到“/”，而没有紧跟着的“*”
+</span><span class='line'>      | ~('/')                    // 在多行注释中没有遇到“/”
+</span><span class='line'>      )*
+</span><span class='line'>      '*/'
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
 
 
-<p>super，parent，this分析</p>
+<p>当然，我们还希望忽略空格、制表符、回车符、换行符等无意义字符。</p>
 
-<p>什么时候使用super<br />
-当直接子类中存在有和父类相同签名的事件或函数时。</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>WS
+</span><span class='line'>    : (' '|'\r'|'\t'|'\u000C'|'\n') {$channel=HIDDEN;}
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
 
-<p>使用super有哪些限制<br />
-1、不能调用父类中控件的脚本（猜测super后只能跟随“::”符号）；<br />
-2、只能在直接子类的函数或事件中调用父类的事件或函数。</p>
 
-<p>在哪些脚本中可以使用parent<br />
-1、窗口中的控件，此时parent指代包含该控件的窗口；<br />
-2、定制的用户对象中的控件，这时parent指代定制的用户对象；<br />
-3、菜单，这时候parent指代该菜单的上一级菜单。</p>
-
-<p>收集的一些script语句</p>
+<p>测试代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -149,41 +181,27 @@
 <span class='line-number'>16</span>
 <span class='line-number'>17</span>
 <span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>this.ls_array[1]
-</span><span class='line'>this.event pfc_addrow()
-</span><span class='line'>this.event rowfocuschanged(ll_row)
-</span><span class='line'>this.uo_1.function hallo()
-</span><span class='line'>post function column_order_update_from_grid()
-</span><span class='line'>event ue_process()
-</span><span class='line'>
-</span><span class='line'>close(parent)
-</span><span class='line'>parent.enabled
-</span><span class='line'>parent.hide()
-</span><span class='line'>parent.event ue_postconstructor()
-</span><span class='line'>parent.function static trigger wf_process( )
-</span><span class='line'>
-</span><span class='line'>super::create
-</span><span class='line'>super::clicked;
-</span><span class='line'>super::event clicked()
-</span><span class='line'>super::event clicked(xpos, ypos, row, dwo)
-</span><span class='line'>super::of_remove_tail(anv_tailnode)
-</span><span class='line'>super::event trigger selectionchanging(oldindex, newindex)
-</span><span class='line'>
-</span><span class='line'>iu_tab_postings.post of_enable_sort(dw_main, dw_detail, false)
-</span><span class='line'>w_main.event doubleclicked(flags, xpos, ypos)
-</span><span class='line'>dw_main.event pfc_retrieve()
-</span><span class='line'>cb_ok.event trigger clicked()
-</span><span class='line'>cb_ok.triggerevent(clicked!)</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>/* This is a single-line comment.   */
+</span><span class='line'>/* /This is a single-line comment. */
+</span><span class='line'>/* *This is a single-line comment. */
+</span><span class='line'>/* This comment /* */*/
+</span><span class='line'>/* This comment /* The nested comment */ */
+</span><span class='line'>/*  This comment starts here.
+</span><span class='line'> /*  This is the start of a nested comment.
+</span><span class='line'> The nested comment ends here.  */
+</span><span class='line'> The first comment ends here.  */
+</span><span class='line'>/* This comment starts here,
+</span><span class='line'> continues to this line,&
+</span><span class='line'> and finally ends here. */
+</span><span class='line'>// This entire line is a comment.
+</span><span class='line'>// This entire line is a comment. //
+</span><span class='line'>// /This entire line is a comment.
+</span><span class='line'>// /This entire line is a comment.
+</span><span class='line'>// This entire line is a comment. */
+</span><span class='line'>// This entire line is a comment. /*</span></code></pre></td></tr></table></div></figure>
 
 
-<p>主表达式语法</p>
+<p>语法文件PowerScript.g的内容如下：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -222,56 +240,42 @@
 <span class='line-number'>35</span>
 <span class='line-number'>36</span>
 <span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-<span class='line-number'>44</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>primary_expression
-</span><span class='line'>    : '(' expression ')'
-</span><span class='line'>    | IDENTIFIER '!'?                // build-in constant
-</span><span class='line'>    | literal
-</span><span class='line'>    | '::' IDENTIFIER                // global variables
-</span><span class='line'>    | call_type IDENTIFIER arguments // example: post function to_string()
-</span><span class='line'>    | 'create' 'using'? (STRING_LITERAL|IDENTIFIER)
-</span><span class='line'>    | 'destroy' IDENTIFIER
-</span><span class='line'>    | 'super' '::' call_type? IDENTIFIER arguments?
-</span><span class='line'>    | object_name ('.' IDENTIFIER)* identifier_suffix?
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar PowerScript;
+</span><span class='line'>
+</span><span class='line'>program
+</span><span class='line'>    : LINE_COMMENT+
+</span><span class='line'>    | BLOCK_COMMENT+
 </span><span class='line'>    ;
 </span><span class='line'>
-</span><span class='line'>object_name
-</span><span class='line'>    : 'this'
-</span><span class='line'>    | 'parent'
-</span><span class='line'>    | IDENTIFIER
+</span><span class='line'>LINE_COMMENT
+</span><span class='line'>    : '//' ~('\n'|'\r')* EndOfLine
+</span><span class='line'>      {
+</span><span class='line'>          System.out.println("lc&gt;" + getText());
+</span><span class='line'>      }
 </span><span class='line'>    ;
 </span><span class='line'>
-</span><span class='line'>call_type
-</span><span class='line'>    : ( 'function'
-</span><span class='line'>      | 'event'
-</span><span class='line'>      | 'static'
-</span><span class='line'>      | 'dynamic'
-</span><span class='line'>      | 'trigger'
-</span><span class='line'>      | 'post'
-</span><span class='line'>      )+
+</span><span class='line'>BLOCK_COMMENT
+</span><span class='line'>    : '/*'
+</span><span class='line'>      ( options {greedy=false;}
+</span><span class='line'>      : ('/' '*')=&gt;; BLOCK_COMMENT
+</span><span class='line'>      | '/' ~('*')
+</span><span class='line'>      | ~('/')
+</span><span class='line'>      )*
+</span><span class='line'>      '*/'
+</span><span class='line'>      {
+</span><span class='line'>          System.out.println("bc&gt;" + getText());
+</span><span class='line'>      }
 </span><span class='line'>    ;
 </span><span class='line'>
-</span><span class='line'>identifier_suffix
-</span><span class='line'>    : arguments ('.' IDENTIFIER arguments)* // cascaded calling
-</span><span class='line'>    | '[' expression_list? ']'
-</span><span class='line'>    | call_type IDENTIFIER arguments
+</span><span class='line'>WS
+</span><span class='line'>    : (' '|'\r'|'\t'|'\u000C'|'\n') {$channel=HIDDEN;}
 </span><span class='line'>    ;
 </span><span class='line'>
-</span><span class='line'>arguments
-</span><span class='line'>    : '(' expression_list? ')'
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>literal
-</span><span class='line'>    : STRING_LITERAL
-</span><span class='line'>    | INTEGER_LITERAL
-</span><span class='line'>    | FLOAT_LITERAL
-</span><span class='line'>    | BOOLEAN_LITERAL
+</span><span class='line'>fragment
+</span><span class='line'>EndOfLine
+</span><span class='line'>    : '\r' '\n' // DOS
+</span><span class='line'>    | '\r'      // Mac
+</span><span class='line'>    | '\n'      // Unix
 </span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
 
 </div>
@@ -296,7 +300,7 @@
   
 
 
-<time datetime="2008-04-26T22:17:05+08:00" pubdate data-updated="true">Apr 26<sup>th</sup>, 2008</time>
+<time datetime="2007-08-22T23:43:04+08:00" pubdate data-updated="true">Aug 22<sup>nd</sup>, 2007</time>
       
 
 
@@ -306,15 +310,15 @@
   <ul class="posts">
   
     <li class="related">
-      <a href="/blog/2007/09/07/using-antlr-to-build-powerscript-grammar-parser-3/">使用ANTLR构建PowerScript语法分析器（3）</a>
+      <a href="/blog/2008/04/26/using-antlr-to-build-powerscript-grammar-parser-part4/">使用ANTLR构建PowerScript语法分析器（4）</a>
     </li>
   
     <li class="related">
-      <a href="/blog/2007/09/02/using-antlr-to-build-powerscript-grammar-parser-2/">使用ANTLR构建PowerScript语法分析器（2）</a>
+      <a href="/blog/2007/09/07/using-antlr-to-build-powerscript-grammar-parser-part3/">使用ANTLR构建PowerScript语法分析器（3）</a>
     </li>
   
     <li class="related">
-      <a href="/blog/2007/08/22/using-antlr-to-build-powerscript-grammar-parser-1/">使用ANTLR构建PowerScript语法分析器（1）</a>
+      <a href="/blog/2007/09/02/using-antlr-to-build-powerscript-grammar-parser-part2/">使用ANTLR构建PowerScript语法分析器（2）</a>
     </li>
   
     <li class="related">
@@ -343,10 +347,10 @@
     
     <p class="meta">
       
-        <a class="basic-alignment left" href="/blog/2008/04/25/cannot-launch-the-remote-parser-because-port-49153-is-already-in-use/" title="Previous Post: Cannot launch the remote parser because port 49153 is already in use">&laquo; Cannot launch the remote parser because port 49153 is already in use</a>
+        <a class="basic-alignment left" href="/blog/2007/08/10/jpa-spring-2-entry/" title="Previous Post: JPA + Spring 2入门">&laquo; JPA + Spring 2入门</a>
       
       
-        <a class="basic-alignment right" href="/blog/2008/05/11/to-extend-the-windows-server-2008-assessment-period/" title="Next Post: 延长Windows Server 2008的评估期限">延长Windows Server 2008的评估期限 &raquo;</a>
+        <a class="basic-alignment right" href="/blog/2007/09/02/using-antlr-to-build-powerscript-grammar-parser-part2/" title="Next Post: 使用ANTLR构建PowerScript语法分析器（2）">使用ANTLR构建PowerScript语法分析器（2） &raquo;</a>
       
     </p>
   </footer>
@@ -391,7 +395,7 @@
 <section>
   <h1>Recent Comments</h1>
   <div class="dsq-widget">
-    <script type="text/javascript" src="http://dohkoos.disqus.com/recent_comments_widget.js"></script>
+    <script type="text/javascript" src="http://codemany.disqus.com/recent_comments_widget.js"></script>
   </div>
 </section>
 <section>
@@ -446,8 +450,8 @@
       
         
         // var disqus_developer = 1;
-        var disqus_identifier = 'http://codemany.com/blog/2008/04/26/using-antlr-to-build-powerscript-grammar-parser-4/';
-        var disqus_url = 'http://codemany.com/blog/2008/04/26/using-antlr-to-build-powerscript-grammar-parser-4/';
+        var disqus_identifier = 'http://codemany.com/blog/2007/08/22/using-antlr-to-build-powerscript-grammar-parser-part1/';
+        var disqus_url = 'http://codemany.com/blog/2007/08/22/using-antlr-to-build-powerscript-grammar-parser-part1/';
         var disqus_script = 'embed.js';
       
     (function () {
