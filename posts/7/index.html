@@ -219,7 +219,7 @@
 </span><span class='line'>android:clickable="false"</span></code></pre></td></tr></table></div></figure>
 
 
-<p>加入CheckBox后，在程序运行过程中会发现整个ListView无法响应onItemClick、onItemLongClick或onCreateContextMenu事件。原因在于CheckBox是拥有焦点的，它的优先级比ListItem的焦点优先级更高，于是屏蔽了ListItem的点击事件。解决方法是让CheckBox不能获得焦点。android:focusable=&#8221;false&#8221;就是做这个的。</p>
+<p>加入CheckBox后，在程序运行过程中会发现整个ListView无法响应onItemClick、onItemLongClick或onCreateContextMenu事件。原因在于CheckBox是拥有焦点的，它的优先级比ListItem的焦点优先级更高，于是ListItem的点击事件被屏蔽了。解决方法是让CheckBox不能获得焦点。android:focusable=&#8221;false&#8221;就是做这个的。</p>
 
 <p>修改整个SimpleIconAdapter类为以下内容：</p>
 
@@ -331,7 +331,7 @@
 </span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
 
-<p>再就是修改主文件：</p>
+<p>再就是修改MainActivity文件：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -380,7 +380,7 @@
 <span class='line-number'>45</span>
 <span class='line-number'>46</span>
 <span class='line-number'>47</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class Main extends Activity {
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class MainActivity extends Activity {
 </span><span class='line'>
 </span><span class='line'>    @Override
 </span><span class='line'>    public void onCreate(Bundle savedInstanceState) {
@@ -440,7 +440,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2011/06/02/implement-a-listview-with-icon-improved/">实现带icon的ListView（改进版）</a></h1>
+      <h1 class="entry-title"><a href="/blog/2011/06/02/implement-listview-with-icon-improved/">实现带Icon的ListView（改进版）</a></h1>
     
     
       <p class="meta">
@@ -463,7 +463,7 @@
   </header>
 
 
-  <div class="entry-content"><p>带icon的ListView工作起来还不错，但是如果手机里安装的软件比较多的话就有问题了。在程序启动时会黑屏一段时间，就好像程序挂起了一样。所以这时需要显示一个对话框，告诉用户正在加载数据，最好还能准确告诉用户加载的进度。</p>
+  <div class="entry-content"><p>带Icon的ListView工作起来还不错，但是如果手机里安装的软件比较多的话就有问题了。在程序启动时会黑屏一段时间，就好像程序挂起了一样。所以这时需要显示一个对话框，告诉用户正在加载数据，最好还能准确告诉用户加载的进度。</p>
 
 <p>显示对话框用ProgressDialog，它有两种样式：HORIZONTAL和SPINNER。这里暂时选择SPINNER，等以后有机会再改成HORIZONTAL。</p>
 
@@ -508,8 +508,13 @@
 <span class='line-number'>11</span>
 <span class='line-number'>12</span>
 <span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'>ProgressDialog pd = ProgressDialog.show(this, "Wait", "loading...");
+</span><span class='line'>
 </span><span class='line'>new Thread() {
+</span><span class='line'>    @Override
 </span><span class='line'>    public void run() {
 </span><span class='line'>        ListView lv = (ListView)findViewById(R.id.list_view);
 </span><span class='line'>        adapter = new SimpleIconAdapter(Main.this,
@@ -520,6 +525,7 @@
 </span><span class='line'>        lv.setAdapter(adapter);
 </span><span class='line'>    }
 </span><span class='line'>}.start();
+</span><span class='line'>
 </span><span class='line'>pd.dismiss();</span></code></pre></td></tr></table></div></figure>
 
 
@@ -535,17 +541,21 @@
 
 <p>看了上面这段话可以知道为啥程序一打开就黑屏，像挂掉了一样。</p>
 
-<p>那为什么用新建线程来执行耗时操作的代码也有问题呢？这是因为它虽然没有阻塞UI线程，但它违背了单线程模型，Android的UI操作并不是线程安全的，并且这些操作必须在UI线程中执行。在这段代码片段中，在另一个线程中执行数据加载，这会引起一些古怪的问题。</p>
+<p>那为什么用新建线程来执行耗时操作的代码也有问题呢？这是因为它虽然没有阻塞UI线程，但它违背了单线程模型，Android的UI操作并不是线程安全的，并且这些操作必须在UI线程中执行。在这段代码片段中，在另一个线程中执行数据加载绑定，这会引起一些古怪的问题。</p>
 
-<p>Andriod提供了几种在其它线程中访问UI线程的方法。下面是所有这些方法的列表：<br />
-<a href="http://developer.android.com/reference/android/app/Activity.html#runOnUiThread(java.lang.Runnable)">Activity.runOnUiThread(Runnable)</a><br />
-<a href="http://developer.android.com/reference/android/view/View.html#post(java.lang.Runnable)">View.post(Runnable)</a><br />
-<a href="http://developer.android.com/reference/android/view/View.html#postDelayed(java.lang.Runnable,%20long)">View.postDelayed(Runnable, long)</a><br />
-<a href="http://developer.android.com/reference/android/os/Handler.html">Hanlder</a></p>
+<p>Andriod提供了几种在其它线程中访问UI线程的方法：</p>
 
-<p>上面的任何一个类或方法都可以修复我们前面代码中出现的问题，很不幸的是这些类或方法同样会使你的代码很复杂很难理解。而且当你需要实现一些很复杂的操作并需要频繁地更新UI时会变得更糟糕。为了解决这个问题，Android 1.5提供了一个工具类AsyncTask，它使创建需要与用户界面交互的长时间运行的任务变得更简单。在Android 1.0和1.1中具有与AsyncTask相同功能的类UserTask。它提供了完全一样的API，你需要做的只是把它的代码拷贝的你的程序中。</p>
+<ul>
+<li><a href="http://developer.android.com/reference/android/app/Activity.html#runOnUiThread(java.lang.Runnable)">Activity.runOnUiThread(Runnable)</a></li>
+<li><a href="http://developer.android.com/reference/android/view/View.html#post(java.lang.Runnable)">View.post(Runnable)</a></li>
+<li><a href="http://developer.android.com/reference/android/view/View.html#postDelayed(java.lang.Runnable,%20long)">View.postDelayed(Runnable, long)</a></li>
+<li><a href="http://developer.android.com/reference/android/os/Handler.html">Hanlder</a></li>
+</ul>
 
-<p>其实这些方案都是采用的Handler，所以这里仍然使用旧有的，复杂的Handler来修复上述问题。</p>
+
+<p>上面的任何一个类或方法都可以修复我们前面代码中遇到的问题，很不幸的是这些类或方法同样会使你的代码变的很复杂很难理解。而且当你需要实现一些很复杂的操作并需要频繁地更新UI时会变得更糟糕。为了解决这个问题，Android 1.5提供了一个工具类AsyncTask，它使创建需要与用户界面交互的长时间运行的任务变得更简单。在Android 1.0和1.1中具有与AsyncTask相同功能的类UserTask，它提供了完全一样的API，你需要做的只是把它的代码拷贝的你的程序中。</p>
+
+<p>其实这些方案背后采用的都是Handler。所以这里仍然使用旧有的，复杂的Handler来修复上述问题。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -606,6 +616,8 @@
 <span class='line-number'>57</span>
 <span class='line-number'>58</span>
 <span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.apkmgt;
 </span><span class='line'>
 </span><span class='line'>import java.util.ArrayList;
@@ -622,7 +634,7 @@
 </span><span class='line'>import android.os.Message;
 </span><span class='line'>import android.widget.ListView;
 </span><span class='line'>
-</span><span class='line'>public class Main extends Activity {
+</span><span class='line'>public class MainActivity extends Activity {
 </span><span class='line'>    private static final String APP_ICON = "app_icon";
 </span><span class='line'>    private static final String APP_TITLE = "app_title";
 </span><span class='line'>    private static final String APP_PACKAGE = "app_package";
@@ -646,6 +658,7 @@
 </span><span class='line'>        lv.setAdapter(adapter);
 </span><span class='line'>
 </span><span class='line'>        pd = ProgressDialog.show(this, "Wait", "loading...");
+</span><span class='line'>
 </span><span class='line'>        new Thread() {
 </span><span class='line'>            @Override
 </span><span class='line'>            public void run() {
@@ -661,6 +674,7 @@
 </span><span class='line'>        public void handleMessage(Message msg) {
 </span><span class='line'>            // 通知UI更新。必须要放在这里
 </span><span class='line'>            adapter.notifyDataSetChanged();
+</span><span class='line'>
 </span><span class='line'>            pd.dismiss();
 </span><span class='line'>        }
 </span><span class='line'>    };
@@ -728,7 +742,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2011/05/26/implement-a-listview-with-icon/">实现带icon的ListView</a></h1>
+      <h1 class="entry-title"><a href="/blog/2011/05/26/implement-listview-with-icon/">实现带Icon的ListView</a></h1>
     
     
       <p class="meta">
@@ -777,7 +791,7 @@
 </span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
 
 
-<p>在list_item.xml中添加ImageView控件，设置高度和宽度分别为32dip，这是因为有些应用icon尺寸比较大的缘故，如果不设置的话有些行就会撑大：</p>
+<p>在list_item.xml中添加ImageView控件，设置高度和宽度分别为32dip，这是因为有些应用Icon尺寸比较大的缘故，如果不设置的话有些行就会撑大：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -899,7 +913,7 @@
 </span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
 
-<p>修改Activity文件：</p>
+<p>修改MainActivity文件，更换绑定的适配器：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -971,7 +985,7 @@
 </span><span class='line'>import android.widget.ListView;
 </span><span class='line'>import android.widget.SimpleAdapter;
 </span><span class='line'>
-</span><span class='line'>public class Main extends Activity {
+</span><span class='line'>public class MainActivity extends Activity {
 </span><span class='line'>    private static final String APP_ICON = "app_icon";
 </span><span class='line'>    private static final String APP_TITLE = "app_title";
 </span><span class='line'>    private static final String APP_PACKAGE = "app_package";
@@ -1002,12 +1016,12 @@
 </span><span class='line'>            Drawable icon = pkg.applicationInfo.loadIcon(getPackageManager());
 </span><span class='line'>            String label = pkg.applicationInfo.loadLabel(getPackageManager()).toString();
 </span><span class='line'>            String version = pkg.versionName;
-</span><span class='line'>            String packageName = pkg.packageName;
+</span><span class='line'>            String pkgName = pkg.packageName;
 </span><span class='line'>
 </span><span class='line'>            HashMap&lt;String, Object&gt; map = new HashMap&lt;String, Object&gt;();
 </span><span class='line'>            map.put(APP_ICON, icon);
 </span><span class='line'>            map.put(APP_TITLE, label + " " + version);
-</span><span class='line'>            map.put(APP_PACKAGE, packageName);
+</span><span class='line'>            map.put(APP_PACKAGE, pkgName);
 </span><span class='line'>            listItem.add(map);
 </span><span class='line'>        }
 </span><span class='line'>        return listItem;
@@ -1026,7 +1040,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2011/05/25/implement-a-listview-without-listactivity/">不使用ListActivity实现ListView的方法</a></h1>
+      <h1 class="entry-title"><a href="/blog/2011/05/25/implement-listview-without-listactivity/">不使用ListActivity实现ListView</a></h1>
     
     
       <p class="meta">
@@ -1182,7 +1196,7 @@
 </span><span class='line'>import android.widget.ListView;
 </span><span class='line'>import android.widget.SimpleAdapter;
 </span><span class='line'>
-</span><span class='line'>public class Main extends Activity {
+</span><span class='line'>public class MainActivity extends Activity {
 </span><span class='line'>
 </span><span class='line'>    @Override
 </span><span class='line'>    public void onCreate(Bundle savedInstanceState) {
@@ -1209,11 +1223,11 @@
 </span><span class='line'>            }
 </span><span class='line'>            String label = pkg.applicationInfo.loadLabel(getPackageManager()).toString();
 </span><span class='line'>            String version = pkg.versionName;
-</span><span class='line'>            String packageName = pkg.packageName;
+</span><span class='line'>            String pkgName = pkg.packageName;
 </span><span class='line'>
 </span><span class='line'>            HashMap&lt;String, Object&gt; map = new HashMap&lt;String, Object&gt;();
 </span><span class='line'>            map.put("app_title", label + " " + version);
-</span><span class='line'>            map.put("app_package", packageName);
+</span><span class='line'>            map.put("app_package", pkgName);
 </span><span class='line'>            listItem.add(map);
 </span><span class='line'>        }
 </span><span class='line'>        return listItem;
@@ -1221,7 +1235,7 @@
 </span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
 
-<p>至此，一个不使用ListActivity实现的ListView就完成了。</p>
+<p>至此，一个不使用ListActivity的ListView就完成了。</p>
 </div>
   
   
@@ -1234,7 +1248,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2011/05/18/show-name-and-package-of-installed-app-list-in-a-listview/">在ListView中显示已安装应用的名字和包名</a></h1>
+      <h1 class="entry-title"><a href="/blog/2011/05/18/show-name-and-package-of-installed-apps-in-listview/">在ListView中显示已安装应用的名字和包名</a></h1>
     
     
       <p class="meta">
@@ -1273,18 +1287,16 @@
 </ol>
 
 
-<p>一个ListView显示出来需要3样东西：</p>
+<p>列表的显示需要三个元素：</p>
 
 <ol>
-<li>ListView（用来显示数据的列表）;</li>
-<li>data（需要显示的数据）;</li>
-<li>绑定data和ListView的适配器ListAdapter。</li>
+<li>用来显示数据的ListView;</li>
+<li>需要显示的数据;</li>
+<li>绑定数据和ListView的Adapter。</li>
 </ol>
 
 
-<p>ListAdapter其实只是适配器接口，实际绑定的话需要使用它的子类。常见的子类有：ArrayAdapter，SimpleAdapter和CursorAdapter。</p>
-
-<p>SimpleAdapter是ArrayList和ListView的桥梁。ArrayList里边的每一项都是一个Map&lt;String, ?>类型。每个Map对象都和ListView里边的一项进行数据绑定。</p>
+<p>Adapter通常有ArrayAdapter、SimpleAdapter和CursorAdapter等。其中SimpleAdapter有最好的扩充性，可以自定义出各种效果。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'>SimpleAdapter(Context context, List&lt;? extends Map&lt;String, ?&gt;&gt; data, int resource, String[] from, int[] to)</span></code></pre></td></tr></table></div></figure>
@@ -1294,10 +1306,10 @@
 
 <ol>
 <li>context：上下文；</li>
-<li>data：基于map的list；</li>
-<li>resource：就是一个布局layout，可引用系统提供的，也可以自定义；</li>
-<li>from：这是个名字数组，每个名字是为了在ArrayList数组的每一项索引Map&lt;String, Object>的Object用的；</li>
-<li>to：里面是一个TextView数组，这些TextView是以id的形式来表示的。例如：R.id.txt，这个txt在layout当中是可以索引的。</li>
+<li>data：数据列表。列表里的每一项都是一个Map&lt;String, ?>对象，都和ListView里的一项进行数据绑定；</li>
+<li>resource：布局资源。可以引用系统提供的，也可以自定义；</li>
+<li>from：名字数组。每个名字都是用来索引数据列表中每个Map&lt;String, Object>里的Object；</li>
+<li>to：资源索引数组，以R.id.xxx的形式表示。</li>
 </ol>
 
 
@@ -1337,7 +1349,7 @@
 
 <p>上面代码中的android:orientation=&#8221;vertical&#8221;很重要，没有它两个TextView就不会显示成两行。</p>
 
-<p>继承了ListActivity的Activity代码：</p>
+<p>继承了ListActivity的MainActivity代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1398,7 +1410,7 @@
 </span><span class='line'>import android.os.Bundle;
 </span><span class='line'>import android.widget.SimpleAdapter;
 </span><span class='line'>
-</span><span class='line'>public class Main extends ListActivity {
+</span><span class='line'>public class MainActivity extends ListActivity {
 </span><span class='line'>
 </span><span class='line'>    @Override
 </span><span class='line'>    public void onCreate(Bundle savedInstanceState) {
@@ -1423,11 +1435,11 @@
 </span><span class='line'>            }
 </span><span class='line'>            String label = pkg.applicationInfo.loadLabel(getPackageManager()).toString();
 </span><span class='line'>            String version = pkg.versionName;
-</span><span class='line'>            String packageName = pkg.packageName;
+</span><span class='line'>            String pkgName = pkg.packageName;
 </span><span class='line'>
 </span><span class='line'>            HashMap&lt;String, Object&gt; map = new HashMap&lt;String, Object&gt;();
 </span><span class='line'>            map.put("app_title", label + " " + version);
-</span><span class='line'>            map.put("app_package", packageName);
+</span><span class='line'>            map.put("app_package", pkgName);
 </span><span class='line'>            list.add(map);
 </span><span class='line'>        }
 </span><span class='line'>        return list;
@@ -2443,19 +2455,19 @@ notify_url中可以做对数据库的业务操作。return_url中可以做数据
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 97%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 133%" href="/tags/android/">Android</a>
+    <a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 111%" href="/tags/crack/">Crack</a>
 <a style="font-size: 108%" href="/tags/database/">Database</a>
 <a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
 <a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
-<a style="font-size: 134%" href="/tags/java/">Java</a>
+<a style="font-size: 135%" href="/tags/java/">Java</a>
 <a style="font-size: 108%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 116%" href="/tags/powerbuilder/">PowerBuilder</a>
 <a style="font-size: 120%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
 <a style="font-size: 101%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
+<a style="font-size: 97%" href="/tags/translation/">Translation</a>
 <a style="font-size: 105%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 108%" href="/tags/wxwidgets/">wxWidgets</a>
 

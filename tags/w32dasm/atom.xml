@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Tag: W32Dasm | 乐者为王]]></title>
+  <link href="http://codemany.com/tags/w32dasm/atom.xml" rel="self"/>
+  <link href="http://codemany.com/"/>
+  <updated>2014-08-21T22:32:52+08:00</updated>
+  <id>http://codemany.com/</id>
+  <author>
+    <name><![CDATA[dohkoos]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[练习破解'Crackme2 - by CoSH']]></title>
+    <link href="http://codemany.com/blog/2005/11/13/learn-to-crack-cosh-crackme2/"/>
+    <updated>2005-11-13T16:57:45+08:00</updated>
+    <id>http://codemany.com/blog/2005/11/13/learn-to-crack-cosh-crackme2</id>
+    <content type="html"><![CDATA[<p><a href="/uploads/crackme2.zip" title="crackme2.zip">Crackme2程序</a></p>
+
+<ol>
+<li>用PEiD查看，程序没有加壳；</li>
+<li>首先找到注册错误提示信息“One of the Details you entered was wrong”；</li>
+<li>用W32Dasm反汇编，利用String Data References找到上述字符串，双击它，看到以下程序：</li>
+</ol>
+
+
+<p>```
+* Reference To: MFC42.Ordinal:0F24, Ord:0F24h
+|
+:004014EB E85A030000              call 0040184A
+:004014F0 83F805                  cmp eax, 00000005                 -> 比较Name字符串的的长度
+:004014F3 7E41                    jle 00401536                      -> 如果小于等于5个字符就跳到出错信息处
+:004014F5 8D86E0000000            lea eax, dword ptr [esi+000000E0] -> Name字符串的地址
+:004014FB 8BCF                    mov ecx, edi
+:004014FD 50                      push eax</p>
+
+<ul>
+<li>Reference To: MFC42.Ordinal:0F22, Ord:0F22h
+|
+:004014FE E841030000              call 00401844
+:00401503 8DBEE4000000            lea edi, dword ptr [esi+000000E4] -> Serial字符串的地址
+:00401509 8BCD                    mov ecx, ebp
+:0040150B 57                      push edi
+```</li>
+</ul>
+
+
+<p>从004014F0到004014F3可以知道Name必须大于5个字符，且和Serial无关。</p>
+
+<p><code>
+* Reference To: MFC42.Ordinal:0F22, Ord:0F22h
+|
+:0040150C E833030000              call 00401844
+:00401511 8B07                    mov eax, dword ptr [edi]
+:00401513 803836                  cmp byte ptr [eax], 36
+:00401516 751E                    jne 00401536                      -&gt; 跳到出错信息处
+:00401518 80780132                cmp byte ptr [eax+01], 32
+:0040151C 7518                    jne 00401536                      -&gt; 跳到出错信息处
+:0040151E 80780238                cmp byte ptr [eax+02], 38
+:00401522 7512                    jne 00401536                      -&gt; 跳到出错信息处
+:00401524 80780337                cmp byte ptr [eax+03], 37
+:00401528 750C                    jne 00401536                      -&gt; 跳到出错信息处
+:0040152A 8078042D                cmp byte ptr [eax+04], 2D
+:0040152E 7506                    jne 00401536                      -&gt; 跳到出错信息处
+:00401530 80780541                cmp byte ptr [eax+05], 41
+:00401534 7417                    je 0040154D                       -&gt; 跳到正确信息处
+</code></p>
+
+<p>36(hex) = 6<br />
+32(hex) = 2<br />
+38(hex) = 8<br />
+37(hex) = 7<br />
+2D(hex) = -<br />
+41(hex) = A<br />
+所以Serial是：6287-A</p>
+
+<p>```
+* Referenced by a (U)nconditional or (C)onditional Jump at Addresses:
+|:004014E4(C), :004014F3(C), :00401516(C), :0040151C(C), :00401522(C)
+|:00401528(C), :0040152E(C)
+|
+:00401536 6A00                    push 00000000</p>
+
+<ul>
+<li><p>Possible StringData Ref from Data Obj ->"ERROR"
+|
+:00401538 6864304000              push 00403064</p></li>
+<li><p>Possible StringData Ref from Data Obj ->"One of the Details you entered was wrong"
+|
+:0040153D 6838304000              push 00403038
+:00401542 8BCE                    mov ecx, esi</p></li>
+<li><p>Reference To: MFC42.Ordinal:1080, Ord:1080h
+|
+:00401544 E8F5020000              Call 0040183E
+:00401549 6A00                    push 00000000
+:0040154B FFD3                    call ebx</p></li>
+<li><p>Referenced by a (U)nconditional or (C)onditional Jump at Address:
+|:00401534(C)
+|
+:0040154D 8D8EE0000000            lea ecx, dword ptr [esi+000000E0]
+:00401553 8D542414                lea edx, dword ptr [esp+14]
+:00401557 51                      push ecx</p></li>
+<li><p>Possible StringData Ref from Data Obj ->"Well done,"
+|
+:00401558 682C304000              push 0040302C
+:0040155D 52                      push edx</p></li>
+<li><p>Reference To: MFC42.Ordinal:039E, Ord:039Eh
+|
+:0040155E E8D5020000              Call 00401838
+:00401563 683C314000              push 0040313C
+:00401568 50                      push eax
+:00401569 8D442418                lea eax, dword ptr [esp+18]
+:0040156D C744242800000000        mov [esp+28], 00000000
+:00401575 50                      push eax</p></li>
+<li><p>Reference To: MFC42.Ordinal:039C, Ord:039Ch
+|
+:00401576 E8B7020000              Call 00401832
+:0040157B 8B00                    mov eax, dword ptr [eax]
+:0040157D 6A00                    push 00000000</p></li>
+<li><p>Possible StringData Ref from Data Obj ->"YOU DID IT"
+|
+:0040157F 6820304000              push 00403020
+:00401584 50                      push eax
+:00401585 8BCE                    mov ecx, esi
+:00401587 C644242C01              mov [esp+2C], 01
+```</p></li>
+</ul>
+
+
+<p>整理后得到：Name的长度必须大于5个字符，且和Serial无关。</p>
+
+<p>小技巧：如何截取W32Dasm中的汇编代码呢？很简单，在W32Dasm中点击其最左边，会有一红点，再按Shift键，点击另一处，选中所需范围，按Ctrl+C复制到剪贴版，剩下的事就是粘贴了。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[去除退出中国游戏中心后弹出的IE窗口]]></title>
+    <link href="http://codemany.com/blog/2005/11/02/remove-popup-ie-window-after-exit-from-china-games/"/>
+    <updated>2005-11-02T23:23:57+08:00</updated>
+    <id>http://codemany.com/blog/2005/11/02/remove-popup-ie-window-after-exit-from-china-games</id>
+    <content type="html"><![CDATA[<p>这次破解的版本是0.8.011.4。</p>
+
+<p>中国游戏中心退出时弹出的IE窗口很烦人，决定做个补丁把它去除掉。</p>
+
+<p>省略无数次尝试...确定退出中国游戏中心后打开的网页地址是 <a href="http://www.chinagames.net/PlazaJump/open">http://www.chinagames.net/PlazaJump/open</a> 。用W32Dasm反汇编iGame.exe，通过String Data References找到网址字符串，双击该字符串，看到以下程序：</p>
+
+<p>```
+:0043397A 90                nop
+:0043397B 90                nop
+:0043397C 90                nop
+:0043397D 90                nop
+:0043397E 90                nop
+:0043397F 90                nop
+:00433980 A1A2034800        mov eax, dword ptr [004803A2]
+:00433985 56                push esi
+:00433986 85C0              test eax, eax
+:00433988 8BF1              mov esi, ecx
+:0043398A 7411              je 0043399D               -> 判断是否要打开IE窗口
+:0043398C 6A00              push 00000000</p>
+
+<ul>
+<li><p>Possible StringData Ref from Data Obj ->"<a href="http://www.chinagames.net/PlazaJump/open/">http://www.chinagames.net/PlazaJump/open/</a>"
+|
+:0043398E 6860D84700        push 0047D860
+:00433993 B9D0FC4700        mov ecx, 0047FCD0
+:00433998 E8B3D2FFFF        call 00430C50             -> 打开IE窗口</p></li>
+<li><p>Referenced by a (U)nconditional or (C)onditional Jump at Address:
+|:0043398A(C)
+|
+:0043399D 8BCE              mov ecx, esi
+```</p></li>
+</ul>
+
+
+<p>从上面可以知道，只要将0043398A处的je指令改成jmp指令就可以避免退出时弹出的IE窗口了。</p>
+
+<p>现在使用CodeFusion来制作一个文件补丁。它有三种制作补丁的方案，这里使用Find&amp;Replace方法。将0043397A到00433998段的数据作为查找匹配数据，并将0043398A处的74（je指令）改成eb（jmp指令），然后按照步骤生成补丁文件就可以了。</p>
+
+<p>2008/3/19更新</p>
+
+<p>应ls的要求制作了一个针对最新版本（0.8.011.10）的补丁，和原来的补丁放在一起提供下载。</p>
+
+<p><a href="/uploads/chinagames-patch.zip" title="chinagames-patch.zip">补丁文件</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[练习破解Andrnalin的Crackme]]></title>
+    <link href="http://codemany.com/blog/2005/04/05/learn-to-crack-andrnalin-crackme/"/>
+    <updated>2005-04-05T21:32:19+08:00</updated>
+    <id>http://codemany.com/blog/2005/04/05/learn-to-crack-andrnalin-crackme</id>
+    <content type="html"><![CDATA[<p>拿到这个程序，用PEiD查看这个程序，发现是用Microsoft Visual Basic 5.0编写的且没有加过壳，所以用W32Dasm反汇编。通过Functions/Imports查看它调用的函数，能够看见MSVBVM50!__vbaStrCmp字样。</p>
+
+<ol>
+<li>启动SoftICE，然后运行Crackme程序；</li>
+<li>在文本框中输入12345678；</li>
+<li>Ctrl+D来到SoftICE中，输入bpx __vbaStrCmp，按回车后用Ctrl+D命令返回Crackme；</li>
+<li>点击OK，程序被SoftICE中断；</li>
+<li>按F12回到调用__vbaStrCmp的地方；</li>
+<li>按F6切换到代码窗口，移动光标，直到代码窗口中出现如下程序段：</li>
+</ol>
+
+
+<p><code>
+001B:00401D70                MOV ECX, [EBP-28]
+001B:00401D73                PUSH ECX
+001B:00401D74                PUSH 00401A54
+001B:00401D79                CALL [MSVBVM50!__vbaStrCmp]
+</code></p>
+
+<p>因此可以知道__vbaStrCmp比较的是ECX和00401A54所指向的字符串。记下00401A54这个值，然后重复步骤1、2、3、4。接着查看ECX和00401a54指向的内容就可以知道正确的key了。</p>
+
+<p>d ecx的显示如下：</p>
+
+<p><code>
+0023:0013CC1C 31 00 32 00 33 00 34 00-35 00 36 00 37 00 38 00 1.2.3.4.5.6.7.8.
+0023:0013CC2C 00 00 72 00 61 00 6D 00-46 00 69 00 79 00 05 00 ..r.a.m.F.i.y...
+</code></p>
+
+<p>d 401a54的显示如下：</p>
+
+<p><code>
+0023:00401A54 53 00 79 00 6E 00 54 00-61 00 58 00 20 00 32 00 S.y.n.T.a.X. .2.
+0023:00401A64 6F 00 6F 00 31 00 00 00-4C 00 00 00 52 00 69 00 o.o.1...L...R.i.
+</code></p>
+
+<p>12345678是我们输入的key，所以正确的key是SynTaX 2oo1（注意中间的空格）。</p>
+
+<p>注意：如果你是在破解VB6程序，你应该在断点前加上msvbvm60!。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[练习破解Brad Soblesky的Crackme]]></title>
+    <link href="http://codemany.com/blog/2005/03/26/learn-to-crack-brad-soblesky-crackme/"/>
+    <updated>2005-03-26T00:26:09+08:00</updated>
+    <id>http://codemany.com/blog/2005/03/26/learn-to-crack-brad-soblesky-crackme</id>
+    <content type="html"><![CDATA[<p><a href="/uploads/crackme.zip" title="crackme.zip">Crackme程序</a></p>
+
+<p>这次破解参考了wind[CCG] 写的《Crackme-Brad Soblesky的Crackme程序破解》文章。因为我用的是Windows 2000操作系统，TRW2000不能在上面使用，所以我用SoftICE 4.05 来破解。</p>
+
+<p>用PEiD查看这个程序，发现是用VC++ 6.0编写的且没加过壳，所以用W32Dasm反汇编。打开Functions/Imports查看它调用的函数，能够看见KERNEL32.lstrcmpA。双击它可以看到如下程序段：</p>
+
+<p>```
+:00401585 8d4de4 lea ecx, dword ptr [ebp-1c]
+:00401588 51 push ecx
+:00401589 8d55f4 lea edx, dword ptr [ebp-0c]
+:0040158c 52 push edx</p>
+
+<ul>
+<li>reference to: kernel32.lstrcmpa, ord:02fch
+:0040158d ff1500204000 call dword ptr [00402000]
+:00401593 85c0 test eax, eax                      -> 典型的判断，肯定是这里了</li>
+</ul>
+
+
+<p>:00401595 7516 jne 004015ad                       -> 看见这个跳转了吗
+:00401597 6a40 push 00000040
+```</p>
+
+<ol>
+<li>启动SoftICE，然后运行Crackme程序；</li>
+<li>在文本框中输入78787878；</li>
+<li>Ctrl+D 来到SoftICE中，输入bpx lstrcmpA，按回车后用Ctrl+D命令返回Crackme；</li>
+<li>按check，程序中断；</li>
+<li>按F11回到调用lstrcmpA的地方，发现CS寄存器的值为001b，输入bpx 001b: 00401585，按回车后用Ctrl+D命令返回Crackme；</li>
+<li>按check，程序中断；</li>
+<li>F10来到如下程序段：</li>
+</ol>
+
+
+<p><code>
+:00401585 8d4de4 lea ecx, dword ptr [ebp-1c]
+:00401588 51 push ecx                             -&gt; 在此处用d ecx就可以看到注册码了
+:00401589 8d55f4 lea edx, dword ptr [ebp-0c]
+:0040158c 52 push edx
+</code></p>
+
+<p>注册码：&lt;BrD-SoB></p>
+]]></content>
+  </entry>
+  
+</feed>
