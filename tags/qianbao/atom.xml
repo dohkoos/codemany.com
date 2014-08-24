@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Qianbao | 乐者为王]]></title>
   <link href="http://codemany.com/tags/qianbao/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-08-22T23:28:43+08:00</updated>
+  <updated>2014-08-24T18:55:48+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -14,76 +14,23 @@
 
   
   <entry>
-    <title type="html"><![CDATA[部署Qianbao到Heroku时遇到的一些问题]]></title>
-    <link href="http://codemany.com/blog/2013/05/19/some-problems-when-deploying-qianbao-to-heroku/"/>
-    <updated>2013-05-19T06:25:33+08:00</updated>
-    <id>http://codemany.com/blog/2013/05/19/some-problems-when-deploying-qianbao-to-heroku</id>
-    <content type="html"><![CDATA[<p>Heroku现在已经是纯粹的只读PaaS了，也就是说以前还支持的SQlite现在也不能使用了。因此部署到Heroku上的Rails应用需要把使用的数据库改成PostgreSQL，并且要关闭assets的预编译功能。</p>
-
-<p>修改Gemfile，将SQLite换成PostgreSQL：
-```</p>
-
-<h1>gem 'sqlite3'</h1>
-
-<p>gem 'pg'
-```</p>
-
-<p>在config/application.rb中添加：
-<code>
-config.assets.initialize_on_precompile = false
-</code></p>
-
-<p>股票功能需要导入交割单文件。因为导入后的文本文件不再使用，所以可以把上传路径由public/uploads改为tmp。这样就避免了不能写文件到public目录的问题。</p>
-
-<p>应用上传后运行时出现异常，使用heroku logs -t命令查看日志发现有如下错误：
-<code>
-Error: column "stocks.share_name" must appear in the GROUP BY clause or be used in an aggregate function
-</code></p>
-
-<p>这是因为在controller中有这么一行代码：
-<code>
-current_user.stocks.select("share_code, share_name, sum(actual_amount) as amount").group("share_code")
-</code></p>
-
-<p>在PostgreSQL中这会有问题。比如下面的数据表：
-<img src="/uploads/qianbao-stocks-table.png" title="qianbao-stocks-table" ></p>
-
-<p>执行上面的SQL语句后，share_name的值到底是取Ruby呢还是ST Ruby？解决这个问题的方法是使用aggregate函数。
-<code>
-current_user.stocks.select("share_code, max(share_name) as share_name, sum(actual_amount) as amount").group("share_code")
-</code></p>
-
-<p>PostgreSQL还有个问题，就是decimal类型的字段，取出来的值是字符串类型。例如：
-<code>
-if stock.amount &lt; 0
-</code></p>
-
-<p>它会报以下错误：
-<code>
-ArgumentError (comparison of String with 0 failed)
-</code></p>
-
-<p>这个可以通过to_f函数解决：
-<code>
-if stock.amount.to_f &lt; 0
-</code></p>
-]]></content>
-  </entry>
-  
-  <entry>
     <title type="html"><![CDATA[用Rails 3.2打造简单记账应用]]></title>
-    <link href="http://codemany.com/blog/2012/04/18/to-create-a-simple-accounting-application-a-using-rails-32/"/>
+    <link href="http://codemany.com/blog/2012/04/18/using-rails32-to-create-a-simple-accounting-application/"/>
     <updated>2012-04-18T07:49:27+08:00</updated>
-    <id>http://codemany.com/blog/2012/04/18/to-create-a-simple-accounting-application-a-using-rails-32</id>
-    <content type="html"><![CDATA[<p>Rails已经到3.2版本了，和以前2.3版本有了很大的不同，决定把原来老版本的记账应用重新写一遍。</p>
+    <id>http://codemany.com/blog/2012/04/18/using-rails32-to-create-a-simple-accounting-application</id>
+    <content type="html"><![CDATA[<p>Rails已经到3.2版本了，和以前的2.3版本有了很大的不同，决定把原来老版本的记账应用重新写一遍，更新部分插件。</p>
 
-<p>我们先来定义一下什么是最简单的记账应用：<br />
-1. 可以输入花钱的记录<br />
-2. 可以修改输入了的记录<br />
-3. 可以删除输入了的记录<br />
-4. 可以显示所有的记录</p>
+<p>记账应用的核心功能：</p>
 
-<p>下面我们就开始动手吧！</p>
+<ol>
+<li>可以输入花钱的记录；</li>
+<li>可以修改输入了的记录；</li>
+<li>可以删除输入了的记录；</li>
+<li>可以显示所有的记录。</li>
+</ol>
+
+
+<p>创建项目</p>
 
 <p><code>
 rails new qianbao
@@ -98,7 +45,7 @@ rails g controller home index
 root :to =&gt; 'home#index'
 </code></p>
 
-<p>现在要给应用加上一个认证系统（注册、激活、登录、登出），通过devise（<a href="https://github.com/plataformatec/devise%EF%BC%89%E6%8F%92%E4%BB%B6%E5%AE%9E%E7%8E%B0%E3%80%82">https://github.com/plataformatec/devise%EF%BC%89%E6%8F%92%E4%BB%B6%E5%AE%9E%E7%8E%B0%E3%80%82</a></p>
+<p>现在要给应用加上一个认证系统（注册、激活、登录、登出），这次使用devise（<a href="https://github.com/plataformatec/devise%EF%BC%89%E6%8F%92%E4%BB%B6%E5%AE%9E%E7%8E%B0%E3%80%82">https://github.com/plataformatec/devise%EF%BC%89%E6%8F%92%E4%BB%B6%E5%AE%9E%E7%8E%B0%E3%80%82</a></p>
 
 <p>在Gemfile中添加：</p>
 
@@ -115,7 +62,7 @@ rails g devise user
 rails g devise:views
 </code></p>
 
-<p>创建一个migration，把user和entry关联起来：</p>
+<p>创建一个migration，把User和Entry关联起来：</p>
 
 <p>```
 class AddUserToEntry &lt; ActiveRecord::Migration
@@ -154,163 +101,168 @@ class User &lt; ActiveRecord::Base
   has_many :users
 </code></p>
 
-<p>修改app/views/home/index.html.erb为如下内容：<br />
-```</p>
+<p>修改app/views/home/index.html.erb为如下内容：</p>
+
+<p>```</p>
 
 <h1>Welcom to Qianbao!</h1>
 
 
-<p>&lt;% if user_signed_in? %><br />
-  <p><br /></p>
+<p>&lt;% if user_signed_in? %>
+  <p></p>
 
-<pre><code>&lt;strong&gt;&lt;%=link_to current_user.email, edit_user_registration_path %&gt;&lt;/strong&gt;&lt;br /&gt;
-&lt;%= link_to 'Logout', destroy_user_session_path, :method =&gt; :delete %&gt;&lt;br /&gt;
+<pre><code>&lt;strong&gt;&lt;%=link_to current_user.email, edit_user_registration_path %&gt;&lt;/strong&gt;
+&lt;%= link_to 'Logout', destroy_user_session_path, :method =&gt; :delete %&gt;
 </code></pre>
 
-<p>  </p><br />
-  &lt;%= link_to "All Entries", entries_path %><br />
-&lt;% else %><br />
-  <p><br /></p>
+<p>  </p>
+  &lt;%= link_to "All Entries", entries_path %>
+&lt;% else %>
+  <p></p>
 
-<pre><code>&lt;strong&gt;You are currently not logged in.&lt;/strong&gt;&lt;br /&gt;
-&lt;%= link_to 'Login', new_user_session_path %&gt; or&lt;br /&gt;
-&lt;%= link_to 'Sign up', new_user_registration_path %&gt;&lt;br /&gt;
+<pre><code>&lt;strong&gt;You are currently not logged in.&lt;/strong&gt;
+&lt;%= link_to 'Login', new_user_session_path %&gt; or
+&lt;%= link_to 'Sign up', new_user_registration_path %&gt;
 </code></pre>
 
-<p>  </p><br />
-&lt;% end %><br />
+<p>  </p>
+&lt;% end %>
 ```</p>
 
-<p>修改app/controller/entries_controller.rb：<br />
-```
-class EntriesController &lt; ApplicationController<br />
+<p>修改app/controller/entries_controller.rb：</p>
+
+<p>```
+class EntriesController &lt; ApplicationController
   before_filter :authenticate_user!</p>
 
-<p>  # GET /entries<br />
-  # GET /entries.json<br />
-  def index<br /></p>
+<p>  # GET /entries
+  # GET /entries.json
+  def index</p>
 
 <pre><code>@entries = current_user.entries
 
-respond_to do |format|&lt;br /&gt;
-  format.html # index.html.erb&lt;br /&gt;
-  format.json { render json: @entries }&lt;br /&gt;
-end&lt;br /&gt;
+respond_to do |format|
+  format.html # index.html.erb
+  format.json { render json: @entries }
+end
 </code></pre>
 
 <p>  end</p>
 
-<p>  # GET /entries/1<br />
-  # GET /entries/1.json<br />
-  def show<br /></p>
+<p>  # GET /entries/1
+  # GET /entries/1.json
+  def show</p>
 
 <pre><code>@entry = current_user.entries.find(params[:id])
 
-respond_to do |format|&lt;br /&gt;
-  format.html # show.html.erb&lt;br /&gt;
-  format.json { render json: @entry }&lt;br /&gt;
-end&lt;br /&gt;
+respond_to do |format|
+  format.html # show.html.erb
+  format.json { render json: @entry }
+end
 </code></pre>
 
 <p>  end</p>
 
-<p>  # GET /entries/new<br />
-  # GET /entries/new.json<br />
-  def new<br /></p>
+<p>  # GET /entries/new
+  # GET /entries/new.json
+  def new</p>
 
 <pre><code>@entry = current_user.entries.new
 
-respond_to do |format|&lt;br /&gt;
-  format.html # new.html.erb&lt;br /&gt;
-  format.json { render json: @entry }&lt;br /&gt;
-end&lt;br /&gt;
+respond_to do |format|
+  format.html # new.html.erb
+  format.json { render json: @entry }
+end
 </code></pre>
 
 <p>  end</p>
 
-<p>  # GET /entries/1/edit<br />
-  def edit<br /></p>
+<p>  # GET /entries/1/edit
+  def edit</p>
 
-<pre><code>@entry = current_user.entries.find(params[:id])&lt;br /&gt;
+<pre><code>@entry = current_user.entries.find(params[:id])
 </code></pre>
 
 <p>  end</p>
 
-<p>  # POST /entries<br />
-  # POST /entries.json<br />
-  def create<br /></p>
+<p>  # POST /entries
+  # POST /entries.json
+  def create</p>
 
-<pre><code>@entry = current_user.entries.new(params[:entry])&lt;br /&gt;
+<pre><code>@entry = current_user.entries.new(params[:entry])
 @entry.user = current_user
 
-respond_to do |format|&lt;br /&gt;
-  if @entry.save&lt;br /&gt;
-    format.html { redirect_to @entry, notice: 'Entry was successfully created.' }&lt;br /&gt;
-    format.json { render json: @entry, status: :created, location: @entry }&lt;br /&gt;
-  else&lt;br /&gt;
-    format.html { render action: "new" }&lt;br /&gt;
-    format.json { render json: @entry.errors, status: :unprocessable_entity }&lt;br /&gt;
-  end&lt;br /&gt;
-end&lt;br /&gt;
+respond_to do |format|
+  if @entry.save
+    format.html { redirect_to @entry, notice: 'Entry was successfully created.' }
+    format.json { render json: @entry, status: :created, location: @entry }
+  else
+    format.html { render action: "new" }
+    format.json { render json: @entry.errors, status: :unprocessable_entity }
+  end
+end
 </code></pre>
 
 <p>  end</p>
 
-<p>  # PUT /entries/1<br />
-  # PUT /entries/1.json<br />
-  def update<br /></p>
+<p>  # PUT /entries/1
+  # PUT /entries/1.json
+  def update</p>
 
 <pre><code>@entry = current_user.entries.find(params[:id])
 
-respond_to do |format|&lt;br /&gt;
-  if @entry.update_attributes(params[:entry])&lt;br /&gt;
-    format.html { redirect_to @entry, notice: 'Entry was successfully updated.' }&lt;br /&gt;
-    format.json { head :no_content }&lt;br /&gt;
-  else&lt;br /&gt;
-    format.html { render action: "edit" }&lt;br /&gt;
-    format.json { render json: @entry.errors, status: :unprocessable_entity }&lt;br /&gt;
-  end&lt;br /&gt;
-end&lt;br /&gt;
+respond_to do |format|
+  if @entry.update_attributes(params[:entry])
+    format.html { redirect_to @entry, notice: 'Entry was successfully updated.' }
+    format.json { head :no_content }
+  else
+    format.html { render action: "edit" }
+    format.json { render json: @entry.errors, status: :unprocessable_entity }
+  end
+end
 </code></pre>
 
 <p>  end</p>
 
-<p>  # DELETE /entries/1<br />
-  # DELETE /entries/1.json<br />
-  def destroy<br /></p>
+<p>  # DELETE /entries/1
+  # DELETE /entries/1.json
+  def destroy</p>
 
-<pre><code>@entry = current_user.entries.find(params[:id])&lt;br /&gt;
+<pre><code>@entry = current_user.entries.find(params[:id])
 @entry.destroy
 
-respond_to do |format|&lt;br /&gt;
-  format.html { redirect_to entries_url }&lt;br /&gt;
-  format.json { head :no_content }&lt;br /&gt;
-end&lt;br /&gt;
+respond_to do |format|
+  format.html { redirect_to entries_url }
+  format.json { head :no_content }
+end
 </code></pre>
 
-<p>  end<br />
-end<br />
+<p>  end
+end
 ```</p>
 
-<p>执行以下命令启动应用：<br />
-<code>
-rake db:migrate&lt;br /&gt;
-rails s&lt;br /&gt;
+<p>执行以下命令启动应用：</p>
+
+<p><code>
+rake db:migrate
+rails s
 </code></p>
 
-<p>以前的版本用的css框架是<a href="http://blueprintcss.org/">Blueprint</a>，这次使用比它更方便快捷的<a href="https://github.com/twitter/bootstrap">Bootstrap</a>。Bootstrap建立在less上，有个<a href="https://github.com/metaskills/less-rails-bootstrap">less-rails-bootstrap</a>，不过在安装libv8时竟然要提示缺少Python，拜托！我用的是Ruby，要我装Python，啥意思啊！还是找个sass版的Bootstrap吧。</p>
+<p>以前的版本用的CSS框架是<a href="http://blueprintcss.org/">Blueprint</a>，这次使用比它更方便快捷的<a href="https://github.com/twitter/bootstrap">Bootstrap</a>。Bootstrap建立在Less上，有个<a href="https://github.com/metaskills/less-rails-bootstrap">less-rails-bootstrap</a>，不过在安装libv8时竟然要提示缺少Python，拜托！我用的是Ruby，要我装Python，啥意思啊！还是找个Sass版的Bootstrap吧。</p>
 
-<p>下载<a href="https://github.com/jlong/sass-twitter-bootstrap">sass-twitter-bootstrap</a>：<br />
-<code>
-git clone https://github.com/jlong/sass-twitter-bootstrap.git&lt;br /&gt;
+<p>下载<a href="https://github.com/jlong/sass-twitter-bootstrap">sass-twitter-bootstrap</a>：</p>
+
+<p><code>
+git clone https://github.com/jlong/sass-twitter-bootstrap.git
 </code></p>
 
-<p>将sass-twitter-bootstrap/lib中的文件拷贝到app/assets/stylesheets/twitter目录下。然后将app/assets/stylesheets/application.css中的<br />
-<code>
-*= require_tree .&lt;br /&gt;
+<p>将sass-twitter-bootstrap/lib中的文件拷贝到app/assets/stylesheets/twitter目录下。然后将app/assets/stylesheets/application.css中的</p>
+
+<p><code>
+*= require_tree .
 </code></p>
 
-<p>修改成</p>
+<p>修改为</p>
 
 <p><code>
 *= require twitter/bootstrap
@@ -331,164 +283,185 @@ body { padding-top: 60px; }
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[用Rails 2.3打造简单记账软件(12)]]></title>
-    <link href="http://codemany.com/blog/2010/01/05/using-the-rails23-to-create-a-simple-accounting-app-12/"/>
+    <title type="html"><![CDATA[用Rails 2.3打造简单记账软件（12）]]></title>
+    <link href="http://codemany.com/blog/2010/01/05/using-rails23-to-create-a-simple-accounting-app-part12/"/>
     <updated>2010-01-05T08:31:28+08:00</updated>
-    <id>http://codemany.com/blog/2010/01/05/using-the-rails23-to-create-a-simple-accounting-app-12</id>
-    <content type="html"><![CDATA[<p>在这以前我们把tags作为Entry的一个字段来实现，这样做有很大的局限性，而且还有好多插件可以实现这个功能，现在我们就来把它替换用插件<a href="http://github.com/jviney/acts_as_taggable_on_steroids">acts_as_taggable_on_steroids</a>实现。</p>
+    <id>http://codemany.com/blog/2010/01/05/using-rails23-to-create-a-simple-accounting-app-part12</id>
+    <content type="html"><![CDATA[<p>在这以前我们把tags作为Entry的一个字段来实现，这样做有很大的局限性，而且还有好多插件可以实现这个功能，现在我们就来把它替换用插件<a href="https://github.comjviney/acts_as_taggable_on_steroids">acts_as_taggable_on_steroids</a>实现。</p>
 
-<p>安装插件<br />
-<code>
-script/plugin install git://github.com/jviney/acts_as_taggable_on_steroids.git&lt;br /&gt;
-script/generate acts_as_taggable_migration&lt;br /&gt;
-rake db:migrate&lt;br /&gt;
+<p>安装插件</p>
+
+<p><code>
+script/plugin install git://github.com/jviney/acts_as_taggable_on_steroids.git
+script/generate acts_as_taggable_migration
+rake db:migrate
 </code></p>
 
-<p>在Entry中添加一句代码<br />
-```
-class Entry &lt; ActiveRecord::Base<br />
+<p>在Entry中添加一句代码：</p>
+
+<p>```
+class Entry &lt; ActiveRecord::Base
   acts_as_taggable</p>
 
-<p>  belongs_to :user<br />
-end<br />
+<p>  belongs_to :user
+end
 ```</p>
 
-<p>还要将所有视图中原来的tags字段替换成tag_list字段。<br />
-index.html.erb<br />
-<code>
-&lt;td&gt;&lt; %=h entry.tag_list %&gt;
+<p>还要将所有视图中原来的tags字段替换成tag_list字段。</p>
+
+<p>```</p>
+
+<h1>index.html.erb</h1>
+
+<p>&lt;%= h entry.tag_list %>
+```</p>
+
+<p>```</p>
+
+<h1>edit.html.erb</h1>
+
+<p>&lt;%= f.text_field :tag_list %>
+```</p>
+
+<p>```</p>
+
+<h1>new.html.erb</h1>
+
+<p>&lt;%= f.text_field :tag_list %>
+```</p>
+
+<p>还要将Entry模型中的验证字段tags改成tag_list。做完这些插件也就安装完成了。</p>
+
+<p>既然用了插件，那么原来的tags字段就不需要了，写个迁移任务把它处理掉吧！</p>
+
+<p><code>
+script/generate migration remove_tags_from_entry
 </code></p>
 
-<p>edit.html.erb<br />
-<code>
-&lt; %= f.text_field :tag_list %&gt;
-</code></p>
+<p>迁移代码如下：</p>
 
-<p>new.html.erb<br />
-<code>
-&lt; %= f.text_field :tag_list %&gt;
-</code></p>
+<p>```
+class RemoveTagsFromEntry &lt; ActiveRecord::Migration
+  def self.up</p>
 
-<p>还要将entry.rb中的验证字段tags改成tag_list。做完这些插件也就安装完成了。</p>
-
-<p>既然用了插件，那么原来的tags字段就不需要了，写个迁移任务把它处理掉吧！<br />
-<code>
-script/generate migration remove_tags_from_entry&lt;br /&gt;
-</code></p>
-
-<p>迁移代码如下：<br />
-```
-class RemoveTagsFromEntry &lt; ActiveRecord::Migration<br />
-  def self.up<br /></p>
-
-<pre><code>remove_column :entries, :tags&lt;br /&gt;
+<pre><code>remove_column :entries, :tags
 </code></pre>
 
 <p>  end</p>
 
-<p>  def self.down<br /></p>
+<p>  def self.down</p>
 
-<pre><code>add_column :entries, :tags, :string&lt;br /&gt;
+<pre><code>add_column :entries, :tags, :string
 </code></pre>
 
-<p>  end<br />
-end<br />
+<p>  end
+end
 ```</p>
 ]]></content>
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[用Rails 2.3打造简单记账软件(11)]]></title>
-    <link href="http://codemany.com/blog/2010/01/05/using-the-rails23-to-create-a-simple-accounting-app-11/"/>
+    <title type="html"><![CDATA[用Rails 2.3打造简单记账软件（11）]]></title>
+    <link href="http://codemany.com/blog/2010/01/05/using-rails23-to-create-a-simple-accounting-app-part11/"/>
     <updated>2010-01-05T04:43:29+08:00</updated>
-    <id>http://codemany.com/blog/2010/01/05/using-the-rails23-to-create-a-simple-accounting-app-11</id>
+    <id>http://codemany.com/blog/2010/01/05/using-rails23-to-create-a-simple-accounting-app-part11</id>
     <content type="html"><![CDATA[<p>当网站出现问题时，让它发送一份错误报告到你的邮箱是件挺不错的事，这样你就不必再担心不能及时发现问题了。</p>
 
-<p><a href="http://github.com/rails/exception_notification">exception_notification</a>插件的功能就是当你的Rails应用出错时，它会向指定的邮箱地址发送错误日志。</p>
+<p><a href="https://github.comrails/exception_notification">exception_notification</a>插件的功能就是当你的Rails应用出错时，它会向指定的邮箱地址发送错误日志。</p>
 
 <p>使用很简单，安装插件后配置一下邮件接受者就可以了。</p>
 
-<p>安装插件<br />
-<code>
-script/plugin install git://github.com/rails/exception_notification.git&lt;br /&gt;
+<p>安装插件</p>
+
+<p><code>
+script/plugin install git://github.com/rails/exception_notification.git
 </code></p>
 
-<p>在config/environment.rb中增加邮件接收者的地址<br />
-```
-Rails::Initializer.run do |config|<br />
-  ...<br />
+<p>在config/environment.rb中增加邮件接收者的地址：</p>
+
+<p>```
+Rails::Initializer.run do |config|
+  ...
 end</p>
 
-<p>ExceptionNotifier.exception_recipients = %w(<a href="&#109;&#97;&#x69;&#108;&#x74;&#111;&#58;&#x79;&#111;&#117;&#x72;&#x6e;&#x61;&#x6d;&#101;&#64;&#x65;&#120;&#x61;&#x6d;&#x70;&#108;&#101;&#x2e;&#x63;&#111;&#x6d;">&#x79;&#x6f;&#117;&#x72;&#x6e;&#x61;&#x6d;&#101;&#x40;&#101;&#120;&#x61;&#109;&#x70;&#x6c;&#101;&#46;&#99;&#x6f;&#109;</a>)<br />
+<p>ExceptionNotifier.exception_recipients = %w(<a href="&#109;&#x61;&#x69;&#x6c;&#116;&#111;&#x3a;&#x79;&#x6f;&#117;&#x72;&#110;&#97;&#109;&#101;&#64;&#x65;&#x78;&#97;&#x6d;&#112;&#x6c;&#101;&#46;&#99;&#111;&#109;">&#121;&#111;&#x75;&#x72;&#110;&#97;&#x6d;&#x65;&#x40;&#x65;&#x78;&#97;&#109;&#x70;&#108;&#101;&#46;&#99;&#111;&#109;</a>)
 ```</p>
 
-<p>然后告诉Exception Notifier哪些controller出错才发送日志，当然是全部啦：<br />
-<code>
-class ApplicationController &lt; ActionController::Base&lt;br /&gt;
-  include ExceptionNotifiable&lt;br /&gt;
-  ...&lt;br /&gt;
-end&lt;br /&gt;
+<p>然后告诉Exception Notifier哪些controller出错才发送日志，当然是全部啦：</p>
+
+<p><code>
+class ApplicationController &lt; ActionController::Base
+  include ExceptionNotifiable
+  ...
+end
 </code></p>
 
-<p>Exception Notifier采用Rails中的ActionMailer发送邮件，所以使用的前提是确保ActionMailer可以正常发送邮件。还有就是Exception Notifier默认只在production环境下才会生效，如果想要在development下也生效，需要将development.rb文件中的<br />
-<code>
-config.action_mailer.raise_delivery_errors = false&lt;br /&gt;
+<p>Exception Notifier采用Rails中的ActionMailer发送邮件，所以使用的前提是确保ActionMailer可以正常发送邮件。还有就是Exception Notifier默认只在production环境下才会生效，如果想要在development下也生效，需要将development.rb文件中的：</p>
+
+<p><code>
+config.action_mailer.raise_delivery_errors = false
 </code></p>
 
-<p>修改为<br />
-<code>
-config.action_mailer.raise_delivery_errors = true&lt;br /&gt;
+<p>修改为</p>
+
+<p><code>
+config.action_mailer.raise_delivery_errors = true
 </code></p>
 ]]></content>
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[用Rails 2.3打造简单记账软件(10)]]></title>
-    <link href="http://codemany.com/blog/2010/01/04/using-the-rails23-to-create-a-simple-accounting-app-10/"/>
+    <title type="html"><![CDATA[用Rails 2.3打造简单记账软件（10）]]></title>
+    <link href="http://codemany.com/blog/2010/01/04/using-rails23-to-create-a-simple-accounting-app-part10/"/>
     <updated>2010-01-04T04:34:41+08:00</updated>
-    <id>http://codemany.com/blog/2010/01/04/using-the-rails23-to-create-a-simple-accounting-app-10</id>
+    <id>http://codemany.com/blog/2010/01/04/using-rails23-to-create-a-simple-accounting-app-part10</id>
     <content type="html"><![CDATA[<p>从2.2版本起Rails开始内置支持i18n，因此以后实现国际化/本地化就可以不再需要各种各样的插件了。</p>
 
 <p>Rails默认的locale文件夹是config/locales，假设你要支持中文和英文，那么你需要在这个文件夹下放置zh.yml和en.yml两个文件。</p>
 
 <p>相应的入门教程网上有不少，我也就不多讲了。这里主要说一下如何在记账应用中实现可以让用户指定语言的i18n实现，即当用户选择English，那么界面就切换成英文界面，并且以后打开的页面也是以英文出现，反之亦如此。</p>
 
-<p>首先在header区添加以下代码：<br />
-<code>
+<p>首先在header区添加以下代码：</p>
+
+<p><code>
 &lt; %= link_to 'Chinese', :locale =&gt; 'zh' %&gt;
 &lt; %= link_to 'English', :locale =&gt; 'en' %&gt;
 </code></p>
 
 <p>点击其中某个链接后，浏览器就会传递对应的参数zh或en到后台。</p>
 
-<p>然后在app/controllers/application_controller.rb中添加以下代码：<br />
-```
+<p>然后在app/controllers/application_controller.rb中添加以下代码：</p>
+
+<p>```
 before_filter :set_locale</p>
 
-<p>def set_locale<br />
-  I18n.locale = params[:locale]<br />
-end<br />
+<p>def set_locale
+  I18n.locale = params[:locale]
+end
 ```</p>
 
-<p>不过这里有个问题就是url中必须得带着参数，不然的话用户的选择就会失效。要想使选择达到持续的效果，可以考虑把这些信息保存在session中，改进后的代码如下：<br />
-<code>
-def set_locale&lt;br /&gt;
-  I18n.locale = params[:locale] || session[:locale]&lt;br /&gt;
-  session[:locale] = I18n.locale&lt;br /&gt;
-end&lt;br /&gt;
+<p>不过这里有个问题就是url中必须得带着参数，不然的话用户的选择就会失效。要想使选择达到持续的效果，可以考虑把这些信息保存在session中，改进后的代码如下：</p>
+
+<p><code>
+def set_locale
+  I18n.locale = params[:locale] || session[:locale]
+  session[:locale] = I18n.locale
+end
 </code></p>
 
-<p>现在这样就基本上差不多了。剩下的就是处理第一次访问时的语言，这个可以从http头中的ACCEPT_LANGUAGE参数获取。最终实现的代码：<br />
-<code>
-def set_locale&lt;br /&gt;
-  accept_lang = request.env['HTTP_ACCEPT_LANGUAGE'].scan(/^[a-z]{2}/).first&lt;br /&gt;
-  I18n.locale = params[:locale] || session[:locale] || accept_lang || 'zh'&lt;br /&gt;
-  session[:locale] = I18n.locale&lt;br /&gt;
-end&lt;br /&gt;
+<p>现在这样就基本上差不多了。剩下的就是处理第一次访问时的语言，这个可以从http头中的ACCEPT_LANGUAGE参数获取。最终实现的代码：</p>
+
+<p><code>
+def set_locale
+  accept_lang = request.env['HTTP_ACCEPT_LANGUAGE'].scan(/^[a-z]{2}/).first
+  I18n.locale = params[:locale] || session[:locale] || accept_lang || 'zh'
+  session[:locale] = I18n.locale
+end
 </code></p>
 
-<p>不过当用户设置locale后，在新建Entry时会报出以下的异常：<br />
-```
+<p>不过当用户设置locale后，在添加Entry时会报以下异常：</p>
+
+<p>```
 can't convert Symbol into String</p>
 
 <p>Extracted source (around line #8):</p>
@@ -500,36 +473,328 @@ can't convert Symbol into String</p>
 
 <p>```</p>
 
-<p>查找资料后发现可以通过在date_select中加入order来解决。但日期下拉列表中的月份还有问题，出现的不是正常月份，而是一些随机数。这个可以在locale文件中加入month_names。<br />
-new.html.erb<br />
-```</p>
+<p>查找资料后发现可以通过在date_select中加入order来解决。但日期下拉列表中的月份还有问题，出现的不是正常月份，而是一些随机数。这个可以在locale文件中加入month_names。</p>
 
-<p>  &lt; %= t(:effective_date) %><br />
+<p>```</p>
+
+<h1>new.html.erb</h1>
+
+<p><p>
+  &lt; %= t(:effective_date) %><br />
   &lt; %= f.date_select :effective_date %>
 </p>
 ```</p>
 
-<p>en.yml<br />
-```
-en:<br />
-  date:<br /></p>
+<p>```</p>
 
-<pre><code>month_names: [~, January, February, ..., November, December]&lt;br /&gt;
-order: [ :year, :month, :day ]&lt;br /&gt;
+<h1>en.yml</h1>
+
+<p>en:
+  date:</p>
+
+<pre><code>month_names: [~, January, February, ..., November, December]
+order: [ :year, :month, :day ]
 </code></pre>
 
 <p>```</p>
 
-<p>zh.yml<br />
-```
-zh:<br />
-  date:<br /></p>
+<p>```</p>
 
-<pre><code>month_names: [~, 一月, 二月, ..., 十一月, 十二月]&lt;br /&gt;
-order: [ :year, :month, :day ]&lt;br /&gt;
+<h1>zh.yml</h1>
+
+<p>zh:
+  date:</p>
+
+<pre><code>month_names: [~, 一月, 二月, ..., 十一月, 十二月]
+order: [ :year, :month, :day ]
 </code></pre>
 
 <p>```</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[用Rails 2.3打造简单记账软件（9）]]></title>
+    <link href="http://codemany.com/blog/2009/12/20/using-rails23-to-create-a-simple-accounting-app-part9/"/>
+    <updated>2009-12-20T04:45:19+08:00</updated>
+    <id>http://codemany.com/blog/2009/12/20/using-rails23-to-create-a-simple-accounting-app-part9</id>
+    <content type="html"><![CDATA[<p>没啥多说的，继续开始干活。</p>
+
+<p>修改app/views/entries/index.html.erb为：</p>
+
+<p>```</p>
+
+<h1>Listing entries</h1>
+
+
+
+
+<table>
+  <thead>
+    <tr>
+      <th class="center">Date</th>
+      <th class="center">Amount</th>
+      <th class="center">Tags</th>
+      <th class="center">Comment</th>
+      <th class="center">Action</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    < % @entries.each do |entry| %>
+    <tr class="<%= cycle('odd', 'even') %>">
+      <td class="center">< %= entry.effective_date %></td>
+      <td class="right">< %= number_to_currency(entry.amount) %></td>
+      <td>< %= entry.tags %></td>
+      <td>< %= entry.comment %></td>
+      <td class="center">
+        < %= link_to 'Edit', edit_entry_path(entry) %>
+        < %= link_to 'Destroy', entry, :confirm => 'Are you sure?', :method => :delete %>
+      </td>
+    </tr>
+    < % end %>
+  </tbody>
+</table>
+
+
+<p>&lt; %= link_to 'New entry', new_entry_path %>
+```</p>
+
+<p>将app/views/layouts/目录下的entries.html.erb改名为application.html.erb，并修改文件内容为：</p>
+
+<p>```
+&lt; !DOCTYPE html PUBLIC<br />
+  "-//W3C//DTD XHTML 1.0 Transitional//EN"<br />
+  "<a href="http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd</a>"></p>
+
+<p><html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+  <title>Qianbao: &lt; %= controller.action_name %></title>
+  &lt; %= stylesheet_link_tag 'scaffold' %>
+  &lt; %= stylesheet_link_tag 'qianbao' %>
+  &lt; %= stylesheet_link_tag 'table' %>
+</head></p>
+
+<p><body>
+  <div id="container"></p>
+
+<pre><code>&lt; %= render :partial =&gt; 'layouts/header' %&gt;
+
+&lt; % if logged_in? %&gt;
+  &lt; %= render :partial =&gt; 'layouts/default' %&gt;
+&lt; % else %&gt;
+  &lt; %= render :partial =&gt; 'layouts/main' %&gt;
+&lt; % end %&gt;
+
+&lt; %= render :partial =&gt; 'layouts/footer' %&gt;
+</code></pre>
+
+<p>  </div>
+</body>
+</html>
+```</p>
+
+<p>新建app/views/layouts/_header.html.erb文件：</p>
+
+<p>```</p>
+
+<div id="header">
+  <div id="usernav">
+    < % if logged_in? %>
+      <strong>You are logged in as < %= current_user.login %></strong>
+      < %= link_to 'Logout', logout_path %>
+    < % else %>
+      < %= link_to 'Login', login_path %> |<br />
+      < %= link_to 'Sign Up', signup_path %>
+    < % end %>
+  </div>
+</div>
+
+
+<p>```</p>
+
+<p>创建app/views/layouts/_footer.html.erb文件：</p>
+
+<p>```</p>
+
+<div id="footer">
+  &copy 2009 Unnamed
+</div>
+
+
+<p>```</p>
+
+<p>创建app/views/layouts/_main.html.erb文件：</p>
+
+<p>```</p>
+
+<div id="main">
+  < %= yield %>
+</div>
+
+
+<p>```</p>
+
+<p>创建app/views/layouts/_default.html.erb文件：</p>
+
+<p>```</p>
+
+<div id="boider">
+  <div id="content">
+    <p style="color: green">< %= flash[:notice] %></p>
+
+    < %= yield %>
+  </div>
+
+  <div id="sidebar">
+    <ul>
+      <li>< %= link_to 'All entries', entries_path %></li>
+    </ul>
+  </div>
+</div>
+
+
+<p>```</p>
+
+<p>修改public/stylesheets/qianbao.css为：</p>
+
+<p>```
+body {
+  padding: 0;
+  margin: 0;
+}</p>
+
+<h1>container {</h1>
+
+<p>  width: 960px;
+  margin: 5px auto;
+}</p>
+
+<h1>header {</h1>
+
+<p>  background: url(/images/qianbao.png) no-repeat 30px;
+  height: 97px;
+}</p>
+
+<h1>tagline {</h1>
+
+<p>  float: left;
+  margin-left: 230px;
+}</p>
+
+<h1>tagline h2 {</h1>
+
+<p>  font-size: 26px;
+  color: #0d4988;
+  line-height: 28px;
+  text-align: center;
+}</p>
+
+<h1>header #usernav {</h1>
+
+<p>  float: right;
+}</p>
+
+<h1>navbar {</h1>
+
+<p>  background: #efefef url(/images/line.png) repeat-x left bottom;
+  height: 33px;
+}</p>
+
+<h1>main, #bodier {</h1>
+
+<p>  clear: both;
+}</p>
+
+<h1>main {</h1>
+
+<p>  background: #efefef;
+}</p>
+
+<h1>content {</h1>
+
+<p>  float: right;
+  width: 720px;
+}</p>
+
+<h1>sidebar {</h1>
+
+<p>  background-color: #efefef;
+  float: left;
+  width: 230px;
+  padding-top: 18px;
+}</p>
+
+<h1>footer {</h1>
+
+<p>  border-top: 1px solid #bbb;
+  clear: both;
+  text-align: center;
+}</p>
+
+<p>h1 {
+  font-size: 18px;
+  line-height: 20px;
+}</p>
+
+<p>h3 {
+  font-size: 12px;
+  line-height: 24px;
+  text-align: center;
+}</p>
+
+<p>img {
+  border-style: none;
+}</p>
+
+<p>.left {
+  text-align: left;
+}</p>
+
+<p>.center {
+  text-align: center;
+}</p>
+
+<p>.right {
+  text-align: right;
+}
+```</p>
+
+<p>新建public/stylesheets/table.css，内容为：</p>
+
+<p>```
+table {
+  border-collapse: collapse;
+  text-align: left;
+  width: 90%;
+}</p>
+
+<p>thead {
+  height: 30px;
+}</p>
+
+<p>thead th {
+  padding: 5px;
+  background: #efefef;
+}</p>
+
+<p>tbody td {
+  padding: 5px;
+}</p>
+
+<p>th, td {
+  border: 1px solid #e6e6e6;
+}</p>
+
+<p>tr.odd {
+  background: #fff;
+}</p>
+
+<p>tr.even {
+  background: #f9f9f9;
+}
+```</p>
 ]]></content>
   </entry>
   

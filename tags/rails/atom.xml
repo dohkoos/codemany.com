@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Rails | 乐者为王]]></title>
   <link href="http://codemany.com/tags/rails/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-08-22T23:28:43+08:00</updated>
+  <updated>2014-08-24T18:55:48+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -46,17 +46,14 @@ pry -r ./config/environment.rb
 
 <p>调试Rails项目时，在需要调试的地方添加binding.pry，当rails server运行到这行代码时会自动调出一个pry终端，可以在这里进行交互，退出调试用exit-all。例如：</p>
 
-<p>```</p>
-
-<h1>/app/controllers/articles_controller.rb</h1>
-
-<p>def index
+<p><code>
+def index
   @articles = Article.all
   binding.pry
 end
-```</p>
+</code></p>
 
-<p>如何退出循环</p>
+<p>可以使用exit-program命令无条件地退出循环。</p>
 
 <p><code>
 (1..100).each do |i|
@@ -65,206 +62,544 @@ end
 end
 </code></p>
 
-<p>可以使用exit-program命令无条件地退出循环。</p>
-
 <p>Pry默认没有调试中经常用到的上一步，下一步等命令，可以安装pry-nav，然后就可以使用step, next, continue跳来跳去了。</p>
 ]]></content>
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[部署Qianbao到Heroku时遇到的一些问题]]></title>
-    <link href="http://codemany.com/blog/2013/05/19/some-problems-when-deploying-qianbao-to-heroku/"/>
-    <updated>2013-05-19T06:25:33+08:00</updated>
-    <id>http://codemany.com/blog/2013/05/19/some-problems-when-deploying-qianbao-to-heroku</id>
-    <content type="html"><![CDATA[<p>Heroku现在已经是纯粹的只读PaaS了，也就是说以前还支持的SQlite现在也不能使用了。因此部署到Heroku上的Rails应用需要把使用的数据库改成PostgreSQL，并且要关闭assets的预编译功能。</p>
+    <title type="html"><![CDATA[用Rails 3.2打造简单记账应用]]></title>
+    <link href="http://codemany.com/blog/2012/04/18/using-rails32-to-create-a-simple-accounting-application/"/>
+    <updated>2012-04-18T07:49:27+08:00</updated>
+    <id>http://codemany.com/blog/2012/04/18/using-rails32-to-create-a-simple-accounting-application</id>
+    <content type="html"><![CDATA[<p>Rails已经到3.2版本了，和以前的2.3版本有了很大的不同，决定把原来老版本的记账应用重新写一遍，更新部分插件。</p>
 
-<p>修改Gemfile，将SQLite换成PostgreSQL：
-```</p>
+<p>记账应用的核心功能：</p>
 
-<h1>gem 'sqlite3'</h1>
+<ol>
+<li>可以输入花钱的记录；</li>
+<li>可以修改输入了的记录；</li>
+<li>可以删除输入了的记录；</li>
+<li>可以显示所有的记录。</li>
+</ol>
 
-<p>gem 'pg'
-```</p>
 
-<p>在config/application.rb中添加：
-<code>
-config.assets.initialize_on_precompile = false
+<p>创建项目</p>
+
+<p><code>
+rails new qianbao
+cd qianbao
+rails g scaffold entry amount:decimal tags:string effective_date:date
+rails g controller home index
 </code></p>
 
-<p>股票功能需要导入交割单文件。因为导入后的文本文件不再使用，所以可以把上传路径由public/uploads改为tmp。这样就避免了不能写文件到public目录的问题。</p>
+<p>删除public/index.html，在config/routes.rb中添加根路由：</p>
 
-<p>应用上传后运行时出现异常，使用heroku logs -t命令查看日志发现有如下错误：
-<code>
-Error: column "stocks.share_name" must appear in the GROUP BY clause or be used in an aggregate function
+<p><code>
+root :to =&gt; 'home#index'
 </code></p>
 
-<p>这是因为在controller中有这么一行代码：
-<code>
-current_user.stocks.select("share_code, share_name, sum(actual_amount) as amount").group("share_code")
+<p>现在要给应用加上一个认证系统（注册、激活、登录、登出），这次使用devise（<a href="https://github.com/plataformatec/devise%EF%BC%89%E6%8F%92%E4%BB%B6%E5%AE%9E%E7%8E%B0%E3%80%82">https://github.com/plataformatec/devise%EF%BC%89%E6%8F%92%E4%BB%B6%E5%AE%9E%E7%8E%B0%E3%80%82</a></p>
+
+<p>在Gemfile中添加：</p>
+
+<p><code>
+gem 'devise'
 </code></p>
 
-<p>在PostgreSQL中这会有问题。比如下面的数据表：
-<img src="/uploads/qianbao-stocks-table.png" title="qianbao-stocks-table" ></p>
+<p>然后执行下列命令：</p>
 
-<p>执行上面的SQL语句后，share_name的值到底是取Ruby呢还是ST Ruby？解决这个问题的方法是使用aggregate函数。
-<code>
-current_user.stocks.select("share_code, max(share_name) as share_name, sum(actual_amount) as amount").group("share_code")
+<p><code>
+bundle install
+rails g devise:install
+rails g devise user
+rails g devise:views
 </code></p>
 
-<p>PostgreSQL还有个问题，就是decimal类型的字段，取出来的值是字符串类型。例如：
-<code>
-if stock.amount &lt; 0
-</code></p>
+<p>创建一个migration，把User和Entry关联起来：</p>
 
-<p>它会报以下错误：
-<code>
-ArgumentError (comparison of String with 0 failed)
-</code></p>
+<p>```
+class AddUserToEntry &lt; ActiveRecord::Migration
+  def change</p>
 
-<p>这个可以通过to_f函数解决：
-<code>
-if stock.amount.to_f &lt; 0
-</code></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Rails中通过checkbox实现批量删除]]></title>
-    <link href="http://codemany.com/blog/2012/12/14/deleting-multiple-records-using-checkboxes-in-rails/"/>
-    <updated>2012-12-14T02:20:20+08:00</updated>
-    <id>http://codemany.com/blog/2012/12/14/deleting-multiple-records-using-checkboxes-in-rails</id>
-    <content type="html"><![CDATA[<p>在Rails生成的控制器模版中，包含的destroy只能处理单个对象，而批量删除要求能够同时处理多个对象，这需要自定义一个批量操作action。批量删除的效果图如下：
-<img src="/uploads/deleting-multiple-using-checkboxes.png" title="deleting-multiple-using-checkboxes" ></p>
+<pre><code>add_column :entries, :user_id, :integer
 
-<p>每一行记录的第一列设置成checkbox，用于标记此行是否被选中。表下方放置一个全选checkbox，表示全部选中或全部反选。全选和反选的JavaScript代码如下：
-```</p>
-
-<script>
-function toggle_checkall(field_name, state) {
-  var checkboxes = document.getElementsByTagName('input');
-  var count = checkboxes.length;
-  for (var i = 0; i < count; i++) {
-    if (checkboxes[i].type == "checkbox"
-        && checkboxes[i].name == field_name + "_ids[]") {
-      checkboxes[i].checked = state;
-    }
-  }
-}
-</script>
-
-
-<p>```</p>
-
-<p>在routes.rb中配置批量删除action：
-<code>
-resources :departs do
-  delete 'destroy_multiple', : on =&gt; collection
-end
-</code></p>
-
-<p>在index.html.erb中添加代码：
-```
-&lt;%= form_tag destroy_multiple_departs_path, method: :delete do %>
-&lt;%= submit_tag "删除选中" %></p>
-
-<table>
-...
-<th><input type="checkbox" onclick="toggle_checkall('depart', this.checked);" /></th>
-...
-<td><%= check_box_tag "depart_ids[]", depart.id %></td>
-...
-</table>
-
-
-<p>&lt;% end %>
-```</p>
-
-<p>在controller中添加批量删除实现代码：
-```
-def destroy_multiple
-  Depart.destroy(params[:depart_ids]) unless params[:depart_ids].blank?</p>
-
-<p>  respond_to do |format|</p>
-
-<pre><code>format.html { redirect_to departs }
-format.json { head :no_content }
+add_index :entries, :user_id
 </code></pre>
 
 <p>  end
 end
 ```</p>
 
-<p>参考资料：
-<a href="http://lzqustc.iteye.com/blog/440694"><a href="http://lzqustc.iteye.com/blog/440694">http://lzqustc.iteye.com/blog/440694</a></a>
-<a href="http://stackoverflow.com/questions/12711178/rails-3-delete-multiple-records-using-checkboxes"><a href="http://stackoverflow.com/questions/12711178/rails-3-delete-multiple-records-using-checkboxes">http://stackoverflow.com/questions/12711178/rails-3-delete-multiple-records-using-checkboxes</a></a>
-<a href="http://railscasts.com/episodes/165-edit-multiple"><a href="http://railscasts.com/episodes/165-edit-multiple">http://railscasts.com/episodes/165-edit-multiple</a></a>
-</p></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[改写Rails 2.x generator到Rails 3.x时的一些记录]]></title>
-    <link href="http://codemany.com/blog/2012/05/03/rewrite-some-records-when-the-rails-2-x-generator-to-the-rails-3-x/"/>
-    <updated>2012-05-03T07:13:58+08:00</updated>
-    <id>http://codemany.com/blog/2012/05/03/rewrite-some-records-when-the-rails-2-x-generator-to-the-rails-3-x</id>
-    <content type="html"><![CDATA[<p>因为有个基于Rails 2.x的项目用到了<a href="https://github.com/jsboulanger/feedback">feedback</a>插件，在把项目迁移到Rails 3.x版本后，需要让feedback也支持Rails 3.x。但是原作者早已不再更新该插件，所以只能自动动手，花了两天的时间查资料，该代码，终于改写完成，在github上做了个分支。</p>
-
-<p>Rails 3.x中生成generator可用下面的命令：<br />
-```
-rails g generator feedback_form<br /></p>
-
-<pre><code>  create  lib/generators/feedback_form&lt;br /&gt;
-  create  lib/generators/feedback_form/feedback_form_generator.rb&lt;br /&gt;
-  create  lib/generators/feedback_form/USAGE&lt;br /&gt;
-  create  lib/generators/feedback_form/templates&lt;br /&gt;
-</code></pre>
-
-<p>```</p>
-
-<p><code>
-class InitializerGenerator &lt; Rails::Generators::NamedBase&lt;br /&gt;
-  source_root File.expand_path("../templates", __FILE__)&lt;br /&gt;
-end&lt;br /&gt;
-</code></p>
-
-<p>Rails::Generators::NamedBase和Rails::Generators::Base的区别是NamedBase期望至少一个参数。</p>
-
-<p>USAGE是打入--help参数时显示的文档：<br />
-<code>
-rails generate feedback_form --help&lt;br /&gt;
-Usage:&lt;br /&gt;
-  rails generate feedback_form NAME [options]&lt;br /&gt;
-</code></p>
-
-<p>Rails 2.x的generator中的manifest可以删除了，因为在3.x中每个public方法在生成过程中会被自动调用。</p>
-
-<p>参考资料：<br />
-<a href="http://guides.rubyonrails.org/generators.html">http://guides.rubyonrails.org/generators.html</a><br />
-<a href="http://railscasts.com/episodes/218-making-generators-in-rails-3">http://railscasts.com/episodes/218-making-generators-in-rails-3</a><br />
-<a href="http://blog.loopedstrange.com/modest-rubyist-archive/rails-3-plugins-part4-more-on-generators">http://blog.loopedstrange.com/modest-rubyist-archive/rails-3-plugins-part4-more-on-generators</a><br />
-<a href="http://nicksda.apotomo.de/2010/09/getting-a-bloody-rails-3-generator-running-and-testing-it/">http://nicksda.apotomo.de/2010/09/getting-a-bloody-rails-3-generator-running-and-testing-it/</a></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[设置i18n时date_select出现can't convert Symbol into String错误]]></title>
-    <link href="http://codemany.com/blog/2012/04/19/set-up-i18n-date_select-can-t-the-convert-the-symbol-into-the-string-error/"/>
-    <updated>2012-04-19T07:56:49+08:00</updated>
-    <id>http://codemany.com/blog/2012/04/19/set-up-i18n-date_select-can-t-the-convert-the-symbol-into-the-string-error</id>
-    <content type="html"><![CDATA[<p>问题和order参数有关，解决方法有两种：<br />
-1、在每次调用date_select时明确指定order参数；<br />
-2、your_lang.yml文件中添加以下内容：</p>
+<p>修改Entry和User模型：</p>
 
 <p>```
-date:<br />
-  order:<br /></p>
+class Entry &lt; ActiveRecord::Base
+  validates :effective_date, :presence => true
+  validates :amount,         :presence => true,</p>
 
-<pre><code>- :year&lt;br /&gt;
-- :month&lt;br /&gt;
-- :day&lt;br /&gt;
+<pre><code>                         :numericality =&gt; {:greater_than =&gt; 0.0},
+                         :format =&gt; {:with =&gt; /^\d+??(?:\.\d{0,2})?$/}
 </code></pre>
 
+<p>  validates :tags,           :presence => true,</p>
+
+<pre><code>                         :length =&gt; { :within =&gt; 1..255 }
+</code></pre>
+
+<p>  belongs_to :user
+```</p>
+
+<p><code>
+class User &lt; ActiveRecord::Base
+  has_many :users
+</code></p>
+
+<p>修改app/views/home/index.html.erb为如下内容：</p>
+
 <p>```</p>
+
+<h1>Welcom to Qianbao!</h1>
+
+
+<p>&lt;% if user_signed_in? %>
+  <p></p>
+
+<pre><code>&lt;strong&gt;&lt;%=link_to current_user.email, edit_user_registration_path %&gt;&lt;/strong&gt;
+&lt;%= link_to 'Logout', destroy_user_session_path, :method =&gt; :delete %&gt;
+</code></pre>
+
+<p>  </p>
+  &lt;%= link_to "All Entries", entries_path %>
+&lt;% else %>
+  <p></p>
+
+<pre><code>&lt;strong&gt;You are currently not logged in.&lt;/strong&gt;
+&lt;%= link_to 'Login', new_user_session_path %&gt; or
+&lt;%= link_to 'Sign up', new_user_registration_path %&gt;
+</code></pre>
+
+<p>  </p>
+&lt;% end %>
+```</p>
+
+<p>修改app/controller/entries_controller.rb：</p>
+
+<p>```
+class EntriesController &lt; ApplicationController
+  before_filter :authenticate_user!</p>
+
+<p>  # GET /entries
+  # GET /entries.json
+  def index</p>
+
+<pre><code>@entries = current_user.entries
+
+respond_to do |format|
+  format.html # index.html.erb
+  format.json { render json: @entries }
+end
+</code></pre>
+
+<p>  end</p>
+
+<p>  # GET /entries/1
+  # GET /entries/1.json
+  def show</p>
+
+<pre><code>@entry = current_user.entries.find(params[:id])
+
+respond_to do |format|
+  format.html # show.html.erb
+  format.json { render json: @entry }
+end
+</code></pre>
+
+<p>  end</p>
+
+<p>  # GET /entries/new
+  # GET /entries/new.json
+  def new</p>
+
+<pre><code>@entry = current_user.entries.new
+
+respond_to do |format|
+  format.html # new.html.erb
+  format.json { render json: @entry }
+end
+</code></pre>
+
+<p>  end</p>
+
+<p>  # GET /entries/1/edit
+  def edit</p>
+
+<pre><code>@entry = current_user.entries.find(params[:id])
+</code></pre>
+
+<p>  end</p>
+
+<p>  # POST /entries
+  # POST /entries.json
+  def create</p>
+
+<pre><code>@entry = current_user.entries.new(params[:entry])
+@entry.user = current_user
+
+respond_to do |format|
+  if @entry.save
+    format.html { redirect_to @entry, notice: 'Entry was successfully created.' }
+    format.json { render json: @entry, status: :created, location: @entry }
+  else
+    format.html { render action: "new" }
+    format.json { render json: @entry.errors, status: :unprocessable_entity }
+  end
+end
+</code></pre>
+
+<p>  end</p>
+
+<p>  # PUT /entries/1
+  # PUT /entries/1.json
+  def update</p>
+
+<pre><code>@entry = current_user.entries.find(params[:id])
+
+respond_to do |format|
+  if @entry.update_attributes(params[:entry])
+    format.html { redirect_to @entry, notice: 'Entry was successfully updated.' }
+    format.json { head :no_content }
+  else
+    format.html { render action: "edit" }
+    format.json { render json: @entry.errors, status: :unprocessable_entity }
+  end
+end
+</code></pre>
+
+<p>  end</p>
+
+<p>  # DELETE /entries/1
+  # DELETE /entries/1.json
+  def destroy</p>
+
+<pre><code>@entry = current_user.entries.find(params[:id])
+@entry.destroy
+
+respond_to do |format|
+  format.html { redirect_to entries_url }
+  format.json { head :no_content }
+end
+</code></pre>
+
+<p>  end
+end
+```</p>
+
+<p>执行以下命令启动应用：</p>
+
+<p><code>
+rake db:migrate
+rails s
+</code></p>
+
+<p>以前的版本用的CSS框架是<a href="http://blueprintcss.org/">Blueprint</a>，这次使用比它更方便快捷的<a href="https://github.com/twitter/bootstrap">Bootstrap</a>。Bootstrap建立在Less上，有个<a href="https://github.com/metaskills/less-rails-bootstrap">less-rails-bootstrap</a>，不过在安装libv8时竟然要提示缺少Python，拜托！我用的是Ruby，要我装Python，啥意思啊！还是找个Sass版的Bootstrap吧。</p>
+
+<p>下载<a href="https://github.com/jlong/sass-twitter-bootstrap">sass-twitter-bootstrap</a>：</p>
+
+<p><code>
+git clone https://github.com/jlong/sass-twitter-bootstrap.git
+</code></p>
+
+<p>将sass-twitter-bootstrap/lib中的文件拷贝到app/assets/stylesheets/twitter目录下。然后将app/assets/stylesheets/application.css中的</p>
+
+<p><code>
+*= require_tree .
+</code></p>
+
+<p>修改为</p>
+
+<p><code>
+*= require twitter/bootstrap
+</code></p>
+
+<p>再在文件末尾添加：</p>
+
+<p><code>
+body { padding-top: 60px; }
+</code></p>
+
+<p>现在就可以使用Bootstrap来布局美化应用了。</p>
+
+<p>代码下载：<a href="https://github.com/dohkoos/qianbao">https://github.com/dohkoos/qianbao</a></p>
+
+<p>演示地址：<a href="http://qianbao.herokuapp.com/">http://qianbao.herokuapp.com/</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Plugin not found]]></title>
+    <link href="http://codemany.com/blog/2010/09/17/plugin-not-found/"/>
+    <updated>2010-09-17T03:24:50+08:00</updated>
+    <id>http://codemany.com/blog/2010/09/17/plugin-not-found</id>
+    <content type="html"><![CDATA[<p>使用Ruby 1.8.7和Rails 2.3.5，每次执行script/plugin install命令都出现：</p>
+
+<p><code>
+Plugin not found: [...]
+</code></p>
+
+<p>无论是使用http或https协议，还是在末尾添加斜杠都不起作用。</p>
+
+<p>出现这个问题的原因是因为Ruby 1.8.7是用mingw32编译的，可以通过ruby -v查看：</p>
+
+<p><code>
+ruby 1.8.7 (2010-08-16 patchlevel 302) [i386-mingw32]
+</code></p>
+
+<p>RUBY_PLATFORM的值是i386-mingw32-xxx，而许多库在判断当前操作系统时是这么做的：</p>
+
+<p><code>
+file.open(RUBY_PLATFORM.match(/mswin/) ? 'NUL', '/dev/null')
+</code></p>
+
+<p>这些库只判断了RUBY_PLATFORM里是否含有mswin，如果没有就认为是*nix平台，从而使用/dev/null，结果可想而知，文件必然打开失败，于是就会出现上述错误。</p>
+
+<p>解决方式（推荐使用第4种方式）:</p>
+
+<p>方法1：打开script/plugin文件加入一行RUBY_PLATFORM = 'mswin'，运行时会打印一条警告说常量重新赋值，不过不影响使用。</p>
+
+<p>方法2：卸载掉1.8.7，重新安装Ruby 1.8.6-p26，这个版本是使用VC6编译的，RUBY_PLATFORM的值是mswin，不会出现平台判断错误。</p>
+
+<p>方法3：使用VC自己编译Ruby 1.8.7，确保RUBY_PLATFORM的值是mswin即可。</p>
+
+<p>方法4：打开RUBY_GEMS/activesupport-2.3.5/lib/active_support/core_ext/kernel/reporting.rb，找到</p>
+
+<p><code>
+stream.reopen(RUBY_PLATFORM =~ /mswin/ ? 'NUL:' : '/dev/null')
+</code></p>
+
+<p>将之修改以下代码即可</p>
+
+<p><code>
+stream.reopen(RUBY_PLATFORM =~ /mswin|mingw/ ? 'NUL:' : '/dev/null')
+</code></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[使用will_paginate给Rails应用添加分页功能]]></title>
+    <link href="http://codemany.com/blog/2010/09/09/pagination-in-rails-application-with-will-paginate-plugin/"/>
+    <updated>2010-09-09T09:37:26+08:00</updated>
+    <id>http://codemany.com/blog/2010/09/09/pagination-in-rails-application-with-will-paginate-plugin</id>
+    <content type="html"><![CDATA[<p>安装<a href="https://github.com/mislav/will_paginate">will_paginate</a>插件：</p>
+
+<p><code>
+script/plugin install git://github.com/mislav/will_paginate.git
+</code></p>
+
+<p>安裝好插件后，在action中將本來的find方法：</p>
+
+<p><code>
+@contacts = Contact.all
+</code></p>
+
+<p>改为</p>
+
+<p><code>
+@contacts = Contact.paginate(:page =&gt; params[:page])
+</code></p>
+
+<p>然后在action对应的view最后加入以下代码：</p>
+
+<p><code>
+&lt;%= will_paginate @contacts %&gt;
+</code></p>
+
+<p>现在便可以使用分页功能了，该语句会产生如下的HTML代码：</p>
+
+<p>```</p>
+
+<div class="pagination">
+  <span class="disabled prev_page">&laquo; Previous</span>
+  <span class="current">1</span>
+  <a href="http://codemany.com/contacts?page=2&s=" rel="next">2</a>
+  <a href="http://codemany.com/contacts?page=2&s=" class="next_page" rel="next">Next &raquo;</a>
+</div>
+
+
+<p>```</p>
+
+<p>下面加入搜索功能，在view的适当位置加入:</p>
+
+<p>```
+&lt;% form_tag contacts_path, :method => 'get' do %></p>
+
+<p>  &lt;%= text_field_tag :s, params[:s] %>
+  &lt;%= submit_tag "Search", :name => nil %>
+</p>
+&lt;% end %>
+```</p>
+
+<p>并且将action中的代码修改为：</p>
+
+<p><code>
+@contacts = Contact.paginate(
+  :page =&gt; params[:page],
+  :per_page =&gt; 5,
+  :conditions =&gt; ["name like ?", "%#{params[:s]}%"])
+</code></p>
+
+<p>试着进行搜索，可以看到搜索结果也很好的进行了分页。</p>
+
+<p>此外will_paginate还提供一些分页统计信息：</p>
+
+<p><code>
+Total entries: &lt;%= @contacts.total_entries %&gt;
+Total pages: &lt;%= @contacts.total_pages %&gt;
+Current page: &lt;%= @contacts.current_page %&gt;
+</code></p>
+
+<p>最后加上will_paginate推荐的CSS代码：</p>
+
+<p>```
+.pagination {
+  padding: 3px;
+  margin: 3px;
+}</p>
+
+<p>.pagination a {
+  padding: 2px 5px 2px 5px;
+  margin: 2px;
+  border: 1px solid #aaaadd;
+  text-decoration: none;
+  color: #000099;
+}</p>
+
+<p>.pagination a:hover, .pagination a:active {
+  border: 1px solid #000099;
+  color: #000;
+}</p>
+
+<p>.pagination span.current {
+  padding: 2px 5px 2px 5px;
+  margin: 2px;
+  border: 1px solid #000099;
+  font-weight: bold;
+  background-color: #000099;
+  color: #fff;
+}</p>
+
+<p>.pagination span.disabled {
+  padding: 2px 5px 2px 5px;
+  margin: 2px;
+  border: 1px solid #eee;
+  color: #ddd;
+}
+```</p>
+
+<p>在写代码的时候碰到一个问题，网上的文章都使用page_count来表示总的分页数，但我在使用时出现了undefined method 'page_count'错误，把page_count换成total_pages后就好了。</p>
+
+<p>2011/1/4更新</p>
+
+<p>这里使用的是2.3.15版本的will_paginate，暂时还不支持i18n，不过可以通过在app/helps/application_helper.rb中添加以下代码来实现：</p>
+
+<p>```
+include WillPaginate::ViewHelpers</p>
+
+<p>def will_paginate_with_i18n(collection, options = {})
+  will_paginate_without_i18n(collection, options.merge(</p>
+
+<pre><code>                    :previous_label =&gt; I18n.t(:previous, :default =&gt; 'Previous'),
+                    :next_label =&gt; I18n.t(:next), :default =&gt; 'Next'))
+</code></pre>
+
+<p>  end</p>
+
+<p>alias_method_chain :will_paginate, :i18n
+```</p>
+
+<p>然后在config/locales/zh.yml中添加：</p>
+
+<p><code>
+next: "后一页"
+previous: "前一页"
+</code></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[用Rails 2.3打造简单记账软件（12）]]></title>
+    <link href="http://codemany.com/blog/2010/01/05/using-rails23-to-create-a-simple-accounting-app-part12/"/>
+    <updated>2010-01-05T08:31:28+08:00</updated>
+    <id>http://codemany.com/blog/2010/01/05/using-rails23-to-create-a-simple-accounting-app-part12</id>
+    <content type="html"><![CDATA[<p>在这以前我们把tags作为Entry的一个字段来实现，这样做有很大的局限性，而且还有好多插件可以实现这个功能，现在我们就来把它替换用插件<a href="https://github.comjviney/acts_as_taggable_on_steroids">acts_as_taggable_on_steroids</a>实现。</p>
+
+<p>安装插件</p>
+
+<p><code>
+script/plugin install git://github.com/jviney/acts_as_taggable_on_steroids.git
+script/generate acts_as_taggable_migration
+rake db:migrate
+</code></p>
+
+<p>在Entry中添加一句代码：</p>
+
+<p>```
+class Entry &lt; ActiveRecord::Base
+  acts_as_taggable</p>
+
+<p>  belongs_to :user
+end
+```</p>
+
+<p>还要将所有视图中原来的tags字段替换成tag_list字段。</p>
+
+<p>```</p>
+
+<h1>index.html.erb</h1>
+
+<p>&lt;%= h entry.tag_list %>
+```</p>
+
+<p>```</p>
+
+<h1>edit.html.erb</h1>
+
+<p>&lt;%= f.text_field :tag_list %>
+```</p>
+
+<p>```</p>
+
+<h1>new.html.erb</h1>
+
+<p>&lt;%= f.text_field :tag_list %>
+```</p>
+
+<p>还要将Entry模型中的验证字段tags改成tag_list。做完这些插件也就安装完成了。</p>
+
+<p>既然用了插件，那么原来的tags字段就不需要了，写个迁移任务把它处理掉吧！</p>
+
+<p><code>
+script/generate migration remove_tags_from_entry
+</code></p>
+
+<p>迁移代码如下：</p>
+
+<p>```
+class RemoveTagsFromEntry &lt; ActiveRecord::Migration
+  def self.up</p>
+
+<pre><code>remove_column :entries, :tags
+</code></pre>
+
+<p>  end</p>
+
+<p>  def self.down</p>
+
+<pre><code>add_column :entries, :tags, :string
+</code></pre>
+
+<p>  end
+end
+```</p>
 ]]></content>
   </entry>
   

@@ -9,19 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="使用以下代码创建数据库： 1
-2
-3
-4
-5
-6
-7
-8
-9
-10
-11
-12
-CREATE DATABASE IF NOT EXISTS jbookshelf; USE jbookshelf; DROP TABLE IF EXISTS users; CREATE TABLE users (&lt &hellip;">
+  <meta name="description" content="从2.2版本起Rails开始内置支持i18n，因此以后实现国际化/本地化就可以不再需要各种各样的插件了。 Rails默认的locale文件夹是config/locales，假设你要支持中文和英文，那么你需要在这个文件夹下放置zh.yml和en.yml两个文件。 相应的入门教程网上有不少， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -83,7 +71,7 @@ CREATE DATABASE IF NOT EXISTS jbookshelf; USE jbookshelf; DROP TABLE IF EXISTS u
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2012/08/31/struts2-hibernate4-login-sample/">Struts 2 + Hibernate 4登录实例</a></h1>
+      <h1 class="entry-title"><a href="/blog/2010/01/04/using-rails23-to-create-a-simple-accounting-app-part10/">用Rails 2.3打造简单记账软件（10）</a></h1>
     
     
       <p class="meta">
@@ -99,14 +87,70 @@ CREATE DATABASE IF NOT EXISTS jbookshelf; USE jbookshelf; DROP TABLE IF EXISTS u
   
 
 
-<time datetime="2012-08-31T07:41:05+08:00" pubdate data-updated="true">Aug 31<sup>st</sup>, 2012</time>
+<time datetime="2010-01-04T04:34:41+08:00" pubdate data-updated="true">Jan 4<sup>th</sup>, 2010</time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>使用以下代码创建数据库：<br /></p>
+  <div class="entry-content"><p>从2.2版本起Rails开始内置支持i18n，因此以后实现国际化/本地化就可以不再需要各种各样的插件了。</p>
+
+<p>Rails默认的locale文件夹是config/locales，假设你要支持中文和英文，那么你需要在这个文件夹下放置zh.yml和en.yml两个文件。</p>
+
+<p>相应的入门教程网上有不少，我也就不多讲了。这里主要说一下如何在记账应用中实现可以让用户指定语言的i18n实现，即当用户选择English，那么界面就切换成英文界面，并且以后打开的页面也是以英文出现，反之亦如此。</p>
+
+<p>首先在header区添加以下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt; %= link_to 'Chinese', :locale =&gt; 'zh' %&gt;
+</span><span class='line'>&lt; %= link_to 'English', :locale =&gt; 'en' %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>点击其中某个链接后，浏览器就会传递对应的参数zh或en到后台。</p>
+
+<p>然后在app/controllers/application_controller.rb中添加以下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>before_filter :set_locale
+</span><span class='line'>
+</span><span class='line'>def set_locale
+</span><span class='line'>  I18n.locale = params[:locale]
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>不过这里有个问题就是url中必须得带着参数，不然的话用户的选择就会失效。要想使选择达到持续的效果，可以考虑把这些信息保存在session中，改进后的代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def set_locale
+</span><span class='line'>  I18n.locale = params[:locale] || session[:locale]
+</span><span class='line'>  session[:locale] = I18n.locale
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>现在这样就基本上差不多了。剩下的就是处理第一次访问时的语言，这个可以从http头中的ACCEPT_LANGUAGE参数获取。最终实现的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def set_locale
+</span><span class='line'>  accept_lang = request.env['HTTP_ACCEPT_LANGUAGE'].scan(/^[a-z]{2}/).first
+</span><span class='line'>  I18n.locale = params[:locale] || session[:locale] || accept_lang || 'zh'
+</span><span class='line'>  session[:locale] = I18n.locale
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>不过当用户设置locale后，在添加Entry时会报以下异常：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -115,378 +159,56 @@ CREATE DATABASE IF NOT EXISTS jbookshelf; USE jbookshelf; DROP TABLE IF EXISTS u
 <span class='line-number'>5</span>
 <span class='line-number'>6</span>
 <span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>CREATE DATABASE IF NOT EXISTS jbookshelf;
+</pre></td><td class='code'><pre><code class=''><span class='line'>can't convert Symbol into String
 </span><span class='line'>
-</span><span class='line'>USE jbookshelf;
+</span><span class='line'>Extracted source (around line #8):
 </span><span class='line'>
-</span><span class='line'>DROP TABLE IF EXISTS users;
-</span><span class='line'>
-</span><span class='line'>CREATE TABLE users (&lt;br /&gt;
-</span><span class='line'>    id int NOT NULL AUTO_INCREMENT,&lt;br /&gt;
-</span><span class='line'>    username varchar(20) NOT NULL,&lt;br /&gt;
-</span><span class='line'>    password varchar(50) NOT NULL,&lt;br /&gt;
-</span><span class='line'>    PRIMARY KEY(id)&lt;br /&gt;
-</span><span class='line'>) ENGINE=InnoDB DEFAULT CHARSET=utf-8;&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>    6:   &lt;p&gt;
+</span><span class='line'>    7:     &lt; %= t(:effective_date) %&gt;&lt;br /&gt;
+</span><span class='line'>    8:     &lt; %= f.date_select :effective_date %&gt;</span></code></pre></td></tr></table></div></figure>
 
 
-<p>在pom.xml中添加Hibernate的依赖配置：<br /></p>
+<p>查找资料后发现可以通过在date_select中加入order来解决。但日期下拉列表中的月份还有问题，出现的不是正常月份，而是一些随机数。这个可以在locale文件中加入month_names。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;dependency&gt;
-</span><span class='line'>    &lt;groupId&gt;org.hibernate&lt;/groupId&gt;
-</span><span class='line'>    &lt;artifactId&gt;hibernate-core&lt;/artifactId&gt;
-</span><span class='line'>    &lt;version&gt;4.1.6.Final&lt;/version&gt;
-</span><span class='line'>&lt;/dependency&gt;
-</span><span class='line'>&lt;dependency&gt;
-</span><span class='line'>    &lt;groupId&gt;mysql&lt;/groupId&gt;
-</span><span class='line'>    &lt;artifactId&gt;mysql-connector-java&lt;/artifactId&gt;
-</span><span class='line'>    &lt;version&gt;5.1.21&lt;/version&gt;
-</span><span class='line'>&lt;/dependency&gt;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'># new.html.erb
+</span><span class='line'>&lt;p&gt;
+</span><span class='line'>  &lt; %= t(:effective_date) %&gt;&lt;br /&gt;
+</span><span class='line'>  &lt; %= f.date_select :effective_date %&gt;
+</span><span class='line'>&lt;/p&gt;</span></code></pre></td></tr></table></div></figure>
 
 
-<p>创建User.java类：<br /></p>
+
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.account.model;
-</span><span class='line'>
-</span><span class='line'>public class User {&lt;br /&gt;
-</span><span class='line'>    private Long id;
-</span><span class='line'>
-</span><span class='line'>    private String username;&lt;br /&gt;
-</span><span class='line'>    private String password;
-</span><span class='line'>
-</span><span class='line'>    public Long getId() {&lt;br /&gt;
-</span><span class='line'>        return id;&lt;br /&gt;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void setId(Long id) {&lt;br /&gt;
-</span><span class='line'>        this.id = id;&lt;br /&gt;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public String getUsername() {&lt;br /&gt;
-</span><span class='line'>        return username;&lt;br /&gt;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void setUsername(String username) {&lt;br /&gt;
-</span><span class='line'>        this.username = username;&lt;br /&gt;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public String getPassword() {&lt;br /&gt;
-</span><span class='line'>        return password;&lt;br /&gt;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void setPassword(String password) {&lt;br /&gt;
-</span><span class='line'>        this.password = password;&lt;br /&gt;
-</span><span class='line'>    }&lt;br /&gt;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'># en.yml
+</span><span class='line'>en:
+</span><span class='line'>  date:
+</span><span class='line'>    month_names: [~, January, February, ..., November, December]
+</span><span class='line'>    order: [ :year, :month, :day ]</span></code></pre></td></tr></table></div></figure>
 
 
-<p>在同一目录下创建User.hbm.xml文件：<br /></p>
+
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
-</span><span class='line'>&lt;!DOCTYPE hibernate-mapping PUBLIC&lt;br /&gt;
-</span><span class='line'>    "-//Hibernate/Hibernate Mapping DTD 3.0//EN"&lt;br /&gt;
-</span><span class='line'>    "http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd"&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;hibernate-mapping package="com.codemany.account.model"&gt;
-</span><span class='line'>    &lt;class name="User" table="users"&gt;
-</span><span class='line'>        &lt;id name="id"&gt;
-</span><span class='line'>            &lt;generator class="increment" /&gt;
-</span><span class='line'>        &lt;/id&gt;
-</span><span class='line'>
-</span><span class='line'>        &lt;property name="username" length="20" /&gt;
-</span><span class='line'>        &lt;property name="password" length="50" /&gt;
-</span><span class='line'>    &lt;/class&gt;
-</span><span class='line'>&lt;/hibernate-mapping&gt;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'># zh.yml
+</span><span class='line'>zh:
+</span><span class='line'>  date:
+</span><span class='line'>    month_names: [~, 一月, 二月, ..., 十一月, 十二月]
+</span><span class='line'>    order: [ :year, :month, :day ]</span></code></pre></td></tr></table></div></figure>
 
-
-<p>在resources目录下创建hibernate.cfg.xml配置文件，内容如下：<br /></p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version='1.0' encoding='utf-8'?&gt;
-</span><span class='line'>&lt;!DOCTYPE hibernate-configuration PUBLIC&lt;br /&gt;
-</span><span class='line'>    "-//Hibernate/Hibernate Configuration DTD 3.0//EN"&lt;br /&gt;
-</span><span class='line'>    "http://www.hibernate.org/dtd/hibernate-configuration-3.0.dtd"&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;hibernate-configuration&gt;
-</span><span class='line'>    &lt;session-factory&gt;
-</span><span class='line'>        &lt;!-- MySQL connection settings --&gt;
-</span><span class='line'>        &lt;property name="connection.driver_class"&gt;com.mysql.jdbc.Driver&lt;/property&gt;
-</span><span class='line'>        &lt;property name="connection.url"&gt;jdbc:mysql://localhost:3306/jbookshelf&lt;/property&gt;
-</span><span class='line'>        &lt;property name="connection.username"&gt;yourname&lt;/property&gt;
-</span><span class='line'>        &lt;property name="connection.password"&gt;yourpassword&lt;/property&gt;
-</span><span class='line'>
-</span><span class='line'>        &lt;!-- JDBC connection pool (use the built-in) --&gt;
-</span><span class='line'>        &lt;property name="connection.pool_size"&gt;1&lt;/property&gt;
-</span><span class='line'>
-</span><span class='line'>        &lt;!-- SQL dialect --&gt;
-</span><span class='line'>        &lt;property name="dialect"&gt;org.hibernate.dialect.MySQLDialect&lt;/property&gt;
-</span><span class='line'>
-</span><span class='line'>        &lt;!-- Disable the second-level cache  --&gt;
-</span><span class='line'>        &lt;property name="cache.provider_class"&gt;org.hibernate.cache.internal.NoCacheProvider&lt;/property&gt;
-</span><span class='line'>
-</span><span class='line'>        &lt;!-- Echo all executed SQL to stdout --&gt;
-</span><span class='line'>        &lt;property name="show_sql"&gt;true&lt;/property&gt;
-</span><span class='line'>
-</span><span class='line'>        &lt;mapping resource="com/codemany/account/model/User.hbm.xml" /&gt;
-</span><span class='line'>    &lt;/session-factory&gt;
-</span><span class='line'>&lt;/hibernate-configuration&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>建立管理Session的HibernateUtil.java类：<br /></p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.account.dao.hibernate;
-</span><span class='line'>
-</span><span class='line'>import org.hibernate.Session;&lt;br /&gt;
-</span><span class='line'>import org.hibernate.SessionFactory;&lt;br /&gt;
-</span><span class='line'>import org.hibernate.cfg.Configuration;
-</span><span class='line'>
-</span><span class='line'>public class HibernateUtil {&lt;br /&gt;
-</span><span class='line'>    private static final SessionFactory sessionFactory;
-</span><span class='line'>
-</span><span class='line'>    static {&lt;br /&gt;
-</span><span class='line'>        try {&lt;br /&gt;
-</span><span class='line'>            // Create the SessionFactory from hibernate.cfg.xml&lt;br /&gt;
-</span><span class='line'>            Configuration configuration = new Configuration();&lt;br /&gt;
-</span><span class='line'>            configuration.configure();&lt;br /&gt;
-</span><span class='line'>            Properties props = configuration.getProperties();
-</span><span class='line'>
-</span><span class='line'>            ServiceRegistry serviceRegistry =&lt;br /&gt;
-</span><span class='line'>                    new ServiceRegistryBuilder().applySettings(props).buildServiceRegistry();
-</span><span class='line'>
-</span><span class='line'>            sessionFactory = configuration.buildSessionFactory(serviceRegistry);&lt;br /&gt;
-</span><span class='line'>        } catch (Throwable ex) {&lt;br /&gt;
-</span><span class='line'>            // Make sure you log the exception, as it might be swallowed&lt;br /&gt;
-</span><span class='line'>            System.err.println("Initial SessionFactory creation failed." + ex);&lt;br /&gt;
-</span><span class='line'>            throw new ExceptionInInitializerError(ex);&lt;br /&gt;
-</span><span class='line'>        }&lt;br /&gt;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public static Session getSession() {&lt;br /&gt;
-</span><span class='line'>        return sessionFactory.openSession();&lt;br /&gt;
-</span><span class='line'>    }&lt;br /&gt;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>在dao包创建数据访问对象：<br /></p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.account.dao;
-</span><span class='line'>
-</span><span class='line'>import org.hibernate.Query;&lt;br /&gt;
-</span><span class='line'>import org.hibernate.Session;&lt;br /&gt;
-</span><span class='line'>import org.hibernate.Transaction;
-</span><span class='line'>
-</span><span class='line'>import com.codemany.account.model.User;
-</span><span class='line'>
-</span><span class='line'>public class UserDao {&lt;br /&gt;
-</span><span class='line'>    public static User getUser(String username) {&lt;br /&gt;
-</span><span class='line'>        Session session = HibernateUtil.getSession();&lt;br /&gt;
-</span><span class='line'>        try {&lt;br /&gt;
-</span><span class='line'>            Query query = session.createQuery("from User u where u.username = ?");&lt;br /&gt;
-</span><span class='line'>            query.setMaxResults(1);&lt;br /&gt;
-</span><span class='line'>            query.setString(0, username);&lt;br /&gt;
-</span><span class='line'>            return (User)query.uniqueResult();&lt;br /&gt;
-</span><span class='line'>        } finally {&lt;br /&gt;
-</span><span class='line'>            session.close();&lt;br /&gt;
-</span><span class='line'>        }&lt;br /&gt;
-</span><span class='line'>    }&lt;br /&gt;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>现在可以访问数据库了，所以要修改LoginAction.java的execute方法：<br /></p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public String execute() throws Exception {&lt;br /&gt;
-</span><span class='line'>    if (username == null || username.length() == 0&lt;br /&gt;
-</span><span class='line'>            || password == null || password.length() == 0) {&lt;br /&gt;
-</span><span class='line'>        return INPUT;&lt;br /&gt;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    User u = UserDao.getUser(username);&lt;br /&gt;
-</span><span class='line'>    if (u == null) {&lt;br /&gt;
-</span><span class='line'>        return INPUT;&lt;br /&gt;
-</span><span class='line'>    }&lt;br /&gt;
-</span><span class='line'>    if (username.equals(u.getUsername()) && password.equals(u.getPassword())) {&lt;br /&gt;
-</span><span class='line'>        ActionContext.getContext().getSession().put("logined", true);&lt;br /&gt;
-</span><span class='line'>        return SUCCESS;&lt;br /&gt;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    return INPUT;&lt;br /&gt;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>PS：如果显示jta-1.0.1b.jar缺失的错误，可以在pom.xml中添加以下语句：<br /></p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;repositories&gt;
-</span><span class='line'>    &lt;repository&gt;
-</span><span class='line'>        &lt;id&gt;java.net&lt;/id&gt;
-</span><span class='line'>        &lt;url&gt;http://download.java.net/maven/2/&lt;/url&gt;
-</span><span class='line'>    &lt;/repository&gt;
-</span><span class='line'>&lt;/repositories&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
 </div>
   
   
@@ -499,7 +221,7 @@ CREATE DATABASE IF NOT EXISTS jbookshelf; USE jbookshelf; DROP TABLE IF EXISTS u
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2012/08/24/struts2-login-sample/">Struts 2登录实例</a></h1>
+      <h1 class="entry-title"><a href="/blog/2009/12/27/how-to-import-or-export-data-from-the-application-in-heroku/">如何导入/导出Heroku中应用的数据</a></h1>
     
     
       <p class="meta">
@@ -515,58 +237,72 @@ CREATE DATABASE IF NOT EXISTS jbookshelf; USE jbookshelf; DROP TABLE IF EXISTS u
   
 
 
-<time datetime="2012-08-24T06:33:20+08:00" pubdate data-updated="true">Aug 24<sup>th</sup>, 2012</time>
+<time datetime="2009-12-27T20:43:03+08:00" pubdate data-updated="true">Dec 27<sup>th</sup>, 2009</time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>新的Eclipse已经包含Maven插件了，不过还需要到Eclipse Marketplace中去安装一个m2-wtp（Maven Integeration for Eclipse WTP）插件，不然启动Tomcat时会报错。</p>
-
-<p>安装好后创建Maven项目，填写groupId和artifactId。</p>
-
-<p>在pom.xml中加入Struts 2的依赖配置：</p>
+  <div class="entry-content"><p>导入/导出Heroku上应用的数据需要安装Taps包：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;dependencies&gt;
-</span><span class='line'>    &lt;dependency&gt;
-</span><span class='line'>        &lt;groupId&gt;org.apache.struts&lt;/groupId&gt;
-</span><span class='line'>        &lt;artifactId&gt;struts2-core&lt;/artifactId&gt;
-</span><span class='line'>        &lt;version&gt;2.3.4&lt;/version&gt;
-</span><span class='line'>    &lt;/dependency&gt;
-</span><span class='line'>&lt;/dependencies&gt;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>gem install taps</span></code></pre></td></tr></table></div></figure>
 
 
-<p>在web.xml文件中添加Struts 2的Filter：</p>
+<p>导入数据到Heroku里：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;filter&gt;
-</span><span class='line'>    &lt;filter-name&gt;struts2&lt;/filter-name&gt;
-</span><span class='line'>    &lt;filter-class&gt;org.apache.struts2.dispatcher.ng.filter.StrutsPrepareAndExecuteFilter&lt;/filter-class&gt;
-</span><span class='line'>&lt;/filter&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;filter-mapping&gt;
-</span><span class='line'>    &lt;filter-name&gt;struts2&lt;/filter-name&gt;
-</span><span class='line'>    &lt;url-pattern&gt;/*&lt;/url-pattern&gt;
-</span><span class='line'>&lt;/filter-mapping&gt;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>heroku db:push</span></code></pre></td></tr></table></div></figure>
 
 
-<p>配置resources/struts.xml文件：</p>
+<p>导出数据到本地：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>heroku db:pull</span></code></pre></td></tr></table></div></figure>
+
+
+<p>其中导入/导出数据由config/database.yml配置设定。</p>
+
+<p>Heroku还支持主机到主机的数据库传输，具体细节可以参考<a href="http://docs.heroku.com/taps">这里</a>。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2009/12/20/using-rails23-to-create-a-simple-accounting-app-part9/">用Rails 2.3打造简单记账软件（9）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2009-12-20T04:45:19+08:00" pubdate data-updated="true">Dec 20<sup>th</sup>, 2009</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>没啥多说的，继续开始干活。</p>
+
+<p>修改app/views/entries/index.html.erb为：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -580,21 +316,191 @@ CREATE DATABASE IF NOT EXISTS jbookshelf; USE jbookshelf; DROP TABLE IF EXISTS u
 <span class='line-number'>10</span>
 <span class='line-number'>11</span>
 <span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;struts&gt;
-</span><span class='line'>    &lt;package name="default" extends="struts-default"&gt;
-</span><span class='line'>        &lt;action name="login" class="com.codemany.account.action.LoginAction"&gt;
-</span><span class='line'>            &lt;result name="success"&gt;/index.jsp&lt;/result&gt;
-</span><span class='line'>            &lt;result name="input"&gt;/index.jsp&lt;/result&gt;
-</span><span class='line'>        &lt;/action&gt;
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;h1&gt;Listing entries&lt;/h1&gt;
 </span><span class='line'>
-</span><span class='line'>        &lt;action name="logout" class="com.codemany.account.action.LogoutAction"&gt;
-</span><span class='line'>            &lt;result name="success" type="redirect"&gt;/index.jsp&lt;/result&gt;
-</span><span class='line'>        &lt;/action&gt;
-</span><span class='line'>    &lt;/package&gt;
-</span><span class='line'>&lt;/struts&gt;</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>&lt;table&gt;
+</span><span class='line'>  &lt;thead&gt;
+</span><span class='line'>    &lt;tr&gt;
+</span><span class='line'>      &lt;th class="center"&gt;Date&lt;/th&gt;
+</span><span class='line'>      &lt;th class="center"&gt;Amount&lt;/th&gt;
+</span><span class='line'>      &lt;th class="center"&gt;Tags&lt;/th&gt;
+</span><span class='line'>      &lt;th class="center"&gt;Comment&lt;/th&gt;
+</span><span class='line'>      &lt;th class="center"&gt;Action&lt;/th&gt;
+</span><span class='line'>    &lt;/tr&gt;
+</span><span class='line'>  &lt;/thead&gt;
+</span><span class='line'>
+</span><span class='line'>  &lt;tbody&gt;
+</span><span class='line'>    &lt; % @entries.each do |entry| %&gt;
+</span><span class='line'>    &lt;tr class="&lt;%= cycle('odd', 'even') %&gt;"&gt;
+</span><span class='line'>      &lt;td class="center"&gt;&lt; %= entry.effective_date %&gt;&lt;/td&gt;
+</span><span class='line'>      &lt;td class="right"&gt;&lt; %= number_to_currency(entry.amount) %&gt;&lt;/td&gt;
+</span><span class='line'>      &lt;td&gt;&lt; %= entry.tags %&gt;&lt;/td&gt;
+</span><span class='line'>      &lt;td&gt;&lt; %= entry.comment %&gt;&lt;/td&gt;
+</span><span class='line'>      &lt;td class="center"&gt;
+</span><span class='line'>        &lt; %= link_to 'Edit', edit_entry_path(entry) %&gt;
+</span><span class='line'>        &lt; %= link_to 'Destroy', entry, :confirm =&gt; 'Are you sure?', :method =&gt; :delete %&gt;
+</span><span class='line'>      &lt;/td&gt;
+</span><span class='line'>    &lt;/tr&gt;
+</span><span class='line'>    &lt; % end %&gt;
+</span><span class='line'>  &lt;/tbody&gt;
+</span><span class='line'>&lt;/table&gt;
+</span><span class='line'>
+</span><span class='line'>&lt; %= link_to 'New entry', new_entry_path %&gt;</span></code></pre></td></tr></table></div></figure>
 
 
+<p>将app/views/layouts/目录下的entries.html.erb改名为application.html.erb，并修改文件内容为：</p>
 
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt; !DOCTYPE html PUBLIC&lt;br /&gt;
+</span><span class='line'>  "-//W3C//DTD XHTML 1.0 Transitional//EN"&lt;br /&gt;
+</span><span class='line'>  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"&gt;
+</span><span class='line'>&lt;head&gt;
+</span><span class='line'>  &lt;meta http-equiv="content-type" content="text/html; charset=utf-8" /&gt;
+</span><span class='line'>  &lt;title&gt;Qianbao: &lt; %= controller.action_name %&gt;&lt;/title&gt;
+</span><span class='line'>  &lt; %= stylesheet_link_tag 'scaffold' %&gt;
+</span><span class='line'>  &lt; %= stylesheet_link_tag 'qianbao' %&gt;
+</span><span class='line'>  &lt; %= stylesheet_link_tag 'table' %&gt;
+</span><span class='line'>&lt;/head&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;body&gt;
+</span><span class='line'>  &lt;div id="container"&gt;
+</span><span class='line'>    &lt; %= render :partial =&gt; 'layouts/header' %&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt; % if logged_in? %&gt;
+</span><span class='line'>      &lt; %= render :partial =&gt; 'layouts/default' %&gt;
+</span><span class='line'>    &lt; % else %&gt;
+</span><span class='line'>      &lt; %= render :partial =&gt; 'layouts/main' %&gt;
+</span><span class='line'>    &lt; % end %&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt; %= render :partial =&gt; 'layouts/footer' %&gt;
+</span><span class='line'>  &lt;/div&gt;
+</span><span class='line'>&lt;/body&gt;
+</span><span class='line'>&lt;/html&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>新建app/views/layouts/_header.html.erb文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div id="header"&gt;
+</span><span class='line'>  &lt;div id="usernav"&gt;
+</span><span class='line'>    &lt; % if logged_in? %&gt;
+</span><span class='line'>      &lt;strong&gt;You are logged in as &lt; %= current_user.login %&gt;&lt;/strong&gt;
+</span><span class='line'>      &lt; %= link_to 'Logout', logout_path %&gt;
+</span><span class='line'>    &lt; % else %&gt;
+</span><span class='line'>      &lt; %= link_to 'Login', login_path %&gt; |&lt;br /&gt;
+</span><span class='line'>      &lt; %= link_to 'Sign Up', signup_path %&gt;
+</span><span class='line'>    &lt; % end %&gt;
+</span><span class='line'>  &lt;/div&gt;
+</span><span class='line'>&lt;/div&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>创建app/views/layouts/_footer.html.erb文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div id="footer"&gt;
+</span><span class='line'>  &copy 2009 Unnamed
+</span><span class='line'>&lt;/div&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>创建app/views/layouts/_main.html.erb文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div id="main"&gt;
+</span><span class='line'>  &lt; %= yield %&gt;
+</span><span class='line'>&lt;/div&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>创建app/views/layouts/_default.html.erb文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div id="boider"&gt;
+</span><span class='line'>  &lt;div id="content"&gt;
+</span><span class='line'>    &lt;p style="color: green"&gt;&lt; %= flash[:notice] %&gt;&lt;/p&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt; %= yield %&gt;
+</span><span class='line'>  &lt;/div&gt;
+</span><span class='line'>
+</span><span class='line'>  &lt;div id="sidebar"&gt;
+</span><span class='line'>    &lt;ul&gt;
+</span><span class='line'>      &lt;li&gt;&lt; %= link_to 'All entries', entries_path %&gt;&lt;/li&gt;
+</span><span class='line'>    &lt;/ul&gt;
+</span><span class='line'>  &lt;/div&gt;
+</span><span class='line'>&lt;/div&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>修改public/stylesheets/qianbao.css为：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -631,451 +537,150 @@ CREATE DATABASE IF NOT EXISTS jbookshelf; USE jbookshelf; DROP TABLE IF EXISTS u
 <span class='line-number'>33</span>
 <span class='line-number'>34</span>
 <span class='line-number'>35</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.account.action;
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+<span class='line-number'>72</span>
+<span class='line-number'>73</span>
+<span class='line-number'>74</span>
+<span class='line-number'>75</span>
+<span class='line-number'>76</span>
+<span class='line-number'>77</span>
+<span class='line-number'>78</span>
+<span class='line-number'>79</span>
+<span class='line-number'>80</span>
+<span class='line-number'>81</span>
+<span class='line-number'>82</span>
+<span class='line-number'>83</span>
+<span class='line-number'>84</span>
+<span class='line-number'>85</span>
+<span class='line-number'>86</span>
+<span class='line-number'>87</span>
+<span class='line-number'>88</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>body {
+</span><span class='line'>  padding: 0;
+</span><span class='line'>  margin: 0;
+</span><span class='line'>}
 </span><span class='line'>
-</span><span class='line'>import com.codemany.account.model.User;
+</span><span class='line'>#container {
+</span><span class='line'>  width: 960px;
+</span><span class='line'>  margin: 5px auto;
+</span><span class='line'>}
 </span><span class='line'>
-</span><span class='line'>import com.opensymphony.xwork2.ActionContext;&lt;br /&gt;
-</span><span class='line'>import com.opensymphony.xwork2.ActionSupport;
+</span><span class='line'>#header {
+</span><span class='line'>  background: url(/images/qianbao.png) no-repeat 30px;
+</span><span class='line'>  height: 97px;
+</span><span class='line'>}
 </span><span class='line'>
-</span><span class='line'>public class LoginAction extends ActionSupport {&lt;br /&gt;
-</span><span class='line'>    private static final long serialVersionUID = -389833745243649130L;
+</span><span class='line'>#tagline {
+</span><span class='line'>  float: left;
+</span><span class='line'>  margin-left: 230px;
+</span><span class='line'>}
 </span><span class='line'>
-</span><span class='line'>    private String username;&lt;br /&gt;
-</span><span class='line'>    private String password;
+</span><span class='line'>#tagline h2 {
+</span><span class='line'>  font-size: 26px;
+</span><span class='line'>  color: #0d4988;
+</span><span class='line'>  line-height: 28px;
+</span><span class='line'>  text-align: center;
+</span><span class='line'>}
 </span><span class='line'>
-</span><span class='line'>    public String execute() throws Exception {&lt;br /&gt;
-</span><span class='line'>        if (username == null || username.length() != 0&lt;br /&gt;
-</span><span class='line'>                || password == null || password.length() != 0) {&lt;br /&gt;
-</span><span class='line'>            return INPUT;&lt;br /&gt;
-</span><span class='line'>        }
+</span><span class='line'>#header #usernav {
+</span><span class='line'>  float: right;
+</span><span class='line'>}
 </span><span class='line'>
-</span><span class='line'>        if ("test".equals(username) && "test".equals(password)) {&lt;br /&gt;
-</span><span class='line'>            ActionContext.getContext().getSession().put("logined", true);&lt;br /&gt;
-</span><span class='line'>            return SUCCESS;&lt;br /&gt;
-</span><span class='line'>        }
+</span><span class='line'>#navbar {
+</span><span class='line'>  background: #efefef url(/images/line.png) repeat-x left bottom;
+</span><span class='line'>  height: 33px;
+</span><span class='line'>}
 </span><span class='line'>
-</span><span class='line'>        return INPUT;&lt;br /&gt;
-</span><span class='line'>    }
+</span><span class='line'>#main, #bodier {
+</span><span class='line'>  clear: both;
+</span><span class='line'>}
 </span><span class='line'>
-</span><span class='line'>    public void setUsername(String username) {&lt;br /&gt;
-</span><span class='line'>        this.username = username;&lt;br /&gt;
-</span><span class='line'>    }
+</span><span class='line'>#main {
+</span><span class='line'>  background: #efefef;
+</span><span class='line'>}
 </span><span class='line'>
-</span><span class='line'>    public void setPassword(String password) {&lt;br /&gt;
-</span><span class='line'>        this.password = password;&lt;br /&gt;
-</span><span class='line'>    }&lt;br /&gt;
+</span><span class='line'>#content {
+</span><span class='line'>  float: right;
+</span><span class='line'>  width: 720px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>#sidebar {
+</span><span class='line'>  background-color: #efefef;
+</span><span class='line'>  float: left;
+</span><span class='line'>  width: 230px;
+</span><span class='line'>  padding-top: 18px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>#footer {
+</span><span class='line'>  border-top: 1px solid #bbb;
+</span><span class='line'>  clear: both;
+</span><span class='line'>  text-align: center;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>h1 {
+</span><span class='line'>  font-size: 18px;
+</span><span class='line'>  line-height: 20px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>h3 {
+</span><span class='line'>  font-size: 12px;
+</span><span class='line'>  line-height: 24px;
+</span><span class='line'>  text-align: center;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>img {
+</span><span class='line'>  border-style: none;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.left {
+</span><span class='line'>  text-align: left;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.center {
+</span><span class='line'>  text-align: center;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.right {
+</span><span class='line'>  text-align: right;
 </span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
 
-
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.account.action;
-</span><span class='line'>
-</span><span class='line'>import com.opensymphony.xwork2.ActionContext;&lt;br /&gt;
-</span><span class='line'>import com.opensymphony.xwork2.ActionSupport;
-</span><span class='line'>
-</span><span class='line'>public class LogoutAction extends ActionSupport {&lt;br /&gt;
-</span><span class='line'>    private static final long serialVersionUID = -518996422060716751L;
-</span><span class='line'>
-</span><span class='line'>    public String execute() throws Exception {&lt;br /&gt;
-</span><span class='line'>        ActionContext.getContext().getSession().put("logined", false);&lt;br /&gt;
-</span><span class='line'>        return SUCCESS;&lt;br /&gt;
-</span><span class='line'>    }&lt;br /&gt;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>index.jsp内容如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%@ page contentType="text/html; charset=utf-8" pageEncoding="utf-8" %&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;%@ taglib uri="/struts-tags" prefix="s" %&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;!DOCTYPE html&gt;
-</span><span class='line'>&lt;html&gt;
-</span><span class='line'>&lt;head&gt;
-</span><span class='line'>&lt;meta charset="utf-8"&gt;
-</span><span class='line'>&lt;title&gt;Struts2 Login Sample&lt;/title&gt;
-</span><span class='line'>&lt;/head&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;body&gt;
-</span><span class='line'>    &lt;s:if test="#session.logined"&gt;
-</span><span class='line'>        Welcome, you have logined. &lt;a href="&lt;%= request.getContextPath() %&gt;/logout.action"&gt;Logout&lt;/a&gt;
-</span><span class='line'>    &lt;/s:if&gt;
-</span><span class='line'>    &lt;s:else&gt;
-</span><span class='line'>        &lt;p&gt;User: test/test&lt;/p&gt;
-</span><span class='line'>        &lt;s:form action="login"&gt;
-</span><span class='line'>            &lt;s:textfield key="username" label="Username" /&gt;
-</span><span class='line'>            &lt;s:password key="password" label="Password" /&gt;
-</span><span class='line'>            &lt;s:submit value="Login" /&gt;
-</span><span class='line'>        &lt;/s:form&gt;
-</span><span class='line'>    &lt;/s:else&gt;
-</span><span class='line'>&lt;/body&gt;
-</span><span class='line'>&lt;/html&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>在项目上点击右键 -> Run As -> Maven build运行项目。在Goals栏中填写tomcat:run，Maven会自动下载Tomcat到项目的target目录下后启动服务器。</p>
-
-<p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/08/08/write-a-ruby-script-to-bulk-modify-traditional-file-called-simplified/">写了个批量修改繁体文件名为简体的Ruby脚本</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-08-08T14:44:13+08:00" pubdate data-updated="true">Aug 8<sup>th</sup>, 2012</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>首先是遍历目录所有文件，使用了<a href="http://beike.iteye.com/blog/361108"><a href="http://beike.iteye.com/blog/361108">http://beike.iteye.com/blog/361108</a></a>的代码，稍微做了下修改。主要是在Windows下处理系统目录时会停止遍历，加上了异常处理。<br /></p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>def traverse(path)&lt;br /&gt;
-</span><span class='line'>  begin&lt;br /&gt;
-</span><span class='line'>    if File.directory?(path)&lt;br /&gt;
-</span><span class='line'>      Dir.foreach(path) do |file|&lt;br /&gt;
-</span><span class='line'>        if file != "." and file != ".." &lt;br /&gt;
-</span><span class='line'>          traverse(path + "/" + file) {|x| yield x}&lt;br /&gt;
-</span><span class='line'>        end&lt;br /&gt;
-</span><span class='line'>      end&lt;br /&gt;
-</span><span class='line'>    else&lt;br /&gt;
-</span><span class='line'>      yield path&lt;br /&gt;
-</span><span class='line'>    end&lt;br /&gt;
-</span><span class='line'>  rescue&lt;br /&gt;
-</span><span class='line'>    puts "Error: #{$!}"&lt;br /&gt;
-</span><span class='line'>  end&lt;br /&gt;
-</span><span class='line'>end&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>如果不输入文件夹路径，就使用当前目录作为根目录：<br /></p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>root = ARGV[0] || Dir.pwd&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>将繁体中文改成简体的代码：<br /></p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mapping = {}&lt;br /&gt;
-</span><span class='line'>mapping["無"] = "无"&lt;br /&gt;
-</span><span class='line'>mapping["龍"] = "龙"
-</span><span class='line'>
-</span><span class='line'>mapping.each do |key, value|&lt;br /&gt;
-</span><span class='line'>  file.gsub!(key.encode('gbk', 'utf-8'), value.encode('gbk', 'utf-8'))&lt;br /&gt;
-</span><span class='line'>end&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>文件重命名：<br /></p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>File.rename(old_file_name, new_file_name)&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>代码下载：<a href="https://github.com/dohkoos/big2gb">https://github.com/dohkoos/big2gb</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/07/28/css-naming-conventions/">CSS命名规范</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-07-28T02:27:06+08:00" pubdate data-updated="true">Jul 28<sup>th</sup>, 2012</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>收集了网上的一些CSS命名规范，根据自己的理解和需求整理了一遍。</p>
-
-<p>1、布局（layout）</p>
-
-<ul>
-<li>container 就是将页面中的所有元素包在一起的部分</li>
-<li>header 页面的头部区域，包含站点的logo和一些其他元素</li>
-<li>navbar 横向导航栏，最典型的网页元素</li>
-<li>breadcrumbs 即页面所处位置的导航提示</li>
-<li>content 是站点的主要区域</li>
-<li>sidebar</li>
-<li>footer</li>
-</ul>
-
-
-<p>2、头部（header）</p>
-
-<ul>
-<li>logo</li>
-<li>tagline</li>
-</ul>
-
-
-<p>3、导航栏（navbar）</p>
-
-<ul>
-<li>mainnav</li>
-<li>subnav</li>
-<li>topnav</li>
-</ul>
-
-
-<p>4、侧边栏（sidebar）</p>
-
-<ul>
-<li>menu 包含一般的链接。sidebar中可以包含多个menu</li>
-</ul>
-
-
-<p>5、常用</p>
-
-<ul>
-<li>userbar 登录注册条</li>
-<li>copyright</li>
-<li>banner</li>
-<li>feature</li>
-</ul>
-
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/07/25/the-binary-search-algorithm-i-wrote-a-bug/">我写的二分查找算法有bug！</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-07-25T08:07:17+08:00" pubdate data-updated="true">Jul 25<sup>th</sup>, 2012</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>看到《你是那10%可以实现二分查找算法的程序员吗？》觉得很不服气，写个二分查找算法还不简单吗？分分钟搞定的事情。</p>
-
-<p>按照它的要求，用Java写出以下代码：<br /></p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public int binarySearch(int[] array, int value) {&lt;br /&gt;
-</span><span class='line'>    int low = 0;&lt;br /&gt;
-</span><span class='line'>    int high = array.length - 1;&lt;br /&gt;
-</span><span class='line'>    int mid;&lt;br /&gt;
-</span><span class='line'>    while (low &lt;= high) {&lt;br /&gt;
-</span><span class='line'>        mid = (low + high) / 2;&lt;br /&gt;
-</span><span class='line'>        if (array[mid] &lt; value) {&lt;br /&gt;
-</span><span class='line'>            low = mid + 1;&lt;br /&gt;
-</span><span class='line'>        } else if (array[mid] &gt; value) {&lt;br /&gt;
-</span><span class='line'>            high = mid - 1;&lt;br /&gt;
-</span><span class='line'>        } else {&lt;br /&gt;
-</span><span class='line'>            return mid;&lt;br /&gt;
-</span><span class='line'>        }&lt;br /&gt;
-</span><span class='line'>    }&lt;br /&gt;
-</span><span class='line'>    return -1;&lt;br /&gt;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>到<a href="http://reprog.wordpress.com/2010/04/19/are-you-one-of-the-10-percent/"><a href="http://reprog.wordpress.com/2010/04/19/are-you-one-of-the-10-percent/">http://reprog.wordpress.com/2010/04/19/are-you-one-of-the-10-percent/</a></a>去comment代码参加测试。</p>
-
-<p>写代码和检查总共花费20分钟时间，3/4时间是用来在脑袋里模拟运算，防止数组索引溢出。然后编译2次，消除了两个语法错误（好久没写Java代码和写Ruby代码的关系，竟然连个数组初始化都不会写了）。也想过数值溢出的问题，但是没想到点子上。结果恰恰是在这里会导致bug。具体原因在<a href="http://googleresearch.blogspot.com/2006/06/extra-extra-read-all-about-it-nearly.html">这里</a>有描述。因为low + high的和会形成数值溢出，解决方法是用<br /></p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>int mid = low + ((high - low) / 2);&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>或<br /></p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>int mid = (low + high) &gt;&gt;&gt; 1;&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>替代
-</p></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/07/20/how-to-crack-zte-zxa10-f460-v30-for-superuser-password/">中兴ZXA10-F460 v3.0获取超级管理员密码</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-07-20T14:12:59+08:00" pubdate data-updated="true">Jul 20<sup>th</sup>, 2012</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>硬件版本号 V3.0<br />
-软件版本号 F460_IMS_V2.30.10P1T6_JS1111<br />
-BOOT版本号 V1.1.0P1T1<br />
-版本日期 2012-02-29 16:29:07</p>
-
-<p>中兴ZXA10-F460光猫（E8-C）在第一次安装的时候，超级管理员帐号是telecomadmin，密码为nE7jA%5m，这个是默认的，由安装人员设置好相关设置后，会自动下载配置，这时候这个超级管理员密码会被修改为telecomadminXXXXXXXX（8个X是8位数字，每个用户是不同的）这种格式。因为很多设置需要在超级管理员下才能设置，所以破解这个超级管理员密码是非常必要的。</p>
-
-<p>其中V1.0和V2.0版本网上有破解方法，大家可以自己搜索。</p>
-
-<p>在命令行下输入telnet 192.168.1.1，帐号和密码都是root。连接成功后，会出现“F460 login:”这样的提示。</p>
-
-<p>注意：目前网上流传的查看/tmp目录下db_backup_cfg.xml文件内容的破解方法已经无效了。另外在/userconfig/cfg目录下有两个加密的配置文件db_backup_cfg.xml和db_user_cfg.xml，同目录下还有个db_default_cfg.xml是不加密的（该文件是出厂设置的配置文件），但是大家不要用这个文件去替换db_user_cfg.xml，否则会出现不可预知的后果。</p>
-
-<p>实际上只要修改一下/home/httpd/login.gch这个文件，就能看到密码了。patch文件内容如下：</p>
+<p>新建public/stylesheets/table.css，内容为：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1103,39 +708,331 @@ BOOT版本号 V1.1.0P1T1<br />
 <span class='line-number'>24</span>
 <span class='line-number'>25</span>
 <span class='line-number'>26</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>--- /home/httpd/login.gch 2012-07-03 14:05:16.000000000 +0800
-</span><span class='line'>+++ login.gch 2012-07-03 14:03:37.000000000 +0800
-</span><span class='line'>@@ -152,6 +152,17 @@
-</span><span class='line'>set_language("langcn.conf");
-</span><span class='line'>langclass = "login_title_centeren";
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>table {
+</span><span class='line'>  border-collapse: collapse;
+</span><span class='line'>  text-align: left;
+</span><span class='line'>  width: 90%;
 </span><span class='line'>}
-</span><span class='line'>+var CK_HANDLE = create_paralist();
-</span><span class='line'>+var login_name = "telecomadmin";
-</span><span class='line'>+set_para(CK_HANDLE, "Username", login_name);
-</span><span class='line'>+qeury_list_bycond("OBJ_USERINFO_ID", "IGD", CK_HANDLE);
-</span><span class='line'>+destroy_paralist(CK_HANDLE);
-</span><span class='line'>+CK_HANDLE = create_paralist();
-</span><span class='line'>+var CK_IDENTITY = query_identity(0);
-</span><span class='line'>+get_inst(CK_HANDLE, "OBJ_USERINFO_ID", CK_IDENTITY);
-</span><span class='line'>+var now_pwd = get_para(CK_HANDLE, "Password");
-</span><span class='line'>+now_pwd = delMoreSlash(now_pwd);
-</span><span class='line'>+destroy_paralist(CK_HANDLE);
-</span><span class='line'>%&gt;
-</span><span class='line'>&lt;head&gt;
-</span><span class='line'>&lt;META HTTP-EQUIV="pragma" CONTENT="no-cache&gt;
-</span><span class='line'>@@ -239,4 +250,5 @@
-</span><span class='line'>&lt;/script&gt;
-</span><span class='line'>&lt;/head&gt;
-</span><span class='line'>&lt;body onload="onFocus();"&gt;
-</span><span class='line'>+&lt;div&gt;&lt;%=now_pwd;%&gt;&lt;/div&gt;
-</span><span class='line'>&lt;div id="container" class="content"&gt;</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>
+</span><span class='line'>thead {
+</span><span class='line'>  height: 30px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>thead th {
+</span><span class='line'>  padding: 5px;
+</span><span class='line'>  background: #efefef;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>tbody td {
+</span><span class='line'>  padding: 5px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>th, td {
+</span><span class='line'>  border: 1px solid #e6e6e6;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>tr.odd {
+</span><span class='line'>  background: #fff;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>tr.even {
+</span><span class='line'>  background: #f9f9f9;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
 
 
-<p>效果是浏览器登录192.168.1.1的时候，超级管理员密码会显示在首页界面的左上角。</p>
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2009/12/18/how-to-host-rails-application-in-heroku/">如何在Heroku上托管Rails应用</a></h1>
+    
+    
+      <p class="meta">
+        
 
-<p>到这儿有人想了，怎么把上面的patch更新到/home/httpd/login.gch中呢？总结了三种方法：</p>
 
-<p>第一种方法是telent到F460上后，执行下面的命令即可：</p>
+
+
+
+
+
+
+  
+
+
+<time datetime="2009-12-18T14:27:21+08:00" pubdate data-updated="true">Dec 18<sup>th</sup>, 2009</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>要使用Heroku，必须先在其官网注册一个账号。</p>
+
+<p>1、在本机上安装Heroku的gem包：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>gem install heroku</span></code></pre></td></tr></table></div></figure>
+
+
+<p>2、提交代码到Heroku需要ssh，可以使用ssh-keygen先产生一个公钥：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ssh-keygen -t rsa</span></code></pre></td></tr></table></div></figure>
+
+
+<p>3、然后通过下面的命令把公钥加入到Heroku：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>heroku keys:add</span></code></pre></td></tr></table></div></figure>
+
+
+<p>4、创建Rails项目并加入Git版本控制：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rails appname  # 不要使用MySQL数据库，因为Heroku暂时还不支持它
+</span><span class='line'>cd appname
+</span><span class='line'>git init
+</span><span class='line'>git add .
+</span><span class='line'>git commit -m "Initial project"</span></code></pre></td></tr></table></div></figure>
+
+
+<p>5、在Heroku上创建这个项目：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>heroku create [appname]</span></code></pre></td></tr></table></div></figure>
+
+
+<p>注意：在创建项目时会要求输入Email和密码（即注册Heroku时输入的Email和密码），以便创建~/.heroku/credentials文件，这个文件记录了你输入的用户名和密码。</p>
+
+<p>如果已经在Heroku上创建了这个项目，那么可以使用下列命令来增加一个远程服务器端，以后提交代码的时候只需要使用heroku别名即可：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>git remote add heroku git@heroku.com:appname.git</span></code></pre></td></tr></table></div></figure>
+
+
+<p>6、将本地的代码部署到Heroku上：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>git push heroku master</span></code></pre></td></tr></table></div></figure>
+
+
+<p>7、最后做一个数据库迁移：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>heroku rake db:migrate</span></code></pre></td></tr></table></div></figure>
+
+
+<p>现在就可以在浏览器里输入<code>http://appname.heroku.com</code>来访问你的应用了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2009/12/17/using-rails23-to-create-a-simple-accounting-app-part8/">用Rails 2.3打造简单记账软件（8）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2009-12-17T03:40:14+08:00" pubdate data-updated="true">Dec 17<sup>th</sup>, 2009</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>今天发现一个问题，收入/支出金额在储存到数据库后小数点后面的数字不见了，经过检查发现是因为amount字段的类型为decimal(10, 0)。</p>
+
+<p>Rails的Migration还真是好，建一个修改列数据类型的迁移任务就能做到。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>script/generate migration add_scale_to_amount_column</span></code></pre></td></tr></table></div></figure>
+
+
+<p>然后修改该迁移任务的内容为：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class AddScaleToAmountColumn &lt; ActiveRecord::Migration
+</span><span class='line'>  def self.up
+</span><span class='line'>    change_column :entries, :amount, :decimal, :precision =&gt; 8, :scale =&gt; 2
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  def self.down
+</span><span class='line'>    change_column :entries, :amount, :decimal
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>最后执行一下迁移任务就可以了：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rake db:migrate</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2009/12/14/using-rails23-to-create-a-simple-accounting-app-part7/">用Rails 2.3打造简单记账软件（7）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2009-12-14T07:48:25+08:00" pubdate data-updated="true">Dec 14<sup>th</sup>, 2009</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>经过这几天的不断完善，记账应用越来越让人心情愉快了。不过要是能给应用加上忘记密码的功能就更好了。</p>
+
+<p>在前面的开发中，我们已经把app/controllers/users_controller.rb中的下面这行代码</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>self.current_user = @user</span></code></pre></td></tr></table></div></figure>
+
+
+<p>注释掉了，现在我们要把它后面的一行代码也注释掉。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>redirect_back_or_default('/')</span></code></pre></td></tr></table></div></figure>
+
+
+<p>同时创建app/views/users/create.html.erb视图文件，这是因为要在用户注册后提示用户去收取邮件激活账号。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;h1&gt;Please confirm your registion!&lt;/h1&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;p&gt;
+</span><span class='line'>  A mail has been sent to &lt;%= @user.email %&gt; with instructions to activate your account.
+</span><span class='line'>  &lt;li&gt;
+</span><span class='line'>    If your email is not valid, you must &lt;%= link_to "Sign up", signup_path %&gt; again and provide a valid email address.
+</span><span class='line'>  &lt;/li&gt;
+</span><span class='line'>  &lt;li&gt;
+</span><span class='line'>    If you don't recieve an email, check your bulk or trash folder, as your spam filter may have inadvertantly caught the registration email.
+</span><span class='line'>  &lt;/li&gt;
+</span><span class='line'>&lt;/p&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>接下来创建一个迁移任务，在users数据表中加入一个字段用来储存修改密码时的重置码。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>script/generate migration add_password_reset_code_to_user</span></code></pre></td></tr></table></div></figure>
+
+
+<p>执行上面的命令后就可以在db/migrate目录下看到如下格式的迁移文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>yyyymmddxxxxxx_add_password_reset_code_to_user.rb</span></code></pre></td></tr></table></div></figure>
+
+
+<p>打开它，将它的内容改为：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class AddPasswordResetCodeToUser &lt; ActiveRecord::Migration
+</span><span class='line'>  def self.up
+</span><span class='line'>    add_column :users, :password_reset_code, :string, :limit =&gt; 40
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  def self.down
+</span><span class='line'>    remove_column :users, :password_reset_code
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>执行迁移任务更新数据表users：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rake db:migrate</span></code></pre></td></tr></table></div></figure>
+
+
+<p>然后打开config/routes.rb文件，在里面增加两个映射：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>map.forgot_password '/forgot_password', :controller =&gt; 'users', :action =&gt; 'forgot_password'
+</span><span class='line'>map.reset_password '/reset_password/:id', :controller =&gt; 'users', :action =&gt; 'reset_password'</span></code></pre></td></tr></table></div></figure>
+
+
+<p>另外还要创建两个视图文件：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1149,355 +1046,150 @@ BOOT版本号 V1.1.0P1T1<br />
 <span class='line-number'>10</span>
 <span class='line-number'>11</span>
 <span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sed -i '155 s/^/var CK_HANDLE = create_paralist();\n/' /home/httpd/login.gch
-</span><span class='line'>sed -i '156 s/^/var login_name = "telecomadmin";\n/' /home/httpd/login.gch
-</span><span class='line'>sed -i '157 s/^/set_para(CK_HANDLE, "Username", login_name);\n/' /home/httpd/login.gch
-</span><span class='line'>sed -i '158 s/^/qeury_list_bycond("OBJ_USERINFO_ID", "IGD", CK_HANDLE);\n/' /home/httpd/login.gch
-</span><span class='line'>sed -i '159 s/^/destroy_paralist(CK_HANDLE);\n/' /home/httpd/login.gch
-</span><span class='line'>sed -i '160 s/^/CK_HANDLE = create_paralist();\n/' /home/httpd/login.gch
-</span><span class='line'>sed -i '161 s/^/var CK_IDENTITY = query_identity(0);\n/' /home/httpd/login.gch
-</span><span class='line'>sed -i '162 s/^/get_inst(CK_HANDLE, "OBJ_USERINFO_ID", CK_IDENTITY);\n/' /home/httpd/login.gch
-</span><span class='line'>sed -i '163 s/^/var now_pwd = get_para(CK_HANDLE, "Password");\n/' /home/httpd/login.gch
-</span><span class='line'>sed -i '164 s/^/now_pwd = delMoreSlash(now_pwd);\n/' /home/httpd/login.gch
-</span><span class='line'>sed -i '165 s/^/destroy_paralist(CK_HANDLE);\n/' /home/httpd/login.gch
-</span><span class='line'>sed -i '253 s/^/&lt;div&gt;&lt;%=now_pwd;%&gt;&lt;\/div&gt;\n/' /home/httpd/login.gch</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># app/views/users/forgot_password.html.erb
+</span><span class='line'>&lt;h1&gt;Password Reset Request&lt;/h3&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;p&gt;
+</span><span class='line'>  Enter your email address that we have on our file and click send.&lt;br /&gt;
+</span><span class='line'>  We will send you a password reset link email to your email address.
+</span><span class='line'>&lt;/p&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;% form_for :user, :url =&gt; {:action =&gt; 'forgot_password'} do |f| %&gt;
+</span><span class='line'>  &lt;%= f.error_messages %&gt;
+</span><span class='line'>
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>    &lt;%= f.label :email %&gt;&lt;br /&gt;
+</span><span class='line'>    &lt;%= f.text_field :email %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>    &lt;%= f.submit 'Send' %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>&lt;% end %&gt;</span></code></pre></td></tr></table></div></figure>
 
 
-<p>第二种方法是telent到F460上后，执行cp /home/httpd/login.gch /home/httpd/login_gch.xml，通过浏览器把login_gch.xml保存到电脑上，然后再把patch更新进去。可以在电脑上架设ftp服务器，在F460上执行以下命令：</p>
+
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>cd /home/httpd/
-</span><span class='line'>wget ftp://&lt;YOUR_COMPUTER_IP&gt;/login.gch # 把&lt;YOUR_COMPUTER_IP&gt;替换成你自己的</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># app/views/users/reset_password.html.erb
+</span><span class='line'>&lt;h1&gt;Reset Password&lt;/h1&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;% form_for :user, :url =&gt; {:action =&gt; "reset_password"} do |f| %&gt;
+</span><span class='line'>  &lt;%= f.error_messages %&gt;
+</span><span class='line'>
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>    &lt;%= f.label :password %&gt;&lt;br /&gt;
+</span><span class='line'>    &lt;%= f.password_field :password %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>    &lt;%= f.label :password_confirmation %&gt;&lt;br /&gt;
+</span><span class='line'>    &lt;%= f.password_field :password_confirmation %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>    &lt;%= f.submit 'Reset password' %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>&lt;% end %&gt;</span></code></pre></td></tr></table></div></figure>
 
 
-<p>第三种方法是telent到F460上后，执行df命令，查看是否有usb1_1或usb2_1，如果有就可以进行下一步操作。输入cp /home/httpd/login.gch /mnt/usb1_1/login.gch把文件拷贝到优盘上，修改后使用cp /mnt/usb1_1/login.gch /home/httpd/login.gch把文件更新到猫上就可以。</p>
-
-<p>2013/6/16更新</p>
-
-<p>其实还有种更简便的方法，中兴的光猫有个sendcmd命令，下面是语法的简单说明：</p>
-
-<ol>
-<li>读取全部表名 sendcmd 1 DB all；</li>
-<li>读取指定表信息 sendcmd 1 DB p 表名。比如sendcmd 1 DB p UserInfo，查看路由器帐号和密码，超级管理员密码也在这里查看；</li>
-<li>查看当前系统运行的服务状态 sendcmd -pc show；</li>
-<li>修改某个表的某个字段的值 sendcmd 1 DB set 表名 行数 字段名 字段值。比如要修改超级管理员密码，可以使用sendcmd 1 DB set UserInfo 0 Password 123456；</li>
-<li>保存对配置文件的修改 sendcmd 1 DB save。</li>
-</ol>
-
-
-<p>其实还有其它的命令，但是就修改光猫配置来说，这几条命令足够了。</p>
-
-<p>参考资料：<br />
-<a href="http://wenku.baidu.com/view/02e14304de80d4d8d15a4fbd.html">http://wenku.baidu.com/view/02e14304de80d4d8d15a4fbd.html</a><br />
-<a href="http://word-ll.dotcloud.com/?p=41">http://word-ll.dotcloud.com/?p=41</a><br />
-<a href="http://www.myxzy.com/post-342.html">http://www.myxzy.com/post-342.html</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/07/02/summary-of-the-sql-joins/">SQL连接的总结</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-07-02T09:44:51+08:00" pubdate data-updated="true">Jul 2<sup>nd</sup>, 2012</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>连接（join）可以在SELECT语句的FROM子句或WHERE子句中建立，在FROM子句中指出连接时有助于将连接操作与WHERE子句中的搜索条件区分开来。连接可以对同一个表操作，也可以对多个表操作，对同一个表操作的连接称为自连接（self join）。</p>
-
-<p>连接类型（join type）分为三种：内连接、外连接和交叉连接。</p>
-
-<ul>
-<li>内连接（inner join）：使用比较运算符进行表间某（些）列数据的比较操作，并列出这些表中与连接条件相匹配的数据行。</li>
-<li>外连接（outer join）：与内连接不同的是外连接不只列出与连接条件相匹配的行，而且列出左表（左外连接时）、右表（右外连接时）或两个表（全外连接时）中所有符合条件的数据行。</li>
-<li>交叉连接（cross join）：返回连接表中所有数据行的笛卡尔积。</li>
-</ul>
-
-
-<p>内链接分为等值连接和不等连接：</p>
-
-<ul>
-<li>等值连接（equijoin）：在连接条件中使用等于（=）运算符比较被连接列的列值，其查询结果中列出被连接表中的所有列，包括其中的重复列。</li>
-<li>不等连接（non-equijoin）：在连接条件使用除等于运算符以外的其它比较运算符比较被连接的列的列值。</li>
-</ul>
-
-
-<p>注意：自然连接（natural join）是一种特殊的等值连接。它使用选择列表指出查询结果中所包括的列，由此删除连接表中的重复列。</p>
-
-<p>books数据表：</p>
-
-<p><img src="/uploads/books.png" title="books" ></p>
-
-<p>publishers数据表：</p>
-
-<p><img src="/uploads/publishers.png" title="publishers" ></p>
-
-<p>自连接查询：</p>
+<p>然后就是在app/views/sessions/new.html.erb中挨着submit按钮的地方加上：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>select * from books b1 [inner] join books b2 on b1.price = b2.price</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= link_to 'Forgot password?', forgot_password_url %&gt;</span></code></pre></td></tr></table></div></figure>
 
 
-<p><img src="/uploads/self-join.png" title="self-join" ></p>
-
-<p>内连接（简称连接）查询：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>select * from books b [inner] join publishers p on b.publisher_id = p.publisher_id</span></code></pre></td></tr></table></div></figure>
-
-
-<p><img src="/uploads/inner-join.png" title="inner-join" ></p>
-
-<p>自然连接查询：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>select b.*, p.name from books b [inner] join publishers p on b.publisher_id = p.publisher_id</span></code></pre></td></tr></table></div></figure>
-
-
-<p><img src="/uploads/natural-join.png" title="natural-join" ></p>
-
-<p>左外连接（简称左连接）查询：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>select * from books b left [outer] join publishers p on b.publisher_id = p.publisher_id</span></code></pre></td></tr></table></div></figure>
-
-
-<p><img src="/uploads/left-outer-join.png" title="left-outer-join" ></p>
-
-<p>右外连接（简称右连接）查询：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>select * from books b right [outer] join publishers p on b.publisher_id = p.publisher_id</span></code></pre></td></tr></table></div></figure>
-
-
-<p><img src="/uploads/right-outer-join.png" title="right-outer-join" ></p>
-
-<p>全外连接（简称全连接）查询：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>select * from books b full [outer] join publishers p on b.publisher_id = p.publisher_id</span></code></pre></td></tr></table></div></figure>
-
-
-<p><img src="/uploads/full-outer-join.png" title="full-outer-join" ></p>
-
-<p>交叉连接查询：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>select * from books cross join publishers</span></code></pre></td></tr></table></div></figure>
-
-
-<p><img src="/uploads/cross-join.png" title="cross-join" ></p>
-
-<p>下图是由Moffatt在2008年制作的连接集合表示：</p>
-
-<p><img src="/uploads/sql-joins.jpg" title="sql-joins" ></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/06/03/how-to-avoid-click-on-the-link-to-download-the-file-browser-automatically-open-the-file/">如何实现点击链接下载文件时避免浏览器自动打开文件</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-06-03T07:26:02+08:00" pubdate data-updated="true">Jun 3<sup>rd</sup>, 2012</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>HTTP Response Header有个Content-Disposition参数，该参数的目的是为了在客户端另存文件时提供一个建议的文件名。将它的值设置为attachment后，浏览器就会老老实实地显示另存为对话框，如果这个值设成inline，则无论怎样浏览器都会自动尝试用已知关联的程序打开文件。</p>
-
-<p>注意：在Firefox中需要把filename用双引号包起来才能得到想要的文件名，不然如果含有空格就会丢掉空格后面的部分，而IE会把空格转为下划线。</p>
-
-<p>Java设置header代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>res.addHeader("Content-Disposition", "attachment; filename=" + res.encodeURL(filename));</span></code></pre></td></tr></table></div></figure>
-
-
-<p>Ruby设置header代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>headers['Content-Disposition'] = "attachment; filename=#{filename}"</span></code></pre></td></tr></table></div></figure>
-
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/05/16/using-fastboot-to-flash-galaxy-nexus-official-rom/">使用fastboot刷Galaxy Nexus官方系统</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-05-16T06:59:56+08:00" pubdate data-updated="true">May 16<sup>th</sup>, 2012</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>root - 系统管理员权限<br />
-bootloader - 相当于电脑上的BIOS</p>
-
-<blockquote><p>bootloader is code that is executed before any Operating System starts to run.
-recovery - 执行底层操作的界面，相当于纯DOS界面
-fastboot - 是比recovery更底层的操作界面
-fastboot is a special diagnostic and engineering protocol that you can boot your Android device into.
-解锁 - 就是解锁bootloader。解锁之后才可以刷ROM</p></blockquote>
-
-<p>分区解释：<br />
-system：系统分区，我们刷ROM一般就是刷的这个分区<br />
-userdata：数据分区<br />
-cache：缓存分区<br />
-recovery：恢复分区<br />
-boot：存放内核和ramdisk的分区<br />
-hboot: 这个是SPL所在的分区，很重要。也是fastboot所在的分区，刷错就真的变砖了（所以一般不轻易刷这个）<br />
-splash1：这个就是开机第一屏幕了<br />
-radio：这个不是什么收音机，而是指无线通信模块，俗称基带（radio最初的意思是无线电通讯）</p>
-
-<p>刷机步骤：</p>
-
-<ol>
-<li><p>安装adb驱动（或者在机器进入fastboot模式后安装也行）</p></li>
-<li><p>下载官方镜像，解压缩。成功解压缩后得到五个文件：<br />
-flash-all.sh<br />
-flash-base.sh<br />
-radio-maguro-i9250xxla02.img<br />
-bootloader-maguro-primela03.img<br />
-image-yakju-imm76i.zip</p></li>
-<li><p>下载Galaxy-Nexus-fastboot-v2.0.zip，解压缩。将官方固件copy到目录下重命名。规则如下：<br />
-刷基带请将radio-xxx.img重命名为radio.img<br />
-刷BL请将bootloader-xxx.img重命名为bootloader.img<br />
-刷固件请将image-xxx.zip重命名为image.zip</p></li>
-<li><p>关机进入fastboot模式（在关机状态下同时按“音量+”和“音量-”和“电源”三个键，等待机器发出轻微震动即可放开）</p></li>
-<li><p>运行bat文件，选择2进行解锁（解锁是root和刷机的前提，音量键选择“YES”开头的，然后按电源键确定）</p></li>
-<li><p>高兴么就root一下。然后开始刷机，基带和BL能不刷就不刷，防止变砖头。不过我在刷的过程中就提示必须刷基带和BL。</p></li>
-</ol>
-
-
-<p><img src="/uploads/gn-update-fail.png" title="gn-update-fail" ></p>
-
-<p>注意事项：<br />
-刷机有风险，操作需谨慎<br />
-刷机前请备份好数据<br />
-刷机前请确保手机电量在50%以上</p>
-
-<p>PS：顺带着把同事的日版机也刷到4.0.4版本。在刷的过程中出现了莫名其妙的事情。刷机一切正常，但是重启之后，就无限在第一屏重启。抠电池重新再刷，还是老样子，但多重启两次后竟然进去了，莫名其妙&#8230;</p>
-
-<p>刷机工具下载：<a href="https://github.com/dohkoos/galaxy-nexus-flash-tools">https://github.com/dohkoos/galaxy-nexus-flash-tools</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/05/03/rewrite-some-records-when-the-rails-2-x-generator-to-the-rails-3-x/">改写Rails 2.x generator到Rails 3.x时的一些记录</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-05-03T07:13:58+08:00" pubdate data-updated="true">May 3<sup>rd</sup>, 2012</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>因为有个基于Rails 2.x的项目用到了<a href="https://github.com/jsboulanger/feedback">feedback</a>插件，在把项目迁移到Rails 3.x版本后，需要让feedback也支持Rails 3.x。但是原作者早已不再更新该插件，所以只能自动动手，花了两天的时间查资料，该代码，终于改写完成，在github上做了个分支。</p>
-
-<p>Rails 3.x中生成generator可用下面的命令：<br /></p>
+<p>在app/controllers/users_controller.rb中添加以下方法：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>rails g generator feedback_form&lt;br /&gt;
-</span><span class='line'>      create  lib/generators/feedback_form&lt;br /&gt;
-</span><span class='line'>      create  lib/generators/feedback_form/feedback_form_generator.rb&lt;br /&gt;
-</span><span class='line'>      create  lib/generators/feedback_form/USAGE&lt;br /&gt;
-</span><span class='line'>      create  lib/generators/feedback_form/templates&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def forgot_password
+</span><span class='line'>  return unless request.post?
+</span><span class='line'>  if @user = User.find_by_email(params[:user][:email])
+</span><span class='line'>    @user.forgot_password
+</span><span class='line'>    @user.save
+</span><span class='line'>    flash[:notice] = "A password reset link has been sent to your email address"
+</span><span class='line'>    redirect_back_or_default('/')
+</span><span class='line'>  else
+</span><span class='line'>    flash[:alert] = "Could not find a user with that email address"
+</span><span class='line'>  end
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>def reset_password
+</span><span class='line'>  @user = User.find_by_password_reset_code(params[:id])
+</span><span class='line'>  return if @user unless params[:user]
+</span><span class='line'>
+</span><span class='line'>  new_password = params[:user][:password]
+</span><span class='line'>  new_password_confirmation = parmas[:user][:password_confirmation]
+</span><span class='line'>  if (new_password && new_password_confirmation && !new_password_confirmation.blank?)
+</span><span class='line'>    @user.reset_password(new_password, new_password_confirmation)
+</span><span class='line'>    @user.save
+</span><span class='line'>    flash[:notice] = @user.save ? "Password reset success." : "Password reset failed."
+</span><span class='line'>    redirect_back_or_default('/')
+</span><span class='line'>  else
+</span><span class='line'>    flash[:alert] = "Password mismatch"
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>再创建两个邮件模板：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># app/views/user_mailer/forgot_password.html.erb
+</span><span class='line'>Dear &lt;%= @user.login %&gt;,
+</span><span class='line'>
+</span><span class='line'>  We have had a request to reset your password, please visit&lt;br /&gt;
+</span><span class='line'>  &lt;%= @url %&gt;</span></code></pre></td></tr></table></div></figure>
 
 
 
@@ -1505,30 +1197,889 @@ image-yakju-imm76i.zip</p></li>
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class InitializerGenerator &lt; Rails::Generators::NamedBase&lt;br /&gt;
-</span><span class='line'>  source_root File.expand_path("../templates", __FILE__)&lt;br /&gt;
-</span><span class='line'>end&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># app/views/user_mailer/reset_password.html.erb
+</span><span class='line'>Your have reset the password for your account successfully.
+</span><span class='line'>
+</span><span class='line'>  Username: &lt;%= @user.login %&gt;
+</span><span class='line'>  Password: &lt;%= @user.password %&gt;</span></code></pre></td></tr></table></div></figure>
 
 
-<p>Rails::Generators::NamedBase和Rails::Generators::Base的区别是NamedBase期望至少一个参数。</p>
-
-<p>USAGE是打入&#8211;help参数时显示的文档：<br /></p>
+<p>下一步是打开app/models/user.rb，在它底部protected关键字的后面添加下面的代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>rails generate feedback_form --help&lt;br /&gt;
-</span><span class='line'>Usage:&lt;br /&gt;
-</span><span class='line'>  rails generate feedback_form NAME [options]&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def make_password_reset_code
+</span><span class='line'>  self.password_reset_code = Digest::SHA1.hexdigest(Time.now.to_s.split(//).sort_by {rand}.join)
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
 
 
-<p>Rails 2.x的generator中的manifest可以删除了，因为在3.x中每个public方法在生成过程中会被自动调用。</p>
+<p>然后在protected关键字的上面添加如下代码：</p>
 
-<p>参考资料：<br />
-<a href="http://guides.rubyonrails.org/generators.html">http://guides.rubyonrails.org/generators.html</a><br />
-<a href="http://railscasts.com/episodes/218-making-generators-in-rails-3">http://railscasts.com/episodes/218-making-generators-in-rails-3</a><br />
-<a href="http://blog.loopedstrange.com/modest-rubyist-archive/rails-3-plugins-part4-more-on-generators">http://blog.loopedstrange.com/modest-rubyist-archive/rails-3-plugins-part4-more-on-generators</a><br />
-<a href="http://nicksda.apotomo.de/2010/09/getting-a-bloody-rails-3-generator-running-and-testing-it/">http://nicksda.apotomo.de/2010/09/getting-a-bloody-rails-3-generator-running-and-testing-it/</a></p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def forgot_password
+</span><span class='line'>  @forgotten_password = true
+</span><span class='line'>  self.make_password_reset_code
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>def reset_password(new_password, new_password_confirmation)
+</span><span class='line'>  # First update the password_reset_code before setting the
+</span><span class='line'>  # reset_password flag to avoid duplicate email notifications.
+</span><span class='line'>  self.password_reset_code = nil
+</span><span class='line'>  self.password = new_password
+</span><span class='line'>  self.password_confirmation = new_password_confirmation
+</span><span class='line'>  @reset_password = true
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>def recently_forgot_password?
+</span><span class='line'>  @forgotten_password
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>def recently_reset_password?
+</span><span class='line'>  @reset_password
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>接着来配置mailer发送通知邮件，打开app/models/user_mailer.rb加上：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def forgot_password(user)
+</span><span class='line'>  setup_email(user)
+</span><span class='line'>  @subject    += 'You have requested to change your password'
+</span><span class='line'>  @body[:url]  = "#{HOST}/reset_password/#{user.password_reset_code}"
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>def reset_password(user)
+</span><span class='line'>  setup_email(user)
+</span><span class='line'>  @subject    += 'Your password has been reset.'
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>最后打开app/models/user_observer.rb修改after_save方法为：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def after_save(user)
+</span><span class='line'>  UserMailer.deliver_activation(user) if user.recently_activated?
+</span><span class='line'>  UserMailer.deliver_forgot_password(user) if user.recently_forgot_password?
+</span><span class='line'>  UserMailer.deliver_reset_password(user) if user.recently_reset_password?
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2009/12/10/using-rails23-to-create-a-simple-accounting-app-part6/">用Rails 2.3打造简单记账软件（6）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2009-12-10T07:17:44+08:00" pubdate data-updated="true">Dec 10<sup>th</sup>, 2009</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>调整后的entries列表就是不一样，感觉清爽多了。现在让我们添加几条测试数据吧！进入new页面，感觉似乎少了点什么。对了，怎么没有消费发生的具体时间呢？还是先把这个给加上吧。</p>
+
+<p>执行下面的命令，创建一个迁移任务，添加date类型的effective_date字段到Entry中：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>script/generate migration add_effective_date_to_entry effective_date:date
+</span><span class='line'>rake db:migrate</span></code></pre></td></tr></table></div></figure>
+
+
+<p>然后修改app/views/entries/index.html.erb以显示该字段：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;h1&gt;Listing entries&lt;/h1&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;table&gt;
+</span><span class='line'>  &lt;tr&gt;
+</span><span class='line'>    &lt;th&gt;Date&lt;/th&gt;
+</span><span class='line'>    &lt;th&gt;Amount&lt;/th&gt;
+</span><span class='line'>    &lt;th&gt;Tags&lt;/th&gt;
+</span><span class='line'>    &lt;th&gt;Comment&lt;/th&gt;
+</span><span class='line'>    &lt;th&gt;Action&lt;/th&gt;
+</span><span class='line'>  &lt;/tr&gt;
+</span><span class='line'>
+</span><span class='line'>&lt; % @entries.each do |entry| %&gt;
+</span><span class='line'>  &lt;tr&gt;
+</span><span class='line'>    &lt;td&gt;&lt; %=h entry.effective_date %&gt;&lt;/td&gt;
+</span><span class='line'>    &lt;td&gt;&lt; %=h entry.amount %&gt;&lt;/td&gt;
+</span><span class='line'>    &lt;td&gt;&lt; %=h entry.tags %&gt;&lt;/td&gt;
+</span><span class='line'>    &lt;td&gt;&lt; %=h entry.comment %&gt;&lt;/td&gt;
+</span><span class='line'>    &lt;td&gt;
+</span><span class='line'>      &lt; %= link_to 'Edit', edit_entry_path(entry) %&gt;
+</span><span class='line'>      &lt; %= link_to 'Destroy', entry, :confirm =&gt; 'Are you sure?', :method =&gt; :delete %&gt;
+</span><span class='line'>    &lt;/td&gt;
+</span><span class='line'>  &lt;/tr&gt;
+</span><span class='line'>&lt; % end %&gt;
+</span><span class='line'>&lt;/table&gt;
+</span><span class='line'>
+</span><span class='line'>&lt; %= link_to 'New entry', new_entry_path %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>修改new和edit页面，加上一个effective_date文本字段：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt; % form_for(@entry) do |f| %&gt;
+</span><span class='line'>  &lt; %= f.error_messages %&gt;
+</span><span class='line'>
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>    &lt; %= f.label :effective_date %&gt;&lt;br /&gt;
+</span><span class='line'>    &lt; %= f.text_field :effective_date %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>&lt; % end %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>录入数据后发现记录是全局的，也就是说A用户添加的记录B用户也能看到，这是个问题。</p>
+
+<p>用户和记录是一对多的关系，我们可以在Entry中添加一个指向User的字段。再次创建一个迁移任务：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>script/generate migration add_user_id_to_entry user_id:int
+</span><span class='line'>rake db:migrate</span></code></pre></td></tr></table></div></figure>
+
+
+<p>修改app/models/user.rb，添加以下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>has_many :entries, :dependent =&gt; :destroy</span></code></pre></td></tr></table></div></figure>
+
+
+<p>修改app/models/entry.rb，加入下面的语句：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>belongs_to :user</span></code></pre></td></tr></table></div></figure>
+
+
+<p>另外还要修改app/controllers/entries_controller.rb文件，修正由scaffold生成代码所带来的查询问题。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class EntriesController &lt; ApplicationController
+</span><span class='line'>  before_filter :login_required
+</span><span class='line'>
+</span><span class='line'>  # GET /entries
+</span><span class='line'>  def index
+</span><span class='line'>    @entries = current_user.entries.find(:all)
+</span><span class='line'>
+</span><span class='line'>    respond_to do |format|
+</span><span class='line'>      format.html # index.html.erb
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  # GET /entries/new
+</span><span class='line'>  def new
+</span><span class='line'>    @entry = Entry.new
+</span><span class='line'>
+</span><span class='line'>    respond_to do |format|
+</span><span class='line'>      format.html # new.html.erb
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  # GET /entries/1/edit
+</span><span class='line'>  def edit
+</span><span class='line'>    @entry = current_user.entries.find(params[:id])
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  # POST /entries
+</span><span class='line'>  def create
+</span><span class='line'>    @entry = Entry.new(params[:entry])
+</span><span class='line'>    @entry.user = current_user
+</span><span class='line'>
+</span><span class='line'>    respond_to do |format|
+</span><span class='line'>      if @entry.save
+</span><span class='line'>        flash[:notice] = 'Entry was successfully created.'
+</span><span class='line'>        format.html { redirect_to(entries_url) }
+</span><span class='line'>      else
+</span><span class='line'>        format.html { render :action =&gt; "new" }
+</span><span class='line'>      end
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  # PUT /entries/1
+</span><span class='line'>  def update
+</span><span class='line'>    @entry = current_user.entries.find(params[:id])
+</span><span class='line'>
+</span><span class='line'>    respond_to do |format|
+</span><span class='line'>      if @entry.update_attributes(params[:entry])
+</span><span class='line'>        flash[:notice] = 'Entry was successfully updated.'
+</span><span class='line'>        format.html { redirect_to(entries_url) }
+</span><span class='line'>      else
+</span><span class='line'>        format.html { render :action =&gt; "edit" }
+</span><span class='line'>      end
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  # DELETE /entries/1
+</span><span class='line'>  def destroy
+</span><span class='line'>    @entry = current_user.entries.find(params[:id])
+</span><span class='line'>    @entry.destroy
+</span><span class='line'>
+</span><span class='line'>    respond_to do |format|
+</span><span class='line'>      format.html { redirect_to(entries_url) }
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2009/12/08/using-rails23-to-create-a-simple-accounting-app-part5/">用Rails 2.3打造简单记账软件（5）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2009-12-08T16:09:59+08:00" pubdate data-updated="true">Dec 8<sup>th</sup>, 2009</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>虽然在前面已经调整了记账应用的页面流程，但在登录系统进入entries页面后却没有登出的链接，这次就来把这个完成。同时也给entries页面加上一个三行两列的布局，使之看上去更像一个应用。</p>
+
+<p>在public/stylesheets下加入qianbao.css，内容如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>body {
+</span><span class='line'>  padding: 0;
+</span><span class='line'>  margin: 0;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>#container {
+</span><span class='line'>  width: 960px;
+</span><span class='line'>  margin: 5px auto;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>#header {
+</span><span class='line'>  background-color: #ddd;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>#content {
+</span><span class='line'>  background-color: #e6e6e6;
+</span><span class='line'>  float: right;
+</span><span class='line'>  width: 720px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>#menu {
+</span><span class='line'>  background-color: #ccc;
+</span><span class='line'>  float: left;
+</span><span class='line'>  width: 230px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>#footer {
+</span><span class='line'>  clear: both;
+</span><span class='line'>  background-color: #bbb;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>修改app/views/layouts/entries.html.erb的代码为以下内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt; !DOCTYPE html PUBLIC&lt;br /&gt;
+</span><span class='line'>  "-//W3C//DTD XHTML 1.0 Transitional//EN"&lt;br /&gt;
+</span><span class='line'>  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"&gt;
+</span><span class='line'>&lt;head&gt;
+</span><span class='line'>  &lt;meta http-equiv="content-type" content="text/html; charset=utf-8" /&gt;
+</span><span class='line'>  &lt;title&gt;Entries: &lt; %= controller.action_name %&gt;&lt;/title&gt;
+</span><span class='line'>  &lt; %= stylesheet_link_tag 'scaffold' %&gt;
+</span><span class='line'>  &lt; %= stylesheet_link_tag 'qianbao' %&gt;
+</span><span class='line'>&lt;/head&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;body&gt;
+</span><span class='line'>  &lt;div id="container"&gt;
+</span><span class='line'>    &lt;div id="header"&gt;
+</span><span class='line'>      &lt; % if logged_in? %&gt;
+</span><span class='line'>        &lt;strong&gt;You are logged in as &lt; %=h current_user.login %&gt;&lt;/strong&gt;
+</span><span class='line'>        &lt; %= link_to 'Logout', logout_path %&gt;
+</span><span class='line'>      &lt; % end %&gt;
+</span><span class='line'>    &lt;/div&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;div id="content"&gt;
+</span><span class='line'>      &lt;p style="color: green"&gt;&lt; %= flash[:notice] %&gt;&lt;/p&gt;
+</span><span class='line'>
+</span><span class='line'>      &lt; %= yield %&gt;
+</span><span class='line'>    &lt;/div&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;div id="menu"&gt;
+</span><span class='line'>      &lt;ul&gt;
+</span><span class='line'>        &lt;li&gt;&lt; %= link_to 'All entries', entries_path %&gt;&lt;/li&gt;
+</span><span class='line'>      &lt;/ul&gt;
+</span><span class='line'>    &lt;/div&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;div id="footer"&gt;
+</span><span class='line'>      &copy 2009 Unnamed
+</span><span class='line'>    &lt;/div&gt;
+</span><span class='line'>  &lt;/div&gt;
+</span><span class='line'>&lt;/body&gt;
+</span><span class='line'>&lt;/html&gt;</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2009/12/03/using-rails23-to-create-a-simple-accounting-app-part4/">用Rails 2.3打造简单记账软件（4）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2009-12-03T07:05:52+08:00" pubdate data-updated="true">Dec 3<sup>rd</sup>, 2009</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>今天我们来继续完善我们的记账应用。</p>
+
+<p>首先，修改app/views/home/index.html.erb为如下内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;h1&gt;Welcom to Qianbao!&lt;/h1&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;% if logged_in? %&gt;
+</span><span class='line'>  &lt;p&gt;&lt;strong&gt;You are logged in as &lt;%=h current_user.login %&gt;&lt;/strong&gt;&lt;/p&gt;
+</span><span class='line'>  &lt;p&gt;&lt;%= link_to 'Logout', logout_path %&gt;&lt;/p&gt;
+</span><span class='line'>&lt;% else %&gt;
+</span><span class='line'>  &lt;p&gt;&lt;strong&gt;You are currently not logged in.&lt;/strong&gt;&lt;/p&gt;
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>    &lt;%= link_to 'Login', login_path %&gt; or
+</span><span class='line'>    &lt;%= link_to 'Sign up', signup_path %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>&lt;% end %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>要在views中使用logged_in?和current_user这两个helper方法，还需要在app/controllers/ApplicationController中增加引入AuthenticatedSystem语句：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class ApplicationController &lt; ActionController::Base
+</span><span class='line'>  include AuthenticatedSystem
+</span><span class='line'>
+</span><span class='line'>  helper :all # include all helpers, all the time
+</span><span class='line'>  protect_from_forgery # See ActionController::RequestForgeryProtection for details
+</span><span class='line'>
+</span><span class='line'>  # Scrub sensitive parameters from your log
+</span><span class='line'>  # filter_parameter_logging :password
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>否则会报告下面的错误：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>undefined method 'logged_in?'</span></code></pre></td></tr></table></div></figure>
+
+
+<p>既然在ApplicationController中已经包含了该模块，那么其它controller中的也就可以删除了。</p>
+
+<p>另外，还需要把entries保护起来，不能让未登录的用户访问。可以在app/controllers/entries_controller.rb中添加一个before_filter做到：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class EntriesController &lt; ApplicationController
+</span><span class='line'>  before_filter :login_required
+</span><span class='line'>
+</span><span class='line'>  # GET /entries
+</span><span class='line'>  # GET /entries.xml
+</span><span class='line'>  def index
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>还要将登录后的页面改成entries列表，这需要将app/controllers/sessions_controller.rb中create方法下的：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>redirect_back_or_default('/')</span></code></pre></td></tr></table></div></figure>
+
+
+<p>改为</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>redirect_back_or_default('/entries')</span></code></pre></td></tr></table></div></figure>
+
+
+<p>并且，还要修复一个bug，即新用户注册后不激活就登录了系统。通过注释掉app/controllers/users_controller.rb中create方法中的</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>self.current_user = @user</span></code></pre></td></tr></table></div></figure>
+
+
+<p>语句就可以修复它了。</p>
+
+<p>最后，还要修改一下entries各个页面之间的流转顺序，把show这个页面去掉，使得在添加或更新记录后就直接跳到entries列表，而不再是首页。</p>
+
+<ol>
+<li>先将app/views/entries/show.html.erb删除；</li>
+<li>删除app/views/entries/index.html.erb中的show链接；</li>
+<li>删除app/views/entries/edit.html.erb中的show链接；</li>
+<li>然后删除app/controllers/entries_controller.erb中的show方法；</li>
+<li>再修改app/controllers/entries_controller.erb中的update和create方法：</li>
+</ol>
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def create
+</span><span class='line'>  # format.html { redirect_to(@entry) }
+</span><span class='line'>  format.html { redirect_to(entries_url) }
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>def update
+</span><span class='line'>  # format.html { redirect_to(@entry) }
+</span><span class='line'>  format.html { redirect_to(entries_url) }
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2009/11/15/using-rails23-to-create-a-simple-accounting-app-part3/">用Rails 2.3打造简单记账软件（3）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2009-11-15T16:21:33+08:00" pubdate data-updated="true">Nov 15<sup>th</sup>, 2009</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>这次要给应用加上一个认证系统（注册、激活、登录、登出）。当用户输入注册信息时，必须输入有效的邮箱地址，注册成功后，用户并不能立即登录系统，而是要登录注册时输入的邮箱，通过该邮箱内的激活邮件来激活账户。通过这种方式可以防止用户的恶意注册。</p>
+
+<p><a href="https://github.comtechnoweenie/restful-authentication">restful_authentication</a>是一个支持Rails 2.0的认证系统插件，它为你生成REST风格的认证系统模板，除了提供最基本的用户注册登录登出功能外，还有一个可选的邮件激活功能。只要一个命令，它就为你生成了User模型、管理注册和登录的控制器、相应的视图页面、mailer等等。</p>
+
+<p>安装插件和生成框架代码</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>script/plugin install http://svn.techno-weenie.net/projects/plugins/restful_authentication
+</span><span class='line'>script/generate authenticated user sessions --include-activation
+</span><span class='line'>rake db:migrate</span></code></pre></td></tr></table></div></figure>
+
+
+<p>include-activation参数决定是否生成向新注册用户发送激活码邮件的代码。</p>
+
+<p>如果你想你的URL看起来更符合惯例一些，那么可以在config/routes.rb中添加：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>map.signup '/signup', :controller =&gt; 'users', :action =&gt; 'new'
+</span><span class='line'>map.login '/login', :controller =&gt; 'sessions', :action =&gt; 'new'
+</span><span class='line'>map.logout '/logout', :controller =&gt; 'sessions', :action =&gt; 'destroy'</span></code></pre></td></tr></table></div></figure>
+
+
+<p>因为使用了include-activation参数，所以还要在config/routes.rb中增加以下映射：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>map.activate '/activate/:activation_code',
+</span><span class='line'>             :controller =&gt; 'users', :action =&gt; 'activate', :activation_code =&gt; nil</span></code></pre></td></tr></table></div></figure>
+
+
+<p>最后，还需要添加一个observer到config/environment.rb的Rails::Initializer块中：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>config.active_record.observers = :user_observer</span></code></pre></td></tr></table></div></figure>
+
+
+<p>设置ActionMailer，在config/environments/development.rb中添加：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># Don't care if the mailer can't send
+</span><span class='line'>config.action_mailer.raise_delivery_errors = true
+</span><span class='line'>config.action_mailer.perform_deliveries = true
+</span><span class='line'>config.action_mailer.delivery_method = :smtp
+</span><span class='line'>config.action_mailer.smtp_settings = {
+</span><span class='line'>  :address =&gt; "smtp.example.com",
+</span><span class='line'>  :port =&gt; 25,
+</span><span class='line'>  :domain =&gt; "example.com",
+</span><span class='line'>  :authentication =&gt; :login,
+</span><span class='line'>  :user_name =&gt; "yourname@example.com",
+</span><span class='line'>  :password =&gt; "yourpassword"
+</span><span class='line'>}
+</span><span class='line'>config.action_mailer.default_charset = "utf-8"
+</span><span class='line'>
+</span><span class='line'>HOST = "localhost:3000"
+</span><span class='line'>ADMINEMAIL = "yourname@example.com"</span></code></pre></td></tr></table></div></figure>
+
+
+<p>打开app/models/user_mailer.rb，修改</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>@body[:url]  = "http://YOURSITE/activate/#{user.activation_code}"
+</span><span class='line'>@body[:url]  = "http://YOURSITE/"
+</span><span class='line'>@subject     = "[YOURSITE] "
+</span><span class='line'>@from        = "ADMINEMAIL"</span></code></pre></td></tr></table></div></figure>
+
+
+<p>为以下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>@body[:url]  = "http://#{HOST}/activate/#{user.activation_code}"
+</span><span class='line'>@body[:url]  = "http://#{HOST}/"
+</span><span class='line'>@subject     = "[#{HOST}] "
+</span><span class='line'>@from        = "#{ADMINEMAIL}"</span></code></pre></td></tr></table></div></figure>
+
+
+<p>如果出现以下错误信息，那么可能是smtp_settings中的domain没有填写：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Net::SMTPSyntaxError (500 Error: bad syntax):
+</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:679:in 'check_response'
+</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:652:in 'getok'
+</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:622:in 'helo'</span></code></pre></td></tr></table></div></figure>
+
+
+<p>user_mailer.rb中的ADMINEMAIL必须是一个有效的邮件账号，否则会出现：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Net::SMTPFatalError (550 Invalid User):
+</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:679:in 'check_response'
+</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:652:in 'getok'
+</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:630:in 'mailfrom'</span></code></pre></td></tr></table></div></figure>
+
 </div>
   
   
@@ -1553,10 +2104,6 @@ image-yakju-imm76i.zip</p></li>
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/2014/08/05/migrating-wordpress-to-octopress/">Wordpress迁移到Octopress</a>
-      </li>
-    
-      <li class="post">
         <a href="/blog/2014/07/17/problem-with-nokogiri-when-url-containing-chinese-character/">Nokogiri抓取页面URL含有中文参数的问题</a>
       </li>
     
@@ -1569,7 +2116,11 @@ image-yakju-imm76i.zip</p></li>
       </li>
     
       <li class="post">
-        <a href="/blog/2014/07/06/raspberry-pi-wifi-with-static-ip-address/">Raspberry Pi使用无线网卡</a>
+        <a href="/blog/2013/05/19/agile-decline/">敏捷开发走下坡路了吗？</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2013/04/11/the-proper-way-to-draw-rounded-corners/">绘制圆角的正确方法</a>
       </li>
     
   </ul>
@@ -1583,21 +2134,21 @@ image-yakju-imm76i.zip</p></li>
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 133%" href="/tags/android/">Android</a>
-<a style="font-size: 111%" href="/tags/crack/">Crack</a>
-<a style="font-size: 108%" href="/tags/database/">Database</a>
-<a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
-<a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
-<a style="font-size: 135%" href="/tags/java/">Java</a>
-<a style="font-size: 108%" href="/tags/mysql/">MySQL</a>
-<a style="font-size: 116%" href="/tags/powerbuilder/">PowerBuilder</a>
-<a style="font-size: 120%" href="/tags/qianbao/">Qianbao</a>
+    <a style="font-size: 106%" href="/tags/antlr/">ANTLR</a>
+<a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
+<a style="font-size: 126%" href="/tags/android/">Android</a>
+<a style="font-size: 117%" href="/tags/crack/">Crack</a>
+<a style="font-size: 98%" href="/tags/database/">Database</a>
+<a style="font-size: 98%" href="/tags/eclipse/">Eclipse</a>
+<a style="font-size: 139%" href="/tags/java/">Java</a>
+<a style="font-size: 112%" href="/tags/listview/">ListView</a>
+<a style="font-size: 106%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 106%" href="/tags/powerscript/">PowerScript</a>
+<a style="font-size: 139%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
-<a style="font-size: 101%" href="/tags/ruby/">Ruby</a>
-<a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 97%" href="/tags/translation/">Translation</a>
-<a style="font-size: 105%" href="/tags/windows-server-2008/">Windows Server 2008</a>
-<a style="font-size: 108%" href="/tags/wxwidgets/">wxWidgets</a>
+<a style="font-size: 106%" href="/tags/ruby/">Ruby</a>
+<a style="font-size: 112%" href="/tags/translation/">Translation</a>
+<a style="font-size: 98%" href="/tags/w32dasm/">W32Dasm</a>
 
   </ul>
 </section>

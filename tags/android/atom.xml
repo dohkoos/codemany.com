@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Android | 乐者为王]]></title>
   <link href="http://codemany.com/tags/android/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-08-22T23:28:43+08:00</updated>
+  <updated>2014-08-24T18:55:48+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -14,550 +14,616 @@
 
   
   <entry>
-    <title type="html"><![CDATA[扫描ISBN条码实现藏书管理]]></title>
-    <link href="http://codemany.com/blog/2013/04/25/manage-library-by-scanning-isbn-barcode/"/>
-    <updated>2013-04-25T12:17:14+08:00</updated>
-    <id>http://codemany.com/blog/2013/04/25/manage-library-by-scanning-isbn-barcode</id>
-    <content type="html"><![CDATA[<p>每个程序猿家里都有一堆技术书籍，偶也不例外，因此想写个Android应用来管理自己的藏书以及想买的书籍。在网上找到marshal的<a href="http://marshal.easymorse.com/archives/2745">识别图书ISBN号并输出查询结果的示例</a>和<a href="http://marshal.easymorse.com/archives/2756">完善图书查询原型，增加收藏夹功能</a>两篇文章，写的非常不错，还提供源代码。下载代码研究后发现已基本具备了想要的功能，决定在它的基础上做些修改供自己使用。</p>
+    <title type="html"><![CDATA[如何创建Android应用启动界面]]></title>
+    <link href="http://codemany.com/blog/2011/08/01/how-to-create-splash-screen-for-android-app/"/>
+    <updated>2011-08-01T15:47:50+08:00</updated>
+    <id>http://codemany.com/blog/2011/08/01/how-to-create-splash-screen-for-android-app</id>
+    <content type="html"><![CDATA[<p>1、制作一张启动图片splash.jpg，放在res/drawable文件夹中。</p>
 
-<p>把原来uses-sdk的minSdkVersion改成了9，增加android:targetSdkVersion="17"。然后使用手机测试程序时发现，在连接网络时后台会抛出了android.os.NetworkOnMainThreadException异常，并且应用崩溃打不开。通过查阅相关资料了解到，自从Android 2.3之后，系统增加了一个类StrictMode。这个类对网络的访问方式进行了一定的改变。官方文档给出了这个类设置的目的：</p>
-
-<blockquote><p>StrictMode is a developer tool which detects things you might be doing by accident and brings them to your attention so you can fix them.</p>
-
-<p>StrictMode is most commonly used to catch accidental disk or network access on the application's main thread, where UI operations are received and animations take place. Keeping disk and network operations off the main thread makes for much smoother, more responsive applications. By keeping your application's main thread responsive, you also prevent ANR dialogs from being shown to users.</p>
-
-<p>Note that even though an Android device's disk is often on flash memory, many devices run a filesystem on top of that memory with very limited concurrency. It's often the case that almost all disk accesses are fast, but may in individual cases be dramatically slower when certain I/O is happening in the background from other processes. If possible, it's best to assume that such things are not fast.</p></blockquote>
-
-<p>因为marshal把访问网络的代码直接放到UI线程中，造成和主线程的首要工作UI交互相矛盾。解决这类问题很容易，把访问网络的代码放到AsyncTask中就行了。官方有个<a href="http://developer.android.com/training/basics/network-ops/index.html">NetworkUsage</a>例子是个不错的参考。</p>
-
-<p>接着发现豆瓣API查询返回的是500错误，在浏览器上访问却又正常，后来给HttpClient加上Agent头就没问题了，不知道是不是期间豆瓣的API在实现上作了改变。
-<code>
-HttpClient client = new DefaultHttpClient();
-String agent = System.getProperty("http.agent");
-client.getParams().setParameter(CoreProtocolPNames.USER_AGENT, agent);
-</code></p>
-
-<p>解析豆瓣XML查询结果的代码：
-```
-XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
-factory.setNamespaceAware(true);
-XmlPullParser parser = factory.newPullParser();
-parser.setInput(inputStream, "utf-8");
-Book book = new Book();</p>
-
-<p>int eventType = parser.getEventType();
-while (eventType != XmlPullParser.END_DOCUMENT) {</p>
-
-<pre><code>switch (eventType) {
-case XmlPullParser.START_TAG:
-    if ("link".equals(parser.getName())
-            &amp;&amp; "image".equals(parser.getAttributeValue(null, "rel"))) {
-        book.setImageUrl(parser.getAttributeValue(null, "href"));
-        eventType = parser.next();
-    } else if ("summary".equals(parser.getName())) {
-        book.setSummary(parser.nextText());
-    } else if ("attribute".equals(parser.getName())) {
-        String name = parser.getAttributeValue(null, "name");
-        if ("title".equals(name)) {
-            book.setTitle(parser.nextText());
-        } else if ("author".equals(name)) {
-            book.setAuthor(parser.nextText());
-        } else if ("isbn10".equals(name)) {
-            book.setIsbn10(parser.nextText());
-        } else if ("isbn13".equals(name)) {
-            book.setIsbn13(parser.nextText());
-        } else if ("publisher".equals(name)) {  
-            book.setPublisher(parser.getText());
-        }                   
-    }
-    break;
-case XmlPullParser.END_TAG:
-    break;
-}
-eventType = parser.next();
-</code></pre>
-
-<p>}
-```</p>
-
-<p>然后，然后就是结果页面不显示图书信息。想要找到原因，肿么办？看来要调试WebView了！<a href="http://developer.android.com/guide/webapps/debugging.html">http://developer.android.com/guide/webapps/debugging.html</a> 告诉了我们如何调试。</p>
-
-<p>首先在WebView上设置setWebChromeClient方法：
-```
-webView.setWebChromeClient(new WebChromeClient() {</p>
-
-<pre><code>public void onConsoleMessage(String message,
-        int lineNumber, String sourceID) {
-    Log.d(TAG, message + " -- From line "
-            + lineNumber + " of " + sourceID);
-}
-</code></pre>
-
-<p>});
-```</p>
-
-<p>然后在JavaScript脚本中使用以下方法就可以在logcat中看到调试信息了。
-<code>
-console.log(String)
-console.info(String)
-console.warn(String)
-console.error(String)
-</code></p>
-
-<p>重新运行程序，果然在logcat中看到报如下错误：
-<code>
-Uncaught TypeError: Object [object Object] has no method...
-</code></p>
-
-<p>搜索后在Stack Overflow找到了<a href="http://stackoverflow.com/questions/14031635/android-4-2-1-webview-and-javascript-interface-breaks">问题的答案</a>（Stack Overflow真的非常不错，问题的回答都非常详尽）。<a href="http://developer.android.com/guide/webapps/webview.html#BindingJavaScript">这里</a>是Android官方文档的解释。</p>
-
-<p>解决方法就是在要被JavaScript调用的方法上加@JavascriptInterface注解：
-```
-public class Book {</p>
-
-<pre><code>@JavascriptInterface
-public String getAuthor() {
-    return author;
-}
-
-public void setAuthor(String author) {
-    if (this.author != null) {
-        this.author += ", " + author;
-    } else {
-        this.author = author;
-    }
-}
-</code></pre>
-
-<p>}
-```</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[使用fastboot刷Galaxy Nexus官方系统]]></title>
-    <link href="http://codemany.com/blog/2012/05/16/using-fastboot-to-flash-galaxy-nexus-official-rom/"/>
-    <updated>2012-05-16T06:59:56+08:00</updated>
-    <id>http://codemany.com/blog/2012/05/16/using-fastboot-to-flash-galaxy-nexus-official-rom</id>
-    <content type="html"><![CDATA[<p>root - 系统管理员权限<br />
-bootloader - 相当于电脑上的BIOS</p>
-
-<blockquote><p>bootloader is code that is executed before any Operating System starts to run.
-recovery - 执行底层操作的界面，相当于纯DOS界面
-fastboot - 是比recovery更底层的操作界面
-fastboot is a special diagnostic and engineering protocol that you can boot your Android device into.
-解锁 - 就是解锁bootloader。解锁之后才可以刷ROM</p></blockquote>
-
-<p>分区解释：<br />
-system：系统分区，我们刷ROM一般就是刷的这个分区<br />
-userdata：数据分区<br />
-cache：缓存分区<br />
-recovery：恢复分区<br />
-boot：存放内核和ramdisk的分区<br />
-hboot: 这个是SPL所在的分区，很重要。也是fastboot所在的分区，刷错就真的变砖了（所以一般不轻易刷这个）<br />
-splash1：这个就是开机第一屏幕了<br />
-radio：这个不是什么收音机，而是指无线通信模块，俗称基带（radio最初的意思是无线电通讯）</p>
-
-<p>刷机步骤：</p>
-
-<ol>
-<li><p>安装adb驱动（或者在机器进入fastboot模式后安装也行）</p></li>
-<li><p>下载官方镜像，解压缩。成功解压缩后得到五个文件：<br />
-flash-all.sh<br />
-flash-base.sh<br />
-radio-maguro-i9250xxla02.img<br />
-bootloader-maguro-primela03.img<br />
-image-yakju-imm76i.zip</p></li>
-<li><p>下载Galaxy-Nexus-fastboot-v2.0.zip，解压缩。将官方固件copy到目录下重命名。规则如下：<br />
-刷基带请将radio-xxx.img重命名为radio.img<br />
-刷BL请将bootloader-xxx.img重命名为bootloader.img<br />
-刷固件请将image-xxx.zip重命名为image.zip</p></li>
-<li><p>关机进入fastboot模式（在关机状态下同时按“音量+”和“音量-”和“电源”三个键，等待机器发出轻微震动即可放开）</p></li>
-<li><p>运行bat文件，选择2进行解锁（解锁是root和刷机的前提，音量键选择“YES”开头的，然后按电源键确定）</p></li>
-<li><p>高兴么就root一下。然后开始刷机，基带和BL能不刷就不刷，防止变砖头。不过我在刷的过程中就提示必须刷基带和BL。</p></li>
-</ol>
-
-
-<p><img src="/uploads/gn-update-fail.png" title="gn-update-fail" ></p>
-
-<p>注意事项：<br />
-刷机有风险，操作需谨慎<br />
-刷机前请备份好数据<br />
-刷机前请确保手机电量在50%以上</p>
-
-<p>PS：顺带着把同事的日版机也刷到4.0.4版本。在刷的过程中出现了莫名其妙的事情。刷机一切正常，但是重启之后，就无限在第一屏重启。抠电池重新再刷，还是老样子，但多重启两次后竟然进去了，莫名其妙...</p>
-
-<p>刷机工具下载：<a href="https://github.com/dohkoos/galaxy-nexus-flash-tools">https://github.com/dohkoos/galaxy-nexus-flash-tools</a></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[使用showDialog()创建的ProgressDialog再次打开时进度条不变化的问题解析]]></title>
-    <link href="http://codemany.com/blog/2012/04/15/the-using-showdialog-to-create-progressdialog-open-again-the-progress-bar-does-not-change-the-problem-resolution/"/>
-    <updated>2012-04-15T13:15:24+08:00</updated>
-    <id>http://codemany.com/blog/2012/04/15/the-using-showdialog-to-create-progressdialog-open-again-the-progress-bar-does-not-change-the-problem-resolution</id>
-    <content type="html"><![CDATA[<p>先来看段代码：<br />
-```
-&lt;?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"<br /></p>
-
-<pre><code>android:layout_width="fill_parent"&lt;br /&gt;
-android:layout_height="fill_parent"&lt;br /&gt;
-android:orientation="vertical"&gt;
-&lt;Button&lt;br /&gt;
-    android:layout_width="fill_parent"&lt;br /&gt;
-    android:layout_height="wrap_content"&lt;br /&gt;
-    android:text="Copy Contacts"&lt;br /&gt;
-    android:onClick="copyContacts" /&gt;
-</code></pre>
-
-<p></LinearLayout>
-```</p>
+<p>2、新建布局文件splash.xml：</p>
 
 <p>```
-import android.app.Activity;<br />
-import android.app.Dialog;<br />
-import android.app.ProgressDialog;<br />
-import android.os.AsyncTask;<br />
-import android.os.Bundle;<br />
-import android.view.View;</p>
-
-<p>public class DialogTestActivity extends Activity {<br /></p>
-
-<pre><code>private static final int COPY_CONTACTS = 0;
-
-private ProgressDialog mProgressDialog;
-
-@Override&lt;br /&gt;
-public void onCreate(Bundle savedInstanceState) {&lt;br /&gt;
-    super.onCreate(savedInstanceState);&lt;br /&gt;
-    setContentView(R.layout.main);&lt;br /&gt;
-}
-
-public void copyContacts(View target) {&lt;br /&gt;
-    showDialog(COPY_CONTACTS);&lt;br /&gt;
-}
-
-@Override&lt;br /&gt;
-protected Dialog onCreateDialog(int id) {&lt;br /&gt;
-    switch (id) {&lt;br /&gt;
-    case COPY_CONTACTS:&lt;br /&gt;
-        mProgressDialog = new ProgressDialog(this);&lt;br /&gt;
-        mProgressDialog.setTitle("Copy contacts");&lt;br /&gt;
-        mProgressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);&lt;br /&gt;
-        mProgressDialog.setMax(100);&lt;br /&gt;
-        new AsyncCopyContactsTask().execute();&lt;br /&gt;
-        break;&lt;br /&gt;
-    }&lt;br /&gt;
-    return mProgressDialog;&lt;br /&gt;
-}
-
-private class AsyncCopyContactsTask extends AsyncTask&lt;Void, Void, Integer&gt; {&lt;br /&gt;
-    @Override&lt;br /&gt;
-    protected Integer doInBackground(Void... params) {&lt;br /&gt;
-        for (int i = 0; i &lt; 100; i++) {&lt;br /&gt;
-            try {&lt;br /&gt;
-                Thread.sleep(100);&lt;br /&gt;
-            } catch (InterruptedException e) {&lt;br /&gt;
-            }&lt;br /&gt;
-            publishProgress();&lt;br /&gt;
-        }&lt;br /&gt;
-        return 0;&lt;br /&gt;
-    }
-
-    protected void onProgressUpdate(Void... progress) {&lt;br /&gt;
-        mProgressDialog.incrementProgressBy(1);&lt;br /&gt;
-    }
-
-    protected void onPostExecute(Integer result) {&lt;br /&gt;
-        mProgressDialog.dismiss();&lt;br /&gt;
-    }&lt;br /&gt;
-}&lt;br /&gt;
-</code></pre>
-
-<p>}
-```</p>
-
-<p>第一次点击按钮会显示一个进度条，上面的数字处于变动当中，到达最大值后进度条会消失不见；再次点击按钮后，就会发现进度条上的数值和消失前相同，并且不再变化，而且进度条也不会消失。这是为什么呢？如果想每次打开对话框时进度条显示的内容都有所不同，该怎么做？</p>
-
-<p>Activity中有三个和对话框显示有关的方法：showDialog()，dismissDialog()和removeDialog()。其中showDialog()用于显示一个对话框；dismissDialog()使对话框消失，但仍然处于内存中，只是不显示而已，如果再次调用showDialog()方法，则缓存在内存中的对话框会重新显示，而不需要重新创建。removeDialog()使对话框消失，并从内存中将对话框清除，如果再次调用showDialog()来显示它，则在显示之前需要重新创建对话框。</p>
-
-<p>在一个对话框的声明周期内，onCreateDialog()仅被调用一次，但onPrepareDialog()方法会每次被调用。比如，第一次调用 showDialog()方法显示某个对话框时，会先触发onCreateDialog()的执行，然后再触发onPrepareDialog()方法；如果将某个对话框 removeDialog()后再showDialog()，也会先触发onCreateDialog()，接着触发onPrepareDialog()方法；如果某个对话框是被dismiss()掉的，再调用 showDialog()方法来显示它时就不会触发onCreateDialog()方法的执行，只会触发onPrepareDialog()方法。</p>
-
-<p>这是因为第一次调用showDialog()时，Android从你的Activity中调用onCreateDialog()方法，得到返回的Dialog对象。把当前Activity设置为该对话框的所有者，从而把对话框挂靠到Activity上，让Activity自动管理该对话框的状态。这样，下次调用showDialog()时就不用重新创建Dialog对象，而是复用旧的。</p>
-
-<p>注意：如果你决定在onCreateDialog()方法之外创建一个对话框，它将不会被附着到活动上。不过，你可以通过setOwnerActivity()把它附着到一个Activity上。</p>
-
-<p>所以，解决再次打开ProgressDialog时进度条不变化的最好方法就是将mProgressDialog.dismiss()改成removeDialog(COPY_CONTACTS)。
-</p></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[简单实现Android底部工具栏]]></title>
-    <link href="http://codemany.com/blog/2011/11/16/simple-to-make-android-the-bottom-toolbar/"/>
-    <updated>2011-11-16T01:08:52+08:00</updated>
-    <id>http://codemany.com/blog/2011/11/16/simple-to-make-android-the-bottom-toolbar</id>
-    <content type="html"><![CDATA[<p>在网上大部分教程中，底部工具栏通常由TabHost和RadioGroup结合完成，每个工具栏项对应一个独立的Activity。不过，我们要实现的是多个工具栏项在单独的一个Activity上起作用。</p>
-
-<p><a href="http://www.cnblogs.com/figoyu/archive/2010/11/20/1882691.html"><a href="http://www.cnblogs.com/figoyu/archive/2010/11/20/1882691.html">http://www.cnblogs.com/figoyu/archive/2010/11/20/1882691.html</a></a>就是这个。不过该教程对每个工具栏项设置了固定宽度80dip，导致工具栏项或屏幕大小不定时代码布局会有问题。</p>
-
-<p>这里对该教程做了些改进，使之能做到适应不定的工具栏项或屏幕大小。改进后的布局代码如下：<br />
-```
-// main.xml<br />
-&lt;?xml version="1.0" encoding="utf-8"?><br />
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"<br /></p>
-
-<pre><code>android:orientation="vertical"&lt;br /&gt;
-android:layout_width="fill_parent"&lt;br /&gt;
-android:layout_height="fill_parent"&gt;&lt;br /&gt;
-&lt;LinearLayout&lt;br /&gt;
-    android:layout_width="fill_parent"&lt;br /&gt;
-    android:layout_height="0dip"&lt;br /&gt;
-    android:layout_weight="1.0"&gt;&lt;br /&gt;
-    &lt;ScrollView&lt;br /&gt;
-        android:layout_width="fill_parent"&lt;br /&gt;
-        android:layout_height="fill_parent"&lt;br /&gt;
-        android:scrollbars="vertical"&lt;br /&gt;
-        android:fadingEdge="vertical"&gt;&lt;br /&gt;
-        &lt;TextView&lt;br /&gt;
-            android:id="@+id/content"&lt;br /&gt;
-            android:layout_width="fill_parent"&lt;br /&gt;
-            android:layout_height="wrap_content"&lt;br /&gt;
-            android:textSize="17dip" /&gt;&lt;br /&gt;
-    &lt;/ScrollView&gt;&lt;br /&gt;
-&lt;/LinearLayout&gt;
-
-&lt;include layout="@layout/toolbar" /&gt;&lt;br /&gt;
-</code></pre>
-
-<p></LinearLayout><br />
-```</p>
-
-<p>以下是工具栏的布局代码：</p>
-
-<p>```
-// toolbar.xml
 &lt;?xml version="1.0" encoding="utf-8"?>
 &lt;LinearLayout xmlns:android="<a href="http://schemas.android.com/apk/res/android">http://schemas.android.com/apk/res/android</a>"</p>
 
-<pre><code>android:orientation="horizontal"
+<pre><code>android:orientation="vertical"
 android:layout_width="fill_parent"
-android:layout_height="wrap_content"
-android:background="@drawable/toolbar_bg"&gt;
-&lt;ImageButton
-    android:id="@+id/btn_index"
-    android:src="@drawable/index"
-    android:text="@string/index"
-    style="@style/toolbar" /&gt;
-&lt;ImageButton
-    android:id="@+id/btn_prev"
-    android:src="@drawable/btn_prev_bg"
-    android:text="@string/prev"
-    style="@style/toolbar" /&gt;
-&lt;ImageButton
-    android:id="@+id/btn_next"
-    android:src="@drawable/btn_next_bg"
-    android:text="@string/next"
-    style="@style/toolbar" /&gt;
-&lt;ImageButton
-    android:id="@+id/btn_zoomin"
-    android:src="@drawable/zoomin"
-    android:text="@string/zoomin"
-    style="@style/toolbar" /&gt;
-&lt;ImageButton
-    android:id="@+id/btn_zoomout"
-    android:src="@drawable/zoomout"
-    android:text="@string/zoomout"
-    style="@style/toolbar" /&gt;
+android:layout_height="fill_parent"&gt;
+&lt;ImageView
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:scaleType="fitXY"
+    android:src="@drawable/splash" /&gt;
 </code></pre>
 
 <p></LinearLayout>
+```</p>
+
+<p>3、建立SplashActivity，代码如下：</p>
+
+<p>```
+package com.codemany.splash;</p>
+
+<p>import android.app.Activity;
+import android.content.Intent;
+import android.os.Bundle;
+import android.view.MotionEvent;</p>
+
+<p>public class SplashActivity extends Activity {</p>
+
+<pre><code>private boolean active = true;
+private int splashTime = 5000;    // time to display the splash screen in ms
+
+@Override
+public void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.splash);
+
+    new Thread() {
+        @Override
+        public void run() {
+            try {
+                int waited = 0;
+                while (active &amp;&amp; (waited &lt; splashTime)) {
+                    sleep(100);
+                    if (active) {
+                        waited += 100;
+                    }
+                }
+            } catch(InterruptedException e) {
+            } finally {
+                finish();
+
+                // Run next activity
+                Intent intent = new Intent(SplashActivity.this, MainActivity.class);
+                startActivity(intent);
+                //stop();
+            }
+        }
+    }.start();
+}
+
+@Override
+public boolean onTouchEvent(MotionEvent event) {
+    if (event.getAction() == MotionEvent.ACTION_DOWN) {
+        active = false;
+    }
+    return true;
+}
+</code></pre>
+
+<p>}
+```</p>
+
+<p>4、修改AndroidManifest.xml文件，将启动界面Activity改为默认启动，并且设置标题栏不可见。</p>
+
+<p>```
+&lt;?xml version="1.0" encoding="utf-8"?>
+&lt;manifest xmlns:android="<a href="http://schemas.android.com/apk/res/android">http://schemas.android.com/apk/res/android</a>"</p>
+
+<pre><code>package="com.codemany.splash"
+android:versionCode="1"
+android:versionName="1.0"&gt;
+
+&lt;application android:icon="@drawable/icon" android:label="@string/app_name"&gt;
+    &lt;activity android:name=".SplashActivity"
+              android:theme="@android:style/Theme.NoTitleBar"&gt;
+        &lt;intent-filter&gt;
+            &lt;action android:name="android.intent.action.MAIN" /&gt;
+            &lt;category android:name="android.intent.category.LAUNCHER" /&gt;
+        &lt;/intent-filter&gt;
+    &lt;/activity&gt;
+
+    &lt;activity android:name=".MainActivity"
+              android:label="@string/app_name"&gt;
+        &lt;intent-filter&gt;
+            &lt;action android:name="android.intent.action.MAIN" /&gt;
+            &lt;category android:name="android.intent.category.DEFAULT" /&gt;
+        &lt;/intent-filter&gt;
+    &lt;/activity&gt;    
+&lt;/application&gt;
+
+&lt;uses-sdk android:minSdkVersion="4" /&gt;
+</code></pre>
+
+<p></manifest>
 ```</p>
 ]]></content>
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[用Spinner + SQLite实现省市县三级联动]]></title>
-    <link href="http://codemany.com/blog/2011/09/16/spinner-sqlite-implementation-with-provincial-and-county-levels-linkage/"/>
-    <updated>2011-09-16T05:48:32+08:00</updated>
-    <id>http://codemany.com/blog/2011/09/16/spinner-sqlite-implementation-with-provincial-and-county-levels-linkage</id>
-    <content type="html"><![CDATA[<ol>
-<li>建立省市县<a href="http://www.stats.gov.cn/tjbz/xzqhdm/index.htm">行政区划代码</a>（截止2010年12月31日）数据表</li>
+    <title type="html"><![CDATA[反编译Android APK文件]]></title>
+    <link href="http://codemany.com/blog/2011/07/01/decompile-android-apk-file/"/>
+    <updated>2011-07-01T06:07:07+08:00</updated>
+    <id>http://codemany.com/blog/2011/07/01/decompile-android-apk-file</id>
+    <content type="html"><![CDATA[<p>classes.dex是Java源码编译后生成的字节码文件。由于Android使用的Dalvik虚拟机与标准的Java虚拟机是不兼容的，dex文件与class文件相比，不论是文件结构还是opcode都不一样。</p>
+
+<p>目前有下面这几种反编译的工具:</p>
+
+<ul>
+<li>dexdump</li>
+<li><a href="http://dedexer.sourceforge.net/">Dedexer</a></li>
+<li><a href="http://code.google.com/p/android4me/">AXMLPrinter2</a></li>
+<li><a href="http://code.google.com/p/android-apktool/">apktool</a></li>
+<li><a href="http://code.google.com/p/dex2jar/">dex2jar</a> + <a href="http://java.decompiler.free.fr/?q=jdgui">JD-GUI</a></li>
+<li><a href="http://code.google.com/p/smali/">smali</a></li>
+</ul>
+
+
+<p>dexdump是Android开发包提供的反编译工具。用法为首先启动Android模拟器，把要反编译的dex文件用adb push上传到模拟器中，然后通过adb shell登录，找到该dex文件，执行dexdump xxx.dex。总的来说dexdump功能比较弱，且用起来麻烦，另外反编译的结果的可读性也很差。</p>
+
+<p>另一个反编译工具是Dedexer，反编译的效果比较好。它可以读取dex格式的文件，生成一种类似于汇编语言的输出。这种输出与Jasmin的输出相似，但包含的是Dalvik的字节码。与dexdump相比它至少有3个优点：</p>
+
+<ol>
+<li>不需要在Android模拟器中运行；</li>
+<li>反编译后的文件目录结构和源代码结构相近，每个class文件对应一个ddx文件。不像dexdump那样把所有的结果都放在一起；</li>
+<li>可以作为反编译引擎。目前好多强大的反编译工具都是以Jasmin作为反编译引擎的。</li>
 </ol>
 
 
-<p><code>
-CREATE TABLE xzqhdm (
-  _id INTEGER PRIMARY KEY,
-  code NUMERIC,
-  region TEXT,
-  parent_code NUMERIC
-);
-</code></p>
-
-<p>parent_code指上一级的行政区划代码，省属于最上级的行政单位，设置它的区划代码为999999。</p>
+<p>可以下载已经编译好的ddx1.11.jar文件（对应Java 1.6版本）。用法：</p>
 
 <p><code>
-insert into xzqhdm values(NULL, 110000, "北京市", 999999);
-insert into xzqhdm values(NULL, 110100, "市辖区", 110000);
-insert into xzqhdm values(NULL, 110101, "东城区", 110100);
-insert into xzqhdm values(NULL, 110102, "西城区", 110100);
-insert into xzqhdm values(NULL, 110103, "崇文区", 110100);
-insert into xzqhdm values(NULL, 110104, "宣武区", 110100);
-insert into xzqhdm values(NULL, 110105, "朝阳区", 110100);
-insert into xzqhdm values(NULL, 110106, "丰台区", 110100);
-...
-insert into xzqhdm values(NULL, 659001, "石河子市", 659000);
-insert into xzqhdm values(NULL, 659002, "阿拉尔市", 659000);
-insert into xzqhdm values(NULL, 659003, "图木舒克市", 659000);
-insert into xzqhdm values(NULL, 659004, "五家渠市", 659000);
+java -jar ddx1.11.jar -o -D -r -d src classes.dex  # 在src目录下生成ddx文件
 </code></p>
 
-<p><strong>2. SQLite数据库的操作</strong>
-如果应用使用到了SQLite数据库，在用户初次使用应用时，需要创建应用使用到的数据库表结构及添加一些初始化记录，另外在软件升级的时候，也需要对数据表结构进行更新。Android系统为我们提供了一个名为SQLiteOpenHelper的类，这是一个抽象类，该类用于对数据库版本进行管理，有两个重要的方法，分别是onCreate()和onUpgrade()。</p>
+<p>APK中的资源是经过压缩的，用文本工具看都是乱码，可以通过AXMLPrinter2将其转换为可读的XML文件。具体命令为：</p>
 
-<p>当调用SQLiteOpenHelper的getWritableDatabase()或getReadableDatabase()方法获取数据库实例时，如果数据库不存在，Android系统会自动生成一个数据库文件，接着调用onCreate()方法，onCreate()方法在初次生成数据库时才会被调用，在onCreate()方法里可以生成数据库表结构及添加一些应用使用到的初始化数据。onUpgrade()方法在数据库的版本发生变化时会被调用，数据库的版本是由程序员控制的，假设数据库现在的版本是1，由于业务的需要，修改了数据库表的结构，这时候就需要升级软件，升级软件时希望更新用户手机里的数据库表结构，为了实现这一目的，可以把原来的数据库版本设置为2（或其他数值），并且在onUpgrade()方法里面实现表结构的更新。当软件的版本升级次数比较多，这时在onUpgrade()方法里面可以根据原版号和目标版本号进行判断，然后作出相应的表结构及数据更新。</p>
+<p><code>
+java -jar AXMLPrinter2.jar xxx.xml output.xml
+</code></p>
 
-<p>SQLiteDatabase类则封装了一些操作数据库的常用API，使用该类可以完成对数据进行CRUD操作。主要是execSQL()和rawQuery()方法。execSQL()方法可以执行insert、delete、update和CREATE TABLE之类有更改行为的SQL语句； rawQuery()方法可以执行select语句。SQLiteDatabase还专门提供了对应于CRUD的操作方法： insert()、delete()、update()和query()。</p>
+<p>目前最好的反编译工具是apktool。可以帮助我们把APK文件反编译，输出smali格式的代码、图片和资源等文件，还可以在修改后重新打包。将下载下来的apktool和apktool-install-windows解压到同一目录，有三个文件：aapt.exe，apktool.bat和apktool.jar。使用方法：</p>
 
-<p>问题：<br />
-如何将SQLite数据库与apk文件一起发布？<br />
-可以将数据库文件复制到res\raw目录中，所有在res\raw目录中的文件不会被压缩，这样可以直接提取该目录中的文件。</p>
+<p><code>
+apktool d xxx.apk zzz  # 反编译xxx.apk到zzz目录，得到APK的图片和配置资源文件等
+apktool b zzz  # 从文件夹zzz重建APK，输出到zzz/dist/out.apk
+</code></p>
 
-<p>如何打开res\raw目录中的数据库文件？<br />
-不能直接打开res\raw目录中的数据库文件，需要在程序第一次启动时将该文件复制到手机内存或SD卡中，然后再打开。</p>
+<p>dex2jar是一个将Dalvik虚拟机的dex文件转换回标准Java的class文件的工具：</p>
+
+<p><code>
+dex2jar xxx.apk  # 生成jar文件，可以用JD GUI工具直接打开查看
+</code></p>
+
+<p>smali可以反编译dex文件，也可以把你修改过的代码重新编译成dex：</p>
+
+<p><code>
+java -jar baksmali.jar classes.dex -o classes
+java -jar smali.jar classes -o classes.dex
+</code></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[给ListView添加卸载功能的Button]]></title>
+    <link href="http://codemany.com/blog/2011/06/06/adding-uninstall-button-to-the-listview/"/>
+    <updated>2011-06-06T09:25:43+08:00</updated>
+    <id>http://codemany.com/blog/2011/06/06/adding-uninstall-button-to-the-listview</id>
+    <content type="html"><![CDATA[<p>修改main.xml，添加Button控件：</p>
 
 <p>```
-public class DBHelper extends SQLiteOpenHelper {</p>
+&lt;?xml version="1.0" encoding="utf-8"?>
+&lt;LinearLayout xmlns:android="<a href="http://schemas.android.com/apk/res/android">http://schemas.android.com/apk/res/android</a>"</p>
 
-<pre><code>private static String DB_PATH = "/data/data/com.codemany.linkage/databases/";
-private static String DB_NAME = "xzqh.db";
-private static DBHelper databaseHelper;
-private static SQLiteDatabase db;
+<pre><code>android:orientation="vertical"
+android:layout_width="fill_parent"
+android:layout_height="fill_parent"&gt;
+&lt;LinearLayout
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:layout_weight="1.0"&gt;
+    &lt;ListView
+        android:id="@+id/list_view"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content" /&gt;
+&lt;/LinearLayout&gt;
+&lt;LinearLayout
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"&gt;
+    &lt;Button
+        android:id="@+id/uninstall_button"
+        android:text="Uninstall Selected Apps"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content" /&gt;
+&lt;/LinearLayout&gt;
+</code></pre>
 
-private Context context;
+<p></LinearLayout>
+```</p>
 
-private DBHelper(Context context) {
-    super(context, DB_NAME, null, 1);
-    this.context = context;
-}
+<p>然后在MainActivity类中添加卸载应用的代码：</p>
 
-public static DBHelper getInstance(Context context) {
-    if (databaseHelper == null) {
-        databaseHelper = new DBHelper(context);
-        databaseHelper.openDataBase();
+<p>```
+private UninstallReceiver mUninstallReceiver;</p>
 
-        if (db == null) {
-            try {
-                db = databaseHelper.getWritableDatabase();
-                databaseHelper.copyDatabase();
+<p>@Override
+public void onCreate(Bundle savedInstanceState) {</p>
+
+<pre><code>Button btn = (Button)findViewById(R.id.uninstall_button);
+btn.setOnClickListener(new OnClickListener() {
+    @Override
+    public void onClick(View v) {
+        for (int i = 0; i &lt; mListData.size(); i++) {
+            HashMap&lt;String, Object&gt; map = mListData.get(i);
+            boolean isSelected = (Boolean)map.get("app_select");
+            if (isSelected) {
+                Uri packageUri = Uri.parse("package:" + map.get("app_package"));
+                Intent intent = new Intent(Intent.ACTION_DELETE, packageUri);
+                startActivity(intent);
             }
-            catch (Exception e) {
-                Log.d("DBHelper", "Error in database creation");
-            }
-
-            databaseHelper.openDataBase();
         }
     }
-    return databaseHelper;
-}
+});
 
-private void copyDatabase() throws IOException {
-    InputStream is = context.getResources().openRawResource(R.raw.xzqh);
-    OutputStream os = new FileOutputStream(DB_PATH + DB_NAME);
-    byte[] buffer = new byte[1024];
-    int length;
-    while ((length = is.read(buffer)) &gt; 0) {
-        os.write(buffer, 0, length);
+// 监听卸载广播
+mUninstallReceiver = new UninstallReceiver();
+IntentFilter filter = new IntentFilter(Intent.ACTION_PACKAGE_REMOVED);
+filter.addDataScheme("package");
+registerReceiver(mUninstallReceiver, filter);
+</code></pre>
+
+<p>}</p>
+
+<p>// 有时选择移除的程序在确认时被取消了，因此要用BroadcastReceiver监听应用是否被真正地卸载
+private class UninstallReceiver extends BroadcastReceiver {</p>
+
+<pre><code>@Override
+public void onReceive(Context ctx, Intent intent) {
+    Log.d("UninstallReceiver.onReceive()", intent.getDataString());
+
+    for (int i = 0; i &lt; mListData.size(); i++) {
+        HashMap&lt;String, Object&gt; map = mListData.get(i);
+        String packageUri = "package:" + map.get("app_package");
+        if (packageUri.equals(intent.getDataString())) {
+            mListData.remove(map);
+        }
     }
-
-    os.flush();
-    os.close();
-    is.close();
+    mHandler.sendEmptyMessage(0);
 }
+</code></pre>
 
-private void openDataBase() {
-    try {
-        db = SQLiteDatabase.openDatabase(
-                DB_PATH + DB_NAME,
-                null,
-                SQLiteDatabase.OPEN_READONLY | SQLiteDatabase.NO_LOCALIZED_COLLATORS);
-    } catch (SQLiteException e) {
-        // database does't exist yet
-    }
-}
+<p>}</p>
 
-public SimpleCursorAdapter getListByParentCode(Context context, String parentCode) {
-    SimpleCursorAdapter list = null;
-    DBHelper dHelper = new DBHelper(context);
-    SQLiteDatabase db = dHelper.getReadableDatabase();
-    Cursor cursor = db.rawQuery(
-            "select code as _id, region from xzqhdm where parent_code = ?",
-            new String[] {parentCode});
-    if (cursor.getCount() != 0) {
-        list = new SimpleCursorAdapter(context,
-                android.R.layout.simple_spinner_item,
-                cursor,
-                new String[] {"region"},
-                new int[] {android.R.id.text1});
-        list.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-    }
-    return list;
+<p>@Override
+public void onDestroy() {</p>
+
+<pre><code>super.onDestroy();
+unregisterReceiver(mUninstallReceiver);
+</code></pre>
+
+<p>}
+```</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[向ListView中添加CheckBox]]></title>
+    <link href="http://codemany.com/blog/2011/06/03/adding-checkbox-to-the-listview/"/>
+    <updated>2011-06-03T14:30:01+08:00</updated>
+    <id>http://codemany.com/blog/2011/06/03/adding-checkbox-to-the-listview</id>
+    <content type="html"><![CDATA[<p>修改list_item.xml文件，添加CheckBox控件：</p>
+
+<p>```
+&lt;?xml version="1.0" encoding="utf-8"?>
+&lt;LinearLayout xmlns:android="<a href="http://schemas.android.com/apk/res/android">http://schemas.android.com/apk/res/android</a>"</p>
+
+<pre><code>android:layout_width="fill_parent"
+android:layout_height="wrap_content"&gt;
+&lt;ImageView
+    android:id="@+id/app_icon"
+    android:layout_gravity="center_vertical"
+    android:layout_width="32.0dip"
+    android:layout_height="32.0dip"
+    android:layout_marginLeft="3.0dip"
+    android:layout_marginRight="3.0dip" /&gt;
+&lt;LinearLayout
+    android:orientation="vertical"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:layout_weight="1.0"&gt;
+    &lt;TextView
+        android:id="@+id/app_title"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:textSize="16.0dip"
+        android:textStyle="bold" /&gt;
+    &lt;TextView
+        android:id="@+id/app_package"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:textSize="13.0dip" /&gt;
+&lt;/LinearLayout&gt;
+&lt;CheckBox
+    android:id="@+id/app_select"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:focusable="false"
+    android:focusableInTouchMode="false"
+    android:clickable="false"
+    android:checkMark="?android:attr/listChoiceIndicatorMultiple" /&gt;
+</code></pre>
+
+<p></LinearLayout>
+```</p>
+
+<p>这三行代码很重要，如果不加会出现一些奇怪的错误。</p>
+
+<p><code>
+android:focusable="false"
+android:focusableInTouchMode="false"
+android:clickable="false"
+</code></p>
+
+<p>加入CheckBox后，在程序运行过程中会发现整个ListView无法响应onItemClick、onItemLongClick或onCreateContextMenu事件。原因在于CheckBox是拥有焦点的，它的优先级比ListItem的焦点优先级更高，于是ListItem的点击事件被屏蔽了。解决方法是让CheckBox不能获得焦点。android:focusable="false"就是做这个的。</p>
+
+<p>修改整个SimpleIconAdapter类为以下内容：</p>
+
+<p>```
+public class SimpleIconAdapter extends BaseAdapter {</p>
+
+<pre><code>private LayoutInflater mInflater;
+private List&lt;? extends Map&lt;String, ?&gt;&gt; mData;
+
+public SimpleIconAdapter(Context context, List&lt;? extends Map&lt;String, ?&gt;&gt; data) {
+    mInflater = LayoutInflater.from(context);
+    mData = data;
 }
 
 @Override
-public synchronized void close() {
-    if (db != null) {
-        db.close();
+public int getCount() {
+    return mData.size();
+}
+
+@Override
+public Object getItem(int position) {
+    return mData.get(position);
+}
+
+@Override
+public long getItemId(int position) {
+    return position;
+}
+
+@SuppressWarnings({ "rawtypes", "unchecked" })
+@Override
+public View getView(int position, View convertView, ViewGroup parent) {
+    View view;
+    if (convertView != null) {
+        view = convertView;
+    } else {
+        view = mInflater.inflate(R.layout.list_item, parent, false);
     }
-    super.close();
-}
 
-@Override
-public void onCreate(SQLiteDatabase db) {
-}
+    Map map = (Map)getItem(position);
+    TextView tv = (TextView)view.findViewById(R.id.app_title);
+    tv.setText((String)map.get("app_title"));
 
-@Override
-public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+    tv = (TextView)view.findViewById(R.id.app_package);
+    tv.setText((String)map.get("app_package"));
+
+    ImageView iv = (ImageView)view.findViewById(R.id.app_icon);
+    iv.setImageDrawable((Drawable)map.get("app_icon"));
+
+    CheckBox cb = (CheckBox)view.findViewById(R.id.app_select);
+    if ((Boolean)map.get("app_select") ==  null) {
+        map.put("app_select", false);
+    }
+    cb.setChecked((Boolean)map.get("app_select"));
+
+    return view;
 }
 </code></pre>
 
 <p>}
 ```</p>
 
-<p>在代码实现时遇到的难题是如何在选中region的同时得到对应的code。网上有教程说定制自己的adapter，重写bingView，不过有多个spinner就需要声明多个全局变量；还有教程指出可以直接往adapter中传递对象（实现一个类，将code和region作为字段），然后重写对象的toString()方法。后来受到这个帖子的启发，修改了rawQuery中的select语句得以实现Spinner控件中的键值绑定。</p>
+<p>再就是修改MainActivity文件：</p>
 
-<p>原来的select语句是：
-<code>
-select _id, code, region from xzqhdm where parent_code = ?
-</code></p>
+<p>```
+public class MainActivity extends Activity {</p>
 
-<p>因为传入到CursorAdapter中的Cursor结果集必须包含有列名为<em>id的列，否则CursorAdapter将不会起作用。而code可以被看作是整数，那么只需要将选出的code当作</em>id就行了，根据这个想法写出的select语句如下：
-<code>
-select code as _id, region from xzqhdm where parent_code = ?
-</code></p>
+<pre><code>@Override
+public void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.main);
 
-<p>这样，但触发Spinner上的ItemSelected事件时就可以通过最后一个参数id得到当前的code了。</p>
+    mListView = (ListView)findViewById(R.id.list_view);
+    mListData = new ArrayList&lt;HashMap&lt;String, Object&gt;&gt;();
+    mAdapter = new SimpleIconAdapter(this, mListData);
+    mListView.setAdapter(mAdapter);
+    mListView.setItemsCanFocus(false);
+    mListView.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
+    mListView.setOnItemClickListener(new OnItemClickListener() {
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        @Override
+        public void onItemClick(AdapterView&lt;?&gt; parent, View view, int position, long id) {
+            // 这里如此处理是因为当选中CheckBox，滚动ListView的时候，会出现一些
+            // CheckBox选择错位的现象，所以在选择CheckBox时，记下其状态，然后在
+            // getView方法中进行设置。
+            //
+            // 原因：
+            // ListView中的getChildCount()并不总是等于Adapter中的数据行数。当手
+            // 机一屏显示不了所有数据时（需要翻页），getChildCount()就等于一屏
+            // 所显示的行数（一般为10），小于Adapter中的数据行数。而ListView的
+            // getCount()与Adapter中的数据行数相等。
+            // 当光标下移到屏幕最底部，新显示出来的View，在调用Adapter的getView
+            // 方法中，会判断convertView为null，而再有新的View显示就会发现
+            // convertView不为空，所以新显示的View其实使用了之前某个View的对象。
+            // 这就造成了状态可能混乱。比如第一行的CheckBox点选时，第11行的也同
+            // 时会被点选。
+            CheckBox cb = (CheckBox)view.findViewById(R.id.app_select);
+            cb.toggle();
+            ((Map)mListData.get(position)).put("app_select", cb.isChecked());
+        }
+    });
 
-<p>写这篇文章的时候同时也在调试着代码，突然发现其实不需要改写select语句也是可以实现键值绑定的。只要在onItemSelected()方法中使用如下代码就可以取得相应的值了：
-```
-Cursor cursor = (Cursor)parent.getSelectedItem();
-if (cursor != null) {</p>
+    mProgressDialog = ProgressDialog.show(this, "Wait", "loading...");
+    new Thread() {
+        @Override
+        public void run() {
+            mListData.addAll(getInstalledApps(false));
+            mHandler.sendEmptyMessage(0);
+        }
+    }.start();
+}
+</code></pre>
 
-<pre><code>int code = cursor.getString(cursor.getColumnIndex("code"));
-String country = cursor.getString(cursor.getColumnIndex("region"));
+<p>}
+```</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[实现带Icon的ListView（改进版）]]></title>
+    <link href="http://codemany.com/blog/2011/06/02/implement-listview-with-icon-improved/"/>
+    <updated>2011-06-02T02:47:58+08:00</updated>
+    <id>http://codemany.com/blog/2011/06/02/implement-listview-with-icon-improved</id>
+    <content type="html"><![CDATA[<p>带Icon的ListView工作起来还不错，但是如果手机里安装的软件比较多的话就有问题了。在程序启动时会黑屏一段时间，就好像程序挂起了一样。所以这时需要显示一个对话框，告诉用户正在加载数据，最好还能准确告诉用户加载的进度。</p>
+
+<p>显示对话框用ProgressDialog，它有两种样式：HORIZONTAL和SPINNER。这里暂时选择SPINNER，等以后有机会再改成HORIZONTAL。</p>
+
+<p>我们在加载数据前显示ProgressDialog，在之后关闭对话框。示例代码如下：</p>
+
+<p>```
+ProgressDialog pd = ProgressDialog.show(this, "Wait", "loading...");</p>
+
+<p>ListView lv = (ListView)findViewById(R.id.list_view);
+adapter = new SimpleIconAdapter(this,</p>
+
+<pre><code>    getInstalledApps(false),
+    R.layout.list_item,
+    new String[] {APP_ICON, APP_TITLE, APP_PACKAGE},
+    new int[] {R.id.app_icon, R.id.app_title, R.id.app_package});
+</code></pre>
+
+<p>lv.setAdapter(adapter);</p>
+
+<p>pd.dismiss();
+```</p>
+
+<p>但结果ProgressDialog没有显示出来，因为加载数据的代码也执行在UI线程中，所以对话框的显示被阻塞了。怎么办呢？可以试着创建一个新线程，然后把加载数据这个耗时的操作放到这个非UI线程中去执行，这样不就可以了么：</p>
+
+<p>```
+ProgressDialog pd = ProgressDialog.show(this, "Wait", "loading...");</p>
+
+<p>new Thread() {</p>
+
+<pre><code>@Override
+public void run() {
+    ListView lv = (ListView)findViewById(R.id.list_view);
+    adapter = new SimpleIconAdapter(Main.this,
+            getInstalledApps(false),
+            R.layout.list_item,
+            new String[] {APP_ICON, APP_TITLE, APP_PACKAGE},
+            new int[] {R.id.app_icon, R.id.app_title, R.id.app_package});
+    lv.setAdapter(adapter);
+}
+</code></pre>
+
+<p>}.start();</p>
+
+<p>pd.dismiss();
+```</p>
+
+<p>这下更惨了，直接报Runtime异常，连界面都打不开了。</p>
+
+<p>深入研究一下Android的线程模型，看看Android到底是怎么处理UI线程和其它线程的交互的，为什么上面的代码会报异常?</p>
+
+<blockquote><p>When an application is launched, the system creates a thread called "main" for the application. The main thread, also called the UI thread, is very important because it is in charge of dispatching the events to the appropriate widgets, including drawing events. It is also the thread where your application interacts with running components of the Android UI toolkit.</p>
+
+<p>For instance, if you touch the a button on screen, the UI thread dispatches the touch event to the widget, which in turn sets its pressed state and posts an invalidate request to the event queue. The UI thread dequeues the request and notifies the widget to redraw itself.</p>
+
+<p>This single-thread model can yield poor performance unless your application is implemented properly. Specifically, if everything is happening in a single thread, performing long operations such as network access or database queries on the UI thread will block the whole user interface. No event can be dispatched, including drawing events, while the long operation is underway. From the user's perspective, the application appears hung. Even worse, if the UI thread is blocked for more than a few seconds (about 5 seconds currently) the user is presented with the infamous "application not responding" (ANR) dialog.</p></blockquote>
+
+<p>看了上面这段话可以知道为啥程序一打开就黑屏，像挂掉了一样。</p>
+
+<p>那为什么用新建线程来执行耗时操作的代码也有问题呢？这是因为它虽然没有阻塞UI线程，但它违背了单线程模型，Android的UI操作并不是线程安全的，并且这些操作必须在UI线程中执行。在这段代码片段中，在另一个线程中执行数据加载绑定，这会引起一些古怪的问题。</p>
+
+<p>Andriod提供了几种在其它线程中访问UI线程的方法：</p>
+
+<ul>
+<li><a href="http://developer.android.com/reference/android/app/Activity.html#runOnUiThread(java.lang.Runnable)">Activity.runOnUiThread(Runnable)</a></li>
+<li><a href="http://developer.android.com/reference/android/view/View.html#post(java.lang.Runnable)">View.post(Runnable)</a></li>
+<li><a href="http://developer.android.com/reference/android/view/View.html#postDelayed(java.lang.Runnable,%20long)">View.postDelayed(Runnable, long)</a></li>
+<li><a href="http://developer.android.com/reference/android/os/Handler.html">Hanlder</a></li>
+</ul>
+
+
+<p>上面的任何一个类或方法都可以修复我们前面代码中遇到的问题，很不幸的是这些类或方法同样会使你的代码变的很复杂很难理解。而且当你需要实现一些很复杂的操作并需要频繁地更新UI时会变得更糟糕。为了解决这个问题，Android 1.5提供了一个工具类AsyncTask，它使创建需要与用户界面交互的长时间运行的任务变得更简单。在Android 1.0和1.1中具有与AsyncTask相同功能的类UserTask，它提供了完全一样的API，你需要做的只是把它的代码拷贝的你的程序中。</p>
+
+<p>其实这些方案背后采用的都是Handler。所以这里仍然使用旧有的，复杂的Handler来修复上述问题。</p>
+
+<p>```
+package com.codemany.apkmgt;</p>
+
+<p>import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;</p>
+
+<p>import android.app.Activity;
+import android.app.ProgressDialog;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
+import android.graphics.drawable.Drawable;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
+import android.widget.ListView;</p>
+
+<p>public class MainActivity extends Activity {</p>
+
+<pre><code>private static final String APP_ICON = "app_icon";
+private static final String APP_TITLE = "app_title";
+private static final String APP_PACKAGE = "app_package";
+
+private SimpleIconAdapter adapter;
+private List&lt;HashMap&lt;String, Object&gt;&gt; listData;
+private ProgressDialog pd;
+
+@Override
+public void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.main);
+
+    ListView lv = (ListView)findViewById(R.id.list_view);
+    listData = new ArrayList&lt;HashMap&lt;String, Object&gt;&gt;();
+    adapter = new SimpleIconAdapter(this,
+            listData,
+            R.layout.list_item,
+            new String[] {APP_ICON, APP_TITLE, APP_PACKAGE},
+            new int[] {R.id.app_icon, R.id.app_title, R.id.app_package});
+    lv.setAdapter(adapter);
+
+    pd = ProgressDialog.show(this, "Wait", "loading...");
+
+    new Thread() {
+        @Override
+        public void run() {
+            // 耗时操作，加载数据
+            listData.addAll(getInstalledApps(false));
+            handler.sendEmptyMessage(0);
+        }
+    }.start();
+}
+
+private Handler handler = new Handler() {
+    @Override
+    public void handleMessage(Message msg) {
+        // 通知UI更新。必须要放在这里
+        adapter.notifyDataSetChanged();
+
+        pd.dismiss();
+    }
+};
 </code></pre>
 
 <p>}
 ```</p>
 
-<p><a href="/uploads/linkage.zip" title="linkage.zip">代码下载</a></p>
-
-<p>参考文章：<br />
-<a href="http://lxmgfd.iteye.com/blog/970637">http://lxmgfd.iteye.com/blog/970637</a><br />
-<a href="http://www.eoeandroid.com/thread-98254-1-1.html">http://www.eoeandroid.com/thread-98254-1-1.html</a><br />
-<a href="http://www.cmd100.com/bbs/thread-5454-1-1.html">http://www.cmd100.com/bbs/thread-5454-1-1.html</a></p>
+<p>参考资料：<br />
+<a href="http://developer.android.com/resources/articles/painless-threading.html">http://developer.android.com/resources/articles/painless-threading.html</a><br />
+<a href="http://kiminotes.iteye.com/blog/382683">http://kiminotes.iteye.com/blog/382683</a> 这个实际上是上面文章的译文</p>
 ]]></content>
   </entry>
   

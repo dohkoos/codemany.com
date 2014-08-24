@@ -9,7 +9,10 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="GitHub Pages提供免费的静态站点托管服务，有两种类型：User/Organization Pages和Project Pages。前者是用户/组织的主页，一个用户/组织仅有一个；后者是每个项目的主页。 安装Octopress时，rake &hellip;">
+  <meta name="description" content="使用Nokogiri抓取某网站的长江现货数据，被抓取页面的URL中含有中文参数，使用以下的代码抓取数据失败： 1
+2
+url = 'http://example.com/search.asp?type=长江有色&sort=asc'
+doc = Nokogiri::HTML(open(url)) 据 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -65,160 +68,6 @@
     <div id="content">
       <div class="blog-index">
   
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2014/08/05/migrating-wordpress-to-octopress/">Wordpress迁移到Octopress</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2014-08-05T19:15:03+08:00" pubdate data-updated="true">Aug 5<sup>th</sup>, 2014</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>GitHub Pages提供免费的静态站点托管服务，有两种类型：User/Organization Pages和Project Pages。前者是用户/组织的主页，一个用户/组织仅有一个；后者是每个项目的主页。</p>
-
-<p>安装Octopress时，rake setup_github_pages会要求输入Github Pages项目的URL，根据URL判断是哪种服务。如果是前者，会在新建的<em>deploy目录上创建master分支，用于存放发布的静态文件，并把原master分支改为source分支；后者则仅在</em>deploy目录上创建gh-pages分支。</p>
-
-<p>在Wordpress的Tools/Export页面选择导出文章内容，保存为wordpress.xml文件。然后使用工具把它转换成markdown格式。这里使用了YORKXIN的<a href="https://gist.github.com/chitsaou/1394128" title="wordpressdotcom.rb">修改版本</a>，将脚本和wordpress.xml放到Octopress根目录下，然后运行：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ruby -r ./wordpressdotcom.rb -e Jekyll::WordpressDotCom.process</span></code></pre></td></tr></table></div></figure>
-
-
-<p>这个脚本会把转换好的文章都放到source/_posts目录下，文件后缀是html，直接改成markdown就是。</p>
-
-<p>然后就是苦力活：修改文中的站内链接、上传的图片路径以及代码高亮语法。</p>
-
-<p>Octopress默认的permalink是/blog/:year/:month/:day/:title/，想把它改成/:title/这种格式，修改_config.yml中的permalink后，发现生成的文章都跑到了public目录下，默认应该是在public/blog目录里的。为了保持目录的简洁，放弃了permalink的修改。</p>
-
-<p>至于评论的迁移，不想费过多的手脚，直接使用Octopress自带的Disqus。在Wordpress中安装好Disqus插件，通过插件设置将现有的评论内容导入Disqus。不过Disqus处理导入数据的时间有点长，需要等待一段时间，可以在 <a href="http://import.disqus.com">http://import.disqus.com</a> 查看导入进度。导入完成后，把Wordpress文章的permalink改成和Octopress相同，登录Disqus后台，找到Migrate Threads栏目，在Domain Migration Wizard里把旧域名改成新域名，然后一路Next就大功告成了。</p>
-
-<p>在侧边栏添加最新评论也很简单，添加recent_comments.html到source/<em>includes/custom/asides目录下，在</em>config.yml的default_asides项做好配置，最近评论内容就会出现在侧边栏中了：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;section&gt;
-</span><span class='line'>  &lt;h1&gt;Recent Comments&lt;/h1&gt;
-</span><span class='line'>  &lt;div class="dsq-widget"&gt;
-</span><span class='line'>    &lt;script type="text/javascript" src="http://codemany.disqus.com/recent_comments_widget.js"&gt;&lt;/script&gt;
-</span><span class='line'>  &lt;/div&gt;
-</span><span class='line'>&lt;/section&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>不过在实践中碰到了问题，打开某篇有评论的文章，发现只有评论框，已有评论没有显示。查看页面源码，负责评论模块的代码如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;section id="comment"&gt;
-</span><span class='line'>&lt;h1 class="title"&gt;Comments&lt;/h1&gt;
-</span><span class='line'>&lt;div id="disqus_thread" aria-live="polite"&gt;
-</span><span class='line'>  &lt;noscript&gt;Please enable JavaScript to view the &lt;a href="http://disqus.com/?ref_noscript"&gt;comments powered by Disqus.&lt;/a&gt;&lt;/noscript&gt;
-</span><span class='line'>&lt;/div&gt;
-</span><span class='line'>&lt;/section&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>这段代码位于source/<em>includes/post/disqus_thread.html中，而真正的评论模块代码则是在source/</em>includes/disqus.html中，查看调用它的代码也没任何问题。苦恼中&#8230;后来受到 <a href="http://www.ducea.com/2012/11/12/disqus-comments-not-visible-in-octopress/">http://www.ducea.com/2012/11/12/disqus-comments-not-visible-in-octopress/</a> 的启发，原来是_config.yml中的URL还是生成项目时的，与CNAME中配置的域名不一致，调整后就没问题了。</p>
-
-<p>在侧边栏显示Tag Cloud参照了 <a href="http://codemacro.com/2012/07/18/add-tag-to-octopress/">http://codemacro.com/2012/07/18/add-tag-to-octopress/</a> 教程，没几分钟就搞定了。</p>
-
-<p>分享使用的是JiaThis，只要把source/_includes/post/sharing.html中的代码替换成以下代码就可以：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div id="jiathis_style_32x32"&gt;
-</span><span class='line'>  &lt;a class="jiathis_button_qzone"&gt;&lt;/a&gt;
-</span><span class='line'>  &lt;a class="jiathis_button_tsina"&gt;&lt;/a&gt;
-</span><span class='line'>  &lt;a class="jiathis_button_tqq"&gt;&lt;/a&gt;
-</span><span class='line'>    &lt;a class="jiathis_button_weixin"&gt;&lt;/a&gt;
-</span><span class='line'>  &lt;a class="jiathis_button_renren"&gt;&lt;/a&gt;
-</span><span class='line'>  &lt;a href="http://www.jiathis.com/share/" class="jiathis jiathis_txt jtico jtico_jiathis" target="_blank"&gt;&lt;/a&gt;
-</span><span class='line'>  &lt;a class="jiathis_counter_style"&gt;&lt;/a&gt;
-</span><span class='line'>&lt;/div&gt;
-</span><span class='line'>&lt;script type="text/javascript" src="http://v2.jiathis.com/code/jia.js" charset="utf-8"&gt;&lt;/script&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>相关文章本想用Octopress自带的lsi模块实现，只是当文章较多时生成速度实在是巨慢，按照推荐安装gsl模块，结果在Windows 2008系统上死活装不上，采用手动编译方式也总是死在rb-gsl的安装上。失望之余终于找到 <a href="https://github.com/LawrenceWoodman/related_posts-jekyll_plugin">https://github.com/LawrenceWoodman/related_posts-jekyll_plugin</a> 这个插件，它使用起来非常简单，只需下载<em>plugins/related_posts.rb放在自己的plugins文件夹中，然后在source/</em>includes/post中新建related_posts.html文件：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>{ % if site.related_posts % }
-</span><span class='line'>  &lt;h3&gt;Related posts&lt;/h3&gt;
-</span><span class='line'>  &lt;ul class="posts"&gt;
-</span><span class='line'>  { % for post in site.related_posts limit:3 % }
-</span><span class='line'>    &lt;li class="related"&gt;
-</span><span class='line'>      &lt;a href=""&gt;&lt;/a&gt;
-</span><span class='line'>    &lt;/li&gt;
-</span><span class='line'>  { % endfor % }
-</span><span class='line'>  &lt;/ul&gt;
-</span><span class='line'>{ % endif % }</span></code></pre></td></tr></table></div></figure>
-
-
-<p>修改source/_layouts/post.html，在</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>{ % include post/author.html % }
-</span><span class='line'>{ % include post/date.html % }{ % if updated % }{ % else % }{ % endif % }
-</span><span class='line'>{ % include post/categories.html % }</span></code></pre></td></tr></table></div></figure>
-
-
-<p>后面添加</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>{ % include post/related_posts.html % }</span></code></pre></td></tr></table></div></figure>
-
-
-<p>就可以了。使用这个插件会有个小问题，就是它和Jekyll 2.1不兼容，rake generate时会报错，可以使用jumanji27提供的<a href="https://github.com/jumanji27/related_posts-jekyll_plugin" title="related_posts-jekyll_plugin">fork版本</a>。</p>
-</div>
-  
-  
-
-
-    </article>
   
   
     <article>
@@ -396,15 +245,13 @@
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>#/app/controllers/articles_controller.rb
-</span><span class='line'>def index
+</pre></td><td class='code'><pre><code class=''><span class='line'>def index
 </span><span class='line'>  @articles = Article.all
 </span><span class='line'>  binding.pry
 </span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
 
 
-<p>如何退出循环</p>
+<p>可以使用exit-program命令无条件地退出循环。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -416,1053 +263,7 @@
 </span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
 
 
-<p>可以使用exit-program命令无条件地退出循环。</p>
-
 <p>Pry默认没有调试中经常用到的上一步，下一步等命令，可以安装pry-nav，然后就可以使用step, next, continue跳来跳去了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2014/07/06/raspberry-pi-wifi-with-static-ip-address/">Raspberry Pi使用无线网卡</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2014-07-06T20:25:08+08:00" pubdate data-updated="true">Jul 6<sup>th</sup>, 2014</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>使用的是EDUP EP-N1556这款无线网卡，体积小巧，支持300M速率，买回来插在RPi上直接就能识别了。</p>
-
-<p>输入lsusb命令，可以见到设备列表中有RTL8192CU 802.11n WLAN Adapter字样，说明网卡已经被系统识别，芯片是RTL8192。</p>
-
-<p>下面就给无线网卡设置静态IP地址：</p>
-
-<p>修改/etc/wpa_supplicant/wpa_supplicant.conf</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
-</span><span class='line'>update_config=1
-</span><span class='line'>
-</span><span class='line'>network={
-</span><span class='line'>  ssid="NETGEAR"
-</span><span class='line'>  psk="12345678"
-</span><span class='line'>  proto=RSN #也可以写成WPA2
-</span><span class='line'>  key_mgmt=WPA-PSK #一定不要写成WPA2-PSK
-</span><span class='line'>  id_str="edup1556"
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>修改/etc/network/interfaces</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>auto lo
-</span><span class='line'>
-</span><span class='line'>iface lo inet loopback
-</span><span class='line'>
-</span><span class='line'>iface eth0 inet static
-</span><span class='line'>  address 192.168.0.100
-</span><span class='line'>  netmask 255.255.255.0
-</span><span class='line'>  gateway 192.168.0.1
-</span><span class='line'>  dns-nameservers 8.8.8.8
-</span><span class='line'>
-</span><span class='line'>allow-hotplug wlan0
-</span><span class='line'>iface wlan0 inet manual
-</span><span class='line'>  wpa-roam /etc/wpa_supplicant/wpa_supplicant.conf
-</span><span class='line'>iface edup1556 inet static
-</span><span class='line'>  address 192.168.0.200
-</span><span class='line'>  netmask 255.255.255.0
-</span><span class='line'>  gateway 192.168.0.1
-</span><span class='line'>  dns-nameservers 8.8.8.8
-</span><span class='line'>
-</span><span class='line'>iface default inet dhcp</span></code></pre></td></tr></table></div></figure>
-
-
-<p>然后用ifconfig命令列出所有的网络设备，可以看到wlan0的IP是192.168.0.200了。</p>
-
-<p>你的树莓派自由了，不再需要网线拖着了。</p>
-
-<p>参考资料：<br />
-<a href="http://hostap.epitest.fi/cgit/hostap/plain/wpa_supplicant/wpa_supplicant.conf">http://hostap.epitest.fi/cgit/hostap/plain/wpa_supplicant/wpa_supplicant.conf</a><br />
-<a href="http://www.electroschematics.com/9496/static-manual-ip-wireless-raspberry-pi/">http://www.electroschematics.com/9496/static-manual-ip-wireless-raspberry-pi/</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2014/06/28/how-i-made-ruby-script-156x-faster/">我是如何让Ruby脚本速度提升156倍的</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2014-06-28T13:04:08+08:00" pubdate data-updated="true">Jun 28<sup>th</sup>, 2014</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>以前写过<a href="/blog/2012/08/08/write-a-ruby-script-to-bulk-modify-traditional-file-called-simplified/">批量修改繁体文件名为简体的Ruby脚本</a>，可惜脚本的性能很有问题，批量重命名时运行速度非常慢。这次准备优化下代码，提升脚本的执行效率。</p>
-
-<p>profile.rb是为Ruby程序准备的profiler，它可以统计并输出各方法的运行时间，以便于找到程序执行的性能瓶颈。这次就用它来剖析脚本的运行时间。使用方法很简单，加上命令行选项-r profile就可以：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ruby -r profile rename.rb</span></code></pre></td></tr></table></div></figure>
-
-
-<p>运行结束后，会把统计信息输出到标准错误输出中。如下图所示：
-<img src="/uploads/profile-before-tuning.png" title="profile-before-tuning" ></p>
-
-<p>profile统计的是各方法的运行时间，分为两类。一类是计算的是从方法调用到方法返回之间的时间，称为整体时间；另一类则是从整体时间中扣除在该方法中调用其它方法所耗费时间之后得到的时间，称为实际时间。</p>
-
-<p>上图输出信息每行中各字段含义如下（从左到右）：<br />
-该方法执行时间占整体时间的百分比，比例越高越说明这行代码可能需要优化<br />
-整体时间的总和<br />
-实际时间的总和<br />
-被调用的次数<br />
-每次调用的平均实际时间（毫秒）<br />
-每次调用的平均整体时间（毫秒）<br />
-方法名</p>
-
-<p>由上图可以看出，脚本执行的时间大部分耗在了循环上。解决方法有两个：消除循环或减少循环次数。前者很难实现，暂且还没有想到办法，也许根本就没有可能。脚本中mapping的大小为2685，所以每修改一个文件名需要执行2685次循环，且循环中的encode和gsub!都是耗时操作。通常文件名的长度不超过30个字符，通过遍历文件名中每个字符的方式重命名就可以把循环次数缩减到不超过30次。</p>
-
-<p>修改代码后重新执行分析命令，得到的结果是脚本运行时间从379395秒优化到2418秒，性能整整提升了156倍，达到2个数量级的效果。
-<img src="/uploads/profile-after-tuning.png" title="profile-after-tuning" ></p>
-
-<p>参考资料：<br />
-<a href="http://www.kuqin.com/rubycndocument/man/addlib/profile.html">http://www.kuqin.com/rubycndocument/man/addlib/profile.html</a><br />
-<a href="http://ruby.about.com/od/advancedruby/a/profile.htm">http://ruby.about.com/od/advancedruby/a/profile.htm</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2014/06/24/using-raspberry-pi-to-monitor-humiture/">使用Raspberry Pi监控室内温湿度</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2014-06-24T14:19:44+08:00" pubdate data-updated="true">Jun 24<sup>th</sup>, 2014</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>机房没有温湿度监控系统，只有温湿度计，还不是数字的，只能得到个大概的读数，不是非常精确。怎么办？自己动手DIY个在线的温湿度监控系统吧！</p>
-
-<p>物品清单：</p>
-
-<ul>
-<li>金士顿16G的SDHC卡1张</li>
-<li>SDHC读卡器1个（可选）</li>
-<li>网线1条</li>
-<li>手机充电器（5V～1A）1个</li>
-<li>MicroUSB数据线1条</li>
-<li>电脑1台</li>
-<li>1P-1P双头母杜邦线3条</li>
-<li>10K电位器一个</li>
-<li>DHT11或DHT22温湿度传感器一个（可以购买已经焊好电阻的传感器模块）</li>
-</ul>
-
-
-<p>让树莓派（Raspberry Pi）工作起来</p>
-
-<p>从 <a href="http://www.raspberrypi.org/downloads">http://www.raspberrypi.org/downloads</a> 下载基于debian的wheezy镜像Raspbian。如果使用Windows系统，官方建议使用<a href="http://sourceforge.net/projects/win32diskimager/">Win32DiskImager</a>来复制image文件到SD卡（如果是Linux系统可以用工具dd）。写入系统后，把卡插到板子上，接上网线、电源，然后就启动了。等个20多秒，板上3个小灯都亮了，表明系统已经启动成功。</p>
-
-<p>登录路由器后台找到raspberrypi设备分配到的IP。然后使用SSH或VNC（前者是命令行界面，后者是图形界面）连接刚才从路由器找到的IP地址。登录的默认账号是pi，密码是raspberry。登录RPi之后输入ping qq.com测试上网是否正常。</p>
-
-<p>使用固定的IP访问RPi</p>
-
-<p>默认情况下RPi使用的是自动分配的IP地址，每次登录都需要在路由器中查找对应IP，实在太麻烦，可以把它设置成静态的。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sudo vi /etc/network/interfaces</span></code></pre></td></tr></table></div></figure>
-
-
-<p>打开配置文件，看到如下内容</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>auto lo
-</span><span class='line'>
-</span><span class='line'>iface lo inet loopback
-</span><span class='line'>iface eth0 inet dhcp
-</span><span class='line'>
-</span><span class='line'>allow-hotplug wlan0
-</span><span class='line'>iface wlan0 inet manual
-</span><span class='line'>wpa-roam /etc/wpa_supplicant/wpa_supplicant.conf
-</span><span class='line'>iface default inet dhcp</span></code></pre></td></tr></table></div></figure>
-
-
-<p>将之修改成</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>auto lo
-</span><span class='line'>
-</span><span class='line'>iface lo inet loopback
-</span><span class='line'>
-</span><span class='line'>iface eth0 inet static
-</span><span class='line'>  address 192.168.0.100
-</span><span class='line'>  netmask 255.255.255.0
-</span><span class='line'>  gateway 192.168.0.1
-</span><span class='line'>  dns-nameservers 8.8.8.8
-</span><span class='line'>
-</span><span class='line'>allow-hotplug wlan0
-</span><span class='line'>iface wlan0 inet manual
-</span><span class='line'>  wpa-roam /etc/wpa_supplicant/wpa_supplicant.conf
-</span><span class='line'>
-</span><span class='line'>iface default inet dhcp</span></code></pre></td></tr></table></div></figure>
-
-
-<p>然后存盘退出。以后就可以通过192.168.0.100来登录RPi了。</p>
-
-<p>把温湿度传感器接到RPi上</p>
-
-<p><img src="/uploads/rpi-dht22.png" title="rpi-dht22" ></p>
-
-<p>DHT11/DHT22共有4根引脚：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>1 -&gt; 3.3v 接左边第1个GPIO针脚
-</span><span class='line'>2 -&gt; GPIO 数据接口，可随意连接1个GPIO针脚（第7个针脚对应的是GPIO Pin #4）
-</span><span class='line'>3 -&gt; NC 不接
-</span><span class='line'>4 -&gt; GND 接地（第14个针脚）</span></code></pre></td></tr></table></div></figure>
-
-
-<p>注意：在1脚和2脚间还需要并联10K的电阻，以保持读数稳定。</p>
-
-<p>安装好的样子：</p>
-
-<p><img src="/uploads/rpi-actual.png" title="rpi-actual" ></p>
-
-<p>用C读取当前的温度和湿度值</p>
-
-<p>用的是树莓派2红色B型，它采用Broadcom BCM2835 (CPU, GPU, DSP, and SDRAM)芯片。所以读取GPIO口需要到 <a href="http://www.open.com.au/mikem/bcm2835/index.html">http://www.open.com.au/mikem/bcm2835/index.html</a> 获取最新的BCM2835 C语言库，然后下载，编译和安装。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>wget http://www.open.com.au/mikem/bcm2835/bcm2835-1.36.tar.gz
-</span><span class='line'>tar -zxvf bcm2835-1.36.tar.gz
-</span><span class='line'>cd bcm2835-1.36
-</span><span class='line'>./configure
-</span><span class='line'>make
-</span><span class='line'>sudo make install</span></code></pre></td></tr></table></div></figure>
-
-
-<p>从Github库中获取DHT11/DHT22温湿度程序，编译测试。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>cd /home/pi
-</span><span class='line'>git clone https://github.com/dohkoos/Raspberry-Pi-Code.git
-</span><span class='line'>cd Raspberry-Pi-Code/DHT22
-</span><span class='line'>make
-</span><span class='line'>sudo ./dht 22 4 # 数据接口接在第7针脚，所以这里是4</span></code></pre></td></tr></table></div></figure>
-
-
-<p>记录曲线图到云端</p>
-
-<p>这里使用<a href="http://www.yeelink.net/">Yeelink</a>的服务，Yeelink是国内比较知名的免费物联网数据平台。根据它的API规则，提交的数据必须为JSON格式：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>{"timestamp": "2012-03-15 16:13:14", "value": 294.34}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>将温湿度值提交到Yeelink的Ruby代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># Capture temperature & humidity value from the console
-</span><span class='line'>output = `sudo ./dht 22 4`
-</span><span class='line'>mt = /Temp =\s+([0-9.]+)/.match(output)
-</span><span class='line'>temperature = mt[1]
-</span><span class='line'>
-</span><span class='line'>mt = /Hum =\s+([0-9.]+)/.match(output)
-</span><span class='line'>humidity = mt[1]
-</span><span class='line'>
-</span><span class='line'># Combined temperature & humidity value into json format
-</span><span class='line'>json_temperature = %Q[{\\"timestamp\\": \\"#{Time.now}\\", \\"value\\": #{temperature}}]
-</span><span class='line'>json_humidity = %Q[{\\"timestamp\\": \\"#{Time.now}\\", \\"value\\": #{humidity}}]
-</span><span class='line'>
-</span><span class='line'># Post json data to Yeelink
-</span><span class='line'>`curl -X POST -d "#{json_temperature}" -H "Content-Type: application/json" -H "U-ApiKey:XXXXXXXXXXXXXXXX" http://api.yeelink.net/v1.0/device/&lt;device_id&gt;/sensor/&lt;sensor_id&gt;/datapoints`
-</span><span class='line'>`curl -X POST -d "#{json_humidity}" -H "Content-Type: application/json" -H "U-ApiKey:XXXXXXXXXXXXXXXX" http://api.yeelink.net/v1.0/device/&lt;device_id&gt;/sensor/&lt;sensor_id&gt;/datapoints`</span></code></pre></td></tr></table></div></figure>
-
-
-<p>将U-ApiKey:XXXXXXXXXXXXXXXX替换为自已账户的API Key，后面的URL也需要替换为自己申请的传感器URL。</p>
-
-<p>添加到计划任务</p>
-
-<p>使用crontab命令将以下内容添加到计划任务中：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># m h dom mon dow command
-</span><span class='line'>*/10 * * * * cd /home/pi/Raspberry-Pi-Code/DHT22/ && ruby yeelink.rb</span></code></pre></td></tr></table></div></figure>
-
-
-<p>重启计划任务，然后每隔10分钟就会上传一次数据到云端。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sudo /etc/init.d/cron restart</span></code></pre></td></tr></table></div></figure>
-
-
-<p>下面是我的曲线图：</p>
-
-<p><img src="/uploads/rpi-yeelink.png" title="rpi-yeelink" ></p>
-
-<p>参考资料：<br />
-<a href="http://www.2fz1.com/?p=370">http://www.2fz1.com/?p=370</a><br />
-<a href="http://learn.adafruit.com/dht-humidity-sensing-on-raspberry-pi-with-gdocs-logging">http://learn.adafruit.com/dht-humidity-sensing-on-raspberry-pi-with-gdocs-logging</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2014/06/19/rebuild-novel-website-with-responsive-design/">使用响应式设计改造小说网站</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2014-06-19T11:55:16+08:00" pubdate data-updated="true">Jun 19<sup>th</sup>, 2014</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>因为要在其它设备上测试响应式设计的效果，需要先对开发环境做些简单的配置。</p>
-
-<p>启动服务器时需加上本机的IP地址和访问端口（通常是80）：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>rails s -b 192.168.0.100 -p 80</span></code></pre></td></tr></table></div></figure>
-
-
-<p>配置Windows系统的内置防火墙，开启80端口以供其它设备访问：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>netsh advfirewall firewall add rule name="Open Port 80" dir=in action=allow protocol=TCP localport=80</span></code></pre></td></tr></table></div></figure>
-
-
-<p>查看和删除防火墙规则的命令：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>netsh advfirewall firewall delete rule name="Open Port 80" protocol=TCP localport=80
-</span><span class='line'>netsh advfirewall firewall show rule name="Open Port 80"</span></code></pre></td></tr></table></div></figure>
-
-
-<p>响应式设计的优缺点就不多说了，已经有太多的文章讲过这些。这里主要讲如何使用响应式设计改造现有的小说网站。</p>
-
-<p>首先，需要使用viewport标签设置屏幕宽度为设备宽度，使网站内容可以适应响应式变化。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;meta name="viewport" content="width=device-width, initial-scale=1" /&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>因为这是一个非常简陋，并且以内容为主的网站。在上述设置后几乎不用再修改就能适应不同屏幕分辨率下的信息呈现，除了导航栏因为导航选项较多，在手机等设备上打开会出现后面部分选项被挤下去。抽屉样式的导航是解决这个问题的好方法。在网上找到一个横向导航栏切换成抽屉式导航栏的库<a href="http://srobbin.github.io/jquery-pageslide/">jQuery PageSlide</a>，它使用图片实现三明治图标，所以对它做了些修改，用标签来实现：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;ul class="burger"&gt;
-</span><span class='line'>  &lt;li&gt;&lt;/li&gt;&lt;li&gt;&lt;/li&gt;&lt;li&gt;&lt;/li&gt;
-</span><span class='line'>&lt;/ul&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>对应的CSS代码如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>.burger {
-</span><span class='line'>  li {
-</span><span class='line'>    height: 4px;
-</span><span class='line'>    width: 30px;
-</span><span class='line'>    background: #000;
-</span><span class='line'>    border-radius: 3px;
-</span><span class='line'>    margin: 5px 0;
-</span><span class='line'>  }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>要实现响应式的话，只要让它在正常情况下隐藏，屏幕变小时显现即可：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>.burger {
-</span><span class='line'>  display: none;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>@media screen and (max-width: 480px) {
-</span><span class='line'>  .burger {
-</span><span class='line'>    display: block;
-</span><span class='line'>  }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>还需要在application.html.erb的底部开启点击三明治图标时的响应事件：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= javascript_include_tag "jquery.pageslide", "data-turbolinks-track" =&gt; true %&gt;
-</span><span class='line'>&lt;script&gt;
-</span><span class='line'>  $(".burger").pageslide();
-</span><span class='line'>&lt;/script&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>导航条的CSS也需要做些修改才能在屏幕变小时转换成抽屉式导航条。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>nav ul {
-</span><span class='line'>  margin: 0;
-</span><span class='line'>  padding: 0;
-</span><span class='line'>  width: 100%;
-</span><span class='line'>  &:after {
-</span><span class='line'>    content: "\0020";
-</span><span class='line'>    display: block;
-</span><span class='line'>    height: 0;
-</span><span class='line'>    clear: both;
-</span><span class='line'>    visibility: hidden;
-</span><span class='line'>  }
-</span><span class='line'>  li {
-</span><span class='line'>    float: left;
-</span><span class='line'>    width: 14.2%;
-</span><span class='line'>    text-align: center;
-</span><span class='line'>    a {
-</span><span class='line'>      display: block;
-</span><span class='line'>      background: #000;
-</span><span class='line'>      color: #fff;
-</span><span class='line'>      font-weight: bold;
-</span><span class='line'>      padding: 10px;
-</span><span class='line'>      border-right: 1px solid #fff;
-</span><span class='line'>      &:hover {
-</span><span class='line'>        background: #333;
-</span><span class='line'>      }
-</span><span class='line'>    }
-</span><span class='line'>  }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>以下是当屏幕变小时的CSS代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>@media screen and (max-width: 480px) {
-</span><span class='line'>  nav ul {
-</span><span class='line'>    display: none;
-</span><span class='line'>  }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>至此，小说网站的响应式改造就基本完成了。如果您觉得对你有所帮助，请将此文发送给你的朋友，如果你还有更好的建议也可以在下面的评论中分享你的经验。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2013/05/24/create-novel-website-with-html5/">使用HTML5创建小说网站</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2013-05-24T15:04:32+08:00" pubdate data-updated="true">May 24<sup>th</sup>, 2013</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在项目开始前，先要了解下HTML5规范包含的一些有用的新的语义标签，用于提供HTML页面的各个区域或部分的意义，例如页眉、页脚、导航栏、边栏等等。在以前的HTML版本中，这些部分通常使用div标签来创建，通过id或class属性来区分。</p>
-
-<p>HTML5引入的主要标签包括：</p>
-
-<p>header标签<br />
-此标签用于定义WEB页面某些部分的页眉，可以是整个页面、article标签或section标签。</p>
-
-<p>nav标签<br />
-这是WEB页面上主要导航链接的容器。此标签不应用于所有链接组，而是应仅用于主要导航块。如果您有一个footer标签包含导航链接，不需要将这些链接封装在nav标签中，因为footer标签将可以独自包括这些链接。</p>
-
-<p>footer标签<br />
-此标签定义页面的某些部分的页脚。页脚不一定是在页面、文章或区域的结尾，但是它通常是在那个位置。</p>
-
-<p>article标签<br />
-定义文档或页面上的独立区块，例如新闻、杂志、博文或评论。</p>
-
-<p>section标签<br />
-此标签表示文档的一部分，例如，文章或教程的一章或一节。该标签通常具有一个页眉，虽然严格来说是不需要的。</p>
-
-<p>aside标签<br />
-用于标记边栏或一些将认为与其周围内容有点无关的内容。此项的一个例子就是广告块。</p>
-
-<p>hgroup标签<br />
-在某些情况下，页面、文章或区域可能需要多个标题，例如，您有一个标题和一个副标题。您可以在hgroup标签中封装这些标题，使用h1标签表示主标题，h2标签表示副标题。</p>
-
-<p>这些标签的基础结构遵循以下大纲：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>header
-</span><span class='line'>  hgroup
-</span><span class='line'>nav
-</span><span class='line'>article
-</span><span class='line'>  header
-</span><span class='line'>  section
-</span><span class='line'>    header
-</span><span class='line'>footer</span></code></pre></td></tr></table></div></figure>
-
-
-<p><img src="/uploads/html5-novel-layout.png" title="html5-novel-layout" >
-上面是网站的布局设计，主要有header、navigation、footer和main四个区块，实现代码如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;!-- HTML5的DOCTYPE声明模式，它可以向后兼容，
-</span><span class='line'>     再也不用记忆XHTML中复杂的DOCTYPE了！--&gt;
-</span><span class='line'>&lt;!DOCTYPE html&gt;
-</span><span class='line'>&lt;html&gt;
-</span><span class='line'>&lt;head&gt;
-</span><span class='line'>  &lt;!-- 指定文档字符编码的写法，该写法在所有浏览器上都有效。--&gt;
-</span><span class='line'>  &lt;meta charset="utf-8" /&gt;
-</span><span class='line'>  &lt;title&gt;HTML5 + CSS3 Demo&lt;/title&gt;
-</span><span class='line'>  &lt;!-- link和script标签也无需提供type属性（No More Types for Scripts and Links），
-</span><span class='line'>       因为CSS和JavaScript是目前惟一受支持的样式表和脚本类型 --&gt;
-</span><span class='line'>  &lt;link href="style.css" rel="stylesheet" /&gt;
-</span><span class='line'>  &lt;!-- 因为IE浏览器（甚至版本8）不支持新的HTML5标签，处理此问题的一个已知方法是使用
-</span><span class='line'>       JavaScript函数document.createElement()为每个标记创建虚拟标签。html5.js文件将
-</span><span class='line'>       为每个新的HTML标签进行此操作 --&gt;
-</span><span class='line'>  &lt;!--[if lt IE 9]&gt;
-</span><span class='line'>    &lt;script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"&gt;&lt;/script&gt;
-</span><span class='line'>  &lt;![endif]--&gt;
-</span><span class='line'>&lt;/head&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;body&gt;
-</span><span class='line'>  &lt;header&gt;
-</span><span class='line'>    &lt;hgroup&gt;
-</span><span class='line'>      &lt;h1&gt;logo&lt;/h1&gt;
-</span><span class='line'>      &lt;h2&gt;tagline&lt;/h2&gt;
-</span><span class='line'>    &lt;/hgroup&gt;
-</span><span class='line'>  &lt;/header&gt;
-</span><span class='line'>
-</span><span class='line'>  &lt;nav&gt;
-</span><span class='line'>    &lt;ul&gt;
-</span><span class='line'>      &lt;li&gt;&lt;a href="#"&gt;Catalog 1&lt;/a&gt;&lt;/li&gt;
-</span><span class='line'>      &lt;li&gt;&lt;a href="#"&gt;Catalog 2&lt;/a&gt;&lt;/li&gt;
-</span><span class='line'>      &lt;li&gt;&lt;a href="#"&gt;Catalog 3&lt;/a&gt;&lt;/li&gt;
-</span><span class='line'>      &lt;li&gt;&lt;a href="#"&gt;Catalog 4&lt;/a&gt;&lt;/li&gt;
-</span><span class='line'>    &lt;/ul&gt;
-</span><span class='line'>  &lt;/nav&gt;
-</span><span class='line'>
-</span><span class='line'>  &lt;!-- main block begin --&gt;
-</span><span class='line'>  &lt;!-- main block end --&gt;
-</span><span class='line'>
-</span><span class='line'>  &lt;footer&gt;&copy; 2013&lt;/footer&gt;
-</span><span class='line'>&lt;/body&gt;
-</span><span class='line'>&lt;/html&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-<span class='line-number'>44</span>
-<span class='line-number'>45</span>
-<span class='line-number'>46</span>
-<span class='line-number'>47</span>
-<span class='line-number'>48</span>
-<span class='line-number'>49</span>
-<span class='line-number'>50</span>
-<span class='line-number'>51</span>
-<span class='line-number'>52</span>
-<span class='line-number'>53</span>
-<span class='line-number'>54</span>
-<span class='line-number'>55</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>* {
-</span><span class='line'>  font-family: Lucida Sans, Arial, Helvetica, sans-serif;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>body {
-</span><span class='line'>  width: 768px;
-</span><span class='line'>  margin: 0px auto;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>header h1 {
-</span><span class='line'>  font-size: 36px;
-</span><span class='line'>  margin: 0px;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>header h2 {
-</span><span class='line'>  font-size: 18px;
-</span><span class='line'>  margin: 0px;
-</span><span class='line'>  color: #888;
-</span><span class='line'>  font-style: italic;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>nav ul {
-</span><span class='line'>  list-style: none;
-</span><span class='line'>  padding: 0px;
-</span><span class='line'>  display: block;
-</span><span class='line'>  background-color: #666;
-</span><span class='line'>  padding-left: 4px;
-</span><span class='line'>  height: 24px;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>nav ul li {
-</span><span class='line'>  display: inline;
-</span><span class='line'>  padding: 0px 20px 5px 10px;
-</span><span class='line'>  height: 24px;
-</span><span class='line'>  border-right: 1px solid #ccc;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>nav ul li a {
-</span><span class='line'>  color: #efd3d3;
-</span><span class='line'>  text-decoration: none;
-</span><span class='line'>  font-size: 13px;
-</span><span class='line'>  font-weight: bold;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>nav ul li a:hover {
-</span><span class='line'>  color: #fff;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>footer {
-</span><span class='line'>  border-top: 1px solid #ccc;
-</span><span class='line'>  text-align: center;
-</span><span class='line'>  font-size: 12px;
-</span><span class='line'>  color: #888;
-</span><span class='line'>  margin-top: 24px;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>整个网站主要有这么几个页面：首页、分类页、书目页、内容页，这些页面共用一个布局，主要区别在于main区块的不同。首页、分类页和书目页相似，都是由列表组成。</p>
-
-<p>首页是多个无序列表：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;h3&gt;Latest&lt;/h3&gt;
-</span><span class='line'>&lt;ul&gt;
-</span><span class='line'>  &lt;li&gt;Book's title&lt;/li&gt;
-</span><span class='line'>  &lt;li&gt;Book's title&lt;/li&gt;
-</span><span class='line'>&lt;/ul&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;h3&gt;Most Viewed&lt;/h3&gt;
-</span><span class='line'>&lt;ul&gt;
-</span><span class='line'>  &lt;li&gt;Book's title&lt;/li&gt;
-</span><span class='line'>  &lt;li&gt;Book's title&lt;/li&gt;
-</span><span class='line'>&lt;/ul&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;h3&gt;Most Shared&lt;/h3&gt;
-</span><span class='line'>&lt;ul&gt;
-</span><span class='line'>  &lt;li&gt;Book's title&lt;/li&gt;
-</span><span class='line'>  &lt;li&gt;Book's title&lt;/li&gt;
-</span><span class='line'>&lt;/ul&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>分类页是单个无序列表：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;h3&gt;Catalog 1&lt;/h3&gt;
-</span><span class='line'>&lt;ul&gt;
-</span><span class='line'>  &lt;li&gt;Book's title&lt;/li&gt;
-</span><span class='line'>  &lt;li&gt;Book's title&lt;/li&gt;
-</span><span class='line'>&lt;/ul&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>书目页是单个有序列表：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;h3&gt;Book's title&lt;/h3&gt;
-</span><span class='line'>&lt;ol&gt;
-</span><span class='line'>  &lt;li&gt;Chapter 1&lt;/li&gt;
-</span><span class='line'>  &lt;li&gt;Chapter 2&lt;/li&gt;
-</span><span class='line'>  &lt;li&gt;Chapter 3&lt;/li&gt;
-</span><span class='line'>&lt;/ol&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p><img src="/uploads/html5-novel-article.png" title="html5-novel-article" >
-内容页，顾名思义就是显示小说具体内容的页面。文章内容用article标签表示，其中的标题、作者、发表时间等信息被包含在header标签中。主要代码如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;article&gt;
-</span><span class='line'>  &lt;header&gt;
-</span><span class='line'>    &lt;h1&gt;&lt;a href="#"&gt;Title&lt;/a&gt;&lt;/h1&gt;
-</span><span class='line'>    &lt;p&gt;By &lt;a href="#"&gt;Peter&lt;/a&gt; on &lt;time&gt;2011-11-12 14:54&lt;/time&gt;&lt;/p&gt;
-</span><span class='line'>  &lt;/header&gt;
-</span><span class='line'>  &lt;p&gt;Lorem ipsum...&lt;/p&gt;
-</span><span class='line'>  &lt;section&gt;
-</span><span class='line'>    &lt;header&gt;
-</span><span class='line'>      &lt;h1&gt;This is a section heading&lt;/h1&gt;
-</span><span class='line'>    &lt;/header&gt;
-</span><span class='line'>    &lt;p&gt;Lorem ipsum...&lt;/p&gt;
-</span><span class='line'>  &lt;/section&gt;
-</span><span class='line'>  &lt;footer&gt;
-</span><span class='line'>    &lt;a href="#"&gt;Back&lt;/a&gt;
-</span><span class='line'>    &lt;a href="#"&gt;List&lt;/a&gt;
-</span><span class='line'>    &lt;a href="#"&gt;Forward&lt;/a&gt;
-</span><span class='line'>  &lt;/footer&gt;
-</span><span class='line'>&lt;/article&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>在上面的代码里，header标签中我们仅使用了h1标签，这是因为HTML5会根据上下文计算出heading元素的层级，因此会有：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;body&gt;&lt;h1&gt;    &lt;!-- 相当于heading 1 --&gt;
-</span><span class='line'>&lt;body&gt; ... &lt;section&gt;&lt;h1&gt;    &lt;!-- 相当于heading 2 --&gt;
-</span><span class='line'>&lt;body&gt; ... &lt;section&gt;&lt;section&gt;&lt;h1&gt;    &lt;!-- 相当于heading 3 --&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>最后顺便说一句，HTML5支持已存在的各种写法：xhtml1.0、xhtml1.1和html4.0，但建议使用xhtml1.1规范，即：</p>
-
-<ol>
-<li>所有标签/属性都使用小写字母;</li>
-<li>所有属性值都必须加引号;</li>
-<li>使用闭合标签。</li>
-</ol>
-
 </div>
   
   
@@ -1518,6 +319,453 @@
 
     </article>
   
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2013/04/11/the-proper-way-to-draw-rounded-corners/">绘制圆角的正确方法</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2013-04-11T14:59:45+08:00" pubdate data-updated="true">Apr 11<sup>th</sup>, 2013</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>英文原文：<a href="http://www.usabilitypost.com/2009/01/26/the-proper-way-to-draw-rounded-corners/">http://www.usabilitypost.com/2009/01/26/the-proper-way-to-draw-rounded-corners/</a></p>
+
+<p>在网络上，我已经注意到当人们在他们的设计中实现圆角时犯了很多同样的错误。因为某些原因，当有另外一个圆角在它里面的时候，这个圆角会带来一个问题—无论是有一个围绕周围的边界，还是另一个圆角形状坐落在一个圆角形状内。</p>
+
+<p>这里是我要说的：</p>
+
+<p><img src="/uploads/bad-corner.png" title="bad-corner" ></p>
+
+<p>我看到了很多这种类型的圆角。您可以看到圆角的半径和内圆角的是相同的。这是错误的，因为如果你保持相同半径，两个拐角之间的空间量不会自始至终相等。</p>
+
+<p>下面是相等间距看起来的样子：</p>
+
+<p><img src="/uploads/good-corner.png" title="good-corner" ></p>
+
+<p>这是正确的做法。有什么不同？内角的半径被减小了。好吧，但你怎么知道半径应该有多大？这很简单—如果你把外面的圆角想象成一个圆形，你可以看到它的圆心在哪里。</p>
+
+<p><img src="/uploads/corner-center.png" title="corner-center" ></p>
+
+<p>把这个圆心同样地作为内角的圆心，你就会得到内角的半径。使用这种方法将确保两个形状之间的完美契合。</p>
+
+<p><img src="/uploads/good-corner-ruler.png" title="good-corner-ruler" ></p>
+
+<p>现在你知道了吧？这是做多个圆角彼此包含的正确办法。当然，不需要你使用精确的圆心—有时为了设计良好还需要你移动一点点。但请不要仅仅把相同的圆角向内移动—这是绝对错误的。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2013/03/13/logic-problems-the-teachers-birthday/">逻辑题-老师的生日</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2013-03-13T10:01:28+08:00" pubdate data-updated="true">Mar 13<sup>th</sup>, 2013</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>小明和小强都是某老师的学生，老师的生日是M月N日，他们都知道老师的生日是以下十组中的一个。老师把M告诉了小明，把N告诉了小强，然后问他们是否知道自己的生日。小明说“如果我不知道小强也不知道”，小强说“本来我不知道，你说了这话我就知道了”，小明说“那我也知道了 ”。问老师的生日是以下的哪个？</p>
+
+<p>3/4, 3/5, 3/8, 6/4, 6/7, 9/1, 9/5, 12/1, 12/2, 12/8</p>
+
+<p>按M排：<br />
+3/4, 3/5, 3/8<br />
+6/4, 6/7<br />
+9/1, 9/5<br />
+12/1, 12/2, 12/8</p>
+
+<p>按N排：<br />
+9/1, 12/1<br />
+12/2<br />
+3/4, 6/4<br />
+3/5, 9/5<br />
+6/7<br />
+3/8, 12/8</p>
+
+<p>条件一：小明说“如果我不知道小强也不知道”<br />
+分析：因为M都是重复的，所以小明一定不知道。小明知道M以后肯定小强不知道，说明N肯定也是重复，可以剔除12/2和6/7这两个日期。另外，还可以排队N为2与7所对应的月份，因为当老师生日的M为6或12时，小强是有可能知道的，与已知条件相违背。<br />
+结果：3/4, 3/5, 3/8, 9/1, 9/5</p>
+
+<p>按M排：<br />
+3/4, 3/5, 3/8<br />
+9/1, 9/5</p>
+
+<p>按N排：<br />
+3/4<br />
+3/5, 9/5<br />
+3/8<br />
+9/1</p>
+
+<p>条件二：小强说“本来我不知道，你说了这话我就知道了”<br />
+分析：根据上面的结果和条件二可以知道，现在N一定不能是重复的，可以把3/5和9/5排除。<br />
+结果：3/4, 3/8, 9/1</p>
+
+<p>按M排：<br />
+3/4, 3/8<br />
+9/1</p>
+
+<p>按N排：<br />
+3/4<br />
+3/8<br />
+9/1</p>
+
+<p>条件三：小明说“那我也知道了”<br />
+分析：综合条件二的结果和条件三可以判定现在M应该是单一的，所以只能是9。<br />
+结果：9/1</p>
+
+<p>老师的生日为9/1。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2013/02/24/do-we-really-need-naming-conventions-for-interfaces/">我们真的需要接口命名规范吗？</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2013-02-24T13:34:04+08:00" pubdate data-updated="true">Feb 24<sup>th</sup>, 2013</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>英文原文：<a href="http://www.adam-bien.com/roller/abien/entry/in_the_age_of_dryness">http://www.adam-bien.com/roller/abien/entry/in_the_age_of_dryness</a></p>
+
+<p>译者：感觉这篇文章讲的不错，也不算太长，就翻译了过来。</p>
+
+<p>在过去的项目/审查中我发现了如下的接口及其实现的命名规范：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>IService service = new Service();
+</span><span class='line'>
+</span><span class='line'>Service service = new ServiceImpl();
+</span><span class='line'>
+</span><span class='line'>ServiceIF service = new Service();</span></code></pre></td></tr></table></div></figure>
+
+
+<p>每一条都含有多余信息。无论是强调接口或其实现，相关信息都已经包含在代码中，所以都是多余的。这种命名规范仅当你真的不知道如何命名实现的时候才需要，作为去思考一个名称的替代，它更容易依靠现有的模板。</p>
+
+<p>实现名称的缺乏可能也是作为它的非充分责任的一个指标（an indicator for it&#8217;s unsufficient responsibilities）。因此，如果你找不到一个适当的实现名称，考虑移除接口直接暴露实现可能是个好主意－没有奇怪的规范。实际上JDK中没有这样的规范，接口及其实现也经常称为不同（are often even called differently）：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Runnable r = new Thread();
+</span><span class='line'>
+</span><span class='line'>RootPaneContainer c = new JFrame();
+</span><span class='line'>
+</span><span class='line'>TableModel t = new DefaultTableModel();
+</span><span class='line'>
+</span><span class='line'>Remote remote = new UnicastRemoteObject();</span></code></pre></td></tr></table></div></figure>
+
+
+<p>接口的目的是抽象或从几个实现解耦。一个单一的实现并不需要通过接口来解耦。也有一些例外的规则，如需要使用动态代理等。</p>
+
+<p>通过单个的，有着奇怪命名规范的实现（implementation）来实现（realize）一个接口不应该被认为是一般的最佳实践&#8230;</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2013/02/24/logic-problems-100-lamps/">逻辑题-100盏电灯</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2013-02-24T08:56:21+08:00" pubdate data-updated="true">Feb 24<sup>th</sup>, 2013</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>房间里有100盏电灯，编号为1，2，3&#8230;100，每盏灯上有一个按钮，初始时灯全都是关的。</p>
+
+<p>编好号的100位同学由房间外依次走进去，将自己编号的倍数的灯的按钮全部按一次，例如第一位同学把编号是1的倍数的灯的按钮按一下（此时100盏灯全亮），第二位同学把编号是2的倍数的灯的按钮按一下（此时只有50盏灯亮着，50盏被这个人按灭了）&#8230;第100位同学把编号是100的倍数的灯（即编号为100的灯）的按钮按一下，请问依次走完后，还有多少盏灯亮着？</p>
+
+<p>解题思路：<br />
+被按过奇数次的灯亮着，偶数次的灯关了。<br />
+因为每个同学会把自己编号的倍数的灯全部按一次，所以：<br />
+1号灯会被1号同学按下；<br />
+2号灯会被1，2号同学按下；<br />
+3号灯会被1，3号同学按下；<br />
+4号灯会被1，2，4号同学按下；<br />
+&#8230;<br />
+10号灯会被1，2，5，10号同学按下；<br />
+&#8230;</p>
+
+<p>从上面可以总结出n号灯会被以它所有约数为编号的同学按下。</p>
+
+<p>这样，问题就变成了求每盏灯的编号有多少个约数的数学问题。如果约数个数为奇数，灯亮着；反之，灯关着。</p>
+
+<p>Ruby代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># Light state: ON/OFF = true/false
+</span><span class='line'>lamps = Array.new(100, false)
+</span><span class='line'>
+</span><span class='line'>1.upto(lamps.length) do |lno|
+</span><span class='line'>  1.upto(lno) do |fno|
+</span><span class='line'>    lamps[lno - 1] = !lamps[lno - 1] if lno % fno == 0
+</span><span class='line'>  end
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>lamps.each_index do |i|
+</span><span class='line'>  print "Light #{i + 1} is "
+</span><span class='line'>  puts lamps[i] ? "ON" : "OFF"
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>最后，我们会发现编号1，4，9，16，25&#8230;100的灯是亮着的，其它都是灭的。即编号值可以开出整数平方根的灯是亮的。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2012/12/06/how-to-extract-random-digit-without-replacement-from-array/">如何从数组中抽取随机不重复的数字</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-12-06T05:49:29+08:00" pubdate data-updated="true">Dec 6<sup>th</sup>, 2012</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>今天浏览订阅的博客时发现了一个巧妙的从数组中抽取随机不重复数字的算法。譬如，在100个不重复的数字中选择10个不相同的数字，通过这个算法就不需要修改数组长度和删除数组元素等。具体算法如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>int[] numbers = new int[100];
+</span><span class='line'>int[] selected = new int[10];
+</span><span class='line'>
+</span><span class='line'>for (int i = 0, n = numbers.length; i &lt; selected.length; i++) {
+</span><span class='line'>    int idx = (int)(Math.random() * n);    // 随机产生一个从0 - (n-1)的数字
+</span><span class='line'>    selected[i] = numbers[idx];
+</span><span class='line'>    numbers[idx] = numbers[n - 1];
+</span><span class='line'>    n--;    // 减1，从而在下次循环时产生的随机的numbers数组下标的范围从0 - (n-1)-1，
+</span><span class='line'>            // 保证了上一步中已经赋值给数组中其它数的numbers[n-1]不会在下次循环中给
+</span><span class='line'>            // 取得，确保了产生的数组selected中的数为不重复的。
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2012/07/28/css-naming-conventions/">CSS命名规范</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-07-28T02:27:06+08:00" pubdate data-updated="true">Jul 28<sup>th</sup>, 2012</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>收集了网上的一些CSS命名规范，根据自己的理解和需求整理了一遍。</p>
+
+<p>1、布局（layout）</p>
+
+<ul>
+<li>container 就是将页面中的所有元素包在一起的部分</li>
+<li>header 页面的头部区域，包含站点的logo和一些其他元素</li>
+<li>navbar 横向导航栏，最典型的网页元素</li>
+<li>breadcrumbs 即页面所处位置的导航提示</li>
+<li>content 是站点的主要区域</li>
+<li>sidebar</li>
+<li>footer</li>
+</ul>
+
+
+<p>2、头部（header）</p>
+
+<ul>
+<li>logo</li>
+<li>tagline</li>
+</ul>
+
+
+<p>3、导航栏（navbar）</p>
+
+<ul>
+<li>mainnav</li>
+<li>subnav</li>
+<li>topnav</li>
+</ul>
+
+
+<p>4、侧边栏（sidebar）</p>
+
+<ul>
+<li>menu 包含一般的链接。sidebar中可以包含多个menu</li>
+</ul>
+
+
+<p>5、常用</p>
+
+<ul>
+<li>userbar 登录注册条</li>
+<li>copyright</li>
+<li>banner</li>
+<li>feature</li>
+</ul>
+
+</div>
+  
+  
+
+
+    </article>
+  
   <div class="pagination">
     
       <a class="prev" href="/posts/2">&larr; Older</a>
@@ -1533,10 +781,6 @@
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/2014/08/05/migrating-wordpress-to-octopress/">Wordpress迁移到Octopress</a>
-      </li>
-    
-      <li class="post">
         <a href="/blog/2014/07/17/problem-with-nokogiri-when-url-containing-chinese-character/">Nokogiri抓取页面URL含有中文参数的问题</a>
       </li>
     
@@ -1549,7 +793,11 @@
       </li>
     
       <li class="post">
-        <a href="/blog/2014/07/06/raspberry-pi-wifi-with-static-ip-address/">Raspberry Pi使用无线网卡</a>
+        <a href="/blog/2013/05/19/agile-decline/">敏捷开发走下坡路了吗？</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2013/04/11/the-proper-way-to-draw-rounded-corners/">绘制圆角的正确方法</a>
       </li>
     
   </ul>
@@ -1563,21 +811,21 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 133%" href="/tags/android/">Android</a>
-<a style="font-size: 111%" href="/tags/crack/">Crack</a>
-<a style="font-size: 108%" href="/tags/database/">Database</a>
-<a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
-<a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
-<a style="font-size: 135%" href="/tags/java/">Java</a>
-<a style="font-size: 108%" href="/tags/mysql/">MySQL</a>
-<a style="font-size: 116%" href="/tags/powerbuilder/">PowerBuilder</a>
-<a style="font-size: 120%" href="/tags/qianbao/">Qianbao</a>
+    <a style="font-size: 106%" href="/tags/antlr/">ANTLR</a>
+<a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
+<a style="font-size: 126%" href="/tags/android/">Android</a>
+<a style="font-size: 117%" href="/tags/crack/">Crack</a>
+<a style="font-size: 98%" href="/tags/database/">Database</a>
+<a style="font-size: 98%" href="/tags/eclipse/">Eclipse</a>
+<a style="font-size: 139%" href="/tags/java/">Java</a>
+<a style="font-size: 112%" href="/tags/listview/">ListView</a>
+<a style="font-size: 106%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 106%" href="/tags/powerscript/">PowerScript</a>
+<a style="font-size: 139%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
-<a style="font-size: 101%" href="/tags/ruby/">Ruby</a>
-<a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 97%" href="/tags/translation/">Translation</a>
-<a style="font-size: 105%" href="/tags/windows-server-2008/">Windows Server 2008</a>
-<a style="font-size: 108%" href="/tags/wxwidgets/">wxWidgets</a>
+<a style="font-size: 106%" href="/tags/ruby/">Ruby</a>
+<a style="font-size: 112%" href="/tags/translation/">Translation</a>
+<a style="font-size: 98%" href="/tags/w32dasm/">W32Dasm</a>
 
   </ul>
 </section>

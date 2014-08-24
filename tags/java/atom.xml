@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Java | 乐者为王]]></title>
   <link href="http://codemany.com/tags/java/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-08-22T23:28:43+08:00</updated>
+  <updated>2014-08-24T18:55:48+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,681 +12,6 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
-  
-  <entry>
-    <title type="html"><![CDATA[使用Interceptor禁止用户访问未授权的图书信息]]></title>
-    <link href="http://codemany.com/blog/2013/02/01/interceptor-prohibit-users-from-accessing-unauthorized-books/"/>
-    <updated>2013-02-01T02:50:02+08:00</updated>
-    <id>http://codemany.com/blog/2013/02/01/interceptor-prohibit-users-from-accessing-unauthorized-books</id>
-    <content type="html"><![CDATA[<p>现在的JBookShelf有两个问题：<br />
-1. 未登录的用户可以访问图书信息；<br />
-2. 登录后的用户可以访问其他用户的图书信息。</p>
-
-<p>第一个问题可以使用Struts 2的Interceptor来解决：<br />
-1. 创建一个实现了Interceptor接口的类；<br />
-2. 在struts.xml配置中定义这个拦截器；<br />
-3. 在struts.xml中定义一个使用了上面拦截器的拦截栈；<br />
-4. 在struts.xml中定义一个全局转向配置。</p>
-
-<p>实现自己的拦截器有点要注意的是，拦截器必须是无状态的，不要使用在API提供的ActionInvocation之外的任何东西。要求拦截器是无状态的原因是Struts 2不能保证为每一个请求或者action创建一个实例，所以如果拦截器带有状态，会引发并发问题。</p>
-
-<p>创建AuthorizationInterceptor类，继承类AbstractInterceptor。为什么继承它呢？而不是直接实现接口Interceptor。这是因为AbstractInterceptor已经实现了Interceptor接口，并且实现了接口中的init和destroy方法。而在这个拦截器中，我们并不需要使用这两个方法。下面上代码：
-```
-package com.codemany.account.interceptor;</p>
-
-<p>import java.util.Collections;
-import java.util.Set;</p>
-
-<p>import com.codemany.account.model.User;</p>
-
-<p>import com.opensymphony.xwork2.Action;
-import com.opensymphony.xwork2.ActionInvocation;
-import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
-import com.opensymphony.xwork2.util.TextParseUtil;</p>
-
-<p>public class AuthorizationInterceptor extends AbstractInterceptor {</p>
-
-<pre><code>private static final long serialVersionUID = -5140884040684756043L;
-
-protected Set&lt;String&gt; skipActions = Collections.emptySet();
-
-public void setSkipActions(String skipActions) {
-    this.skipActions = TextParseUtil.commaDelimitedStringToSet(skipActions);
-}
-
-@Override
-public String intercept(ActionInvocation invocation) throws Exception {
-    User user = (User)invocation.getInvocationContext()
-            .getSession().get(User.SESSION_KEY);
-
-    boolean isLogined = user != null;
-    String action = invocation.getProxy().getActionName();
-    // 如果用户未登录，并且访问的是需要登录权限的Action，就跳转到全局转向配置login上
-    if (isLogined || skipActions.contains(action)) {
-        return invocation.invoke();
-    } else {
-        return Action.LOGIN;
-    }
-}
-</code></pre>
-
-<p>}
-```</p>
-
-<p>这里的skipActions目的是为了跳过一些不需要拦截的Action。因为默认情况下，拦截器会拦截Action中的所有的方法。像login，register这类Action是任何用户在任何状态下都可以访问的，所以不需要拦截，这里就可以将这些Action放到skipActions中来跳过拦截。</p>
-
-<p>实现了拦截类后还要在struts.xml进行配置使它起作用，以下是struts.xml的完整代码：
-```
-&lt;?xml version="1.0" encoding="utf-8"?>
-&lt;!DOCTYPE struts PUBLIC</p>
-
-<pre><code>"-//Apache Software Foundation//DTD Struts Configuration 2.3//EN"
-"http://struts.apache.org/dtds/struts-2.3.dtd"&gt;
-</code></pre>
-
-<p><struts></p>
-
-<pre><code>&lt;constant name="struts.enable.DynamicMethodInvocation" value="true" /&gt;
-&lt;constant name="struts.devMode" value="true" /&gt;
-
-&lt;package name="default" extends="struts-default"&gt;
-    &lt;interceptors&gt;
-        &lt;interceptor name="authorization"
-            class="com.codemany.account.interceptor.AuthorizationInterceptor" /&gt;
-
-        &lt;interceptor-stack name="authorizationStack"&gt;
-            &lt;interceptor-ref name="authorization"&gt;
-                &lt;param name="skipActions"&gt;login, logout, register&lt;/param&gt;
-            &lt;/interceptor-ref&gt;
-            &lt;interceptor-ref name="defaultStack" /&gt;
-        &lt;/interceptor-stack&gt;
-    &lt;/interceptors&gt;
-
-    &lt;default-interceptor-ref name="authorizationStack" /&gt;
-
-    &lt;!-- 全局转向配置 --&gt;
-    &lt;!-- 还记得拦截器里面的return Action.LOGIN这句吧，当程序执行完这一行后，--&gt;
-    &lt;!-- 就会到struts.xml文件的global-results中找name为login的全局转向配置。--&gt;
-    &lt;global-results&gt;
-        &lt;result name="login" type="redirectAction"&gt;login!input&lt;/result&gt;
-    &lt;/global-results&gt;
-&lt;/package&gt;
-
-&lt;include file="account.xml" /&gt;
-&lt;include file="book.xml" /&gt;
-</code></pre>
-
-<p></struts>
-```</p>
-
-<p>然后将account.xml和book.xml中package继承的父包改成struts.xml配置中的default包：
-<code>
-&lt;package name="xxx" extends="default"&gt;
-</code></p>
-
-<p>第二个问题的解决就是重写BookAction.java的代码，不再从数据库中读取Book数据，而是从当前登录用户的books属性中查找Book信息。
-```
-package com.codemany.book.action;</p>
-
-<p>import java.util.ArrayList;
-import java.util.List;</p>
-
-<p>import com.codemany.account.model.User;
-import com.codemany.book.model.Book;
-import com.codemany.book.service.BookService;</p>
-
-<p>import com.opensymphony.xwork2.ActionContext;
-import com.opensymphony.xwork2.ActionSupport;</p>
-
-<p>public class BookAction extends ActionSupport {</p>
-
-<pre><code>private static final long serialVersionUID = 2538923417705852774L;
-
-private Long bookId;
-private Book book;
-private List&lt;Book&gt; bookList;
-
-private BookService bookService;
-
-public String list() throws Exception {
-    if (bookList == null) {
-        bookList = new ArrayList&lt;Book&gt;();
-    }
-    bookList.addAll(getCurrentUser().getBooks());
-    return "list";
-}
-
-public String show() throws Exception {
-    book = getCurrentUser().getBook(bookId);
-    return "show";
-}
-
-public String input() throws Exception {
-    if (bookId != null) {
-        book = getCurrentUser().getBook(bookId);
-    }
-    return INPUT;
-}
-
-public String saveOrUpdate() throws Exception {
-    book.setUser(getCurrentUser());
-    bookService.saveOrUpdateBook(book);
-    return SUCCESS;
-}
-
-public String delete() throws Exception {
-    Book book = getCurrentUser().getBook(bookId);
-    if (book != null) {
-        bookService.deleteBook(bookId);
-        getCurrentUser().getBooks().remove(book);
-    }
-    return SUCCESS;
-}
-
-public List&lt;Book&gt; getBookList() {
-    return bookList;
-}
-
-public Book getBook() {
-    return book;
-}
-
-public void setBook(Book book) {
-    this.book = book;
-}
-
-public void setBookId(Long bookId) {
-    this.bookId = bookId;
-}
-
-public void setBookService(BookService bookService) {
-    this.bookService = bookService;
-}
-
-private User getCurrentUser() {
-    return (User)ActionContext.getContext()
-            .getSession().get(User.SESSION_KEY);
-}
-</code></pre>
-
-<p>}
-```</p>
-
-<p>上面的代码会产生异常，提示取出的Book数据为空，所以要在User.hbm.xml中set标签后添加属性lazy=“false”，这样Hibernate从数据库中读取User数据时会连带取出对应的Book数据：
-<code>
-&lt;set name="books" inverse="true" lazy="false"&gt;
-</code></p>
-
-<p>下面是BookAction类中用到的User.getBook(bookId)代码：
-```
-public class User {</p>
-
-<pre><code>public Book getBook(Long bookId) {
-    for (Book book : books) {
-        if (bookId != null &amp;&amp; bookId.equals(book.getId())) {
-            return book;
-        }
-    }
-    return null;
-}
-</code></pre>
-
-<p>}
-```</p>
-
-<p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[实现图书的增删查改（CRUD）]]></title>
-    <link href="http://codemany.com/blog/2012/12/22/book-additions-and-deletions-investigation-changed-crud/"/>
-    <updated>2012-12-22T14:25:20+08:00</updated>
-    <id>http://codemany.com/blog/2012/12/22/book-additions-and-deletions-investigation-changed-crud</id>
-    <content type="html"><![CDATA[<p>图书的MySQL数据库创建脚本：<br />
-<code>
-CREATE TABLE books (&lt;br /&gt;
-  id int NOT NULL AUTO_INCREMENT,&lt;br /&gt;
-  title varchar(255) NOT NULL,&lt;br /&gt;
-  description text,&lt;br /&gt;
-  image_url varchar(255),&lt;br /&gt;
-  price decimal(8, 2) NOT NULL,&lt;br /&gt;
-  author varchar(255) NOT NULL,&lt;br /&gt;
-  isbn varchar(255) NOT NULL,&lt;br /&gt;
-  publisher varchar(255) NOT NULL,&lt;br /&gt;
-  user_id int NOT NULL,&lt;br /&gt;
-  PRIMARY KEY (id)&lt;br /&gt;
-) ENGINE=InnoDB DEFAULT CHARSET=utf-8;&lt;br /&gt;
-</code></p>
-
-<p>图书实体类文件Book.java主要代码：<br />
-```
-public class Book {<br /></p>
-
-<pre><code>private Long id;&lt;br /&gt;
-private String title;&lt;br /&gt;
-private String description;&lt;br /&gt;
-private String image_url;&lt;br /&gt;
-private double price;&lt;br /&gt;
-private String author;&lt;br /&gt;
-private String isbn;&lt;br /&gt;
-private String publisher;&lt;br /&gt;
-private User user;&lt;br /&gt;
-...&lt;br /&gt;
-</code></pre>
-
-<p>}
-```</p>
-
-<p>在User类中添加集合变量books：<br />
-```
-public class User {<br /></p>
-
-<pre><code>...&lt;br /&gt;
-private Set&lt;Book&gt; books = new HashSet&lt;Book&gt;();&lt;br /&gt;
-...&lt;br /&gt;
-</code></pre>
-
-<p>}
-```</p>
-
-<p>在User.hbm.xml中配置和图书的一对多关联：<br />
-```</p>
-
-<!-- Bidirectional one-to-many association to Book -->
-
-
-<p><set name="books" inverse="true"></p>
-
-<pre><code>&lt;key column="user_id" not-null="true" /&gt;
-&lt;one-to-many class="com.codemany.book.model.Book" /&gt;
-</code></pre>
-
-<p></set>
-```</p>
-
-<p>图书的表映射文件Book.hbm.xml代码：<br />
-```
-&lt;hibernate-mapping></p>
-
-<pre><code>&lt;class name="com.codemany.book.model.Book" table="books"&gt;
-    &lt;id name="id"&gt;
-        &lt;generator class="increment" /&gt;
-    &lt;/id&gt;
-
-    &lt;property name="title" not-null="true" /&gt;
-    &lt;property name="description" /&gt;
-    &lt;property name="image_url" /&gt;
-    &lt;property name="price" not-null="true" /&gt;
-    &lt;property name="author" not-null="true" /&gt;
-    &lt;property name="isbn" not-null="true" /&gt;
-    &lt;property name="publisher" not-null="true" /&gt;
-
-    &lt;many-to-one name="user" column="user_id" not-null="true" /&gt;
-&lt;/class&gt;
-</code></pre>
-
-<p>&lt;/hibernate-mapping>
-```</p>
-
-<p>BookService.java中的代码相对简单，因为没什么复杂的业务逻辑，只是负责把Action和Dao这两层连接起来。</p>
-
-<p>BookDao.java中的代码主要实现图书的读取，更新和删除：<br />
-```
-package com.codemany.book.dao;</p>
-
-<p>import java.util.List;</p>
-
-<p>import org.hibernate.Query;<br />
-import org.hibernate.Session;<br />
-import org.hibernate.SessionFactory;<br />
-import org.hibernate.Transaction;</p>
-
-<p>import com.codemany.book.model.Book;</p>
-
-<p>public class BookDao {<br /></p>
-
-<pre><code>private SessionFactory sessionFactory;
-
-public void setSessionFactory(SessionFactory sessionFactory) {&lt;br /&gt;
-    this.sessionFactory = sessionFactory;&lt;br /&gt;
-}
-
-public List&lt;Book&gt; getBookList() {&lt;br /&gt;
-    Session session = sessionFactory.openSession();&lt;br /&gt;
-    try {&lt;br /&gt;
-        Query query = session.createQuery("from Book b");&lt;br /&gt;
-        List&lt;Book&gt; bookList = query.list();&lt;br /&gt;
-        return bookList;&lt;br /&gt;
-    } finally {&lt;br /&gt;
-        session.close();&lt;br /&gt;
-    }&lt;br /&gt;
-}
-
-public Book getBook(Long bookId) {&lt;br /&gt;
-    Session session = sessionFactory.openSession();&lt;br /&gt;
-    try {&lt;br /&gt;
-        Query query = session.createQuery("from Book b where b.id = :id");&lt;br /&gt;
-        query.setLong("id", bookId);&lt;br /&gt;
-        query.setMaxResults(1);&lt;br /&gt;
-        return (Book)query.uniqueResult();&lt;br /&gt;
-    } finally {&lt;br /&gt;
-        session.close();&lt;br /&gt;
-    }&lt;br /&gt;
-}
-
-public void saveOrUpdateBook(Book book) {&lt;br /&gt;
-    Session session = sessionFactory.openSession();&lt;br /&gt;
-    Transaction ts = null;&lt;br /&gt;
-    try {&lt;br /&gt;
-        ts = session.beginTransaction();&lt;br /&gt;
-        session.saveOrUpdate(book);&lt;br /&gt;
-        ts.commit();&lt;br /&gt;
-    } finally {&lt;br /&gt;
-        session.close();&lt;br /&gt;
-    }&lt;br /&gt;
-}
-
-public void deleteBook(Long bookId) {&lt;br /&gt;
-    Session session = sessionFactory.openSession();&lt;br /&gt;
-    Transaction ts = null;&lt;br /&gt;
-    try {&lt;br /&gt;
-        ts = session.beginTransaction();&lt;br /&gt;
-        Book book = (Book)session.get(Book.class, bookId);&lt;br /&gt;
-        session.delete(book);&lt;br /&gt;
-        ts.commit();&lt;br /&gt;
-    } finally {&lt;br /&gt;
-        session.close();&lt;br /&gt;
-    }&lt;br /&gt;
-}&lt;br /&gt;
-</code></pre>
-
-<p>}
-```</p>
-
-<p>BookAction.java负责协调图书应用程序间的运转。接收访问请求，与模型进行交互，将合适的视图展示给用户：<br />
-```
-package com.codemany.book.action;</p>
-
-<p>import java.util.List;</p>
-
-<p>import com.codemany.account.model.User;<br />
-import com.codemany.book.model.Book;<br />
-import com.codemany.book.service.BookService;</p>
-
-<p>import com.opensymphony.xwork2.ActionContext;<br />
-import com.opensymphony.xwork2.ActionSupport;</p>
-
-<p>public class BookAction extends ActionSupport {<br /></p>
-
-<pre><code>private static final long serialVersionUID = 2538923417705852774L;
-
-private Long bookId;&lt;br /&gt;
-private Book book;&lt;br /&gt;
-private List&lt;Book&gt; bookList;&lt;br /&gt;
-private BookService bookService;
-
-public String list() throws Exception {&lt;br /&gt;
-    bookList = bookService.getBookList();&lt;br /&gt;
-    return "list";&lt;br /&gt;
-}
-
-public String show() throws Exception {&lt;br /&gt;
-    book = bookService.getBook(bookId);&lt;br /&gt;
-    return "show";&lt;br /&gt;
-}
-
-public String input() throws Exception {&lt;br /&gt;
-    if (bookId != null) {&lt;br /&gt;
-        book = bookService.getBook(bookId);&lt;br /&gt;
-    }&lt;br /&gt;
-    return INPUT;&lt;br /&gt;
-}
-
-public String saveOrUpdate() throws Exception {&lt;br /&gt;
-    User user = (User)ActionContext.getContext().getSession().get("user");&lt;br /&gt;
-    book.setUser(user);&lt;br /&gt;
-    bookService.saveOrUpdateBook(book);&lt;br /&gt;
-    return SUCCESS;&lt;br /&gt;
-}
-
-public String delete() throws Exception {&lt;br /&gt;
-    bookService.deleteBook(bookId);&lt;br /&gt;
-    return SUCCESS;&lt;br /&gt;
-}&lt;br /&gt;
-...&lt;br /&gt;
-</code></pre>
-
-<p>}
-```</p>
-
-<p>在applicationContext.xml中添加Book的相关配置，如下面代码所示：<br />
-```
-<bean id="sessionFactory" class="org.springframework.orm.hibernate4.LocalSessionFactoryBean"></p>
-
-<pre><code>...&lt;br /&gt;
-&lt;property name="mappingResources"&gt;
-    &lt;list&gt;
-        ...&lt;br /&gt;
-        &lt;value&gt;com/codemany/book/model/Book.hbm.xml&lt;/value&gt;
-    &lt;/list&gt;
-&lt;/property&gt;
-</code></pre>
-
-<p></bean>
-...</p>
-
-<!-- book -->
-
-
-<p><bean id="bookDao" class="com.codemany.book.dao.BookDao"></p>
-
-<pre><code>&lt;property name="sessionFactory" ref="sessionFactory" /&gt;
-</code></pre>
-
-<p></bean></p>
-
-<p><bean id="bookService" class="com.codemany.book.service.BookService"></p>
-
-<pre><code>&lt;property name="bookDao" ref="bookDao" /&gt;
-</code></pre>
-
-<p></bean></p>
-
-<p><bean id="bookAction" class="com.codemany.book.action.BookAction" scope="prototype"></p>
-
-<pre><code>&lt;property name="bookService" ref="bookService" /&gt;
-</code></pre>
-
-<p></bean>
-```</p>
-
-<p>在Struts 2配置文件struts.xml中include文件book.xml。以下是book.xml文件的内容：<br />
-```
-&lt;?xml version="1.0" encoding="utf-8"?>
-&lt;!DOCTYPE struts PUBLIC<br /></p>
-
-<pre><code>"-//Apache Software Foundation//DTD Struts Configuration 2.0//EN"&lt;br /&gt;
-"http://struts.apache.org/dtds/struts-2.0.dtd"&gt;
-</code></pre>
-
-<p><struts></p>
-
-<pre><code>&lt;package name="book" extends="struts-default"&gt;
-    &lt;action name="*Book" method="{1}" class="bookAction"&gt;
-        &lt;result name="list"&gt;/books/list.jsp&lt;/result&gt;
-        &lt;result name="show"&gt;/books/show.jsp&lt;/result&gt;
-        &lt;result name="input"&gt;/books/form.jsp&lt;/result&gt;
-        &lt;result type="redirectAction"&gt;listBook&lt;/result&gt;
-    &lt;/action&gt;
-&lt;/package&gt;
-</code></pre>
-
-<p></struts>
-```</p>
-
-<p>视图文件show.jsp作为显示单本图书的信息，代码很简单，就不放出来了，只把list.jsp和form.jsp的代码列出来。</p>
-
-<p>list.jsp用来显示所有的图书：<br />
-```
-<body></p>
-
-<h1>Listing books</h1>
-
-
-
-
-<table>
-    <tr>
-        <th>Title</th>
-        <th>Description</th>
-        <th>Image url</th>
-        <th>Price</th>
-        <th>Author</th>
-        <th>ISBN</th>
-        <th>Publisher</th>
-        <th>Action</th>
-    </tr>
-
-    <s:iterator value="bookList">
-    <tr>
-        <td><s:property value="title" /></td>
-        <td><s:property value="description" /></td>
-        <td><s:property value="image_url" /></td>
-        <td><s:property value="price" /></td>
-        <td><s:property value="author" /></td>
-        <td><s:property value="isbn" /></td>
-        <td><s:property value="publisher" /></td>
-        <td>
-            <s:a href="showBook.action?bookId=%{id}">Show</s:a>
-            <s:a href="inputBook.action?bookId=%{id}">Edit</s:a>
-            <s:a href="deleteBook.action?bookId=%{id}" method="delete">Destroy</s:a>
-        </td>
-    </tr>
-    </s:iterator>
-</table>
-
-
-<p>&lt;s:a action="inputBook">Add&lt;/s:a>
-</body>
-```</p>
-
-<p>当用户新建或者更新图书时，视图form.jsp就上场了。因为被两个逻辑使用，显示的标题等信息也不相同，所以需要判断图书的id是否存在，如果不存在的话即是新建业务，否则就是更新操作。<br />
-```
-<body>
-&lt;s:if test="book.id != null"></p>
-
-<pre><code>&lt;h1&gt;Editing book&lt;/h1&gt;
-</code></pre>
-
-<p>&lt;/s:if>
-&lt;s:else></p>
-
-<pre><code>&lt;h1&gt;Add book&lt;/h1&gt;
-</code></pre>
-
-<p>&lt;/s:else></p>
-
-<p>&lt;s:form action="saveOrUpdateBook" method="post"></p>
-
-<pre><code>&lt;div class="field"&gt;
-    &lt;s:hidden name="book.id" value="%{book.id}" /&gt;
-&lt;/div&gt;
-&lt;div class="field"&gt;
-    &lt;s:textfield name="book.title" label="Title" /&gt;
-&lt;/div&gt;
-&lt;div class="field"&gt;
-    &lt;s:textarea name="book.description" label="Description" rows="5" cols="25" /&gt;
-&lt;/div&gt;
-&lt;div class="field"&gt;
-    &lt;s:textfield name="book.image_url" label="Image URL" /&gt;
-&lt;/div&gt;
-&lt;div class="field"&gt;
-    &lt;s:textfield name="book.price" label="Price" /&gt;
-&lt;/div&gt;
-&lt;div class="field"&gt;
-    &lt;s:textfield name="book.author" label="Author" /&gt;
-&lt;/div&gt;
-&lt;div class="field"&gt;
-    &lt;s:textfield name="book.isbn" label="ISBN" /&gt;
-&lt;/div&gt;
-&lt;div class="field"&gt;
-    &lt;s:textfield name="book.publisher" label="Publisher" /&gt;
-&lt;/div&gt;
-&lt;div class="actions"&gt;
-    &lt;s:if test="book.id != null"&gt;
-    &lt;s:submit value="Update" /&gt;
-    &lt;/s:if&gt;
-    &lt;s:else&gt;
-    &lt;s:submit value="Save" /&gt;
-    &lt;/s:else&gt;
-</code></pre>
-
-<p>  </div>
-&lt;/s:form></p>
-
-<p>&lt;s:if test="book.id != null">
-&lt;s:a href="showBook.action?bookId=%{book.id}">Show&lt;/s:a> |
-&lt;/s:if>
-&lt;s:a action="listBook">Back&lt;/s:a>
-</body>
-```</p>
-
-<p>最后还要完成图书模型的服务端校验。Struts 2的校验文件有两种格式：ActionName-validation.xml和ActionName-alias-validation.xml。第一种会对该Action中的每个方法进行校验，不符合只对saveOrUpdate校验的要求。在BookAction.java同目录下创建BookAction-saveOrUpdateBook-validation.xml文件：<br />
-```
-<validators></p>
-
-<pre><code>&lt;field name="book"&gt;
-    &lt;field-validator type="visitor"&gt;
-        &lt;param name="appendPrefix"&gt;true&lt;/param&gt;
-        &lt;message /&gt;
-    &lt;/field-validator&gt;
-&lt;/field&gt;
-</code></pre>
-
-<p></validators>
-```</p>
-
-<p>当然，还要在Book.java所在的位置创建Book-validation.xml文件：<br />
-```
-<validators></p>
-
-<pre><code>&lt;field name="title"&gt;
-    &lt;field-validator type="required"&gt;
-        &lt;message&gt;Price is required&lt;/message&gt;
-    &lt;/field-validator&gt;
-&lt;/field&gt;
-...&lt;br /&gt;
-&lt;field name="price"&gt;
-    &lt;field-validator type="required"&gt;
-        &lt;message&gt;Price is required&lt;/message&gt;
-    &lt;/field-validator&gt;
-    &lt;field-validator type="double"&gt;
-        &lt;param name="minInclusive"&gt;0.01&lt;/param&gt;
-        &lt;message&gt;Price should be at least 0.01&lt;/message&gt;
-    &lt;/field-validator&gt;
-&lt;/field&gt;
-</code></pre>
-
-<p></validators>
-```</p>
-
-<p>看着BookAction-saveOrUpdateBook-validation.xml这么长的文件名是不是有点无语:)没关系，BookAction-validation.xml配置文件还是可以用的，只要在BookAction.java中那些不需要进行校验的方法上添加@SkipValidation；也可以在action配置中启用validation.excludeMethods参数：<br />
-```
-<action name="*Book" method="{1}" class="bookAction"></p>
-
-<pre><code>&lt;interceptor-ref name="defaultStack"&gt;
-    &lt;param name="validation.excludeMethods"&gt;list,show,input,delete&lt;/param&gt;
-&lt;/interceptor-ref&gt;
-...
-</code></pre>
-
-<p></action>
-```</p>
-
-<p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
-]]></content>
-  </entry>
   
   <entry>
     <title type="html"><![CDATA[如何从数组中抽取随机不重复的数字]]></title>
@@ -715,498 +40,338 @@ n--;    // 减1，从而在下次循环时产生的随机的numbers数组下标�
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[实现用户注册的功能]]></title>
-    <link href="http://codemany.com/blog/2012/09/22/register-functions/"/>
-    <updated>2012-09-22T11:11:25+08:00</updated>
-    <id>http://codemany.com/blog/2012/09/22/register-functions</id>
-    <content type="html"><![CDATA[<p>已经两个星期没有更新代码了，这次来给加上用户注册的功能。</p>
+    <title type="html"><![CDATA[将Nokia 6670的短信导入HTC Hero G3]]></title>
+    <link href="http://codemany.com/blog/2011/06/21/transfer-sms-from-nokia6670-to-htc-hero-g3/"/>
+    <updated>2011-06-21T08:43:10+08:00</updated>
+    <id>http://codemany.com/blog/2011/06/21/transfer-sms-from-nokia6670-to-htc-hero-g3</id>
+    <content type="html"><![CDATA[<p>这事本该N久前就该干了（09年末把手机从Nokia 6670换到HTC Hero G3），却一直拖着没有做，今天终于把这事作了一个了结。</p>
 
-<p>先在User.java中添加confirmPassword字段。然后在UserDao.java中添加保存用户的代码：<br />
-```
-public void addUser(User user) {<br /></p>
+<p>Nokia下导出的短信是如Messages_Nokia 6670_20091215.xml这样的一个XML文件，文件内容的编码是unicode，格式就像下面这样：</p>
 
-<pre><code>Session session = sessionFactory.openSession();&lt;br /&gt;
-Transaction ts = null;&lt;br /&gt;
-try {&lt;br /&gt;
-    ts = session.beginTransaction();&lt;br /&gt;
-    session.save(user);&lt;br /&gt;
-    ts.commit();&lt;br /&gt;
-} finally {&lt;br /&gt;
-    session.close();&lt;br /&gt;
-}&lt;br /&gt;
+<p>```
+&lt;?xml version="1.0" encoding="unicode"?>
+<SMS PhoneModel="Nokia 6670">
+  <Message DateTime="2011-06-21 10:10:10"></p>
+
+<pre><code>&lt;Sender&gt;路人甲&lt;/Sender&gt;
+&lt;PhoneNumber&gt;+8613988888888&lt;/PhoneNumber&gt;
+&lt;Location&gt;Inbox&lt;/Location&gt;
+&lt;Text&gt;我是路人甲&lt;/Text&gt;
+</code></pre>
+
+<p>  </Message></p>
+
+<p>  <Message DateTime="2011-06-21 11:11:11"></p>
+
+<pre><code>&lt;Sender&gt;路人乙&lt;/Sender&gt;
+&lt;PhoneNumber&gt;+8613966666666&lt;/PhoneNumber&gt;
+&lt;Location&gt;Outbox&lt;/Location&gt;
+&lt;Text&gt;我是路人乙&lt;/Text&gt;
+</code></pre>
+
+<p>  </Message>
+</SMS>
+```</p>
+
+<p>本来是想写个Android应用来直接导入这些备份短信的，不过在实现的过程中发现了SMS Backup&amp;Restore应用导出的备份文件和Nokia的备份文件类似，产生了做个将Nokia备份文件转换成SMS Backup&amp;Restore备份文件的念头，又在网上发现了nicholashan的教程<a href="http://bbs.hiapk.com/thread-140564-1-1.html">《将Nokia的短信导入Hero(可能适用所有Android机型)》</a>，坚定了我的这个想法。</p>
+
+<p>分析了一下SMS Backup&amp;Restore备份文件的格式，文件内容的编码是utf-8的：</p>
+
+<p>```
+&lt;?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<smses count="3">
+  &lt;sms protocol="0" address="10658658" date="1308629532000"</p>
+
+<pre><code>type="1" subject="null" body="我是内容" toa="null"
+sc_toa="null" service_center="null" read="1"
+status="-1" locked="0" /&gt;
+</code></pre>
+
+<p>  &lt;sms protocol="0" address="13566666666" date="1308633733000"</p>
+
+<pre><code>type="2" subject="null" body="我也是内容" toa="null"
+sc_toa="null" service_center="null" read="1"
+status="-1" locked="0" /&gt;
+</code></pre>
+
+<p>  &lt;sms protocol="0" address="+8613588888888" date="1308641377000"</p>
+
+<pre><code>type="1" subject="null" body="我还是内容" toa="null"
+sc_toa="null" service_center="null" read="1"
+status="-1" locked="0" /&gt;
+</code></pre>
+
+<p></smses>
+```</p>
+
+<p>与转换相关的就address、date、type和body四个属性。address是发信人的号码；date是短信发送日期的timestamp。这点nicholashan的确说错了，后面不需要加什么0的（实际上nicholashan自己也怀疑自己的说法）；type等于1表示别人发给你的短信，如果是2的话就是你发给其他人的短信；body就是短信内容了。</p>
+
+<p>将Nokia中的时间转换到SMS Backup&amp;Restore的时间可以使用下面的代码：</p>
+
+<p>```
+DateFormat dt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+long value = 1355296332000L;    // 2012-12-12 12:12:12
+Element e = (Element)iter.next();
+Attribute attr = e.attribute("DateTime");
+try {</p>
+
+<pre><code>value = dt.parse(attr.getValue()).getTime();
+</code></pre>
+
+<p>} catch (ParseException ex) {
+}
+```</p>
+
+<p>完整的代码如下（使用dom4j实现XML解析）：</p>
+
+<p>```
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Iterator;
+import java.util.List;</p>
+
+<p>import org.dom4j.Attribute;
+import org.dom4j.Document;
+import org.dom4j.DocumentException;
+import org.dom4j.DocumentHelper;
+import org.dom4j.Element;
+import org.dom4j.Node;
+import org.dom4j.io.SAXReader;
+import org.dom4j.io.XMLWriter;</p>
+
+<p>public class Main {</p>
+
+<pre><code>public static void main(String[] args) {
+    try {
+        SAXReader sr = new SAXReader();
+        Document doc = sr.read(new File(args[0]));
+
+        generateDocument(doc);
+    } catch (DocumentException e) {
+        e.printStackTrace();
+    } catch (IOException e) {
+        e.printStackTrace();
+    }
+}
+
+private static void generateDocument(Document doc) {
+    List list = doc.selectNodes("//Message");
+
+    Document document = DocumentHelper.createDocument();
+    Element smses = document.addElement("smses");
+    smses.addAttribute("count", String.valueOf(list.size()));
+
+    DateFormat dt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    long value = 1355296332000L;    // 2012-12-12 12:12:12
+    Iterator iter = list.iterator();
+    while (iter.hasNext()) {
+        Element e = (Element)iter.next();
+        Attribute attr = e.attribute("DateTime");
+        try {
+            value = dt.parse(attr.getValue()).getTime();
+        } catch (ParseException e) {
+            System.out.println(e.getMessage());
+        }
+        Node phone = e.selectSingleNode("PhoneNumber");
+        Node location = e.selectSingleNode("Location");
+        Node text = e.selectSingleNode("Text");
+
+        Element sms = smses.addElement("sms");
+        sms.addAttribute("protocol", "0");
+        sms.addAttribute("address", phone.getText());
+        sms.addAttribute("date", String.valueOf(value));
+        if ("Inbox".equals(location.getText())) {
+            sms.addAttribute("type", "1");
+        } else if ("Outbox".equals(location.getText())) {
+            sms.addAttribute("type", "2");
+        }
+        sms.addAttribute("subject", "null");
+        sms.addAttribute("body", text.getText());
+        sms.addAttribute("toa", "null");
+        sms.addAttribute("sc_toa", "null");
+        sms.addAttribute("service_center", "null");
+        sms.addAttribute("read", "1");
+        sms.addAttribute("status", "-1");
+        sms.addAttribute("locked", "0");
+    }
+
+    File f = new File("output.xml");
+    XMLWriter output = new XMLWriter(new FileWriter(f));
+    output.write(document);
+    output.close();
+}
 </code></pre>
 
 <p>}
 ```</p>
 
-<p>在UserService.java中添加以下代码：<br />
-```
-public void addUser(User user) throws UserAlreadyExistsException {<br /></p>
-
-<pre><code>User u = getUser(user.getUsername());&lt;br /&gt;
-if (u != null) {&lt;br /&gt;
-    //register.user.already.exists&lt;br /&gt;
-    throw new UserAlreadyExistsException();&lt;br /&gt;
-}&lt;br /&gt;
-userDao.addUser(user);&lt;br /&gt;
-</code></pre>
-
-<p>}
-```</p>
-
-<p>其中UserAlreadyExistsException.java代码如下：<br />
-```
-package com.codemany.account.service;</p>
-
-<p>public class UserAlreadyExistsException extends Exception {<br /></p>
-
-<pre><code>private static final long serialVersionUID = -7518737598462419360L;
-
-public UserAlreadyExistsException() {&lt;br /&gt;
-    super();&lt;br /&gt;
-}
-
-public UserAlreadyExistsException(String message) {&lt;br /&gt;
-    super(message);&lt;br /&gt;
-}
-
-public UserAlreadyExistsException(String message, Throwable cause) {&lt;br /&gt;
-    super(message, cause);&lt;br /&gt;
-}
-
-public UserAlreadyExistsException(Throwable cause) {&lt;br /&gt;
-    super(cause);&lt;br /&gt;
-}&lt;br /&gt;
-</code></pre>
-
-<p>}
-```</p>
-
-<p>在applicationContext.xml中加上一个bean：<br />
-```
-<bean id="registerAction" scope="prototype"<br /></p>
-
-<pre><code>    class="com.codemany.account.action.RegisterAction"&gt;
-&lt;property name="userService" ref="userService" /&gt;
-</code></pre>
-
-<p></bean>
-```</p>
-
-<p>然后在account.xml中添加register动作，并修改login动作相应的页面：<br />
-```
-<action name="login" class="loginAction"></p>
-
-<pre><code>&lt;result name="success"&gt;/index.jsp&lt;/result&gt;
-&lt;result name="input"&gt;/login.jsp&lt;/result&gt;
-</code></pre>
-
-<p></action></p>
-
-<p><action name="register" class="registerAction"></p>
-
-<pre><code>&lt;result name="success"&gt;/index.jsp&lt;/result&gt;
-&lt;result name="input"&gt;/register.jsp&lt;/result&gt;
-</code></pre>
-
-<p></action>
-```</p>
-
-<p>建立RegisterAction.java类：<br />
-```
-package com.codemany.account.action;</p>
-
-<p>import com.codemany.account.model.User;<br />
-import com.codemany.account.service.UserAlreadyExistsException;<br />
-import com.codemany.account.service.UserService;</p>
-
-<p>import com.opensymphony.xwork2.ActionSupport;</p>
-
-<p>public class RegisterAction extends ActionSupport {<br /></p>
-
-<pre><code>private static final long serialVersionUID = 7021982816578678150L;
-
-private User user;
-
-private UserService userService;
-
-public String execute() throws Exception {&lt;br /&gt;
-    try {&lt;br /&gt;
-        userService.addUser(user);&lt;br /&gt;
-    } catch (UserAlreadyExistsException e) {&lt;br /&gt;
-        return INPUT;&lt;br /&gt;
-    }&lt;br /&gt;
-    return SUCCESS;&lt;br /&gt;
-}
-
-public User getUser() {&lt;br /&gt;
-    return user;&lt;br /&gt;
-}
-
-public void setUser(User user) {&lt;br /&gt;
-    this.user = user;&lt;br /&gt;
-}
-
-public void setUserService(UserService userService) {&lt;br /&gt;
-    this.userService = userService;&lt;br /&gt;
-}&lt;br /&gt;
-</code></pre>
-
-<p>}
-```</p>
-
-<p>新建校验配置文件。先是对应RegisterAction类的RegisterAction-validation.xml配置：<br />
-```
-&lt;!DOCTYPE validators PUBLIC<br /></p>
-
-<pre><code>"-//OpenSymphony Group//XWork Validator 1.0.2//EN"&lt;br /&gt;
-"http://www.opensymphony.com/xwork/xwork-validator-1.0.2.dtd"&gt;
-</code></pre>
-
-<p><validators></p>
-
-<pre><code>&lt;field name="user"&gt;
-    &lt;field-validator type="visitor"&gt;
-        &lt;param name="appendPrefix"&gt;true&lt;/param&gt;
-        &lt;message /&gt;
-    &lt;/field-validator&gt;
-&lt;/field&gt;
-</code></pre>
-
-<p></validators>
-```</p>
-
-<p>这里的校验使用了visitor类型，它是用于检测action里的复合属性的。这里的复合属性是User，所以要在User.java同一个目录下建立校验配置文件User-validation.xml，内容如下：<br />
-```
-&lt;!DOCTYPE validators PUBLIC<br /></p>
-
-<pre><code>"-//OpenSymphony Group//XWork Validator 1.0.2//EN"&lt;br /&gt;
-"http://www.opensymphony.com/xwork/xwork-validator-1.0.2.dtd"&gt;
-</code></pre>
-
-<p><validators></p>
-
-<pre><code>&lt;field name="username"&gt;
-    &lt;field-validator type="requiredstring"&gt;
-        &lt;message&gt;Username is required&lt;/message&gt;
-    &lt;/field-validator&gt;
-    &lt;field-validator type="stringlength"&gt;
-        &lt;param name="minLength"&gt;2&lt;/param&gt;
-        &lt;param name="maxLength"&gt;20&lt;/param&gt;
-        &lt;message&gt;Username must be between ${minLength} and ${maxLength} characters&lt;/message&gt;
-    &lt;/field-validator&gt;
-&lt;/field&gt;
-
-&lt;field name="password"&gt;
-    &lt;field-validator type="requiredstring"&gt;
-        &lt;message&gt;Password is required&lt;/message&gt;
-    &lt;/field-validator&gt;
-    &lt;field-validator type="stringlength"&gt;
-        &lt;param name="minLength"&gt;6&lt;/param&gt;
-        &lt;param name="maxLength"&gt;50&lt;/param&gt;
-        &lt;message&gt;Password must be between ${minLength} and ${maxLength} characters&lt;/message&gt;
-    &lt;/field-validator&gt;
-&lt;/field&gt;
-
-&lt;field name="confirmPassword"&gt;
-    &lt;field-validator type="fieldexpression"&gt;
-        &lt;param name="expression"&gt;confirmPassword.equals(password)&lt;/param&gt;
-        &lt;message&gt;Password does not match the confirm password&lt;/message&gt;
-    &lt;/field-validator&gt;
-&lt;/field&gt;
-</code></pre>
-
-<p></validators>
-```</p>
-
-<p>修改index.jsp，将登录表单移到单独的login.jsp页面中:<br />
-```
-&lt;%@ page contentType="text/html; charset=utf-8" pageEncoding="utf-8" %></p>
-
-<p>&lt;%@ taglib uri="/struts-tags" prefix="s" %></p>
-
-<p>&lt;!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>JBookShelf</title>
-</head></p>
-
-<p><body></p>
-
-<pre><code>&lt;s:if test="#session.logined"&gt;
-    Welcome, you have logined.&lt;br /&gt;
-    &lt;a href="&lt;%= request.getContextPath() %&gt;/logout.action"&gt;Logout&lt;/a&gt;
-&lt;/s:if&gt;
-&lt;s:else&gt;
-    &lt;a href="&lt;%= request.getContextPath() %&gt;/login!input.action"&gt;Login&lt;/a&gt; |&lt;br /&gt;
-    &lt;a href="&lt;%= request.getContextPath() %&gt;/register!input.action"&gt;Register&lt;/a&gt;
-&lt;/s:else&gt;
-</code></pre>
-
-<p></body>
-</html>
-```</p>
-
-<p>这里是登录页面login.jsp，首页index.jsp中的登录表单就是被移到这个文件中：<br />
-```
-&lt;%@ page contentType="text/html; charset=utf-8" pageEncoding="utf-8" %></p>
-
-<p>&lt;%@ taglib uri="/struts-tags" prefix="s" %></p>
-
-<p>&lt;!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Login</title>
-</head></p>
-
-<p><body></p>
-
-<pre><code>&lt;p&gt;User: test/test&lt;/p&gt;
-&lt;s:form action="login"&gt;
-    &lt;s:textfield key="username" label="Username" /&gt;
-    &lt;s:password key="password" label="Password" /&gt;
-    &lt;s:submit value="Login" /&gt;
-&lt;/s:form&gt;
-</code></pre>
-
-<p></body>
-</html>
-```</p>
-
-<p>注册页面register.jsp，负责生成注册时的表单：<br />
-```
-&lt;%@ page contentType="text/html; charset=utf-8" pageEncoding="utf-8" %></p>
-
-<p>&lt;%@ taglib uri="/struts-tags" prefix="s" %></p>
-
-<p>&lt;!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Register</title>
-</head></p>
-
-<p><body></p>
-
-<pre><code>&lt;s:form action="register"&gt;
-    &lt;s:textfield key="user.username" label="Username" /&gt;
-    &lt;s:password key="user.password" label="Password" /&gt;
-    &lt;s:password key="user.confirmPassword" label="Password Confirmation" /&gt;
-    &lt;s:submit value="Register" /&gt;
-&lt;/s:form&gt;
-</code></pre>
-
-<p></body>
-</html>
-```</p>
-
-<p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
+<p>代码下载：<a href="https://github.com/dohkoos/N6670Conv">https://github.com/dohkoos/N6670Conv</a></p>
 ]]></content>
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[Struts 2 + Spring 3 + Hibernate 4登录实例]]></title>
-    <link href="http://codemany.com/blog/2012/09/04/struts2-spring3-hibernate4-login-sample/"/>
-    <updated>2012-09-04T06:54:27+08:00</updated>
-    <id>http://codemany.com/blog/2012/09/04/struts2-spring3-hibernate4-login-sample</id>
-    <content type="html"><![CDATA[<p>在pom.xml中添加依赖包：<br />
-```
-<dependency></p>
+    <title type="html"><![CDATA[短信分拆算法]]></title>
+    <link href="http://codemany.com/blog/2007/11/22/sms-split-algorithm/"/>
+    <updated>2007-11-22T21:34:47+08:00</updated>
+    <id>http://codemany.com/blog/2007/11/22/sms-split-algorithm</id>
+    <content type="html"><![CDATA[<p>今天，突然心血来潮，写了一段分拆短信的代码。代码如下：</p>
 
-<pre><code>&lt;groupId&gt;org.springframework&lt;/groupId&gt;
-&lt;artifactId&gt;spring-orm&lt;/artifactId&gt;
-&lt;version&gt;3.1.2.RELEASE&lt;/version&gt;
+<p>```
+public class SMSHelper {</p>
+
+<pre><code>private static final int SMS_MAX_LENGTH = 70;
+
+public static List split(String msg) {
+    if (msg.length() &lt;= SMS_MAX_LENGTH) {
+        throw new IllegalArgumentException("被分拆的短信长度必须大于70个字符");
+    }
+
+    List&lt;String&gt; list = new ArrayList&lt;String&gt;();
+    int i = 0, start = 0;
+    while (true) {
+        i++;
+        String prompt = "(第" + i + "条)";
+        int remain = SMS_MAX_LENGTH - prompt.length();
+        if (start + remain &gt; msg.length()) {
+            list.add(prompt + msg.substring(start));
+            break;
+        }
+        list.add(prompt + msg.substring(start, start + remain));
+        start += remain;
+    }
+    return list;
+}
 </code></pre>
 
-<p></dependency>
-<dependency></p>
-
-<pre><code>&lt;groupId&gt;org.springframework&lt;/groupId&gt;
-&lt;artifactId&gt;spring-web&lt;/artifactId&gt;
-&lt;version&gt;3.1.2.RELEASE&lt;/version&gt;
-</code></pre>
-
-<p></dependency></p>
-
-<!-- 没有这个plugin包会导致Spring无法注入bean到Struts 2的Action中 -->
-
-
-<p><dependency></p>
-
-<pre><code>&lt;groupId&gt;org.apache.struts&lt;/groupId&gt;
-&lt;artifactId&gt;struts2-spring-plugin&lt;/artifactId&gt;
-&lt;version&gt;2.3.4.1&lt;/version&gt;
-</code></pre>
-
-<p></dependency>
+<p>}
 ```</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[如何解决含有中文的页面末尾内容会被SiteMesh截掉的问题]]></title>
+    <link href="http://codemany.com/blog/2005/07/22/how-to-solve-sitemesh-truncate-the-page-containing-chinese-character/"/>
+    <updated>2005-07-22T14:33:59+08:00</updated>
+    <id>http://codemany.com/blog/2005/07/22/how-to-solve-sitemesh-truncate-the-page-containing-chinese-character</id>
+    <content type="html"><![CDATA[<p>首先我们先要了解一下ServletResponse.setContentLength(int len)的含义。setContentLength是设置返回内容体长度的方法，len是内容体的长度。由于网络上传输内容是以字节（byte）为单位的，所以len就是指内容体有多少个字节。假设现在有长度为100个字节的数据，在输出数据到客户端前我们用setContentLength(90)设置内容体的长度为90个字节。那么在客户端接收到的数据长度就是90个字节而不是100。下面我们来做个试验：</p>
 
-<p>配置web.xml文件：<br />
-```
-&lt;context-param></p>
+<p>```
+public class PageTruncateFilter implements Filter {</p>
 
-<pre><code>&lt;param-name&gt;contextConfigLocation&lt;/param-name&gt;
-&lt;param-value&gt;classpath:applicationContext.xml&lt;/param-value&gt;
-</code></pre>
-
-<p>&lt;/context-param></p>
-
-<p><listener></p>
-
-<pre><code>&lt;listener-class&gt;org.springframework.web.context.ContextLoaderListener&lt;/listener-class&gt;
-</code></pre>
-
-<p></listener>
-```</p>
-
-<p>删除hibernate.cfg.xml，添加applicationContext.xml，内容为：<br />
-```
-&lt;?xml version="1.0" encoding="utf-8"?>
-<beans xmlns="http://www.springframework.org/schema/beans"<br /></p>
-
-<pre><code>xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"&lt;br /&gt;
-xsi:schemaLocation="http://www.springframework.org/schema/beans&lt;br /&gt;
-    http://www.springframework.org/schema/beans/spring-beans.xsd"&gt;
-
-&lt;!-- DriverManagerDataSource在每个连接请求时都新建一个connection。&lt;br /&gt;
-     与DBCP的BasicDataSource不同，DriverManagerDataSource提供的连接没有进行池管理 --&gt;
-&lt;bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource"&gt;
-    &lt;property name="driverClassName" value="com.mysql.jdbc.Driver" /&gt;
-    &lt;property name="url" value="jdbc:mysql://localhost:3306/jbookshelf" /&gt;
-    &lt;property name="username" value="root" /&gt;
-    &lt;property name="password" value="123456" /&gt;
-&lt;/bean&gt;
-
-&lt;bean id="sessionFactory" class="org.springframework.orm.hibernate4.LocalSessionFactoryBean"&gt;
-    &lt;property name="dataSource" ref="dataSource" /&gt;
-    &lt;property name="hibernateProperties"&gt;
-        &lt;props&gt;
-            &lt;prop key="hibernate.connection.pool_size"&gt;1&lt;/prop&gt;
-            &lt;prop key="hibernate.dialect"&gt;org.hibernate.dialect.MySQLDialect&lt;/prop&gt;
-            &lt;prop key="hibernate.cache.provider_class"&gt;org.hibernate.cache.internal.NoCacheProvider&lt;/prop&gt;
-            &lt;prop key="show_sql"&gt;true&lt;/prop&gt;
-        &lt;/props&gt;
-    &lt;/property&gt;
-    &lt;property name="mappingResources"&gt;
-        &lt;list&gt;
-            &lt;value&gt;com/codemany/account/model/User.hbm.xml&lt;/value&gt;
-        &lt;/list&gt;
-    &lt;/property&gt;
-&lt;/bean&gt;
-
-&lt;bean id="userDao" class="com.codemany.account.dao.UserDao"&gt;
-    &lt;property name="sessionFactory" ref="sessionFactory" /&gt;
-&lt;/bean&gt;
-
-&lt;!-- Struts 2的action是有状态的，必须显示设置scope为prototype，每次请求过来都会创建一个action --&gt;
-&lt;bean id="loginAction" class="com.codemany.account.action.LoginAction" scope="prototype"&gt;
-    &lt;property name="userDao" ref="userDao" /&gt;
-&lt;/bean&gt;
-</code></pre>
-
-<p></beans>
-```</p>
-
-<p>删除HibernateUtil.java，修改UserDao.java为以下内容：<br />
-```
-package com.codemany.account.dao;</p>
-
-<p>import org.hibernate.Query;<br />
-import org.hibernate.Session;<br />
-import org.hibernate.SessionFactory;</p>
-
-<p>import com.codemany.account.model.User;</p>
-
-<p>public class UserDao {<br /></p>
-
-<pre><code>// Spring 3集成Hibernate 4不再需要HibernateDaoSupport或HibernateTemplate了，&lt;br /&gt;
-// 直接使用原生API即可。&lt;br /&gt;
-private SessionFactory sessionFactory;
-
-public void setSessionFactory(SessionFactory sessionFactory) {&lt;br /&gt;
-    this.sessionFactory = sessionFactory;&lt;br /&gt;
+<pre><code>public void init(FilterConfig config) throws ServletException {
 }
 
-public User getUser(String username) {&lt;br /&gt;
-    Session session = sessionFactory.openSession();&lt;br /&gt;
-    try {&lt;br /&gt;
-        Query query = session.createQuery("from User u where u.username = ?");&lt;br /&gt;
-        query.setString(0, username);&lt;br /&gt;
-        query.setMaxResults(1);&lt;br /&gt;
-        return (User)query.uniqueResult();&lt;br /&gt;
-    } finally {&lt;br /&gt;
-        session.close();&lt;br /&gt;
-    }&lt;br /&gt;
-}&lt;br /&gt;
+public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
+                    throws IOException, ServletException {
+    HttpServletRequest request = (HttpServletRequest)req;
+    HttpServletResponse response = (HttpServletResponse)res;
+
+    String content = "&lt;html&gt;&lt;head&gt;&lt;title&gt;Truncated Page&lt;/title&gt;&lt;/head&gt;";
+           content += "&lt;body&gt;这个页面的内容will be truncated.&lt;/body&gt;&lt;/html&gt;";
+    response.setCharacterEncoding("gbk");
+    response.setContentLength(content.length());
+    PrintWriter out = response.getWriter();
+    out.println(content);
+    out.close();
+}
+
+public void destroy() {
+}
 </code></pre>
 
 <p>}
 ```</p>
 
-<p>在struts.xml中将action元素中login的class属性改为applicationContext.xml配置文件中的loginAction： <br />
-```
-<action name="login" class="loginAction"></p>
+<p>由于content字符串含有两个中文字符，每一个中文字符又是由两个字节组成，所以content.length()的值比content的字节数要少2。在客户端显示的内容也会因此少2个字节，即缺少“l>”这两个字符。</p>
 
-<pre><code>&lt;result name="success"&gt;/index.jsp&lt;/result&gt;
-&lt;result name="input"&gt;/index.jsp&lt;/result&gt;
-</code></pre>
+<p>现在我们来浏览SiteMesh的源码找出问题的原因。首先从PageFilter.java的doFilter方法开始。由于页面没有在decorators.xml中注册修饰，所以writeOriginal方法会被调用。下面是writeOriginal方法的源代码：</p>
 
-<p></action>
-```</p>
+<p>```
+/<em>* Write the original page data to the response. </em>/
+private void writeOriginal(HttpServletRequest request, HttpServletResponse response,</p>
 
-<p>修改LoginAction.java的代码：<br />
-```
-package com.codemany.account.action;</p>
+<pre><code>                      Page page) throws IOException {
+response.setContentLength(page.getContentLength());
 
-<p>import com.codemany.account.dao.UserDao;<br />
-import com.codemany.account.model.User;</p>
-
-<p>import com.opensymphony.xwork2.ActionContext;<br />
-import com.opensymphony.xwork2.ActionSupport;</p>
-
-<p>public class LoginAction extends ActionSupport {<br /></p>
-
-<pre><code>private static final long serialVersionUID = -389833745243649130L;
-
-private String username;&lt;br /&gt;
-private String password;
-
-private UserDao userDao;
-
-public String execute() throws Exception {&lt;br /&gt;
-    if (username == null || username.length() == 0&lt;br /&gt;
-            || password == null || password.length() == 0) {&lt;br /&gt;
-        return INPUT;&lt;br /&gt;
-    }
-
-    User u = userDao.getUser(username);&lt;br /&gt;
-    if (u == null || !password.equals(u.getPassword())) {&lt;br /&gt;
-        return INPUT;&lt;br /&gt;
-    }
-
-    ActionContext.getContext().getSession().put("logined", true);&lt;br /&gt;
-    return SUCCESS;&lt;br /&gt;
+if (request.getAttribute(USING_STREAM).equals(Boolean.TRUE)) {
+    PrintWriter writer = new PrintWriter(response.getOutputStream());
+    page.writePage(writer);
+    // flush writer to underlying outputStream
+    writer.flush();
+    response.getOutputStream().flush();
+} else {
+    page.writePage(response.getWriter());
+    response.getWriter().flush();
 }
-
-public void setUsername(String username) {&lt;br /&gt;
-    this.username = username;&lt;br /&gt;
-}
-
-public void setPassword(String password) {&lt;br /&gt;
-    this.password = password;&lt;br /&gt;
-}
-
-public void setUserDao(UserDao userDao) {&lt;br /&gt;
-    this.userDao = userDao;&lt;br /&gt;
-}&lt;br /&gt;
 </code></pre>
 
 <p>}
 ```</p>
 
-<p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
+<p>首行代码就是设置内容体长度的，让我们追到page.getContentLength()里面去看看（Page接口的getContentLength方法是由AbstractPage.java实现的）：</p>
+
+<p>```
+public int getContentLength() {</p>
+
+<pre><code>return pageData.length;
+</code></pre>
+
+<p>}
+```</p>
+
+<p>它返回pageData数组的长度。但是pageData数组是char类型的，假如pageData中有中文内容时，设置的内容体长度就会小于pageData的字节数。这时就会出现输出到客户端的数据截掉的问题。所以只要修改getContentLength方法返回的值就可以了，下面是修改后的getContentLength方法：</p>
+
+<p>```
+public int getContentLength() {</p>
+
+<pre><code>String content = new String(pageData);
+return content.getBytes().length;
+</code></pre>
+
+<p>}
+```</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[在Eclipse 3中使用SSH2访问gro.clinux.org的CVS服务器]]></title>
+    <link href="http://codemany.com/blog/2005/07/07/using-ssh2-to-access-gro-clinux-org-cvs-server-in-eclipse3/"/>
+    <updated>2005-07-07T18:33:00+08:00</updated>
+    <id>http://codemany.com/blog/2005/07/07/using-ssh2-to-access-gro-clinux-org-cvs-server-in-eclipse3</id>
+    <content type="html"><![CDATA[<p>在Eclipse中生成公钥和私钥</p>
+
+<p>打开Eclipse，进入Window -> Preferences -> Team -> CVS -> SSH2 Connection Method -> Key Management，点击Generate RSA Key...然后填写Passphrase 和Confirm Passphrase，接着点击Save Private Key...保存公钥和私钥（公钥和私钥文件保存在~/.ssh/目录下，id_rsa是私钥文件，id_rsa.pub 是公钥文件）。</p>
+
+<p>将公钥上传至gro.clinux.org服务器</p>
+
+<p>登陆gro服务器，进入[帐号维护]，在页面底部你可以看到如下信息：</p>
+
+<p>```
+Shell帐号信息</p>
+
+<p>Shell box：
+CVS/SSH 共享认证Key：0 [编辑Keys]
+```</p>
+
+<p>点击[编辑Keys]，然后把刚才生成的文件id_rsa.pub中的内容粘贴到文本框中（看看是不是符合它上面的要求，千万要仔细看看），如果没有问题的话，就更新吧。大约6个小时后cron会自动更新，在服务器上你的目录下会自动添加文件夹/.ssh/，里面包含了名为authorized_keys2的文件，你的公钥就保存在这里。</p>
+
+<p>在Eclipse中建立CVS连接</p>
+
+<p>打开CVS Repository Exploring Perspective，进入New -> Repository Location，填入以下内容：</p>
+
+<p><code>
+Host：cvs.unixname.gro.clinux.org
+Repository Path：/cvsroot/unixname
+User：你在gro.clinux.org上注册的帐户
+Password：先前保存公钥和私钥时输入的Passphrase
+Connection Type：extssh
+</code></p>
+
+<p>点击Finish。如果你是第一次登录的话，将会弹出一个对话框，不用看那么仔细，直接点击OK就好了。</p>
 ]]></content>
   </entry>
   
