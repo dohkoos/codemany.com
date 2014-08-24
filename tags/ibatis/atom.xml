@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Tag: iBatis | 乐者为王]]></title>
+  <link href="http://codemany.com/tags/ibatis/atom.xml" rel="self"/>
+  <link href="http://codemany.com/"/>
+  <updated>2014-08-24T22:32:13+08:00</updated>
+  <id>http://codemany.com/</id>
+  <author>
+    <name><![CDATA[dohkoos]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[在iBatis中如何将JavaBean的boolean值映射成数据库的CHAR(Y或N)值]]></title>
+    <link href="http://codemany.com/blog/2006/05/29/in-ibatis-how-will-the-boolean-value-javabean-mapping-into-the-database-char-y-or-n-value/"/>
+    <updated>2006-05-29T12:15:40+08:00</updated>
+    <id>http://codemany.com/blog/2006/05/29/in-ibatis-how-will-the-boolean-value-javabean-mapping-into-the-database-char-y-or-n-value</id>
+    <content type="html"><![CDATA[<p>Spring 1.2.8 + iBatis 2.1.5</p>
+
+<p>&#21442;&#32771;文&#29486;：<br />
+<a href="http://opensource.atlassian.com/confluence/oss/display/IBATIS/How+do+I+use+a+Custom+Type+Handler+with+complex+property+or+Type+Safe+Enumeration">http://opensource.atlassian.com/confluence/oss/display/IBATIS/How+do+I+use+a+Custom+Type+Handler+with+complex+property+or+Type+Safe+Enumeration</a><br />
+<a href="http://opensource.atlassian.com/confluence/oss/display/IBATIS/How+do+I+use+a+BLOB+or+CLOB">http://opensource.atlassian.com/confluence/oss/display/IBATIS/How+do+I+use+a+BLOB+or+CLOB</a><br />
+<a href="http://java.mblogger.cn/wuyu/posts/8416.aspx">http://java.mblogger.cn/wuyu/posts/8416.aspx</a><br />
+<a href="http://www.mail-archive.com/user-java@ibatis.apache.org/msg03985.html">http://www.mail-archive.com/user-java@ibatis.apache.org/msg03985.html</a><br />
+<a href="http://www.mail-archive.com/user-java@ibatis.apache.org/msg04107.html">http://www.mail-archive.com/user-java@ibatis.apache.org/msg04107.html</a><br /></p>
+
+<br />
+
+
+<br />
+
+
+<p>JavaBean的boolean&#20540;&#26144;&#23556;到&#25968;&#25454;&#24211;的&#40664;&#35748;&#20540;是0&#21644;1，不是&#38750;&#24120;&#30452;&#35266;。现在&#24076;&#26395;能将boolean&#20540;&#26144;&#23556;成&#20026;Y&#21644;N，iBatis 2.0.5以后<br />
+的版本&#25552;&#20379;了TypeHandlerCallback，可以&#29992;来&#35299;&#20915;&#36825;&#20010;&#38382;&#39064;。<br /></p>
+
+<br />
+
+
+<p>首先&#23450;&#20041;&#25968;&#25454;&#24211;table：<br /></p>
+
+<br />
+
+
+<p>user (<br /></p>
+
+<pre><code>username varchar(40),&lt;br /&gt;
+password varchar(255),&lt;br /&gt;
+enabled char(1),&lt;br /&gt;
+PRIMARY KEY (username)&lt;br /&gt;
+</code></pre>
+
+<p>);<br /></p>
+
+<br />
+
+
+<p>YesNoTypeHandlerCallback&#23454;现&#20195;&#30721;：<br /></p>
+
+<br />
+
+
+<p>public class YesNoTypeHandlerCallback implements TypeHandlerCallback {<br /></p>
+
+<br />
+
+
+<pre><code>public void setParameter(ParameterSetter setter, Object parameter) throws SQLException {&lt;br /&gt;
+    if (parameter == null) {&lt;br /&gt;
+        setter.setString("");&lt;br /&gt;
+    } else {&lt;br /&gt;
+        Boolean b = (Boolean)parameter;&lt;br /&gt;
+        if (b.booleanValue()) {&lt;br /&gt;
+            setter.setString("Y");&lt;br /&gt;
+        } else {&lt;br /&gt;
+            setter.setString("N");&lt;br /&gt;
+        }&lt;br /&gt;
+    }&lt;br /&gt;
+}&lt;br /&gt;
+</code></pre>
+
+<br />
+
+
+<pre><code>public Object getResult(ResultGetter getter) throws SQLException {&lt;br /&gt;
+    String string = getter.getString();&lt;br /&gt;
+    if (string == null) {&lt;br /&gt;
+        return null;&lt;br /&gt;
+    } else if ("Y".equalsIgnoreCase(string)) {&lt;br /&gt;
+        return new Boolean(true);&lt;br /&gt;
+    } else {&lt;br /&gt;
+        return new Boolean(false);&lt;br /&gt;
+    }&lt;br /&gt;
+}&lt;br /&gt;
+</code></pre>
+
+<br />
+
+
+<pre><code>public Object valueOf(String s) {&lt;br /&gt;
+    return s;&lt;br /&gt;
+}&lt;br /&gt;
+</code></pre>
+
+<p>}<br /></p>
+
+<br />
+
+
+<p>下&#38754;是SQL Map Config：<br /></p>
+
+<br />
+
+
+<p><sqlMapConfig><br /></p>
+
+<pre><code>&lt;typeHandler jdbcType="CHAR" javaType="boolean"&lt;br /&gt;
+             callback="org.company.project.dao.support.YesNoTypeHandlerCallback" /&gt;&lt;br /&gt;
+</code></pre>
+
+<br />
+
+
+<pre><code>&lt;sqlMap resource="org/company/project/dao/impl/sql/UserSQL.xml" /&gt;&lt;br /&gt;
+</code></pre>
+
+<p></sqlMapConfig><br /></p>
+
+<br />
+
+
+<p>jdbcType="CHAR" javaType="boolean"&#24517;&#39035;&#26377;，&#21542;&#21017;YesNoTypeHandlerCallback.setParameter()不会&#34987;&#35843;&#29992;。<br /></p>
+
+<br />
+
+
+<p>UserSQL.xml&#37096;&#20998;：<br /></p>
+
+<br />
+
+
+<p><typeAlias alias="user" type="org.company.project.model.User" /><br /></p>
+
+<br />
+
+
+<p><resultMap id="userResult" class="user"><br /></p>
+
+<pre><code>&lt;result property="username" column="username" /&gt;&lt;br /&gt;
+&lt;result property="password" column="password" /&gt;&lt;br /&gt;
+&lt;result property="enabled" column="enabled" jdbcType="CHAR" javaType="boolean" /&gt;&lt;br /&gt;
+</code></pre>
+
+<p></resultMap><br /></p>
+
+<br />
+
+
+<p><select id="getUser" parameterClass="string" resultMap="userResult"><br />
+&lt;![CDATA[<br /></p>
+
+<pre><code>SELECT username, password, enabled&lt;br /&gt;
+FROM user WHERE username = #username#&lt;br /&gt;
+</code></pre>
+
+<p>]]&gt;<br />
+</select><br /></p>
+
+<br />
+
+
+<p><insert id="addUser" parameterClass="user"><br />
+&lt;![CDATA[<br /></p>
+
+<pre><code>INSERT INTO user (username, password, enabled)&lt;br /&gt;
+VALUES (#username#, #password#, #enabled,jdbcType=CHAR,javaType=boolean#)&lt;br /&gt;
+</code></pre>
+
+<p>]]&gt;<br />
+</insert><br /></p>
+
+<br />
+
+
+<p>jdbcType="CHAR" javaType="boolean"&#24517;&#39035;&#26377;，&#21542;&#21017;YesNoTypeHandlerCallback.getResult()不会&#34987;&#35843;&#29992;；<br /></p>
+
+<h1>enabled,jdbcType=CHAR,javaType=boolean#&#20063;&#24517;&#39035;&#36825;样写，&#21542;&#21017;YesNoTypeHandlerCallback.setParameter()<br /></h1>
+
+<p>不会&#34987;&#35843;&#29992;，写成#enabled:CHAR#&#21644;#enabled#&#37117;&#27809;&#26377;&#20160;么&#20316;&#29992;。</p></p>
+]]></content>
+  </entry>
+  
+</feed>

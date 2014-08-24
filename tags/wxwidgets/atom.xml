@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: wxWidgets | 乐者为王]]></title>
   <link href="http://codemany.com/tags/wxwidgets/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-08-24T18:55:48+08:00</updated>
+  <updated>2014-08-24T22:32:13+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -14,88 +14,457 @@
 
   
   <entry>
-    <title type="html"><![CDATA[Hello wxWidgets!]]></title>
-    <link href="http://codemany.com/blog/2007/09/25/hello-wxwidgets/"/>
-    <updated>2007-09-25T11:31:56+08:00</updated>
-    <id>http://codemany.com/blog/2007/09/25/hello-wxwidgets</id>
-    <content type="html"><![CDATA[<p>MainApp.h
-```</p>
+    <title type="html"><![CDATA[利用WHOIS协议查询域名信息]]></title>
+    <link href="http://codemany.com/blog/2009/09/16/the-using-of-whois-domain-name-information-query-protocols/"/>
+    <updated>2009-09-16T06:15:04+08:00</updated>
+    <id>http://codemany.com/blog/2009/09/16/the-using-of-whois-domain-name-information-query-protocols</id>
+    <content type="html"><![CDATA[<p>域名信息的查询原理非常简单，主要是基于RFC 954（RFC 812已被废弃）提供的WHOIS协议。WHOIS服务器是一个基于“查询/响应”的TCP事务服务器，用户程序通过访问WHOIS服务器，从WHOIS数据库中查询得到我们所需要的内容。其主要过程有以下三步：</p>
 
-<h1>ifndef <strong>MAINAPP_H</strong></h1>
+<ol>
+<li>在TCP服务端口43连接WHOIS服务主机；</li>
+<li>发送一个命令，以回车换行符结尾；</li>
+<li>接受相应命令的返回信息，一旦输出结束，服务器将关闭连接。</li>
+</ol>
 
-<h1>define <strong>MAINAPP_H</strong></h1>
 
-<h1>include &lt;wx/wx.h></h1>
+<p>命令的格式非常简单。可以直接输入域名（例如example.com）查询相关域名信息；也可以使用help得到详细的帮助信息。以下是查询的代码：</p>
 
-<p>class MainApp : public wxApp
+<p>```
+wxString Whois::Lookup(wxString&amp; host, wxString&amp; szAddress)
+{</p>
+
+<pre><code>char szQuery[512];
+char szBuffer[512];
+wxString szResult;
+
+strcpy(szQuery, szAddress);
+strcat(szQuery, "\r\n");
+
+wxIPV4address addr;
+addr.Hostname(host);
+addr.Service(43);
+
+wxSocketClient socket;
+socket.Connect(addr, false);
+socket.WaitOnConnect(30);
+
+if (socket.IsConnected())
 {
-public:</p>
+    socket.Write(szQuery, strlen(szQuery));
+    szResult = "";
+    while (true)
+    {
+        // Clear buffer before each iteration
+        memset(szBuffer, 0, 512);
 
-<pre><code>virtual bool OnInit();
+        // Try to receive some data
+        socket.Read(szBuffer, 500);
+        if (socket.LastCount() &lt;= 0)
+        {
+            break;
+        }
+        szResult += szBuffer;
+    }
+}
+else
+{
+    szResult = wxT("Failed! Unable to connect\n");
+}
+socket.Close();
+
+return wxString::FromUTF8(szResult);
 </code></pre>
 
-<p>};</p>
+<p>}
+```</p>
 
-<h1>endif</h1>
+<p>常用的WHOIS服务器：</p>
+
+<p><code>
+.cn=whois.cnnic.net.cn
+.com=whois.internic.com
+.net=whois.internic.com
+.name=www.whois.name
+.cc=whois.nic.cc
+</code></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[修复wxWidgets Wizard for Visual Studio 2005/2008中的一个bug]]></title>
+    <link href="http://codemany.com/blog/2008/10/16/repair-wxwidgets-wizard-for-visual-studio-20052008-a-bug/"/>
+    <updated>2008-10-16T17:41:47+08:00</updated>
+    <id>http://codemany.com/blog/2008/10/16/repair-wxwidgets-wizard-for-visual-studio-20052008-a-bug</id>
+    <content type="html"><![CDATA[<p>前面发布的wxWidgets Wizard for Visual Studio 2005/2008存在一个bug，安装在VS2008中后不能创建新的wxWidgets项目。原因是没有将wxAppWiz.vsz文件中 VsWizardEngine的版本号改为9.0。现在做了一些修改，修改后的代码如下：</p>
+
+<p>```
+procedure CurStepChanged(CurStep: TSetupStep);
+var</p>
+
+<pre><code>i: Integer;
+Signature: String;
+VsdirLine: String;
+ConfigFile: String;
+ConfigFileLines: TArrayOfString;
+</code></pre>
+
+<p>begin</p>
+
+<pre><code>if CurStep = ssPostInstall then begin
+    if (Pos('Visual Studio 9.0', ExpandConstant('{app}')) &gt; 0) then begin
+        Signature := 'Wizard=VsWizard.VsWizardEngine';
+        ConfigFile := ExpandConstant('{app}\VCProjects\wxAppWiz.vsz');
+        LoadStringsFromFile(ConfigFile, ConfigFileLines);
+        for i := 0 to GetArrayLength(ConfigFileLines) - 1 do begin
+            if (Pos(Signature, ConfigFileLines[i]) &gt; 0) then begin
+                ConfigFileLines[i] := 'Wizard=VsWizard.VsWizardEngine.9.0'
+                SaveStringsToFile(ConfigFile, ConfigFileLines, False);
+                break;
+            end;
+        end;
+    end;
+
+    Signature := 'wxWidgets';
+    VsdirLine := 'wxWidgets|{1B027A40-8F43-11D0-8D11-00A0C91BC942}|#1043|70' + #13#10;
+    ConfigFile:= ExpandConstant('{app}\VCProjects\vc.vsdir');
+    LoadStringsFromFile(ConfigFile, ConfigFileLines);
+    for i:= 0 to GetArrayLength(ConfigFileLines) - 1 do begin
+        if (Pos(Signature, ConfigFileLines[i]) &gt; 0) then abort;
+    end;
+    SaveStringToFile(ConfigFile, VsdirLine, True);
+end;
+</code></pre>
+
+<p>end;
+```</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[完成了wxWidgets Wizard for Visual Studio 2005/2008的安装程序]]></title>
+    <link href="http://codemany.com/blog/2008/05/21/completed-the-wxwidgets-wizard-for-visual-studio-20052008-installation-process/"/>
+    <updated>2008-05-21T15:28:16+08:00</updated>
+    <id>http://codemany.com/blog/2008/05/21/completed-the-wxwidgets-wizard-for-visual-studio-20052008-installation-process</id>
+    <content type="html"><![CDATA[<p>两个晚上的时间，一边查资料一边学习，同时编写和测试安装脚本，最终完成了wxWidgets Wizard for Visual Studio 2005/2008的安装程序。现在不用配置就可以使用wxWidgets Wizard的代码框架生成功能了。安装制作程序采用的是Inno Setup，完整的安装脚本如下：</p>
 
 <p>```</p>
 
-<p>MainApp.cpp
+<h1>define SrcImgsDir '..VCWizardsimages'</h1>
+
+<h1>define SrcHtmlDir '..VCWizardshtml1033'</h1>
+
+<h1>define SrcScptDir '..VCWizardsscripts1033'</h1>
+
+<h1>define SrcTempDir '..VCWizardstemplates1033'</h1>
+
+<h1>define TgtImgsDir 'VCWizardsAppWizwxWidgetsApplicationimages'</h1>
+
+<h1>define TgtHtmlDir 'VCWizardsAppWizwxWidgetsApplicationhtml1033'</h1>
+
+<h1>define TgtScptDir 'VCWizardsAppWizwxWidgetsApplicationscripts1033'</h1>
+
+<h1>define TgtTempDir 'VCWizardsAppWizwxWidgetsApplicationtemplates1033'</h1>
+
+<p>[Setup]
+AppName=wxWidgets Application Wizard
+AppVerName=wxWidgets Wizard 1.0.0
+AppPublisher=<a href="http://codemany.com">http://codemany.com</a>
+DefaultDirName={pf32}Microsoft Visual Studio 9.0VC
+DirExistsWarning=no
+;Uninstallable=no
+UninstallFilesDir={app}VCProjectswxWidgets
+UninstallDisplayIcon={app}VCProjectswxAppWiz.ico
+Compression=lzma
+SolidCompression=yes</p>
+
+<p>[Files]
+Source: ..VCProjectswxAppWiz.ico; DestDir: {app}VCProjects
+Source: ..VCProjectswxAppWiz.vsz; DestDir: {app}VCProjects
+Source: ..VCProjectswxWidgetswxWidgets.vsdir; DestDir: {app}VCProjectswxWidgets
+Source: {#SrcImgsDir}<em>.gif; DestDir: {app}{#TgtImgsDir}
+Source: {#SrcHtmlDir}</em>.htm; DestDir: {app}{#TgtHtmlDir}
+Source: {#SrcHtmlDir}<em>.css; DestDir: {app}{#TgtHtmlDir}
+Source: {#SrcScptDir}</em>.js; DestDir: {app}{#TgtScptDir}
+Source: {#SrcTempDir}<em>.h; DestDir: {app}{#TgtTempDir}
+Source: {#SrcTempDir}</em>.cpp; DestDir: {app}{#TgtTempDir}
+Source: {#SrcTempDir}readme.txt; DestDir: {app}{#TgtTempDir}
+Source: {#SrcTempDir}root.manifest; DestDir: {app}{#TgtTempDir}
+Source: {#SrcTempDir}Templates.inf; DestDir: {app}{#TgtTempDir}</p>
+
+<p>[Code]
+procedure CurStepChanged(CurStep: TSetupStep);
+var</p>
+
+<pre><code>i: Integer;
+Signature: String;
+VsdirLine: String;
+VcVsdirFile: String;
+VcVsdirFileLines: TArrayOfString;
+</code></pre>
+
+<p>begin</p>
+
+<pre><code>if CurStep = ssPostInstall then begin
+    Signature := 'wxWidgets';
+    VsdirLine := 'wxWidgets|{1B027A40-8F43-11D0-8D11-00A0C91BC942}|#1043|70' + #13#10;
+    VcVsdirFile := ExpandConstant('{app}VCProjectsvc.vsdir');
+    LoadStringsFromFile(VcVsdirFile, VcVsdirFileLines);
+    for i := 0 to GetArrayLength(VcVsdirFileLines) - 1 do begin
+        if (Pos(Signature, VcVsdirFileLines[i]) &gt; 0) then abort;
+    end;
+    SaveStringToFile(VcVsdirFile, VsdirLine, True);
+end;
+</code></pre>
+
+<p>end;</p>
+
+<p>procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var</p>
+
+<pre><code>i, j: Integer;
+Signature: String;
+VcVsdirFile: String;
+VcVsdirFileLines, NewVcVsdirFileLines: TArrayOfString;
+</code></pre>
+
+<p>begin</p>
+
+<pre><code>if CurUninstallStep = usUninstall then begin
+    Signature := 'wxWidgets';
+    VcVsdirFile := ExpandConstant('{app}VCProjectsvc.vsdir');
+    LoadStringsFromFile(VcVsdirFile, VcVsdirFileLines);
+    SetArrayLength(NewVcVsdirFileLines, GetArrayLength(VcVsdirFileLines) - 1);
+    j := 0;
+    for i := 0 to GetArrayLength(VcVsdirFileLines) - 1 do begin
+        if (Pos(Signature, VcVsdirFileLines[i]) &gt; 0) then begin
+            continue;
+        end else begin
+            NewVcVsdirFileLines[j] := VcVsdirFileLines[i];
+            j := j + 1;
+        end;
+    end;
+    SaveStringsToFile(VcVsdirFile, NewVcVsdirFileLines, False);
+end;
+</code></pre>
+
+<p>end;
 ```</p>
 
-<h1>include "MainApp.h"</h1>
+<p>下一步准备将wxWidgets的Help文档集成到VS2005/VS2008中。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[wxWidgets Wizard for Visual Studio 2005]]></title>
+    <link href="http://codemany.com/blog/2008/02/16/wxwidgets-wizard-for-visual-studio-2005/"/>
+    <updated>2008-02-16T08:13:19+08:00</updated>
+    <id>http://codemany.com/blog/2008/02/16/wxwidgets-wizard-for-visual-studio-2005</id>
+    <content type="html"><![CDATA[<p>花了点时间为VS2005写了一个简单的wxWidgets wizard。本来想写的更完善一些再发布出来的，只是实在没有多少心思再继续地写下去了。而且该wizard已经基本可以满足我自己的要求了。不过，如果以后有时间的话还是会继续完善它的。以下是我原本打算要实现的一些功能：</p>
 
-<h1>include "MainFrame.h"</h1>
+<ol>
+<li>支持创建对话框程序；</li>
+<li>可以直接安装wxWidgets Wizard到VS2005中的安装程序；</li>
+<li>集成wxWidgets Help文档到VS2005中；</li>
+<li>实现代码智能提示功能；</li>
+<li>可以在VS2005中直接编辑和编译xrc资源；</li>
+<li>在向导过程中可以设置一些wxWidgets的高级特性（比如Menu Bar，Status Bar等）。</li>
+</ol>
 
-<p>IMPLEMENT_APP(MainApp)</p>
 
-<p>bool MainApp::OnInit()
+<p>截图：
+<img src="/uploads/wxwizard-generated-classes.png" title="wxwizard-generated-classes" ></p>
+
+<p>代码下载：<a href="https://github.comdohkoos/wxwizard">https://github.comdohkoos/wxwizard</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[XRC和动态子菜单]]></title>
+    <link href="http://codemany.com/blog/2008/01/11/xrc-and-dynamic-sub-menu/"/>
+    <updated>2008-01-11T15:08:59+08:00</updated>
+    <id>http://codemany.com/blog/2008/01/11/xrc-and-dynamic-sub-menu</id>
+    <content type="html"><![CDATA[<p>什么是XRC</p>
+
+<p>XRC是基于XML的资源系统。它的基本出发点是将界面布局和程序逻辑分离，即将界面布局代码保存在分离的XML文件中，在程序中不涉及控件的创建和布局，只需要加载相应的资源并处理事件绑定即可。</p>
+
+<p>XRC文件格式</p>
+
+<p>```
+&lt;?xml version="1.0"?>
+<resource version="2.3.0.1"></p>
+
+<pre><code>&lt;object class="wxFrame" name="ID_MAIN_FRAME"&gt;
+    &lt;size&gt;200, 300&lt;/size&gt;
+&lt;/object&gt;
+</code></pre>
+
+<p></resource>
+```</p>
+
+<p>XRC文件中菜单资源的相关属性</p>
+
+<p>wxMenuBar<br />
+style　Menu bar style: wxMB_DOCKABLE</p>
+
+<p>wxMenu<br />
+style　Menu style: wxMENU_TEAROFF<br />
+label　Text: label of the menu.<br />
+help　Text: displayed help string.</p>
+
+<p>wxMenuItem<br />
+style　Menu style: wxMENU_TEAROFF<br />
+label　Text: label of the menu.<br />
+accel　Text: accelerator associated to this item ( Alt-X for example ).<br />
+help　Text: displayed help string.<br />
+radio　bool value(0/1): 1 if this item is a radio menu item.<br />
+checkable　bool value(0/1): 1 if this item is a check menu item.<br />
+enabled　bool value(0/1): 1 if this item is initially enabled.<br />
+checked　bool value(0/1): 1 if this (check) item is initially checked.<br />
+bitmap　Text: path to a bitmap to draw at the left of the item.</p>
+
+<p> 使用XRC创建菜单</p>
+
+<p>创建一个包含菜单布局信息的XML资源文件MenuBar.xrc：
+```
+&lt;?xml version="1.0" encoding="utf-8" ?>
+<resource version="2.3.0.1" xmlns="http://www.wxwindows.org/wxxrc"></p>
+
+<pre><code>&lt;object class="wxMenuBar" name="ID_MENUBAR"&gt;
+    &lt;object class="wxMenu" name="ID_MENU_FILE"&gt;
+        &lt;label&gt;&amp;File&lt;/label&gt;
+        &lt;object class="wxMenuItem" name="wxID_CLOSE"&gt;
+            &lt;label&gt;E&amp;xit&lt;/label&gt;
+            &lt;accel&gt;Ctrl+Q&lt;/accel&gt;
+            &lt;help&gt;Quit the application&lt;/help&gt;
+        &lt;/object&gt;
+    &lt;/object&gt;
+    &lt;object class="wxMenu" name="ID_MENU_VIEW"&gt;
+        &lt;label&gt;&amp;View&lt;/label&gt;
+    &lt;/object&gt;
+    &lt;object class="wxMenu" name="ID_MENU_TOOLS"&gt;
+        &lt;label&gt;&amp;Tools&lt;/label&gt;
+        &lt;object class="wxMenuItem" name="wxID_OPTIONS"&gt;
+            &lt;label&gt;&amp;Options...&lt;/label&gt;
+        &lt;/object&gt;
+    &lt;/object&gt;
+    &lt;object class="wxMenu" name="ID_MENU_HELP"&gt;
+        &lt;label&gt;&amp;Help&lt;/label&gt;
+        &lt;object class="wxMenuItem" name="wxID_CHECKFORUPDATES"&gt;
+            &lt;label&gt;Check for &amp;Updates...&lt;/label&gt;
+        &lt;/object&gt;
+        &lt;object class="separator" /&gt;
+        &lt;object class="wxMenuItem" name="wxID_ABOUT"&gt;
+            &lt;label&gt;&amp;About...&lt;/label&gt;
+        &lt;/object&gt;
+    &lt;/object&gt;
+&lt;/object&gt;
+</code></pre>
+
+<p></resource>
+```</p>
+
+<p>加载资源文件
+```
+bool MainApp::OnInit()
 {</p>
 
-<pre><code>MainFrame* frame = new MainFrame("Hello wxWidgets!");
-SetTopWindow(frame);
-frame-&gt;Show();
+<pre><code>wxXmlResource* pResource = wxXmlResource::Get();
+pResource-&gt;AddHandler(new wxMenuBarXmlHandler);
+pResource-&gt;AddHandler(new wxMenuXmlHandler);
+pResource-&gt;Load(wxT("resources/MenuBar.xrc"));
+...
+</code></pre>
+
+<p>}
+```</p>
+
+<p>初始化资源文件
+```
+MainFrame::MainFrame(const wxString&amp; title) : wxFrame(NULL, wxID_ANY, title)
+{</p>
+
+<pre><code>m_menuBar = NULL;
+InitMenuBar();
+</code></pre>
+
+<p>}</p>
+
+<p>bool MainFrame::InitMenuBar()
+{</p>
+
+<pre><code>if (m_menuBar)
+{
+    SetMenuBar(NULL);
+    delete m_menuBar;
+}
+// Initialize the resource system
+m_menuBar = wxXmlResource::Get()-&gt;LoadMenuBar(wxT("ID_MENUBAR"));
+if (!m_menuBar)
+{
+    wxLogError(wxT("Cannot load main menu from resource file"));
+    return false;
+}
+SetMenuBar(m_menuBar);
 return true;
 </code></pre>
 
 <p>}
 ```</p>
 
-<p>MainFrame.h
+<p>在XRC菜单上添加动态子菜单</p>
+
+<p>在资源文件中添加一个新的菜单项（wxID_LANGUAGES）：
 ```</p>
 
-<h1>ifndef <strong>MAINFRAME_H</strong></h1>
+<p><object class="wxMenu" name="ID_MENU_VIEW"></p>
 
-<h1>define <strong>MAINFRAME_H</strong></h1>
-
-<h1>include &lt;wx/frame.h></h1>
-
-<p>class MainFrame : public wxFrame
-{
-public:</p>
-
-<pre><code>MainFrame(const wxString&amp; title);
+<pre><code>&lt;label&gt;&amp;View&lt;/label&gt;
+&lt;object class="wxMenu" name="wxID_LANGUAGE"&gt;
+    &lt;label&gt;&amp;Language&lt;/label&gt;
+    &lt;object class="wxMenuItem" name="wxID_LANGUAGES"&gt;
+        &lt;label&gt;Get Additional/Update language pack&lt;/label&gt;
+        &lt;help&gt;Downloading Additional/Update language pack&lt;/help&gt;
+    &lt;/object&gt;
+    &lt;object class="separator" /&gt;
+&lt;/object&gt;
 </code></pre>
 
-<p>};</p>
-
-<h1>endif</h1>
-
-<p>```</p>
-
-<p>MainFrame.cpp
+<p></object>
 ```</p>
 
-<h1>include "MainFrame.h"</h1>
-
-<p>MainFrame::MainFrame(const wxString&amp; title) : wxFrame(NULL, wxID_ANY, title)
+<p>创建动态子菜单
+```
+// Initialize the resource system
+m_menuBar = wxXmlResource::Get()->LoadMenuBar(wxT("ID_MENUBAR"));
+if (!m_menuBar)
 {</p>
 
-<pre><code>// TODO: add member initialization code here
+<pre><code>wxLogError(wxT("Cannot load main menu from resource file"));
+return false;
 </code></pre>
 
 <p>}
+/<em>
+ * 这里很奇怪，在XRC文件wxID_LANGUAGE的类型明明是wxMenu，可在这里确只能用wxMenuItem。
+ * 查看wxWidgets源代码发现XRC系统只会把最上层的class为wxMenu的object创建为wxMenu对象。
+ * 其它的则都被创建成了wxMenuItem对象。
+ </em>/
+// 使用XRCID方法获取控件ID，创建动态子菜单
+wxMenuItem* menuItem = m_menuBar->FindItem(XRCID("wxID_LANGUAGE"));
+if (menuItem)
+{</p>
+
+<pre><code>wxMenu* subMenu = menuItem-&gt;GetSubMenu();
+subMenu-&gt;AppendRadioItem(wxID_LANGUAGE_LOWEST + 1, wxT("English"));
+subMenu-&gt;AppendRadioItem(wxID_LANGUAGE_LOWEST + 2, wxT("Chinese(Simplified)"));
+</code></pre>
+
+<p>}
+SetMenuBar(m_menuBar);
+return true;
 ```</p>
+
+<p><a href="/uploads/wxXRC.zip" title="wxXRC.zip">代码下载</a></p>
 ]]></content>
   </entry>
   

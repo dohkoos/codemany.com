@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Tag: Spinner | 乐者为王]]></title>
+  <link href="http://codemany.com/tags/spinner/atom.xml" rel="self"/>
+  <link href="http://codemany.com/"/>
+  <updated>2014-08-24T22:32:13+08:00</updated>
+  <id>http://codemany.com/</id>
+  <author>
+    <name><![CDATA[dohkoos]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[用Spinner + SQLite实现省市县三级联动]]></title>
+    <link href="http://codemany.com/blog/2011/09/16/spinner-sqlite-implementation-with-provincial-and-county-levels-linkage/"/>
+    <updated>2011-09-16T05:48:32+08:00</updated>
+    <id>http://codemany.com/blog/2011/09/16/spinner-sqlite-implementation-with-provincial-and-county-levels-linkage</id>
+    <content type="html"><![CDATA[<ol>
+<li>建立省市县<a href="http://www.stats.gov.cn/tjbz/xzqhdm/index.htm">行政区划代码</a>（截止2010年12月31日）数据表</li>
+</ol>
+
+
+<p><code>
+CREATE TABLE xzqhdm (
+  _id INTEGER PRIMARY KEY,
+  code NUMERIC,
+  region TEXT,
+  parent_code NUMERIC
+);
+</code></p>
+
+<p>parent_code指上一级的行政区划代码，省属于最上级的行政单位，设置它的区划代码为999999。</p>
+
+<p><code>
+insert into xzqhdm values(NULL, 110000, "北京市", 999999);
+insert into xzqhdm values(NULL, 110100, "市辖区", 110000);
+insert into xzqhdm values(NULL, 110101, "东城区", 110100);
+insert into xzqhdm values(NULL, 110102, "西城区", 110100);
+insert into xzqhdm values(NULL, 110103, "崇文区", 110100);
+insert into xzqhdm values(NULL, 110104, "宣武区", 110100);
+insert into xzqhdm values(NULL, 110105, "朝阳区", 110100);
+insert into xzqhdm values(NULL, 110106, "丰台区", 110100);
+...
+insert into xzqhdm values(NULL, 659001, "石河子市", 659000);
+insert into xzqhdm values(NULL, 659002, "阿拉尔市", 659000);
+insert into xzqhdm values(NULL, 659003, "图木舒克市", 659000);
+insert into xzqhdm values(NULL, 659004, "五家渠市", 659000);
+</code></p>
+
+<p><strong>2. SQLite数据库的操作</strong>
+如果应用使用到了SQLite数据库，在用户初次使用应用时，需要创建应用使用到的数据库表结构及添加一些初始化记录，另外在软件升级的时候，也需要对数据表结构进行更新。Android系统为我们提供了一个名为SQLiteOpenHelper的类，这是一个抽象类，该类用于对数据库版本进行管理，有两个重要的方法，分别是onCreate()和onUpgrade()。</p>
+
+<p>当调用SQLiteOpenHelper的getWritableDatabase()或getReadableDatabase()方法获取数据库实例时，如果数据库不存在，Android系统会自动生成一个数据库文件，接着调用onCreate()方法，onCreate()方法在初次生成数据库时才会被调用，在onCreate()方法里可以生成数据库表结构及添加一些应用使用到的初始化数据。onUpgrade()方法在数据库的版本发生变化时会被调用，数据库的版本是由程序员控制的，假设数据库现在的版本是1，由于业务的需要，修改了数据库表的结构，这时候就需要升级软件，升级软件时希望更新用户手机里的数据库表结构，为了实现这一目的，可以把原来的数据库版本设置为2（或其他数值），并且在onUpgrade()方法里面实现表结构的更新。当软件的版本升级次数比较多，这时在onUpgrade()方法里面可以根据原版号和目标版本号进行判断，然后作出相应的表结构及数据更新。</p>
+
+<p>SQLiteDatabase类则封装了一些操作数据库的常用API，使用该类可以完成对数据进行CRUD操作。主要是execSQL()和rawQuery()方法。execSQL()方法可以执行insert、delete、update和CREATE TABLE之类有更改行为的SQL语句； rawQuery()方法可以执行select语句。SQLiteDatabase还专门提供了对应于CRUD的操作方法： insert()、delete()、update()和query()。</p>
+
+<p>问题：<br />
+如何将SQLite数据库与apk文件一起发布？<br />
+可以将数据库文件复制到res\raw目录中，所有在res\raw目录中的文件不会被压缩，这样可以直接提取该目录中的文件。</p>
+
+<p>如何打开res\raw目录中的数据库文件？<br />
+不能直接打开res\raw目录中的数据库文件，需要在程序第一次启动时将该文件复制到手机内存或SD卡中，然后再打开。</p>
+
+<p>```
+public class DBHelper extends SQLiteOpenHelper {</p>
+
+<pre><code>private static String DB_PATH = "/data/data/com.codemany.linkage/databases/";
+private static String DB_NAME = "xzqh.db";
+private static DBHelper databaseHelper;
+private static SQLiteDatabase db;
+
+private Context context;
+
+private DBHelper(Context context) {
+    super(context, DB_NAME, null, 1);
+    this.context = context;
+}
+
+public static DBHelper getInstance(Context context) {
+    if (databaseHelper == null) {
+        databaseHelper = new DBHelper(context);
+        databaseHelper.openDataBase();
+
+        if (db == null) {
+            try {
+                db = databaseHelper.getWritableDatabase();
+                databaseHelper.copyDatabase();
+            }
+            catch (Exception e) {
+                Log.d("DBHelper", "Error in database creation");
+            }
+
+            databaseHelper.openDataBase();
+        }
+    }
+    return databaseHelper;
+}
+
+private void copyDatabase() throws IOException {
+    InputStream is = context.getResources().openRawResource(R.raw.xzqh);
+    OutputStream os = new FileOutputStream(DB_PATH + DB_NAME);
+    byte[] buffer = new byte[1024];
+    int length;
+    while ((length = is.read(buffer)) &gt; 0) {
+        os.write(buffer, 0, length);
+    }
+
+    os.flush();
+    os.close();
+    is.close();
+}
+
+private void openDataBase() {
+    try {
+        db = SQLiteDatabase.openDatabase(
+                DB_PATH + DB_NAME,
+                null,
+                SQLiteDatabase.OPEN_READONLY | SQLiteDatabase.NO_LOCALIZED_COLLATORS);
+    } catch (SQLiteException e) {
+        // database does't exist yet
+    }
+}
+
+public SimpleCursorAdapter getListByParentCode(Context context, String parentCode) {
+    SimpleCursorAdapter list = null;
+    DBHelper dHelper = new DBHelper(context);
+    SQLiteDatabase db = dHelper.getReadableDatabase();
+    Cursor cursor = db.rawQuery(
+            "select code as _id, region from xzqhdm where parent_code = ?",
+            new String[] {parentCode});
+    if (cursor.getCount() != 0) {
+        list = new SimpleCursorAdapter(context,
+                android.R.layout.simple_spinner_item,
+                cursor,
+                new String[] {"region"},
+                new int[] {android.R.id.text1});
+        list.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+    }
+    return list;
+}
+
+@Override
+public synchronized void close() {
+    if (db != null) {
+        db.close();
+    }
+    super.close();
+}
+
+@Override
+public void onCreate(SQLiteDatabase db) {
+}
+
+@Override
+public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+}
+</code></pre>
+
+<p>}
+```</p>
+
+<p>在代码实现时遇到的难题是如何在选中region的同时得到对应的code。网上有教程说定制自己的adapter，重写bingView，不过有多个spinner就需要声明多个全局变量；还有教程指出可以直接往adapter中传递对象（实现一个类，将code和region作为字段），然后重写对象的toString()方法。后来受到这个帖子的启发，修改了rawQuery中的select语句得以实现Spinner控件中的键值绑定。</p>
+
+<p>原来的select语句是：
+<code>
+select _id, code, region from xzqhdm where parent_code = ?
+</code></p>
+
+<p>因为传入到CursorAdapter中的Cursor结果集必须包含有列名为<em>id的列，否则CursorAdapter将不会起作用。而code可以被看作是整数，那么只需要将选出的code当作</em>id就行了，根据这个想法写出的select语句如下：
+<code>
+select code as _id, region from xzqhdm where parent_code = ?
+</code></p>
+
+<p>这样，但触发Spinner上的ItemSelected事件时就可以通过最后一个参数id得到当前的code了。</p>
+
+<p>写这篇文章的时候同时也在调试着代码，突然发现其实不需要改写select语句也是可以实现键值绑定的。只要在onItemSelected()方法中使用如下代码就可以取得相应的值了：
+```
+Cursor cursor = (Cursor)parent.getSelectedItem();
+if (cursor != null) {</p>
+
+<pre><code>int code = cursor.getString(cursor.getColumnIndex("code"));
+String country = cursor.getString(cursor.getColumnIndex("region"));
+</code></pre>
+
+<p>}
+```</p>
+
+<p><a href="/uploads/linkage.zip" title="linkage.zip">代码下载</a></p>
+
+<p>参考文章：<br />
+<a href="http://lxmgfd.iteye.com/blog/970637">http://lxmgfd.iteye.com/blog/970637</a><br />
+<a href="http://www.eoeandroid.com/thread-98254-1-1.html">http://www.eoeandroid.com/thread-98254-1-1.html</a><br />
+<a href="http://www.cmd100.com/bbs/thread-5454-1-1.html">http://www.cmd100.com/bbs/thread-5454-1-1.html</a></p>
+]]></content>
+  </entry>
+  
+</feed>
