@@ -5,11 +5,11 @@
 <!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  <title>如何在过了60天后再激活Windows Server 2008 - 乐者为王</title>
+  <title>PowerBuilder中如何调用默认的邮件客户端 - 乐者为王</title>
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="登录系统后，会出现一个激活窗口，告诉你激活已过期，要接着使用的话就必须先激活。并提供几种激活的方式。选择第二项即Buy a new product key online，会弹出如下窗口： 点击确定，这时就会打开浏览器。在浏览器中选择打开文件菜单，找到command命令，右键点击Run as &hellip;">
+  <meta name="description" content="在某个窗口上有一个文字超链接（StaticHyperLink控件），点击后就打开默认的邮件客户端，并且把指定收件人的邮件地址填写到收件人地址栏中。 如果在StaticHyperLink控件的URL中使用mailto协议，的确能够做到上述的要求。但是有个问题是在打开邮件客户端前总是先打开一个IE窗口 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -18,7 +18,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   
-  <link rel="canonical" href="http://codemany.com/blog/2009/10/21/how-to-activate-over-the-60-days-after-windows-server-2008">
+  <link rel="canonical" href="http://codemany.com/blog/2007/09/20/how-to-call-the-default-mail-client-in-powerbuilder">
   <link href="/favicon.png" rel="icon">
   <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
   <link href="/atom.xml" rel="alternate" title="乐者为王" type="application/atom+xml">
@@ -68,7 +68,7 @@
   
   <header>
     
-      <h1 class="entry-title">如何在过了60天后再激活Windows Server 2008</h1>
+      <h1 class="entry-title">PowerBuilder中如何调用默认的邮件客户端</h1>
     
     
       <p class="meta">
@@ -84,18 +84,72 @@
   
 
 
-<time datetime="2009-10-21T05:51:06+08:00" pubdate data-updated="true">Oct 21<sup>st</sup>, 2009</time>
+<time datetime="2007-09-20T00:17:40+08:00" pubdate data-updated="true">Sep 20<sup>th</sup>, 2007</time>
         
       </p>
     
   </header>
 
 
-<div class="entry-content"><p>登录系统后，会出现一个激活窗口，告诉你激活已过期，要接着使用的话就必须先激活。并提供几种激活的方式。选择第二项即Buy a new product key online，会弹出如下窗口：</p>
+<div class="entry-content"><p>在某个窗口上有一个文字超链接（StaticHyperLink控件），点击后就打开默认的邮件客户端，并且把指定收件人的邮件地址填写到收件人地址栏中。</p>
 
-<p><img src="/uploads/go-microsoft-fwlink.png" title="go-microsoft-fwlink" ></p>
+<p>如果在StaticHyperLink控件的URL中使用mailto协议，的确能够做到上述的要求。但是有个问题是在打开邮件客户端前总是先打开一个IE窗口，这样使得用户的体验非常差。而PowerBuilder自带的mailsession对象则只能调用Outlook Express，根本就不用考虑。</p>
 
-<p>点击确定，这时就会打开浏览器。在浏览器中选择打开文件菜单，找到command命令，右键点击Run as administrator，然后执行slmgr.vbs -rearm指令，接着重启计算机就可以了。</p>
+<p>查找资料后发现可以通过调用外部函数ShellExecute来解决这个问题。首先在Global/Local External Functions中添加如下声明：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>function ulong ShellExecuteA(ulong hwnd, &
+</span><span class='line'>                            string lpOperation, &
+</span><span class='line'>                            string lpFile, &
+</span><span class='line'>                            string lpParameters, &
+</span><span class='line'>                            string lpDirectory, &
+</span><span class='line'>                            long nShowCmd) library "shell32"</span></code></pre></td></tr></table></div></figure>
+
+
+<p>然后在StaticHyperLink控件的Clicked事件中添加代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>string ls_null
+</span><span class='line'>
+</span><span class='line'>SetNull(ls_null)
+</span><span class='line'>ShellExecuteA(Handle(parent), &
+</span><span class='line'>            "open", &
+</span><span class='line'>            "mailto:yourname@example.com", &
+</span><span class='line'>            ls_null, &
+</span><span class='line'>            ls_null, &
+</span><span class='line'>            1)    // SW_SHOWNORMAL</span></code></pre></td></tr></table></div></figure>
+
+
+<p>还有要注意4个string类型的参数，一定是string xxx，千万不要使用下面这种声明方式：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>function ulong ShellExecuteA(ulong hwnd, &
+</span><span class='line'>                             ref string lpOperation, &
+</span><span class='line'>                             ref string lpFile, &
+</span><span class='line'>                             ref string lpParameters, &
+</span><span class='line'>                             ref string lpDirectory, &
+</span><span class='line'>                             long nShowCmd) library "shell32"</span></code></pre></td></tr></table></div></figure>
+
+
+<p>刚开始的时候我就使用了这种声明方式，结果每次程序执行到ShellExecuteA时都会弹出一个异常对话框，搞的我非常郁闷。</p>
 </div>
 
 
@@ -118,7 +172,7 @@
   
 
 
-<time datetime="2009-10-21T05:51:06+08:00" pubdate data-updated="true">Oct 21<sup>st</sup>, 2009</time>
+<time datetime="2007-09-20T00:17:40+08:00" pubdate data-updated="true">Sep 20<sup>th</sup>, 2007</time>
       
 
 
@@ -128,23 +182,23 @@
   <ul class="posts">
   
     <li class="related">
-      <a href="/blog/2010/10/03/enable-wireless-networks-to-support-windows-server-2008/">启用Windows Server 2008无线网络支持</a>
+      <a href="/blog/2013/03/29/tips-for-creating-executable-file-in-powerbuilder/">PowerBuilder生成可执行文件的小技巧</a>
     </li>
   
     <li class="related">
-      <a href="/blog/2009/11/04/install-android-sdk-20-on-windows-server-2008/">在Windows Server 2008下安装Android SDK 2.0</a>
+      <a href="/blog/2009/10/15/datawindows-data-buffer/">DataWindow的数据缓冲区</a>
     </li>
   
     <li class="related">
-      <a href="/blog/2009/08/18/freemind-solution-in-windows-server-2008-can-not-run-the-problem-of/">解决FreeMind在Windows Server 2008中不能运行的问题</a>
+      <a href="/blog/2008/10/18/how-do-i-set-up-a-data-window-of-a-line-out-the-background-color/">如何设置数据窗口中某行某列的背景颜色</a>
     </li>
   
     <li class="related">
-      <a href="/blog/2008/12/02/virtualbox-shared-folders-between-ubuntu-guest-and-windows-server-2008-host/">VirtualBox虚拟Ubuntu 8.10时共享文件夹的使用</a>
+      <a href="/blog/2008/04/26/using-antlr-to-build-powerscript-grammar-parser-part4/">使用ANTLR构建PowerScript语法分析器（4）</a>
     </li>
   
     <li class="related">
-      <a href="/blog/2008/05/11/to-extend-the-windows-server-2008-assessment-period/">延长Windows Server 2008的评估期限</a>
+      <a href="/blog/2007/09/16/tool-for-chinese-identity-card/">身份证工具IDCardTool</a>
     </li>
   
   </ul>
@@ -165,10 +219,10 @@
     
     <p class="meta">
       
-        <a class="basic-alignment left" href="/blog/2009/10/15/datawindows-data-buffer/" title="Previous Post: DataWindow的数据缓冲区">&laquo; DataWindow的数据缓冲区</a>
+        <a class="basic-alignment left" href="/blog/2007/09/16/tool-for-chinese-identity-card/" title="Previous Post: 身份证工具IDCardTool">&laquo; 身份证工具IDCardTool</a>
       
       
-        <a class="basic-alignment right" href="/blog/2009/10/31/fingerprint-recognition-technology-break/" title="Next Post: 10块钱破解指纹考勤机">10块钱破解指纹考勤机 &raquo;</a>
+        <a class="basic-alignment right" href="/blog/2007/09/25/hello-wxwidgets/" title="Next Post: Hello wxWidgets!">Hello wxWidgets! &raquo;</a>
       
     </p>
   </footer>
@@ -268,8 +322,8 @@
       
         
         // var disqus_developer = 1;
-        var disqus_identifier = 'http://codemany.com/blog/2009/10/21/how-to-activate-over-the-60-days-after-windows-server-2008/';
-        var disqus_url = 'http://codemany.com/blog/2009/10/21/how-to-activate-over-the-60-days-after-windows-server-2008/';
+        var disqus_identifier = 'http://codemany.com/blog/2007/09/20/how-to-call-the-default-mail-client-in-powerbuilder/';
+        var disqus_url = 'http://codemany.com/blog/2007/09/20/how-to-call-the-default-mail-client-in-powerbuilder/';
         var disqus_script = 'embed.js';
       
     (function () {

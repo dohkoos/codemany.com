@@ -5,15 +5,12 @@
 <!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  <title>如何联机调试Android应用 - 乐者为王</title>
+  <title>如何获得已安装应用的安装时间和占用空间 - 乐者为王</title>
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="首先你需要一台开发手机，如果不是的话可以刷ROM；
-在Settings -> Applications -> Development下激活USB debugging选项；
-下载并安装USB驱动程序；
-用USB数据线连接手机与电脑；
-在AndroidManifest.xml中的&lt; &hellip;">
+  <meta name="description" content="可以通过ApplicationInfo类中sourceDir取得应用的文件路径，再使用File类读取文件的相关属性实现。不过这可能导致: 无法获取原始的创建时间，可能很早就被创建了，之后被替换了；
+如果这个应用在一个私有的位置，比如app-private目录（ &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -22,7 +19,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   
-  <link rel="canonical" href="http://codemany.com/blog/2009/12/26/how-to-debugging-android-app-on-device">
+  <link rel="canonical" href="http://codemany.com/blog/2011/06/18/how-to-obtain-install-time-and-space-of-installed-apps">
   <link href="/favicon.png" rel="icon">
   <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
   <link href="/atom.xml" rel="alternate" title="乐者为王" type="application/atom+xml">
@@ -72,7 +69,7 @@
   
   <header>
     
-      <h1 class="entry-title">如何联机调试Android应用</h1>
+      <h1 class="entry-title">如何获得已安装应用的安装时间和占用空间</h1>
     
     
       <p class="meta">
@@ -88,22 +85,61 @@
   
 
 
-<time datetime="2009-12-26T03:54:41+08:00" pubdate data-updated="true">Dec 26<sup>th</sup>, 2009</time>
+<time datetime="2011-06-18T09:59:11+08:00" pubdate data-updated="true">Jun 18<sup>th</sup>, 2011</time>
         
       </p>
     
   </header>
 
 
-<div class="entry-content"><ol>
-<li>首先你需要一台开发手机，如果不是的话可以刷ROM；</li>
-<li>在Settings -> Applications -> Development下激活USB debugging选项；</li>
-<li>下载并安装USB驱动程序；</li>
-<li>用USB数据线连接手机与电脑；</li>
-<li>在AndroidManifest.xml中的<code>&lt;application&gt;</code>里添加android:debuggable=&#8221;true&#8221;；</li>
-<li>然后你就可以像平常一样调试你的Android代码了。</li>
+<div class="entry-content"><p>可以通过ApplicationInfo类中sourceDir取得应用的文件路径，再使用File类读取文件的相关属性实现。不过这可能导致:</p>
+
+<ol>
+<li>无法获取原始的创建时间，可能很早就被创建了，之后被替换了；</li>
+<li>如果这个应用在一个私有的位置，比如app-private目录（使用Market付费购买的应用在这个位置），没有root过的手机是没有权限的，会导致读取失败。</li>
 </ol>
 
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>List&lt;PackageInfo&gt; pkgs = getPackageManager().getInstalledPackages(0);
+</span><span class='line'>for (int i = 0; i &lt; pkgs.size(); i++) {
+</span><span class='line'>    PackageInfo pkg = pkgs.get(i);
+</span><span class='line'>
+</span><span class='line'>    File file = new File(pkg.applicationInfo.sourceDir);
+</span><span class='line'>    System.out.println("file size: " + file.length());
+</span><span class='line'>    System.out.println("file last modified: " + file.lastModified());
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>不过File类中文件大小和文件最后修改时间的值是long型，不是用户友好的，在显示前需要格式化一下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>String size = Formatter.formatFileSize(context, file.length())
+</span><span class='line'>
+</span><span class='line'>Date date = new Date(file.lastModified())
+</span><span class='line'>String lastModified = new SimpleDateFormat("yyyy-MM-dd").format(date)
+</span><span class='line'>
+</span><span class='line'>System.out.println("file size: " + size);
+</span><span class='line'>System.out.println("file last modified: " + lastModified);</span></code></pre></td></tr></table></div></figure>
+
+
+<p>从Android 2.3 API Level为9开始，ApplicationInfo类新增了firstInstallTime和lastUpdateTime两个字段，可以直接获取应用的创建和最后修改时间，即使是付费软件也能正常获取。</p>
+
+<p>参考资料：<br />
+<a href="http://www.android123.com.cn/androidkaifa/719.html">http://www.android123.com.cn/androidkaifa/719.html</a></p>
 </div>
 
 
@@ -126,7 +162,7 @@
   
 
 
-<time datetime="2009-12-26T03:54:41+08:00" pubdate data-updated="true">Dec 26<sup>th</sup>, 2009</time>
+<time datetime="2011-06-18T09:59:11+08:00" pubdate data-updated="true">Jun 18<sup>th</sup>, 2011</time>
       
 
 
@@ -173,10 +209,10 @@
     
     <p class="meta">
       
-        <a class="basic-alignment left" href="/blog/2009/12/20/using-rails23-to-create-a-simple-accounting-app-part9/" title="Previous Post: 用Rails 2.3打造简单记账软件（9）">&laquo; 用Rails 2.3打造简单记账软件（9）</a>
+        <a class="basic-alignment left" href="/blog/2011/06/06/adding-uninstall-button-to-the-listview/" title="Previous Post: 给ListView添加卸载功能的Button">&laquo; 给ListView添加卸载功能的Button</a>
       
       
-        <a class="basic-alignment right" href="/blog/2009/12/27/how-to-import-or-export-data-from-the-application-in-heroku/" title="Next Post: 如何导入/导出Heroku中应用的数据">如何导入/导出Heroku中应用的数据 &raquo;</a>
+        <a class="basic-alignment right" href="/blog/2011/06/21/transfer-sms-from-nokia6670-to-htc-hero-g3/" title="Next Post: 将Nokia 6670的短信导入HTC Hero G3">将Nokia 6670的短信导入HTC Hero G3 &raquo;</a>
       
     </p>
   </footer>
@@ -276,8 +312,8 @@
       
         
         // var disqus_developer = 1;
-        var disqus_identifier = 'http://codemany.com/blog/2009/12/26/how-to-debugging-android-app-on-device/';
-        var disqus_url = 'http://codemany.com/blog/2009/12/26/how-to-debugging-android-app-on-device/';
+        var disqus_identifier = 'http://codemany.com/blog/2011/06/18/how-to-obtain-install-time-and-space-of-installed-apps/';
+        var disqus_url = 'http://codemany.com/blog/2011/06/18/how-to-obtain-install-time-and-space-of-installed-apps/';
         var disqus_script = 'embed.js';
       
     (function () {
