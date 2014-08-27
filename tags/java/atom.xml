@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Java | 乐者为王]]></title>
   <link href="http://codemany.com/tags/java/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-08-27T02:16:45+08:00</updated>
+  <updated>2014-08-27T20:47:47+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,167 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[使用SiteMesh做网页布局]]></title>
+    <link href="http://codemany.com/blog/2013/04/09/page-layout-using-sitemesh/"/>
+    <updated>2013-04-09T08:18:33+08:00</updated>
+    <id>http://codemany.com/blog/2013/04/09/page-layout-using-sitemesh</id>
+    <content type="html"><![CDATA[<p>SiteMesh是一个基于GoF的Decorator模式，用于页面布局的框架。能帮助我们在由大量页面构成的项目中创建一致的页面布局和外观。</p>
+
+<p>这里我们将会把它整合到JBookShelf里去。要和Struts2整合，先在pom.xml添加以下插件，该插件会将依赖的SiteMesh也一并包含到项目中。</p>
+
+<p>```
+<dependency></p>
+
+<pre><code>&lt;groupId&gt;org.apache.struts&lt;/groupId&gt;
+&lt;artifactId&gt;struts2-sitemesh-plugin&lt;/artifactId&gt;
+&lt;version&gt;2.3.12&lt;/version&gt;
+</code></pre>
+
+<p></dependency>
+```</p>
+
+<p>将web.xml配置中原来的</p>
+
+<p>```
+<filter></p>
+
+<pre><code>&lt;filter-name&gt;struts2&lt;/filter-name&gt;
+&lt;filter-class&gt;
+    org.apache.struts2.dispatcher.ng.filter.StrutsPrepareAndExecuteFilter
+&lt;/filter-class&gt;
+</code></pre>
+
+<p></filter></p>
+
+<p>&lt;filter-mapping></p>
+
+<pre><code>&lt;filter-name&gt;struts2&lt;/filter-name&gt;
+&lt;url-pattern&gt;/*&lt;/url-pattern&gt;
+</code></pre>
+
+<p>&lt;/filter-mapping>
+```</p>
+
+<p>改成</p>
+
+<p>```
+<filter></p>
+
+<pre><code>&lt;filter-name&gt;struts-prepare&lt;/filter-name&gt;
+&lt;filter-class&gt;org.apache.struts2.dispatcher.ng.filter.StrutsPrepareFilter&lt;/filter-class&gt;
+</code></pre>
+
+<p></filter></p>
+
+<p><filter></p>
+
+<pre><code>&lt;filter-name&gt;sitemesh&lt;/filter-name&gt;
+&lt;filter-class&gt;com.opensymphony.sitemesh.webapp.SiteMeshFilter&lt;/filter-class&gt;
+</code></pre>
+
+<p></filter></p>
+
+<p><filter></p>
+
+<pre><code>&lt;filter-name&gt;struts-execute&lt;/filter-name&gt;
+&lt;filter-class&gt;org.apache.struts2.dispatcher.ng.filter.StrutsExecuteFilter&lt;/filter-class&gt;
+</code></pre>
+
+<p></filter></p>
+
+<p>&lt;filter-mapping></p>
+
+<pre><code>&lt;filter-name&gt;struts-prepare&lt;/filter-name&gt;
+&lt;url-pattern&gt;/*&lt;/url-pattern&gt;
+</code></pre>
+
+<p>&lt;/filter-mapping></p>
+
+<p>&lt;filter-mapping></p>
+
+<pre><code>&lt;filter-name&gt;sitemesh&lt;/filter-name&gt;
+&lt;url-pattern&gt;/*&lt;/url-pattern&gt;
+</code></pre>
+
+<p>&lt;/filter-mapping></p>
+
+<p>&lt;filter-mapping></p>
+
+<pre><code>&lt;filter-name&gt;struts-execute&lt;/filter-name&gt;
+&lt;url-pattern&gt;/*&lt;/url-pattern&gt;
+</code></pre>
+
+<p>&lt;/filter-mapping>
+```</p>
+
+<p>这里要注意过滤器的位置。SiteMesh过滤器必须在StrutsPrepareFilter之后和StrutsExecuteFilter之前，否则在SiteMesh的修饰器页面中将访问不到ActionContext。这是因为Struts2的所有值是保存在Stack Context或者ValueStack中的。默认情况下，某个过滤器一旦访问了该Stack Context或ValueStack，里面对应的值会被清洗掉。如果先使用Struts2的StrutsPrepareAndExecuteFilter来过滤用户请求，则SiteMesh的过滤器将无法取得Stack Context或者ValueStack中的数据。为了解决这个问题，Struts2提供了StrutsPrepareFilter和StrutsExecuteFilter类（在2.1.3版本前是ActionContextCleanUp和FilterDispatcher），通过它们协同来确保SiteMesh正常工作。</p>
+
+<p>在WEB-INF下添加decorators.xml文档：</p>
+
+<p>```
+&lt;?xml version="1.0" encoding="utf-8"?>
+<decorators defaultdir="/layouts"></p>
+
+<pre><code>&lt;excludes&gt;
+    &lt;pattern&gt;/stylesheets/*&lt;/pattern&gt;
+    &lt;pattern&gt;/javascripts/*&lt;/pattern&gt;
+    &lt;pattern&gt;/images/*&lt;/pattern&gt;
+&lt;/excludes&gt;
+
+&lt;decorator name="application" page="application.jsp"&gt;
+    &lt;pattern&gt;/*&lt;/pattern&gt;
+&lt;/decorator&gt;
+</code></pre>
+
+<p></decorators>
+```</p>
+
+<p>stylesheets、javascripts、images目录下的内容是不需要被修饰的，可以把它们放到execludes块中排除掉。</p>
+
+<p>新建/layouts/application.jsp模版页：</p>
+
+<p>```
+&lt;%@ taglib uri="/struts-tags" prefix="s" %>
+&lt;%@ taglib uri="<a href="http://www.opensymphony.com/sitemesh/decorator">http://www.opensymphony.com/sitemesh/decorator</a>" prefix="decorator" %></p>
+
+<p>&lt;!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>&lt;decorator:title default="JBookShelf" /></title>
+&lt;decorator:head />
+</head></p>
+
+<p><body></p>
+
+<pre><code>&lt;div&gt;
+    &lt;s:if test="#session.user_session_key != null"&gt;
+    &lt;s:a action="listBook"&gt;All Books&lt;/s:a&gt;
+    Welcome, you have logined.
+    &lt;s:a action="logout"&gt;Logout&lt;/s:a&gt;
+    &lt;/s:if&gt;
+    &lt;s:else&gt;
+    &lt;s:a action="login!input"&gt;Login&lt;/s:a&gt; |
+    &lt;s:a action="register!input"&gt;Register&lt;/s:a&gt;
+    &lt;/s:else&gt;
+&lt;/div&gt;
+&lt;hr /&gt;
+&lt;div&gt;Navigation&lt;/div&gt;
+&lt;hr /&gt;
+&lt;decorator:body /&gt;
+&lt;hr /&gt;
+&lt;div&gt;Footer&lt;/div&gt;
+</code></pre>
+
+<p></body>
+</html>
+```</p>
+
+<p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[使用Interceptor禁止用户访问未授权的图书信息]]></title>
@@ -1002,210 +1163,6 @@ public void setUserService(UserService userService) {&lt;br /&gt;
 
 <p></body>
 </html>
-```</p>
-
-<p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Struts 2 + Spring 3 + Hibernate 4登录实例]]></title>
-    <link href="http://codemany.com/blog/2012/09/04/struts2-spring3-hibernate4-login-sample/"/>
-    <updated>2012-09-04T06:54:27+08:00</updated>
-    <id>http://codemany.com/blog/2012/09/04/struts2-spring3-hibernate4-login-sample</id>
-    <content type="html"><![CDATA[<p>在pom.xml中添加依赖包：<br />
-```
-<dependency></p>
-
-<pre><code>&lt;groupId&gt;org.springframework&lt;/groupId&gt;
-&lt;artifactId&gt;spring-orm&lt;/artifactId&gt;
-&lt;version&gt;3.1.2.RELEASE&lt;/version&gt;
-</code></pre>
-
-<p></dependency>
-<dependency></p>
-
-<pre><code>&lt;groupId&gt;org.springframework&lt;/groupId&gt;
-&lt;artifactId&gt;spring-web&lt;/artifactId&gt;
-&lt;version&gt;3.1.2.RELEASE&lt;/version&gt;
-</code></pre>
-
-<p></dependency></p>
-
-<!-- 没有这个plugin包会导致Spring无法注入bean到Struts 2的Action中 -->
-
-
-<p><dependency></p>
-
-<pre><code>&lt;groupId&gt;org.apache.struts&lt;/groupId&gt;
-&lt;artifactId&gt;struts2-spring-plugin&lt;/artifactId&gt;
-&lt;version&gt;2.3.4.1&lt;/version&gt;
-</code></pre>
-
-<p></dependency>
-```</p>
-
-<p>配置web.xml文件：<br />
-```
-&lt;context-param></p>
-
-<pre><code>&lt;param-name&gt;contextConfigLocation&lt;/param-name&gt;
-&lt;param-value&gt;classpath:applicationContext.xml&lt;/param-value&gt;
-</code></pre>
-
-<p>&lt;/context-param></p>
-
-<p><listener></p>
-
-<pre><code>&lt;listener-class&gt;org.springframework.web.context.ContextLoaderListener&lt;/listener-class&gt;
-</code></pre>
-
-<p></listener>
-```</p>
-
-<p>删除hibernate.cfg.xml，添加applicationContext.xml，内容为：<br />
-```
-&lt;?xml version="1.0" encoding="utf-8"?>
-<beans xmlns="http://www.springframework.org/schema/beans"<br /></p>
-
-<pre><code>xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"&lt;br /&gt;
-xsi:schemaLocation="http://www.springframework.org/schema/beans&lt;br /&gt;
-    http://www.springframework.org/schema/beans/spring-beans.xsd"&gt;
-
-&lt;!-- DriverManagerDataSource在每个连接请求时都新建一个connection。&lt;br /&gt;
-     与DBCP的BasicDataSource不同，DriverManagerDataSource提供的连接没有进行池管理 --&gt;
-&lt;bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource"&gt;
-    &lt;property name="driverClassName" value="com.mysql.jdbc.Driver" /&gt;
-    &lt;property name="url" value="jdbc:mysql://localhost:3306/jbookshelf" /&gt;
-    &lt;property name="username" value="root" /&gt;
-    &lt;property name="password" value="123456" /&gt;
-&lt;/bean&gt;
-
-&lt;bean id="sessionFactory" class="org.springframework.orm.hibernate4.LocalSessionFactoryBean"&gt;
-    &lt;property name="dataSource" ref="dataSource" /&gt;
-    &lt;property name="hibernateProperties"&gt;
-        &lt;props&gt;
-            &lt;prop key="hibernate.connection.pool_size"&gt;1&lt;/prop&gt;
-            &lt;prop key="hibernate.dialect"&gt;org.hibernate.dialect.MySQLDialect&lt;/prop&gt;
-            &lt;prop key="hibernate.cache.provider_class"&gt;org.hibernate.cache.internal.NoCacheProvider&lt;/prop&gt;
-            &lt;prop key="show_sql"&gt;true&lt;/prop&gt;
-        &lt;/props&gt;
-    &lt;/property&gt;
-    &lt;property name="mappingResources"&gt;
-        &lt;list&gt;
-            &lt;value&gt;com/codemany/account/model/User.hbm.xml&lt;/value&gt;
-        &lt;/list&gt;
-    &lt;/property&gt;
-&lt;/bean&gt;
-
-&lt;bean id="userDao" class="com.codemany.account.dao.UserDao"&gt;
-    &lt;property name="sessionFactory" ref="sessionFactory" /&gt;
-&lt;/bean&gt;
-
-&lt;!-- Struts 2的action是有状态的，必须显示设置scope为prototype，每次请求过来都会创建一个action --&gt;
-&lt;bean id="loginAction" class="com.codemany.account.action.LoginAction" scope="prototype"&gt;
-    &lt;property name="userDao" ref="userDao" /&gt;
-&lt;/bean&gt;
-</code></pre>
-
-<p></beans>
-```</p>
-
-<p>删除HibernateUtil.java，修改UserDao.java为以下内容：<br />
-```
-package com.codemany.account.dao;</p>
-
-<p>import org.hibernate.Query;<br />
-import org.hibernate.Session;<br />
-import org.hibernate.SessionFactory;</p>
-
-<p>import com.codemany.account.model.User;</p>
-
-<p>public class UserDao {<br /></p>
-
-<pre><code>// Spring 3集成Hibernate 4不再需要HibernateDaoSupport或HibernateTemplate了，&lt;br /&gt;
-// 直接使用原生API即可。&lt;br /&gt;
-private SessionFactory sessionFactory;
-
-public void setSessionFactory(SessionFactory sessionFactory) {&lt;br /&gt;
-    this.sessionFactory = sessionFactory;&lt;br /&gt;
-}
-
-public User getUser(String username) {&lt;br /&gt;
-    Session session = sessionFactory.openSession();&lt;br /&gt;
-    try {&lt;br /&gt;
-        Query query = session.createQuery("from User u where u.username = ?");&lt;br /&gt;
-        query.setString(0, username);&lt;br /&gt;
-        query.setMaxResults(1);&lt;br /&gt;
-        return (User)query.uniqueResult();&lt;br /&gt;
-    } finally {&lt;br /&gt;
-        session.close();&lt;br /&gt;
-    }&lt;br /&gt;
-}&lt;br /&gt;
-</code></pre>
-
-<p>}
-```</p>
-
-<p>在struts.xml中将action元素中login的class属性改为applicationContext.xml配置文件中的loginAction： <br />
-```
-<action name="login" class="loginAction"></p>
-
-<pre><code>&lt;result name="success"&gt;/index.jsp&lt;/result&gt;
-&lt;result name="input"&gt;/index.jsp&lt;/result&gt;
-</code></pre>
-
-<p></action>
-```</p>
-
-<p>修改LoginAction.java的代码：<br />
-```
-package com.codemany.account.action;</p>
-
-<p>import com.codemany.account.dao.UserDao;<br />
-import com.codemany.account.model.User;</p>
-
-<p>import com.opensymphony.xwork2.ActionContext;<br />
-import com.opensymphony.xwork2.ActionSupport;</p>
-
-<p>public class LoginAction extends ActionSupport {<br /></p>
-
-<pre><code>private static final long serialVersionUID = -389833745243649130L;
-
-private String username;&lt;br /&gt;
-private String password;
-
-private UserDao userDao;
-
-public String execute() throws Exception {&lt;br /&gt;
-    if (username == null || username.length() == 0&lt;br /&gt;
-            || password == null || password.length() == 0) {&lt;br /&gt;
-        return INPUT;&lt;br /&gt;
-    }
-
-    User u = userDao.getUser(username);&lt;br /&gt;
-    if (u == null || !password.equals(u.getPassword())) {&lt;br /&gt;
-        return INPUT;&lt;br /&gt;
-    }
-
-    ActionContext.getContext().getSession().put("logined", true);&lt;br /&gt;
-    return SUCCESS;&lt;br /&gt;
-}
-
-public void setUsername(String username) {&lt;br /&gt;
-    this.username = username;&lt;br /&gt;
-}
-
-public void setPassword(String password) {&lt;br /&gt;
-    this.password = password;&lt;br /&gt;
-}
-
-public void setUserDao(UserDao userDao) {&lt;br /&gt;
-    this.userDao = userDao;&lt;br /&gt;
-}&lt;br /&gt;
-</code></pre>
-
-<p>}
 ```</p>
 
 <p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>

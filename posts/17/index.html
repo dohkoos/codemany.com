@@ -9,8 +9,10 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="Ruby DBI是一个为Ruby程序访问数据库提供的与数据库无关的统一数据库编程接口。结构层次上可以分为两层： Database Interface 数据库接口层，与数据库无关，提供与数据库无关的标准接口
-Database Driver 数据库驱动，与数据库相关 Ruby DBI模块可以从 &hellip;">
+  <meta name="description" content="在上篇文中写的词法分析文件存在有两个小问题： 处理换行符和回车符的词法定义有重复，在WS和EndOfLine中都有出现；
+像/* comments /* nested comments */ */这种嵌套注释会被输出成： 1
+2
+bc&gt;/* comments /* nested &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -66,130 +68,6 @@ Database Driver 数据库驱动，与数据库相关 Ruby DBI模块可以从 &he
     <div id="content">
       <div class="blog-index">
   
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2007/09/04/install-and-use-ruby-dbi/">Ruby DBI的安装和使用</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2007-09-04T22:35:15+08:00" pubdate data-updated="true">Sep 4<sup>th</sup>, 2007</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Ruby DBI是一个为Ruby程序访问数据库提供的与数据库无关的统一数据库编程接口。结构层次上可以分为两层：</p>
-
-<ol>
-<li>Database Interface 数据库接口层，与数据库无关，提供与数据库无关的标准接口</li>
-<li>Database Driver 数据库驱动，与数据库相关</li>
-</ol>
-
-
-<p>Ruby DBI模块可以从 <a href="http://ruby-dbi.sourceforge.net/">http://ruby-dbi.sourceforge.net/</a> 取得，下载后解压缩，配置，然后安装：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ruby setup.rb config --with=dbi,dbd_mysql
-</span><span class='line'>ruby setup.rb setup
-</span><span class='line'>ruby setup.rb install</span></code></pre></td></tr></table></div></figure>
-
-
-<p>注意：<code>--with</code>参数必须根据你所安装的数据库类型来选择。可以配置多个，但不能选择没有安装在你机器上的数据库类型。记得刚开始的时候我使用ruby setup.rb config来配置（我机器上只安装了MySQL和SQL Server），结果在ruby setup.rb setup时一直出现像下面这样的错误信息：</p>
-
-<p><img src="/uploads/ruby-dbi.png" title="ruby-dbi" ></p>
-
-<p>下面是一个完整的例子</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># testdbi.rb
-</span><span class='line'>require 'dbi'
-</span><span class='line'>
-</span><span class='line'># Connect to a database
-</span><span class='line'>dbh = DBI.connect('dbi:Mysql:rubydbi:localhost', 'root', '123456')
-</span><span class='line'>
-</span><span class='line'>dbh.do('DROP TABLE IF EXISTS people')
-</span><span class='line'>dbh.do('CREATE TABLE people (id INT, name VARCHAR(30))')
-</span><span class='line'>
-</span><span class='line'># Insert some rows, use placeholders
-</span><span class='line'>sql = 'INSERT INTO people VALUES (?, ?)'
-</span><span class='line'>dbh.prepare(sql) do |sth|
-</span><span class='line'>    sth.execute('100', 'Michael')
-</span><span class='line'>    sth.execute('200', 'John')
-</span><span class='line'>end
-</span><span class='line'>
-</span><span class='line'># Select all rows
-</span><span class='line'>sth = dbh.prepare('select * from people')
-</span><span class='line'>sth.execute
-</span><span class='line'>
-</span><span class='line'># Print out each row
-</span><span class='line'>while row = sth.fetch do
-</span><span class='line'>    p row
-</span><span class='line'>end
-</span><span class='line'>
-</span><span class='line'># Close the statement handle when done
-</span><span class='line'>sth.finish
-</span><span class='line'>
-</span><span class='line'>dbh.do('DROP TABLE people')
-</span><span class='line'>
-</span><span class='line'># Finally, disconnect
-</span><span class='line'>dbh.disconnect</span></code></pre></td></tr></table></div></figure>
-
-</div>
-  
-  
-
-
-    </article>
   
   
     <article>
@@ -657,43 +535,7 @@ public class ProductDaoImpl implements ProductDao {<br /></p>
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2007/06/30/debugging-in-c-in-c-of-the-dll/">在C#中调试C++的DLL</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2007-06-30T21:09:09+08:00" pubdate data-updated="true">Jun 30<sup>th</sup>, 2007</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在C#中调试C++的DLL很简单，只要在C#项目属性的Debug一项中钩上&#8221;Enable unmanaged code debugging&#8221;就OK了，然后你就可以像调试一般程序那样调试DLL了。</p></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2007/06/23/vc-dynamic-link-library-dll-programming-entry/">VC++动态链接库(DLL)编程入门</a></h1>
+      <h1 class="entry-title"><a href="/blog/2007/06/23/getting-started-visual-cpp-dll-programming/">VC++动态链接库（DLL）编程入门</a></h1>
     
     
       <p class="meta">
@@ -971,8 +813,9 @@ DLL文件的布局与EXE文件非常相似，但有一个重要差异：DLL文�
   </header>
 
 
-  <div class="entry-content"><p>运行环境：WebLogic 8.16 + Sybase ASE 12.5<br />
-问题：The New, Save from File menu are grayed out</p>
+  <div class="entry-content"><p>运行环境：WebLogic 8.16 + Sybase ASE 12.5</p>
+
+<p>问题：The New, Save from File menu are grayed out</p>
 
 <p>分析打印出来的日志文件找到有以下异常出现：</p>
 
@@ -990,10 +833,15 @@ DLL文件的布局与EXE文件非常相似，但有一个重要差异：DLL文�
 
 <p>搜索到一篇出现类似问题的文章 <a href="http://www.ibm.com/support/docview.wss?uid=swg21174150">http://www.ibm.com/support/docview.wss?uid=swg21174150</a> ，其中有这么一段文字：</p>
 
-<blockquote><p>If you call CallableStatement.clearParameters() when the statement has a ?=rpc return value,
-  we forget that there is a return value and the next time the rpc is executed we send too many
-  input parameters, and they are all shifted to the right. This problem has been corrected,
-  and jConnect now has the expected behavior for the clearParameters() method.</p></blockquote>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>If you call CallableStatement.clearParameters() when the statement has a ?=rpc return value,
+</span><span class='line'>we forget that there is a return value and the next time the rpc is executed we send too many
+</span><span class='line'>input parameters, and they are all shifted to the right. This problem has been corrected,
+</span><span class='line'>and jConnect now has the expected behavior for the clearParameters() method.</span></code></pre></td></tr></table></div></figure>
+
 
 <p>因此猜测菜单变灰的问题是由于使用了不正确的JDBC Driver版本。在Weblogic Console发现Connection Pools中Driver Name是com.sybase.jdbc.SybDriver，而正确的设置应该是com.sybase.jdbc2.jdbc.SybDriver，修改Driver Name后New, Save菜单项果然可以正常使用了。</p>
 </div>
@@ -1195,6 +1043,168 @@ DLL文件的布局与EXE文件非常相似，但有一个重要差异：DLL文�
 
     </article>
   
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2007/04/20/javascript-undefined/">JavaScript中的undefined</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2007-04-20T16:03:06+08:00" pubdate data-updated="true">Apr 20<sup>th</sup>, 2007</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>JavaScript有6种类型，undefined、null、boolean、number、string和object。其中，null类型只有一个值null。undefined类型也只有一个值，即undefined，当声明的变量没有被赋值的时候，该变量的默认值就是undefined。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>var foo;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>上面这行代码声明了变量foo，没有赋值。脚本引擎在处理代码的时候会给该变量赋予值undefined。实际上，该行代码等价于</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>var foo = undefined;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>可以用下面的代码测试：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>var foo;
+</span><span class='line'>alert(foo == undefined);    // true
+</span><span class='line'>alert(foo === undefined);    // true
+</span><span class='line'>alert(typeof(foo));    // undefined</span></code></pre></td></tr></table></div></figure>
+
+
+<p>JavaScript另一个有趣的方面是在使用变量之前不必声明。例如：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>var foo = "Hello ";
+</span><span class='line'>bar = foo + "world!";
+</span><span class='line'>alert(bar);    // Hello world!</span></code></pre></td></tr></table></div></figure>
+
+
+<p>变量bar并没有用var运算符定义，这里只是使用了它，就像已经声明过它一样。脚本引擎遇到未声明过的标识符时，用该变量名创建一个全局变量，并将其初始化为指定的值（这里是foo + &#8220;world&#8221;）。这是该语言的便利之处，不过如果不能紧密跟踪变量，这样做也很危险。考虑下面的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>var foo;
+</span><span class='line'>// Make sure this variable isn't defined
+</span><span class='line'>//var bar;
+</span><span class='line'>alert(foo);
+</span><span class='line'>alert(bar);</span></code></pre></td></tr></table></div></figure>
+
+
+<p>执行的结果是：</p>
+
+<p><img src="/uploads/undefined.png" title="undefined" ></p>
+
+<p><img src="/uploads/undefined-error.png" title="undefined-error" ></p>
+
+<p>alert(bar)出现错误是因为bar被创建成全局变量后没有被初始化，还处在未初始化（uninitialized）状态。但是，typeof运算符并不真正区分这两种值。考虑下面的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>var foo;
+</span><span class='line'>// Make sure this variable isn't defined
+</span><span class='line'>//var bar;
+</span><span class='line'>alert(typeof(foo));    // undefined
+</span><span class='line'>alert(typeof(bar));    // undefined</span></code></pre></td></tr></table></div></figure>
+
+
+<p>前面的代码对两个变量的输出都是“undefined”，即使变量bar在使用前没有被声明。</p>
+
+<p>当函数无明确返回值时，返回的也是值undefined，如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>function foobar() { }
+</span><span class='line'>alert(foobar() == undefined);    // true
+</span><span class='line'>alert(foobar() === undefined);    // true</span></code></pre></td></tr></table></div></figure>
+
+
+<p>ECMAScript认为undefined是从null派生出来的，所以把它们定义为相等的：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>alert(null == undefined);    // true</span></code></pre></td></tr></table></div></figure>
+
+
+<p>尽管这两个值相等，但它们的含义不同。undefined是声明了变量但未赋值时赋予该变量的值，null则用于表示尚未存在的对象（但从技术上来说，null仍然是原始值）。如果要区分两者，要使用===或typeof运算符。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2007/04/08/mysql-database-backup-script-jsp-version/">MySQL数据库备份脚本（JSP版本）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2007-04-08T08:16:55+08:00" pubdate data-updated="true">Apr 8<sup>th</sup>, 2007</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>最近需要备份博客所在服务器上的MySQL数据库到本机，作为虚拟主机用户，不能使用MySQL自带的mysqldump和mysqlimport工具。因此一开始打算采用直接备份MySQL的data目录的办法，但由于编码不同的原因产生了一些问题。在网上找到的一些备份工具都是用PHP写的，因此用JSP写了一个的备份MySQL数据库的小工具。</p>
+
+<p>该程序需要设置数据库连接参数和备份文件路径，运行后会自动生成一个指定的备份文件。</p>
+
+<p><a href="/uploads/mysqltool.zip" title="mysqltool.zip">代码下载</a></p>
+</div>
+  
+  
+
+
+    </article>
+  
   <div class="pagination">
     
       <a class="prev" href="/posts/18">&larr; Older</a>
@@ -1224,7 +1234,7 @@ DLL文件的布局与EXE文件非常相似，但有一个重要差异：DLL文�
       </li>
     
       <li class="post">
-        <a href="/blog/2014/07/07/debugging-rails-with-pry/">使用Pry调试Rails项目</a>
+        <a href="/blog/2014/07/07/debugging-rails-application-with-pry/">使用Pry调试Rails应用</a>
       </li>
     
       <li class="post">
@@ -1242,19 +1252,19 @@ DLL文件的布局与EXE文件非常相似，但有一个重要差异：DLL文�
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 97%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 133%" href="/tags/android/">Android</a>
+    <a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 111%" href="/tags/crack/">Crack</a>
 <a style="font-size: 108%" href="/tags/database/">Database</a>
 <a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
-<a style="font-size: 135%" href="/tags/java/">Java</a>
+<a style="font-size: 138%" href="/tags/java/">Java</a>
+<a style="font-size: 97%" href="/tags/listview/">ListView</a>
 <a style="font-size: 108%" href="/tags/mysql/">MySQL</a>
-<a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
 <a style="font-size: 116%" href="/tags/powerbuilder/">PowerBuilder</a>
 <a style="font-size: 120%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
 <a style="font-size: 101%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
+<a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 105%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 108%" href="/tags/wxwidgets/">wxWidgets</a>
 
