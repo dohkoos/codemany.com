@@ -9,14 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="建立省市县行政区划代码（截止2010年12月31日）数据表 1
-2
-3
-4
-5
-6
-CREATE TABLE xzqhdm ( _id INTEGER PRIMARY KEY, code NUMERIC, region TEXT, parent_code NUMERIC
-); &hellip;">
+  <meta name="description" content="带Icon的ListView工作起来还不错，但是如果手机里安装的软件比较多的话就有问题了。在程序启动时会黑屏一段时间，就好像程序挂起了一样。所以这时需要显示一个对话框，告诉用户正在加载数据，最好还能准确告诉用户加载的进度。 显示对话框用ProgressDialog，它有两种样式： &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -78,7 +71,7 @@ CREATE TABLE xzqhdm ( _id INTEGER PRIMARY KEY, code NUMERIC, region TEXT, parent
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2011/09/16/spinner-sqlite-implementation-with-provincial-and-county-levels-linkage/">用Spinner + SQLite实现省市县三级联动</a></h1>
+      <h1 class="entry-title"><a href="/blog/2011/06/02/implement-listview-with-icon-improved/">实现带Icon的ListView（改进版）</a></h1>
     
     
       <p class="meta">
@@ -94,17 +87,18 @@ CREATE TABLE xzqhdm ( _id INTEGER PRIMARY KEY, code NUMERIC, region TEXT, parent
   
 
 
-<time datetime="2011-09-16T05:48:32+08:00" pubdate data-updated="true">Sep 16<sup>th</sup>, 2011</time>
+<time datetime="2011-06-02T02:47:58+08:00" pubdate data-updated="true">Jun 2<sup>nd</sup>, 2011</time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><ol>
-<li>建立省市县<a href="http://www.stats.gov.cn/tjbz/xzqhdm/index.htm">行政区划代码</a>（截止2010年12月31日）数据表</li>
-</ol>
+  <div class="entry-content"><p>带Icon的ListView工作起来还不错，但是如果手机里安装的软件比较多的话就有问题了。在程序启动时会黑屏一段时间，就好像程序挂起了一样。所以这时需要显示一个对话框，告诉用户正在加载数据，最好还能准确告诉用户加载的进度。</p>
 
+<p>显示对话框用ProgressDialog，它有两种样式：HORIZONTAL和SPINNER。这里暂时选择SPINNER，等以后有机会再改成HORIZONTAL。</p>
+
+<p>我们在加载数据前显示ProgressDialog，在之后关闭对话框。示例代码如下：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -112,15 +106,25 @@ CREATE TABLE xzqhdm ( _id INTEGER PRIMARY KEY, code NUMERIC, region TEXT, parent
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
 <span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>CREATE TABLE xzqhdm (
-</span><span class='line'>  _id INTEGER PRIMARY KEY,
-</span><span class='line'>  code NUMERIC,
-</span><span class='line'>  region TEXT,
-</span><span class='line'>  parent_code NUMERIC
-</span><span class='line'>);</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ProgressDialog pd = ProgressDialog.show(this, "Wait", "loading...");
+</span><span class='line'>
+</span><span class='line'>ListView lv = (ListView)findViewById(R.id.list_view);
+</span><span class='line'>adapter = new SimpleIconAdapter(this,
+</span><span class='line'>        getInstalledApps(false),
+</span><span class='line'>        R.layout.list_item,
+</span><span class='line'>        new String[] {APP_ICON, APP_TITLE, APP_PACKAGE},
+</span><span class='line'>        new int[] {R.id.app_icon, R.id.app_title, R.id.app_package});
+</span><span class='line'>lv.setAdapter(adapter);
+</span><span class='line'>
+</span><span class='line'>pd.dismiss();</span></code></pre></td></tr></table></div></figure>
 
 
-<p>parent_code指上一级的行政区划代码，省属于最上级的行政单位，设置它的区划代码为999999。</p>
+<p>但结果ProgressDialog没有显示出来，因为加载数据的代码也执行在UI线程中，所以对话框的显示被阻塞了。怎么办呢？可以试着创建一个新线程，然后把加载数据这个耗时的操作放到这个非UI线程中去执行，这样不就可以了么：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -135,34 +139,982 @@ CREATE TABLE xzqhdm ( _id INTEGER PRIMARY KEY, code NUMERIC, region TEXT, parent
 <span class='line-number'>11</span>
 <span class='line-number'>12</span>
 <span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>insert into xzqhdm values(NULL, 110000, "北京市", 999999);
-</span><span class='line'>insert into xzqhdm values(NULL, 110100, "市辖区", 110000);
-</span><span class='line'>insert into xzqhdm values(NULL, 110101, "东城区", 110100);
-</span><span class='line'>insert into xzqhdm values(NULL, 110102, "西城区", 110100);
-</span><span class='line'>insert into xzqhdm values(NULL, 110103, "崇文区", 110100);
-</span><span class='line'>insert into xzqhdm values(NULL, 110104, "宣武区", 110100);
-</span><span class='line'>insert into xzqhdm values(NULL, 110105, "朝阳区", 110100);
-</span><span class='line'>insert into xzqhdm values(NULL, 110106, "丰台区", 110100);
-</span><span class='line'>...
-</span><span class='line'>insert into xzqhdm values(NULL, 659001, "石河子市", 659000);
-</span><span class='line'>insert into xzqhdm values(NULL, 659002, "阿拉尔市", 659000);
-</span><span class='line'>insert into xzqhdm values(NULL, 659003, "图木舒克市", 659000);
-</span><span class='line'>insert into xzqhdm values(NULL, 659004, "五家渠市", 659000);</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ProgressDialog pd = ProgressDialog.show(this, "Wait", "loading...");
+</span><span class='line'>
+</span><span class='line'>new Thread() {
+</span><span class='line'>    @Override
+</span><span class='line'>    public void run() {
+</span><span class='line'>        ListView lv = (ListView)findViewById(R.id.list_view);
+</span><span class='line'>        adapter = new SimpleIconAdapter(Main.this,
+</span><span class='line'>                getInstalledApps(false),
+</span><span class='line'>                R.layout.list_item,
+</span><span class='line'>                new String[] {APP_ICON, APP_TITLE, APP_PACKAGE},
+</span><span class='line'>                new int[] {R.id.app_icon, R.id.app_title, R.id.app_package});
+</span><span class='line'>        lv.setAdapter(adapter);
+</span><span class='line'>    }
+</span><span class='line'>}.start();
+</span><span class='line'>
+</span><span class='line'>pd.dismiss();</span></code></pre></td></tr></table></div></figure>
 
 
-<p><strong>2. SQLite数据库的操作</strong>
-如果应用使用到了SQLite数据库，在用户初次使用应用时，需要创建应用使用到的数据库表结构及添加一些初始化记录，另外在软件升级的时候，也需要对数据表结构进行更新。Android系统为我们提供了一个名为SQLiteOpenHelper的类，这是一个抽象类，该类用于对数据库版本进行管理，有两个重要的方法，分别是onCreate()和onUpgrade()。</p>
+<p>这下更惨了，直接报Runtime异常，连界面都打不开了。</p>
 
-<p>当调用SQLiteOpenHelper的getWritableDatabase()或getReadableDatabase()方法获取数据库实例时，如果数据库不存在，Android系统会自动生成一个数据库文件，接着调用onCreate()方法，onCreate()方法在初次生成数据库时才会被调用，在onCreate()方法里可以生成数据库表结构及添加一些应用使用到的初始化数据。onUpgrade()方法在数据库的版本发生变化时会被调用，数据库的版本是由程序员控制的，假设数据库现在的版本是1，由于业务的需要，修改了数据库表的结构，这时候就需要升级软件，升级软件时希望更新用户手机里的数据库表结构，为了实现这一目的，可以把原来的数据库版本设置为2（或其他数值），并且在onUpgrade()方法里面实现表结构的更新。当软件的版本升级次数比较多，这时在onUpgrade()方法里面可以根据原版号和目标版本号进行判断，然后作出相应的表结构及数据更新。</p>
+<p>深入研究一下Android的线程模型，看看Android到底是怎么处理UI线程和其它线程的交互的，为什么上面的代码会报异常?</p>
 
-<p>SQLiteDatabase类则封装了一些操作数据库的常用API，使用该类可以完成对数据进行CRUD操作。主要是execSQL()和rawQuery()方法。execSQL()方法可以执行insert、delete、update和CREATE TABLE之类有更改行为的SQL语句； rawQuery()方法可以执行select语句。SQLiteDatabase还专门提供了对应于CRUD的操作方法： insert()、delete()、update()和query()。</p>
+<blockquote><p>When an application is launched, the system creates a thread called &#8220;main&#8221; for the application. The main thread, also called the UI thread, is very important because it is in charge of dispatching the events to the appropriate widgets, including drawing events. It is also the thread where your application interacts with running components of the Android UI toolkit.</p>
 
-<p>问题：<br />
-如何将SQLite数据库与apk文件一起发布？<br />
-可以将数据库文件复制到res\raw目录中，所有在res\raw目录中的文件不会被压缩，这样可以直接提取该目录中的文件。</p>
+<p>For instance, if you touch the a button on screen, the UI thread dispatches the touch event to the widget, which in turn sets its pressed state and posts an invalidate request to the event queue. The UI thread dequeues the request and notifies the widget to redraw itself.</p>
 
-<p>如何打开res\raw目录中的数据库文件？<br />
-不能直接打开res\raw目录中的数据库文件，需要在程序第一次启动时将该文件复制到手机内存或SD卡中，然后再打开。</p>
+<p>This single-thread model can yield poor performance unless your application is implemented properly. Specifically, if everything is happening in a single thread, performing long operations such as network access or database queries on the UI thread will block the whole user interface. No event can be dispatched, including drawing events, while the long operation is underway. From the user&#8217;s perspective, the application appears hung. Even worse, if the UI thread is blocked for more than a few seconds (about 5 seconds currently) the user is presented with the infamous &#8220;application not responding&#8221; (ANR) dialog.</p></blockquote>
+
+<p>看了上面这段话可以知道为啥程序一打开就黑屏，像挂掉了一样。</p>
+
+<p>那为什么用新建线程来执行耗时操作的代码也有问题呢？这是因为它虽然没有阻塞UI线程，但它违背了单线程模型，Android的UI操作并不是线程安全的，并且这些操作必须在UI线程中执行。在这段代码片段中，在另一个线程中执行数据加载绑定，这会引起一些古怪的问题。</p>
+
+<p>Andriod提供了几种在其它线程中访问UI线程的方法：</p>
+
+<ul>
+<li><a href="http://developer.android.com/reference/android/app/Activity.html#runOnUiThread(java.lang.Runnable)">Activity.runOnUiThread(Runnable)</a></li>
+<li><a href="http://developer.android.com/reference/android/view/View.html#post(java.lang.Runnable)">View.post(Runnable)</a></li>
+<li><a href="http://developer.android.com/reference/android/view/View.html#postDelayed(java.lang.Runnable,%20long)">View.postDelayed(Runnable, long)</a></li>
+<li><a href="http://developer.android.com/reference/android/os/Handler.html">Hanlder</a></li>
+</ul>
+
+
+<p>上面的任何一个类或方法都可以修复我们前面代码中遇到的问题，很不幸的是这些类或方法同样会使你的代码变的很复杂很难理解。而且当你需要实现一些很复杂的操作并需要频繁地更新UI时会变得更糟糕。为了解决这个问题，Android 1.5提供了一个工具类AsyncTask，它使创建需要与用户界面交互的长时间运行的任务变得更简单。在Android 1.0和1.1中具有与AsyncTask相同功能的类UserTask，它提供了完全一样的API，你需要做的只是把它的代码拷贝的你的程序中。</p>
+
+<p>其实这些方案背后采用的都是Handler。所以这里仍然使用旧有的，复杂的Handler来修复上述问题。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.apkmgt;
+</span><span class='line'>
+</span><span class='line'>import java.util.ArrayList;
+</span><span class='line'>import java.util.HashMap;
+</span><span class='line'>import java.util.List;
+</span><span class='line'>
+</span><span class='line'>import android.app.Activity;
+</span><span class='line'>import android.app.ProgressDialog;
+</span><span class='line'>import android.content.pm.ApplicationInfo;
+</span><span class='line'>import android.content.pm.PackageInfo;
+</span><span class='line'>import android.graphics.drawable.Drawable;
+</span><span class='line'>import android.os.Bundle;
+</span><span class='line'>import android.os.Handler;
+</span><span class='line'>import android.os.Message;
+</span><span class='line'>import android.widget.ListView;
+</span><span class='line'>
+</span><span class='line'>public class MainActivity extends Activity {
+</span><span class='line'>    private static final String APP_ICON = "app_icon";
+</span><span class='line'>    private static final String APP_TITLE = "app_title";
+</span><span class='line'>    private static final String APP_PACKAGE = "app_package";
+</span><span class='line'>
+</span><span class='line'>    private SimpleIconAdapter adapter;
+</span><span class='line'>    private List&lt;HashMap&lt;String, Object&gt;&gt; listData;
+</span><span class='line'>    private ProgressDialog pd;
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void onCreate(Bundle savedInstanceState) {
+</span><span class='line'>        super.onCreate(savedInstanceState);
+</span><span class='line'>        setContentView(R.layout.main);
+</span><span class='line'>
+</span><span class='line'>        ListView lv = (ListView)findViewById(R.id.list_view);
+</span><span class='line'>        listData = new ArrayList&lt;HashMap&lt;String, Object&gt;&gt;();
+</span><span class='line'>        adapter = new SimpleIconAdapter(this,
+</span><span class='line'>                listData,
+</span><span class='line'>                R.layout.list_item,
+</span><span class='line'>                new String[] {APP_ICON, APP_TITLE, APP_PACKAGE},
+</span><span class='line'>                new int[] {R.id.app_icon, R.id.app_title, R.id.app_package});
+</span><span class='line'>        lv.setAdapter(adapter);
+</span><span class='line'>
+</span><span class='line'>        pd = ProgressDialog.show(this, "Wait", "loading...");
+</span><span class='line'>
+</span><span class='line'>        new Thread() {
+</span><span class='line'>            @Override
+</span><span class='line'>            public void run() {
+</span><span class='line'>                // 耗时操作，加载数据
+</span><span class='line'>                listData.addAll(getInstalledApps(false));
+</span><span class='line'>                handler.sendEmptyMessage(0);
+</span><span class='line'>            }
+</span><span class='line'>        }.start();
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    private Handler handler = new Handler() {
+</span><span class='line'>        @Override
+</span><span class='line'>        public void handleMessage(Message msg) {
+</span><span class='line'>            // 通知UI更新。必须要放在这里
+</span><span class='line'>            adapter.notifyDataSetChanged();
+</span><span class='line'>
+</span><span class='line'>            pd.dismiss();
+</span><span class='line'>        }
+</span><span class='line'>    };
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>参考资料：<br />
+<a href="http://developer.android.com/resources/articles/painless-threading.html">http://developer.android.com/resources/articles/painless-threading.html</a><br />
+<a href="http://kiminotes.iteye.com/blog/382683">http://kiminotes.iteye.com/blog/382683</a> 这个实际上是上面文章的译文</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2011/05/28/no-such-file-to-load-xxx-missingsourcefile-on-heroku/">No Such File to Load &#8211; Xxx (MissingSourceFile) on Heroku</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-05-28T23:08:16+08:00" pubdate data-updated="true">May 28<sup>th</sup>, 2011</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>终于解决掉了困扰我多日的一个问题。</p>
+
+<p>部署在Heroku上的项目，在controller中require某个文件时总是出现no such file to load &#8211; idcard (MissingSourceFile)。</p>
+
+<p>本地机器上运行的好好的，在Heroku上就出现Application error，百思不得其解，网上也没有找到类似问题的解决方法。</p>
+
+<p>咨询Heroku的技术支持，几封邮件交流下来对方也没有办法（感觉Heroku的技术支持不咋的）。</p>
+
+<p>今天把问题解决掉后再回过头来看，发现这其实是个非常简单的问题，就是Linux和Windows对待文件名大小写的差异。因为在Windows上是不区分大小写的，所以在controller中用require &#8216;calc&#8217;来引入Calc.rb时是成功的，但是在Linux下就不可以。将文件名Calc.rb改成calc.rb再push到Heroku就把问题解决了。</p>
+
+<p>就这么个问题竟然让我思考了几天，还真是郁闷啊！</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2011/05/26/implement-listview-with-icon/">实现带Icon的ListView</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-05-26T08:26:55+08:00" pubdate data-updated="true">May 26<sup>th</sup>, 2011</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p><img src="/uploads/apkmgt-screenshot.png" title="apkmgt-screenshot" ></p>
+
+<p>main.xml不需要修改，还是用原来的那个：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+</span><span class='line'>    android:orientation="vertical"
+</span><span class='line'>    android:layout_width="fill_parent"
+</span><span class='line'>    android:layout_height="wrap_content"&gt;
+</span><span class='line'>    &lt;ListView
+</span><span class='line'>        android:id="@+id/list_view"
+</span><span class='line'>        android:layout_width="fill_parent"
+</span><span class='line'>        android:layout_height="wrap_content" /&gt;
+</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>在list_item.xml中添加ImageView控件，设置高度和宽度分别为32dip，这是因为有些应用Icon尺寸比较大的缘故，如果不设置的话有些行就会撑大：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+</span><span class='line'>    android:layout_width="fill_parent"
+</span><span class='line'>    android:layout_height="wrap_content"&gt;
+</span><span class='line'>    &lt;ImageView
+</span><span class='line'>        android:id="@+id/app_icon"
+</span><span class='line'>        android:layout_gravity="center_vertical"
+</span><span class='line'>        android:layout_width="32.0dip"
+</span><span class='line'>        android:layout_height="32.0dip"
+</span><span class='line'>        android:layout_marginLeft="3.0dip"
+</span><span class='line'>        android:layout_marginRight="3.0dip" /&gt;
+</span><span class='line'>    &lt;LinearLayout
+</span><span class='line'>        android:orientation="vertical"
+</span><span class='line'>        android:layout_width="fill_parent"
+</span><span class='line'>        android:layout_height="wrap_content"
+</span><span class='line'>        android:layout_weight="1.0"&gt;
+</span><span class='line'>        &lt;TextView
+</span><span class='line'>            android:id="@+id/app_title"
+</span><span class='line'>            android:layout_width="fill_parent"
+</span><span class='line'>            android:layout_height="wrap_content"
+</span><span class='line'>            android:textSize="16.0dip"
+</span><span class='line'>            android:textStyle="bold" /&gt;
+</span><span class='line'>        &lt;TextView
+</span><span class='line'>            android:id="@+id/app_package"
+</span><span class='line'>            android:layout_width="fill_parent"
+</span><span class='line'>            android:layout_height="wrap_content"
+</span><span class='line'>            android:textSize="13.0dip" /&gt;
+</span><span class='line'>    &lt;/LinearLayout&gt;
+</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>新建SimpleIconAdapter类，继承SimpleAdapter适配器：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.apkmgt;
+</span><span class='line'>
+</span><span class='line'>import java.util.List;
+</span><span class='line'>import java.util.Map;
+</span><span class='line'>
+</span><span class='line'>import android.content.Context;
+</span><span class='line'>import android.graphics.drawable.Drawable;
+</span><span class='line'>import android.view.View;
+</span><span class='line'>import android.view.ViewGroup;
+</span><span class='line'>import android.widget.ImageView;
+</span><span class='line'>import android.widget.SimpleAdapter;
+</span><span class='line'>
+</span><span class='line'>public class SimpleIconAdapter extends SimpleAdapter {
+</span><span class='line'>
+</span><span class='line'>    public SimpleIconAdapter(Context context, List&lt;? extends Map&lt;String, ?&gt;&gt; data,
+</span><span class='line'>            int resource, String[] from, int[] to) {
+</span><span class='line'>        super(context, data, resource, from, to);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @SuppressWarnings("rawtypes")
+</span><span class='line'>    @Override
+</span><span class='line'>    public View getView(int position, View convertView, ViewGroup parent) {
+</span><span class='line'>        View view = super.getView(position, convertView, parent);
+</span><span class='line'>        ImageView iv = (ImageView)view.findViewById(R.id.app_icon);
+</span><span class='line'>        iv.setImageDrawable((Drawable)((Map)getItem(position)).get("app_icon"));
+</span><span class='line'>        return view;
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>修改MainActivity文件，更换绑定的适配器：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.apkmgt;
+</span><span class='line'>
+</span><span class='line'>import java.util.ArrayList;
+</span><span class='line'>import java.util.HashMap;
+</span><span class='line'>import java.util.List;
+</span><span class='line'>
+</span><span class='line'>import android.app.Activity;
+</span><span class='line'>import android.content.pm.ApplicationInfo;
+</span><span class='line'>import android.content.pm.PackageInfo;
+</span><span class='line'>import android.graphics.drawable.Drawable;
+</span><span class='line'>import android.os.Bundle;
+</span><span class='line'>import android.widget.ListView;
+</span><span class='line'>import android.widget.SimpleAdapter;
+</span><span class='line'>
+</span><span class='line'>public class MainActivity extends Activity {
+</span><span class='line'>    private static final String APP_ICON = "app_icon";
+</span><span class='line'>    private static final String APP_TITLE = "app_title";
+</span><span class='line'>    private static final String APP_PACKAGE = "app_package";
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void onCreate(Bundle savedInstanceState) {
+</span><span class='line'>        super.onCreate(savedInstanceState);
+</span><span class='line'>        setContentView(R.layout.main);
+</span><span class='line'>
+</span><span class='line'>        ListView listView = (ListView)findViewById(R.id.list_view);
+</span><span class='line'>        SimpleAdapter adapter = new SimpleIconAdapter(this,
+</span><span class='line'>                getInstalledApps(false),
+</span><span class='line'>                R.layout.list_item,
+</span><span class='line'>                new String[] {APP_ICON, APP_TITLE, APP_PACKAGE},
+</span><span class='line'>                new int[] {R.id.app_icon, R.id.app_title, R.id.app_package});
+</span><span class='line'>        listView.setAdapter(adapter);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    private List&lt;HashMap&lt;String, Object&gt;&gt; getInstalledApps(boolean getSysPackages) {
+</span><span class='line'>        List&lt;HashMap&lt;String, Object&gt;&gt; listItem = new ArrayList&lt;HashMap&lt;String, Object&gt;&gt;();
+</span><span class='line'>
+</span><span class='line'>        List&lt;PackageInfo&gt; pkgs = getPackageManager().getInstalledPackages(0);
+</span><span class='line'>        for (int i = 0; i&lt; pkgs.size(); i++) {
+</span><span class='line'>            PackageInfo pkg = pkgs.get(i);
+</span><span class='line'>            if (!getSysPackages && (pkg.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) &gt; 0) {
+</span><span class='line'>                continue;
+</span><span class='line'>            }
+</span><span class='line'>            Drawable icon = pkg.applicationInfo.loadIcon(getPackageManager());
+</span><span class='line'>            String label = pkg.applicationInfo.loadLabel(getPackageManager()).toString();
+</span><span class='line'>            String version = pkg.versionName;
+</span><span class='line'>            String pkgName = pkg.packageName;
+</span><span class='line'>
+</span><span class='line'>            HashMap&lt;String, Object&gt; map = new HashMap&lt;String, Object&gt;();
+</span><span class='line'>            map.put(APP_ICON, icon);
+</span><span class='line'>            map.put(APP_TITLE, label + " " + version);
+</span><span class='line'>            map.put(APP_PACKAGE, pkgName);
+</span><span class='line'>            listItem.add(map);
+</span><span class='line'>        }
+</span><span class='line'>        return listItem;
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2011/05/25/implement-listview-without-listactivity/">不使用ListActivity实现ListView</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-05-25T05:29:57+08:00" pubdate data-updated="true">May 25<sup>th</sup>, 2011</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>main.xml</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+</span><span class='line'>    android:orientation="vertical"
+</span><span class='line'>    android:layout_width="fill_parent"
+</span><span class='line'>    android:layout_height="wrap_content"&gt;
+</span><span class='line'>    &lt;ListView
+</span><span class='line'>        android:id="@+id/list_view"
+</span><span class='line'>        android:layout_width="fill_parent"
+</span><span class='line'>        android:layout_height="wrap_content" /&gt;
+</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>list_item.xml</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+</span><span class='line'>    android:layout_width="fill_parent"
+</span><span class='line'>    android:layout_height="wrap_content"&gt;
+</span><span class='line'>    &lt;LinearLayout
+</span><span class='line'>        android:orientation="vertical"
+</span><span class='line'>        android:layout_width="fill_parent"
+</span><span class='line'>        android:layout_height="wrap_content"
+</span><span class='line'>        android:layout_weight="1.0"&gt;
+</span><span class='line'>        &lt;TextView
+</span><span class='line'>            android:id="@+id/app_title"
+</span><span class='line'>            android:layout_width="fill_parent"
+</span><span class='line'>            android:layout_height="wrap_content"
+</span><span class='line'>            android:textSize="16dip" /&gt;
+</span><span class='line'>        &lt;TextView
+</span><span class='line'>            android:id="@+id/app_package"
+</span><span class='line'>            android:layout_width="fill_parent"
+</span><span class='line'>            android:layout_height="wrap_content" /&gt;
+</span><span class='line'>    &lt;/LinearLayout&gt;
+</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>创建一个继承自Activitiy的类，重写onCreate方法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.apkmgt;
+</span><span class='line'>
+</span><span class='line'>import java.util.ArrayList;
+</span><span class='line'>import java.util.HashMap;
+</span><span class='line'>import java.util.List;
+</span><span class='line'>
+</span><span class='line'>import android.app.Activity;
+</span><span class='line'>import android.content.pm.ApplicationInfo;
+</span><span class='line'>import android.content.pm.PackageInfo;
+</span><span class='line'>import android.os.Bundle;
+</span><span class='line'>import android.widget.ListView;
+</span><span class='line'>import android.widget.SimpleAdapter;
+</span><span class='line'>
+</span><span class='line'>public class MainActivity extends Activity {
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void onCreate(Bundle savedInstanceState) {
+</span><span class='line'>        super.onCreate(savedInstanceState);
+</span><span class='line'>        setContentView(R.layout.main);
+</span><span class='line'>
+</span><span class='line'>        ListView listView = (ListView)findViewById(R.id.list_view);
+</span><span class='line'>        SimpleAdapter adapter = new SimpleAdapter(this,
+</span><span class='line'>                getInstalledApps(false),
+</span><span class='line'>                R.layout.list_item,
+</span><span class='line'>                new String[] {"app_title", "app_package"},
+</span><span class='line'>                new int[] {R.id.app_title, R.id.app_package});
+</span><span class='line'>        listView.setAdapter(adapter);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    private List&lt;HashMap&lt;String, Object&gt;&gt; getInstalledApps(boolean getSysPackages) {
+</span><span class='line'>        List&lt;HashMap&lt;String, Object&gt;&gt; listItem = new ArrayList&lt;HashMap&lt;String, Object&gt;&gt;();
+</span><span class='line'>
+</span><span class='line'>        List&lt;PackageInfo&gt; pkgs = getPackageManager().getInstalledPackages(0);
+</span><span class='line'>        for (int i = 0; i&lt; pkgs.size(); i++) {
+</span><span class='line'>            PackageInfo pkg = pkgs.get(i);
+</span><span class='line'>            if (!getSysPackages && (pkg.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) &gt; 0) {
+</span><span class='line'>                continue;
+</span><span class='line'>            }
+</span><span class='line'>            String label = pkg.applicationInfo.loadLabel(getPackageManager()).toString();
+</span><span class='line'>            String version = pkg.versionName;
+</span><span class='line'>            String pkgName = pkg.packageName;
+</span><span class='line'>
+</span><span class='line'>            HashMap&lt;String, Object&gt; map = new HashMap&lt;String, Object&gt;();
+</span><span class='line'>            map.put("app_title", label + " " + version);
+</span><span class='line'>            map.put("app_package", pkgName);
+</span><span class='line'>            listItem.add(map);
+</span><span class='line'>        }
+</span><span class='line'>        return listItem;
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>至此，一个不使用ListActivity的ListView就完成了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2011/05/18/display-name-and-package-of-installed-apps-in-listview/">在ListView中显示已安装应用的名字和包名</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-05-18T07:02:47+08:00" pubdate data-updated="true">May 18<sup>th</sup>, 2011</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>通过PackageManager获取手机中已安装应用的信息，具体代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>PackageManager packageManager = this.getPackageManager();
+</span><span class='line'>List&lt;PackageInfo&gt; packageInfoList = packageManager.getInstalledPackages(0);</span></code></pre></td></tr></table></div></figure>
+
+
+<p>通过以上方法，可以得到所有已安装的应用程序，既包括了手动安装的应用程序的信息，也包括了系统预装的应用程序的信息。要区分这两类应用可使用以下方法:</p>
+
+<ol>
+<li>从packageInfoList获取的packageInfo，再通过packageInfo.applicationInfo获取applicationInfo；</li>
+<li>判断applicationInfo.flags &amp; ApplicationInfo.FLAG_SYSTEM的值，该值大于0时，表示获取的应用为系统预装的应用，反之则为手动安装的应用。</li>
+</ol>
+
+
+<p>列表的显示需要三个元素：</p>
+
+<ol>
+<li>用来显示数据的ListView;</li>
+<li>需要显示的数据;</li>
+<li>绑定数据和ListView的Adapter。</li>
+</ol>
+
+
+<p>Adapter通常有ArrayAdapter、SimpleAdapter和CursorAdapter等。其中SimpleAdapter有最好的扩充性，可以自定义出各种效果。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SimpleAdapter(Context context, List&lt;? extends Map&lt;String, ?&gt;&gt; data, int resource, String[] from, int[] to)</span></code></pre></td></tr></table></div></figure>
+
+
+<p>参数解释：</p>
+
+<ol>
+<li>context：上下文；</li>
+<li>data：数据列表。列表里的每一项都是一个Map&lt;String, ?>对象，都和ListView里的一项进行数据绑定；</li>
+<li>resource：布局资源。可以引用系统提供的，也可以自定义；</li>
+<li>from：名字数组。每个名字都是用来索引数据列表中每个Map&lt;String, Object>里的Object；</li>
+<li>to：资源索引数组，以R.id.xxx的形式表示。</li>
+</ol>
+
+
+<p>main.xml布局代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+</span><span class='line'>    android:orientation="vertical"
+</span><span class='line'>    android:layout_width="fill_parent"
+</span><span class='line'>    android:layout_height="fill_parent"&gt;
+</span><span class='line'>    &lt;TextView
+</span><span class='line'>        android:id="@+id/app_title"
+</span><span class='line'>        android:layout_width="wrap_content"
+</span><span class='line'>        android:layout_height="wrap_content"
+</span><span class='line'>        android:textSize="22px" /&gt;
+</span><span class='line'>    &lt;TextView
+</span><span class='line'>        android:id="@+id/app_package"
+</span><span class='line'>        android:layout_width="wrap_content"
+</span><span class='line'>        android:layout_height="wrap_content" /&gt;
+</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>上面代码中的android:orientation=&#8221;vertical&#8221;很重要，没有它两个TextView就不会显示成两行。</p>
+
+<p>继承了ListActivity的MainActivity代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.apkmgt;
+</span><span class='line'>
+</span><span class='line'>import java.util.ArrayList;
+</span><span class='line'>import java.util.HashMap;
+</span><span class='line'>import java.util.List;
+</span><span class='line'>
+</span><span class='line'>import android.app.ListActivity;
+</span><span class='line'>import android.content.pm.ApplicationInfo;
+</span><span class='line'>import android.content.pm.PackageInfo;
+</span><span class='line'>import android.os.Bundle;
+</span><span class='line'>import android.widget.SimpleAdapter;
+</span><span class='line'>
+</span><span class='line'>public class MainActivity extends ListActivity {
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void onCreate(Bundle savedInstanceState) {
+</span><span class='line'>        super.onCreate(savedInstanceState);
+</span><span class='line'>
+</span><span class='line'>        SimpleAdapter adapter = new SimpleAdapter(this,
+</span><span class='line'>                getInstalledApps(false),
+</span><span class='line'>                R.layout.main,
+</span><span class='line'>                new String[] {"app_title", "app_package"},
+</span><span class='line'>                new int[] {R.id.app_title, R.id.app_package});
+</span><span class='line'>        setListAdapter(adapter);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    private List&lt;HashMap&lt;String, Object&gt;&gt; getInstalledApps(boolean getSysPackages) {
+</span><span class='line'>        List&lt;HashMap&lt;String, Object&gt;&gt; list = new ArrayList&lt;HashMap&lt;String, Object&gt;&gt;();
+</span><span class='line'>
+</span><span class='line'>        List&lt;PackageInfo&gt; pkgs = getPackageManager().getInstalledPackages(0);
+</span><span class='line'>        for (int i = 0; i&lt; pkgs.size(); i++) {
+</span><span class='line'>            PackageInfo pkg = pkgs.get(i);
+</span><span class='line'>            if (!getSysPackages && (pkg.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) &gt; 0) {
+</span><span class='line'>                continue;
+</span><span class='line'>            }
+</span><span class='line'>            String label = pkg.applicationInfo.loadLabel(getPackageManager()).toString();
+</span><span class='line'>            String version = pkg.versionName;
+</span><span class='line'>            String pkgName = pkg.packageName;
+</span><span class='line'>
+</span><span class='line'>            HashMap&lt;String, Object&gt; map = new HashMap&lt;String, Object&gt;();
+</span><span class='line'>            map.put("app_title", label + " " + version);
+</span><span class='line'>            map.put("app_package", pkgName);
+</span><span class='line'>            list.add(map);
+</span><span class='line'>        }
+</span><span class='line'>        return list;
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2011/05/08/build-oauth-enabled-sina-weibo-desktop-client/">构建支持OAuth的新浪微博桌面客户端</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-05-08T15:22:11+08:00" pubdate data-updated="true">May 8<sup>th</sup>, 2011</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>要使用OAuth，首先要去新浪微博注册一个自己的微博应用。注册之后，会得到微博应用的Consumer key和Consumer secret，都是一个字符串。之后就可以进行OAuth的认证过程了。</p>
+
+<p>从 <a href="http://code.google.com/p/sina-weibo4j/">http://code.google.com/p/sina-weibo4j/</a> 下载新浪微博的Java SDK包，当然也可以在 <a href="http://open.weibo.com/wiki/index.php/SDK">http://open.weibo.com/wiki/index.php/SDK</a> 下载。推荐使用前者，已经打好包了。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -256,136 +1208,122 @@ CREATE TABLE xzqhdm ( _id INTEGER PRIMARY KEY, code NUMERIC, region TEXT, parent
 <span class='line-number'>90</span>
 <span class='line-number'>91</span>
 <span class='line-number'>92</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class DBHelper extends SQLiteOpenHelper {
-</span><span class='line'>    private static String DB_PATH = "/data/data/com.codemany.linkage/databases/";
-</span><span class='line'>    private static String DB_NAME = "xzqh.db";
-</span><span class='line'>    private static DBHelper databaseHelper;
-</span><span class='line'>    private static SQLiteDatabase db;
+<span class='line-number'>93</span>
+<span class='line-number'>94</span>
+<span class='line-number'>95</span>
+<span class='line-number'>96</span>
+<span class='line-number'>97</span>
+<span class='line-number'>98</span>
+<span class='line-number'>99</span>
+<span class='line-number'>100</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>import java.io.BufferedReader;
+</span><span class='line'>import java.io.File;
+</span><span class='line'>import java.io.FileInputStream;
+</span><span class='line'>import java.io.FileOutputStream;
+</span><span class='line'>import java.io.IOException;
+</span><span class='line'>import java.io.InputStream;
+</span><span class='line'>import java.io.InputStreamReader;
+</span><span class='line'>import java.io.OutputStream;
+</span><span class='line'>import java.util.Properties;
+</span><span class='line'>import java.util.PropertyResourceBundle;
 </span><span class='line'>
-</span><span class='line'>    private Context context;
+</span><span class='line'>import weibo4j.Weibo;
+</span><span class='line'>import weibo4j.WeiboException;
+</span><span class='line'>import weibo4j.http.AccessToken;
+</span><span class='line'>import weibo4j.http.RequestToken;
 </span><span class='line'>
-</span><span class='line'>    private DBHelper(Context context) {
-</span><span class='line'>        super(context, DB_NAME, null, 1);
-</span><span class='line'>        this.context = context;
+</span><span class='line'>public class UpdateStatus {
+</span><span class='line'>  private static final String ACCESS_SECRET = "access_secret";
+</span><span class='line'>  private static final String ACCESS_TOKEN = "access_token";
+</span><span class='line'>  private static final String FILE_NAME = "sina_token.properties";
+</span><span class='line'>
+</span><span class='line'>  public static void main(String[] args) {
+</span><span class='line'>    // 在这里填写在应用申请中得到的App Key和App Secret
+</span><span class='line'>    System.setProperty("weibo4j.oauth.consumerKey", YOUR_CONSUMER_KEY);
+</span><span class='line'>    System.setProperty("weibo4j.oauth.consumerSecret", YOUR_CONSUMER_SECRET);
+</span><span class='line'>
+</span><span class='line'>    Weibo weibo = new Weibo();
+</span><span class='line'>
+</span><span class='line'>    try {
+</span><span class='line'>      // 读取存储起来的Access Token 
+</span><span class='line'>      AccessToken accessToken = loadAccessToken();
+</span><span class='line'>      if (accessToken == null) {
+</span><span class='line'>        String backUrl = "http://zhubabo.appspot.com";
+</span><span class='line'>
+</span><span class='line'>        // 请求Request Token（未授权令牌）
+</span><span class='line'>        RequestToken requestToken = weibo.getOAuthRequestToken(backUrl);
+</span><span class='line'>        System.out.println("Got request token...");
+</span><span class='line'>        System.out.println("Request token: " + requestToken.getToken());
+</span><span class='line'>        System.out.println("Request token secret: " + requestToken.getTokenSecret());
+</span><span class='line'>
+</span><span class='line'>        // 将以下打印出的授权链接在浏览器中打开，完成应用授权，会自动跳转到
+</span><span class='line'>        // 指定的callback url，并将oauth_verifier一起返回
+</span><span class='line'>        System.out.println("Open the following url in a browser");
+</span><span class='line'>        System.out.println(" http://api.t.sina.com.cn/oauth/authorize?oauth_token=" + requestToken.getToken());
+</span><span class='line'>
+</span><span class='line'>        // 输入上面得到的oauth_verifier的值，取得Access Token，这个Token是长期有效的
+</span><span class='line'>        System.out.println("please input verifier:");
+</span><span class='line'>        String verifier = readLine();
+</span><span class='line'>        accessToken = weibo.getOAuthAccessToken(
+</span><span class='line'>            requestToken.getToken(),
+</span><span class='line'>            requestToken.getTokenSecret(),
+</span><span class='line'>            verifier);
+</span><span class='line'>
+</span><span class='line'>        // 将Access Token保存下来，以后就可以直接通过此Token向新浪围脖发消息了
+</span><span class='line'>        storeAccessToken(accessToken.getToken(), accessToken.getTokenSecret());
+</span><span class='line'>      }
+</span><span class='line'>
+</span><span class='line'>      weibo.setToken(accessToken.getToken(), accessToken.getTokenSecret());
+</span><span class='line'>
+</span><span class='line'>      System.out.println("Input message to sina:");
+</span><span class='line'>      String message = readLine();
+</span><span class='line'>      while (!"exit".equals(message.trim())) {
+</span><span class='line'>        weibo.updateStatus(message);
+</span><span class='line'>        System.out.println("Input message to sina:");
+</span><span class='line'>        message = readLine();
+</span><span class='line'>      }
+</span><span class='line'>    } catch (WeiboException e) {
+</span><span class='line'>      e.printStackTrace();
+</span><span class='line'>    } catch (IOException e) {
+</span><span class='line'>      e.printStackTrace();
 </span><span class='line'>    }
+</span><span class='line'>  }
 </span><span class='line'>
-</span><span class='line'>    public static DBHelper getInstance(Context context) {
-</span><span class='line'>        if (databaseHelper == null) {
-</span><span class='line'>            databaseHelper = new DBHelper(context);
-</span><span class='line'>            databaseHelper.openDataBase();
+</span><span class='line'>  private static void storeAccessToken(String token, String tokenSecret) throws IOException {
+</span><span class='line'>    OutputStream out = new FileOutputStream(new File(FILE_NAME));
+</span><span class='line'>    Properties p = new Properties();
+</span><span class='line'>    p.setProperty(ACCESS_TOKEN, token);
+</span><span class='line'>    p.setProperty(ACCESS_SECRET, tokenSecret);
+</span><span class='line'>    p.store(out, "sina access token");
+</span><span class='line'>    out.flush();
+</span><span class='line'>    out.close();
+</span><span class='line'>  }
 </span><span class='line'>
-</span><span class='line'>            if (db == null) {
-</span><span class='line'>                try {
-</span><span class='line'>                    db = databaseHelper.getWritableDatabase();
-</span><span class='line'>                    databaseHelper.copyDatabase();
-</span><span class='line'>                }
-</span><span class='line'>                catch (Exception e) {
-</span><span class='line'>                    Log.d("DBHelper", "Error in database creation");
-</span><span class='line'>                }
-</span><span class='line'>
-</span><span class='line'>                databaseHelper.openDataBase();
-</span><span class='line'>            }
-</span><span class='line'>        }
-</span><span class='line'>        return databaseHelper;
+</span><span class='line'>  private static AccessToken loadAccessToken() throws IOException {
+</span><span class='line'>    File f = new File(FILE_NAME);
+</span><span class='line'>    if (!f.exists()) {
+</span><span class='line'>      return null;
 </span><span class='line'>    }
+</span><span class='line'>    InputStream in = new FileInputStream(f);
+</span><span class='line'>    PropertyResourceBundle bundle = new PropertyResourceBundle(in);
+</span><span class='line'>    in.close();
+</span><span class='line'>    return new AccessToken(bundle.getString(ACCESS_TOKEN), bundle.getString(ACCESS_SECRET));
+</span><span class='line'>  }
 </span><span class='line'>
-</span><span class='line'>    private void copyDatabase() throws IOException {
-</span><span class='line'>        InputStream is = context.getResources().openRawResource(R.raw.xzqh);
-</span><span class='line'>        OutputStream os = new FileOutputStream(DB_PATH + DB_NAME);
-</span><span class='line'>        byte[] buffer = new byte[1024];
-</span><span class='line'>        int length;
-</span><span class='line'>        while ((length = is.read(buffer)) &gt; 0) {
-</span><span class='line'>            os.write(buffer, 0, length);
-</span><span class='line'>        }
-</span><span class='line'>
-</span><span class='line'>        os.flush();
-</span><span class='line'>        os.close();
-</span><span class='line'>        is.close();
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    private void openDataBase() {
-</span><span class='line'>        try {
-</span><span class='line'>            db = SQLiteDatabase.openDatabase(
-</span><span class='line'>                    DB_PATH + DB_NAME,
-</span><span class='line'>                    null,
-</span><span class='line'>                    SQLiteDatabase.OPEN_READONLY | SQLiteDatabase.NO_LOCALIZED_COLLATORS);
-</span><span class='line'>        } catch (SQLiteException e) {
-</span><span class='line'>            // database does't exist yet
-</span><span class='line'>        }
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public SimpleCursorAdapter getListByParentCode(Context context, String parentCode) {
-</span><span class='line'>        SimpleCursorAdapter list = null;
-</span><span class='line'>        DBHelper dHelper = new DBHelper(context);
-</span><span class='line'>        SQLiteDatabase db = dHelper.getReadableDatabase();
-</span><span class='line'>        Cursor cursor = db.rawQuery(
-</span><span class='line'>                "select code as _id, region from xzqhdm where parent_code = ?",
-</span><span class='line'>                new String[] {parentCode});
-</span><span class='line'>        if (cursor.getCount() != 0) {
-</span><span class='line'>            list = new SimpleCursorAdapter(context,
-</span><span class='line'>                    android.R.layout.simple_spinner_item,
-</span><span class='line'>                    cursor,
-</span><span class='line'>                    new String[] {"region"},
-</span><span class='line'>                    new int[] {android.R.id.text1});
-</span><span class='line'>            list.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-</span><span class='line'>        }
-</span><span class='line'>        return list;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    @Override
-</span><span class='line'>    public synchronized void close() {
-</span><span class='line'>        if (db != null) {
-</span><span class='line'>            db.close();
-</span><span class='line'>        }
-</span><span class='line'>        super.close();
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    @Override
-</span><span class='line'>    public void onCreate(SQLiteDatabase db) {
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    @Override
-</span><span class='line'>    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-</span><span class='line'>    }
+</span><span class='line'>  private static String readLine() throws IOException {
+</span><span class='line'>    BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+</span><span class='line'>    byte[] bs = reader.readLine().getBytes("gbk");
+</span><span class='line'>    return new String(bs);
+</span><span class='line'>  }
 </span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
 
-<p>在代码实现时遇到的难题是如何在选中region的同时得到对应的code。网上有教程说定制自己的adapter，重写bingView，不过有多个spinner就需要声明多个全局变量；还有教程指出可以直接往adapter中传递对象（实现一个类，将code和region作为字段），然后重写对象的toString()方法。后来受到这个帖子的启发，修改了rawQuery中的select语句得以实现Spinner控件中的键值绑定。</p>
-
-<p>原来的select语句是：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>select _id, code, region from xzqhdm where parent_code = ?</span></code></pre></td></tr></table></div></figure>
-
-
-<p>因为传入到CursorAdapter中的Cursor结果集必须包含有列名为<em>id的列，否则CursorAdapter将不会起作用。而code可以被看作是整数，那么只需要将选出的code当作</em>id就行了，根据这个想法写出的select语句如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>select code as _id, region from xzqhdm where parent_code = ?</span></code></pre></td></tr></table></div></figure>
-
-
-<p>这样，但触发Spinner上的ItemSelected事件时就可以通过最后一个参数id得到当前的code了。</p>
-
-<p>写这篇文章的时候同时也在调试着代码，突然发现其实不需要改写select语句也是可以实现键值绑定的。只要在onItemSelected()方法中使用如下代码就可以取得相应的值了：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Cursor cursor = (Cursor)parent.getSelectedItem();
-</span><span class='line'>if (cursor != null) {
-</span><span class='line'>    int code = cursor.getString(cursor.getColumnIndex("code"));
-</span><span class='line'>    String country = cursor.getString(cursor.getColumnIndex("region"));
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p><a href="/uploads/linkage.zip" title="linkage.zip">代码下载</a></p>
-
-<p>参考文章：<br />
-<a href="http://lxmgfd.iteye.com/blog/970637">http://lxmgfd.iteye.com/blog/970637</a><br />
-<a href="http://www.eoeandroid.com/thread-98254-1-1.html">http://www.eoeandroid.com/thread-98254-1-1.html</a><br />
-<a href="http://www.cmd100.com/bbs/thread-5454-1-1.html">http://www.cmd100.com/bbs/thread-5454-1-1.html</a></p>
+<p>参考资料：<br />
+<a href="http://www.ibm.com/developerworks/cn/web/wa-oauth1">通过OAuth访问社会网络Web站点，第1部分: 构建支持OAuth的桌面Twitter客户端</a><br />
+<a href="http://www.williamlong.info/archives/2185.html">在Twitter应用中使用OAuth</a><br />
+<a href="http://www.cnblogs.com/liuxinet/archive/2011/01/25/1944752.html">新浪微博开放平台OAuth授权解决方案（含代码）</a><br />
+<a href="http://tigerszdf.blog.163.com/blog/static/459551332010725772998/">Java程序向新浪微博发送图片</a><br />
+<a href="http://bbs.chinaunix.net/viewthread.php?tid=1871053">使用OAuth向新浪微博发消息</a></p>
 </div>
   
   
@@ -398,7 +1336,7 @@ CREATE TABLE xzqhdm ( _id INTEGER PRIMARY KEY, code NUMERIC, region TEXT, parent
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2011/09/09/android-tab-using-summary/">Android Tab使用总结</a></h1>
+      <h1 class="entry-title"><a href="/blog/2011/04/28/upload-multiple-images-with-paperclip-rails-23-improved/">Rails 2.3和Paperclip实现多图片上传（改进版）</a></h1>
     
     
       <p class="meta">
@@ -414,21 +1352,138 @@ CREATE TABLE xzqhdm ( _id INTEGER PRIMARY KEY, code NUMERIC, region TEXT, parent
   
 
 
-<time datetime="2011-09-09T08:55:45+08:00" pubdate data-updated="true">Sep 9<sup>th</sup>, 2011</time>
+<time datetime="2011-04-28T06:48:00+08:00" pubdate data-updated="true">Apr 28<sup>th</sup>, 2011</time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>TabHost是整个Tab的容器，包括TabWidget和FrameLayout两部分：TabWidget用于展示标签页，FrameLayout用于展示隶属于各个标签页的具体内容。一个带有TabHost的Activity看起来就像这样：
-<img src="/uploads/android-tabs.jpg" title="android-tabs" ></p>
+  <div class="entry-content"><p>从Rails 2.3开始，有了新的方法来处理多模型表单，这就是accepts_nested_attributes_for，它允许直接赋值到子对象上，对于标准的属性使用相同的哈希格式。</p>
 
-<p>如果Activity是继承自TabAcitivty，那么TabHost的id必须设置为@android:id/tabhost，TabWidget必须设置为@android:id/tabs，FrameLayout需要设置为@android:id/tabcontent。</p>
+<p>例如，一个parent有多个children，包含所有类的POST数据将会是下面这样：</p>
 
-<p>创建一个简单的Tab应用</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>params =&gt;
+</span><span class='line'>  action =&gt; update
+</span><span class='line'>  id =&gt; 1
+</span><span class='line'>  controller =&gt; parents
+</span><span class='line'>  parent =&gt;
+</span><span class='line'>    first_name =&gt; John
+</span><span class='line'>    last_name =&gt; Doe
+</span><span class='line'>    age =&gt; 40
+</span><span class='line'>    children_attributes =&gt;
+</span><span class='line'>      1 =&gt; { id =&gt; 16, :name =&gt; Jack }
+</span><span class='line'>      2 =&gt; { id =&gt; 18, :name =&gt; Mary }</span></code></pre></td></tr></table></div></figure>
 
-<p>废话不多说，直接上代码。以下就是main.xml的布局代码：</p>
+
+<p>注意，那个children_attributes元素在parent的元素中。fields_for命令会生成必要的语法去生成POST数据，这些数据会被转换成方便accepts_nested_attributes_for解释的哈希。children_attributes不是数组而是哈希，它的键是一个简单的索引（不是模型的ID），被用来从一个单一的实体聚合属性。</p>
+
+<p>不用ID的理由是简单的：正在被编辑的模型可能不会被保存，发送到了客户端，这时它的ID为nil。因此为每个被显示的children的id关联一个隐藏字段是个好的实践。</p>
+
+<p>下面我们就用accepts_nested_attributes_for来改写上传多图片的代码。</p>
+
+<p>修改albums_controller.rb中的new方法，删除下面的这句代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>1.upto(3) { @album.photos.build }</span></code></pre></td></tr></table></div></figure>
+
+
+<p>将album.rb中的</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def photo_attributes=(photo_attributes)
+</span><span class='line'>  photo_attributes.each do |attributes|
+</span><span class='line'>    photos.build(attributes)
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>代码改成</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>accepts_nested_attributes_for :photos</span></code></pre></td></tr></table></div></figure>
+
+
+<p>修改_form.html.erb中的</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div id="photos"&gt;
+</span><span class='line'>  &lt;% if @album.new_record? %&gt;
+</span><span class='line'>    &lt;%= render :partial =&gt; 'photo', :collection =&gt; @album.photos %&gt;
+</span><span class='line'>  &lt;% end %&gt;
+</span><span class='line'>&lt;/div&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;%= link_to_function "Add Photo" do |page| page.insert_html :bottom, :photos, :partial =&gt; 'photo', :object =&gt; Photo.new end %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>为下面的代码</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div id="photos"&gt;
+</span><span class='line'>  &lt;% if @album.new_record? %&gt;
+</span><span class='line'>    &lt;%= render :partial =&gt; 'photo', :locals =&gt; { :form =&gt; f, :photo =&gt; @album.photos.build } %&gt;
+</span><span class='line'>  &lt;% end %&gt;
+</span><span class='line'>&lt;/div&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;%= add_object_link("Add Photo", f, @album.photos.build, "photo", "#photos") %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>再将_photo.html.erb中的</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;% fields_for "album[photo_attributes][]", photo do |p| %&gt;
+</span><span class='line'>  &lt;%= p.label :photo %&gt;&lt;br /&gt;
+</span><span class='line'>  &lt;%= p.file_field :data, :index =&gt; nil %&gt;
+</span><span class='line'>  &lt;%= link_to_function "delete", "remove_field($(this), ('.photo'))" %&gt;
+</span><span class='line'>&lt;% end %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>改为</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;% form.fields_for :photos, photo, :child_index =&gt; (photo.new_record? ? "index_to_replace_with_js" : nil) do |p| %&gt;
+</span><span class='line'>  &lt;%= p.label :photo %&gt;&lt;br /&gt;
+</span><span class='line'>  &lt;%= p.file_field :data %&gt;
+</span><span class='line'>  &lt;%= link_to_function "delete", "remove_field($(this), ('.photo'))" %&gt;
+</span><span class='line'>&lt;% end %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>在albums_helper中添加两个方法：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -446,255 +1501,28 @@ CREATE TABLE xzqhdm ( _id INTEGER PRIMARY KEY, code NUMERIC, region TEXT, parent
 <span class='line-number'>14</span>
 <span class='line-number'>15</span>
 <span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
-</span><span class='line'>&lt;TabHost xmlns:android="http://schemas.android.com/apk/res/android"
-</span><span class='line'>    android:id="@android:id/tabhost"
-</span><span class='line'>    android:layout_width="fill_parent"
-</span><span class='line'>    android:layout_height="fill_parent"&gt;
-</span><span class='line'>    &lt;LinearLayout
-</span><span class='line'>        android:orientation="vertical"
-</span><span class='line'>        android:layout_width="fill_parent"
-</span><span class='line'>        android:layout_height="fill_parent"&gt;
-</span><span class='line'>        &lt;TabWidget
-</span><span class='line'>            android:id="@android:id/tabs"
-</span><span class='line'>            android:layout_width="fill_parent"
-</span><span class='line'>            android:layout_height="wrap_content" /&gt;
-</span><span class='line'>        &lt;FrameLayout
-</span><span class='line'>            android:id="@android:id/tabcontent"
-</span><span class='line'>            android:layout_width="fill_parent"
-</span><span class='line'>            android:layout_height="fill_parent"&gt;
-</span><span class='line'>            &lt;include android:id="@+id/left" layout="@layout/tab_left" /&gt;
-</span><span class='line'>            &lt;include android:id="@+id/right" layout="@layout/tab_right" /&gt;
-</span><span class='line'>        &lt;/FrameLayout&gt;
-</span><span class='line'>    &lt;/LinearLayout&gt;
-</span><span class='line'>&lt;/TabHost&gt;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def add_object_link(name, form, object, partial, where)
+</span><span class='line'>  html = render(:partial =&gt; partial, :locals =&gt; { :form =&gt; form }, :object =&gt; object)
+</span><span class='line'>  link_to_function name, %{
+</span><span class='line'>    var new_object_id = new Date().getTime();
+</span><span class='line'>    var html = jQuery(#{js html}.replace(/index_to_replace_with_js/g, new_object_id)).hide();
+</span><span class='line'>    html.appendTo(jQuery("#{where}")).slideDown('slow');
+</span><span class='line'>  }
+</span><span class='line'>end
+</span><span class='line'> 
+</span><span class='line'>def js(data)
+</span><span class='line'>  if data.respond_to? :to_json
+</span><span class='line'>    data.to_json
+</span><span class='line'>  else
+</span><span class='line'>    data.inspect.to_json
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
 
 
-<p>左边标签页tab_left.xml的内容：</p>
+<p>到这里就修改完成了。试试看，是不是和原来的效果一样。</p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
-</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-</span><span class='line'>    android:layout_width="fill_parent"
-</span><span class='line'>    android:layout_height="fill_parent"&gt;
-</span><span class='line'>    &lt;TextView
-</span><span class='line'>        android:text="left"
-</span><span class='line'>        android:layout_width="fill_parent"
-</span><span class='line'>        android:layout_height="fill_parent" /&gt;
-</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>右边标签页tab_right.xml的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
-</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-</span><span class='line'>    android:layout_width="fill_parent"
-</span><span class='line'>    android:layout_height="fill_parent"&gt;
-</span><span class='line'>    &lt;TextView
-</span><span class='line'>        android:text="right"
-</span><span class='line'>        android:layout_width="fill_parent"
-</span><span class='line'>        android:layout_height="fill_parent" /&gt;
-</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>修改MainActivity，改成从TabActivity继承：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class MainActivity extends TabActivity {
-</span><span class='line'>
-</span><span class='line'>    @Override
-</span><span class='line'>    public void onCreate(Bundle savedInstanceState) {
-</span><span class='line'>        super.onCreate(savedInstanceState);
-</span><span class='line'>        setContentView(R.layout.main);
-</span><span class='line'>
-</span><span class='line'>        TabHost tabHost = getTabHost();
-</span><span class='line'>        tabHost.addTab(tabHost.newTabSpec("left")
-</span><span class='line'>                .setIndicator("Left")
-</span><span class='line'>                .setContent(R.id.left));
-</span><span class='line'>        tabHost.addTab(tabHost.newTabSpec("right")
-</span><span class='line'>                .setIndicator("Right")
-</span><span class='line'>                .setContent(R.id.right));
-</span><span class='line'>        tabHost.setCurrentTab(0);
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>到这里，一个简单至极的Tab应用已经完成了。不过在实际情况中，每个Tab页会有多个控件，并且有很多业务逻辑在其中。如果使用上述代码，将所有控件和逻辑放在一个类中，那么这个类将变的极度臃肿，以后维护也会变的非常困难。需要找个简单且优雅的方案解决这个问题。</p>
-
-<p>简单优雅且容易维护的Tab应用</p>
-
-<p>删除main.xml中的include语句：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
-</span><span class='line'>&lt;TabHost xmlns:android="http://schemas.android.com/apk/res/android"
-</span><span class='line'>    android:id="@android:id/tabhost"
-</span><span class='line'>    android:layout_width="fill_parent"
-</span><span class='line'>    android:layout_height="fill_parent"&gt;
-</span><span class='line'>    &lt;LinearLayout
-</span><span class='line'>        android:orientation="vertical"
-</span><span class='line'>        android:layout_width="fill_parent"
-</span><span class='line'>        android:layout_height="fill_parent"&gt;
-</span><span class='line'>        &lt;TabWidget
-</span><span class='line'>            android:id="@android:id/tabs"
-</span><span class='line'>            android:layout_width="fill_parent"
-</span><span class='line'>            android:layout_height="wrap_content" /&gt;
-</span><span class='line'>        &lt;FrameLayout
-</span><span class='line'>            android:id="@android:id/tabcontent"
-</span><span class='line'>            android:layout_width="fill_parent"
-</span><span class='line'>            android:layout_height="fill_parent" /&gt;
-</span><span class='line'>    &lt;/LinearLayout&gt;
-</span><span class='line'>&lt;/TabHost&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>新建TabLeftActivity和TabRightActivity类：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class TabLeftActivity extends Activity {
-</span><span class='line'>
-</span><span class='line'>    @Override
-</span><span class='line'>    public void onCreate(Bundle savedInstanceState) {
-</span><span class='line'>        super.onCreate(savedInstanceState);
-</span><span class='line'>        setContentView(R.layout.tab_left);
-</span><span class='line'>
-</span><span class='line'>        // do something
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class TabRightActivity extends Activity {
-</span><span class='line'>
-</span><span class='line'>    @Override
-</span><span class='line'>    public void onCreate(Bundle savedInstanceState) {
-</span><span class='line'>        super.onCreate(savedInstanceState);
-</span><span class='line'>        setContentView(R.layout.tab_right);
-</span><span class='line'>
-</span><span class='line'>        // do something
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>修改MainAcvitity为如下代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class MainActivity extends TabActivity {
-</span><span class='line'>
-</span><span class='line'>    @Override
-</span><span class='line'>    public void onCreate(Bundle savedInstanceState) {
-</span><span class='line'>        super.onCreate(savedInstanceState);
-</span><span class='line'>        setContentView(R.layout.main);
-</span><span class='line'>
-</span><span class='line'>        TabHost tabHost = getTabHost();
-</span><span class='line'>        tabHost.addTab(tabHost.newTabSpec("left")
-</span><span class='line'>                .setIndicator("Left")
-</span><span class='line'>                .setContent(new Intent(this, TabLeftActivity.class)));
-</span><span class='line'>        tabHost.addTab(tabHost.newTabSpec("right")
-</span><span class='line'>                .setIndicator("Right")
-</span><span class='line'>                .setContent(new Intent(this, TabRightActivity.class)));
-</span><span class='line'>        tabHost.setCurrentTab(0);
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>最后，不要忘记在AndroidManifest.xml中注册TabLeftActivity和TabRightAcvitity这两个Activity。</p>
-
-<p>如何将Tab显示在下方</p>
-
-<p>这个非常简单，只要将main.xml中的LinearLayout改成RelativeLayout，然后给TagWidget添加android:layout_alignParentBottom=&#8221;true&#8221;属性即可。当然也可以在main.xml中把TabWidget放在FrameLayout下面。</p>
+<p>参考资料：<br />
+<a href="http://weblogs.manas.com.ar/spalladino/2010/03/03/handling-children-with-accepts_nested_attributes_for-in-rails/">http://weblogs.manas.com.ar/spalladino/2010/03/03/handling-children-with-accepts_nested_attributes_for-in-rails/</a></p>
 </div>
   
   
@@ -707,7 +1535,7 @@ CREATE TABLE xzqhdm ( _id INTEGER PRIMARY KEY, code NUMERIC, region TEXT, parent
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2011/08/30/create-custom-keyboard-for-android/">创建Android自定义键盘</a></h1>
+      <h1 class="entry-title"><a href="/blog/2011/04/24/upload-multiple-images-with-paperclip-rails-23/">Rails 2.3和Paperclip实现多图片上传</a></h1>
     
     
       <p class="meta">
@@ -723,313 +1551,7 @@ CREATE TABLE xzqhdm ( _id INTEGER PRIMARY KEY, code NUMERIC, region TEXT, parent
   
 
 
-<time datetime="2011-08-30T02:10:05+08:00" pubdate data-updated="true">Aug 30<sup>th</sup>, 2011</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在使用股票应用时，我们会发现这些应用使用的是特殊的软键盘，这是如何实现的呢？下面就来做个实例详解。</p>
-
-<p>注意，这篇文章不是教你如何创建输入法，如果你想创建自己的输入法，可以研究文章<a href="http://developer.android.com/resources/articles/creating-input-method.html">Creating an Input Method</a>和Android Sample中的SoftKeyboard项目。</p>
-
-<p><img src="/uploads/android-custom-keyboard.png" title="android-custom-keyboard" ></p>
-
-<p>软键盘实现：在Android中软键盘是很容易实现的，通过android.inputmethodservice.Keyboard类来创建软键盘，该类从XML文件中读取软键盘信息。有多少行，每行有多少按键，每个按键代表什么内容等。下面是软键盘的XML代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
-</span><span class='line'>&lt;Keyboard xmlns:android="http://schemas.android.com/apk/res/android"
-</span><span class='line'>    android:keyWidth="25%p"
-</span><span class='line'>    android:horizontalGap="0px"
-</span><span class='line'>    android:verticalGap="0px"
-</span><span class='line'>    android:keyHeight="@dimen/key_height"&gt;
-</span><span class='line'>    &lt;Row&gt;
-</span><span class='line'>        &lt;Key android:codes="49" android:keyLabel="1" /&gt;
-</span><span class='line'>        &lt;Key android:codes="50" android:keyLabel="2" /&gt;
-</span><span class='line'>        &lt;Key android:codes="51" android:keyLabel="3" /&gt;
-</span><span class='line'>        &lt;Key android:codes="57419"
-</span><span class='line'>            android:keyEdgeFlags="right"
-</span><span class='line'>            android:keyIcon="@drawable/sym_keyboard_left" /&gt;
-</span><span class='line'>    &lt;/Row&gt;
-</span><span class='line'>    &lt;Row&gt;
-</span><span class='line'>        &lt;Key android:codes="52" android:keyLabel="4" /&gt;
-</span><span class='line'>        &lt;Key android:codes="53" android:keyLabel="5" /&gt;
-</span><span class='line'>        &lt;Key android:codes="54" android:keyLabel="6" /&gt;
-</span><span class='line'>        &lt;Key android:codes="57421"
-</span><span class='line'>            android:keyEdgeFlags="right"
-</span><span class='line'>            android:keyIcon="@drawable/sym_keyboard_right" /&gt;
-</span><span class='line'>    &lt;/Row&gt;
-</span><span class='line'>    &lt;Row&gt;
-</span><span class='line'>        &lt;Key android:codes="55" android:keyLabel="7" /&gt;
-</span><span class='line'>        &lt;Key android:codes="56" android:keyLabel="8" /&gt;
-</span><span class='line'>        &lt;Key android:codes="57" android:keyLabel="9" /&gt;
-</span><span class='line'>        &lt;Key android:codes="-5"
-</span><span class='line'>            android:keyHeight="@dimen/key_height_large"
-</span><span class='line'>            android:keyEdgeFlags="right"
-</span><span class='line'>            android:isRepeatable="true"
-</span><span class='line'>            android:keyIcon="@drawable/sym_keyboard_delete" /&gt;
-</span><span class='line'>    &lt;/Row&gt;
-</span><span class='line'>    &lt;Row&gt;
-</span><span class='line'>        &lt;Key android:codes="-3" android:keyIcon="@drawable/sym_keyboard_done" /&gt;
-</span><span class='line'>        &lt;Key android:codes="48" android:keyLabel="0" /&gt;
-</span><span class='line'>        &lt;Key android:codes="88" android:keyLabel="X" /&gt;
-</span><span class='line'>    &lt;/Row&gt;
-</span><span class='line'>&lt;/Keyboard&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>在上面的键盘定义中，Row元素说明这是一行按键的定义，Key元素说明这是一个按键的定义。Key元素通过一些属性来定义每个按键，下面是一些常用的属性介绍：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>codes：代表按键对应的输出值，可以为unicode值或则逗号（,）分割的多个值，也可以为一个字符串。
-</span><span class='line'>       在字符串中通过“\”来转义特殊字符，例如“\n”或者“\uxxxx”。Codes通常用来定义该键的键码，
-</span><span class='line'>       例如上图中的数字按键1对应的为49。如果提供的是逗号分割的多个值则和普通手机输入键盘一
-</span><span class='line'>       样在多个值之间切换。
-</span><span class='line'> keyLabel：代表按键显示的文本内容。
-</span><span class='line'> keyIcon：代表按键显示的图标内容，如果指定了该值则在显示的时候显示为图片不显示文本。
-</span><span class='line'> keyWidth：代表按键的宽度，可以为精确值或则相对值，对于精确值支持多种单位，例如：像素，英
-</span><span class='line'>           寸等；相对值为相对于基础取值的百分比，为以%或则%p结尾，其中%p表示相对于父容器。
-</span><span class='line'> keyHeight：代表按键的高度，取值同上。
-</span><span class='line'> horizontalGap：代表按键前的间隙（水平方向），取值同上。
-</span><span class='line'> isSticky：指定按键是否为sticky的。例如Shift大小写切换按键，具有两种状态，按下状态和正常
-</span><span class='line'>           状态，取值为true或则false。
-</span><span class='line'> isModifier：指定按键是否为功能键(modifier key)，例如Alt或则Shift，取值为true或则false。
-</span><span class='line'> keyOutputText：指定按键输出的文本内容，取值为字符串。
-</span><span class='line'> isRepeatable：指定按键是否是可重复的，如果长按该键可以触发重复按键事件则为true，否则为false。
-</span><span class='line'> keyEdgeFlags：指定按键的对齐指令，取值为left或则right。</span></code></pre></td></tr></table></div></figure>
-
-
-<p>然后在main.xml文件末尾加入以下代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;RelativeLayout
-</span><span class='line'>    android:layout_width="fill_parent"
-</span><span class='line'>    android:layout_height="wrap_content"&gt;
-</span><span class='line'>    &lt;android.inputmethodservice.KeyboardView
-</span><span class='line'>        android:id="@+id/keyboard_view"
-</span><span class='line'>        android:visibility="gone"
-</span><span class='line'>        android:focusable="true"
-</span><span class='line'>        android:focusableInTouchMode="true"
-</span><span class='line'>        android:layout_width="fill_parent"
-</span><span class='line'>        android:layout_height="wrap_content"
-</span><span class='line'>        android:layout_alignParentBottom="true" /&gt;
-</span><span class='line'>&lt;/RelativeLayout&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>下面是主要的处理代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-<span class='line-number'>44</span>
-<span class='line-number'>45</span>
-<span class='line-number'>46</span>
-<span class='line-number'>47</span>
-<span class='line-number'>48</span>
-<span class='line-number'>49</span>
-<span class='line-number'>50</span>
-<span class='line-number'>51</span>
-<span class='line-number'>52</span>
-<span class='line-number'>53</span>
-<span class='line-number'>54</span>
-<span class='line-number'>55</span>
-<span class='line-number'>56</span>
-<span class='line-number'>57</span>
-<span class='line-number'>58</span>
-<span class='line-number'>59</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class MainActivity extends Activity {
-</span><span class='line'>    @Override
-</span><span class='line'>    public void onCreate(Bundle savedInstanceState) {
-</span><span class='line'>        super.onCreate(savedInstanceState);
-</span><span class='line'>        setContentView(R.layout.main);
-</span><span class='line'>
-</span><span class='line'>        EditText edit = (EditText)findViewById(R.id.edit);
-</span><span class='line'>        edit.setInputType(InputType.TYPE_NULL);
-</span><span class='line'>        edit.setOnClickListener(new OnClickListener() {
-</span><span class='line'>            @Override
-</span><span class='line'>            public void onClick(View v) {
-</span><span class='line'>                showKeyboard();
-</span><span class='line'>            }
-</span><span class='line'>        });
-</span><span class='line'>
-</span><span class='line'>        KeyboardView keyboardView = (KeyboardView)findViewById(R.id.keyboard_view);
-</span><span class='line'>        keyboardView.setKeyboard(new Keyboard(this, R.xml.qwerty));
-</span><span class='line'>        keyboardView.setEnabled(true);
-</span><span class='line'>        keyboardView.setPreviewEnabled(true);
-</span><span class='line'>        keyboardView.setOnKeyboardActionListener(new OnKeyboardActionListener() {
-</span><span class='line'>            @Override
-</span><span class='line'>            public void onKey(int primaryCode, int[] keyCodes) {
-</span><span class='line'>                Editable editable = edit.getText();
-</span><span class='line'>                int start = edit.getSelectionStart();
-</span><span class='line'>                if (primaryCode == Keyboard.KEYCODE_CANCEL) {
-</span><span class='line'>                    hideKeyboard();
-</span><span class='line'>                } else if (primaryCode == Keyboard.KEYCODE_DELETE) {
-</span><span class='line'>                    if (editable != null && editable.length() &gt; 0) {
-</span><span class='line'>                        editable.delete(start - 1, start);
-</span><span class='line'>                    }
-</span><span class='line'>                } else if (primaryCode == 57419) {    // go left
-</span><span class='line'>                    if (start &gt; 0) {
-</span><span class='line'>                        edit.setSelection(start - 1);
-</span><span class='line'>                    }
-</span><span class='line'>                } else if (primaryCode == 57421) {    // go right
-</span><span class='line'>                    if (start &lt; edit.length()) {
-</span><span class='line'>                        edit.setSelection(start + 1);
-</span><span class='line'>                    }
-</span><span class='line'>                } else {
-</span><span class='line'>                    editable.insert(start, Character.toString((char)primaryCode));
-</span><span class='line'>                }
-</span><span class='line'>            }
-</span><span class='line'>        });
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    private void showKeyboard() {
-</span><span class='line'>        int visibility = keyboardView.getVisibility();
-</span><span class='line'>        if (visibility == View.GONE || visibility == View.INVISIBLE) {
-</span><span class='line'>            keyboardView.setVisibility(View.VISIBLE);
-</span><span class='line'>        }
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    private void hideKeyboard() {
-</span><span class='line'>        int visibility = keyboardView.getVisibility();
-</span><span class='line'>        if (visibility == View.VISIBLE) {
-</span><span class='line'>            keyboardView.setVisibility(View.INVISIBLE);
-</span><span class='line'>        }
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2011/08/05/git-notes-branch-merge-and-rebase/">Git笔记之branch，merge和rebase</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2011-08-05T05:05:02+08:00" pubdate data-updated="true">Aug 5<sup>th</sup>, 2011</time>
+<time datetime="2011-04-24T12:12:29+08:00" pubdate data-updated="true">Apr 24<sup>th</sup>, 2011</time>
         
       </p>
     
@@ -1044,73 +1566,19 @@ CREATE TABLE xzqhdm ( _id INTEGER PRIMARY KEY, code NUMERIC, region TEXT, parent
 <span class='line-number'>6</span>
 <span class='line-number'>7</span>
 <span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git branch &lt;branch_name&gt;  # 建立branch
-</span><span class='line'>git branch -m &lt;old_branch_name&gt; &lt;new_branch_name&gt;  # 修改branch名字
-</span><span class='line'>git branch  # 列出所有branch以及当前在哪个branch
-</span><span class='line'>git checkout &lt;branch_name&gt;  # 切换branch
-</span><span class='line'>git checkout -b &lt;branch_name&gt;  # 新建branch并切换过去
-</span><span class='line'>git branch -d &lt;branch_name&gt;  # 刪除branch
-</span><span class='line'>git merge &lt;branch_name&gt;  # 合并分支到当前分支上
-</span><span class='line'>git rebase &lt;branch_name&gt;  # 将以往的变更迁移到最新的上游版本库的状态中</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rails upload
+</span><span class='line'>cd upload
+</span><span class='line'>script/plugin install git://github.com/thoughtbot/paperclip.git
+</span><span class='line'>script/plugin install git://github.com/aaronchi/jrails.git
+</span><span class='line'>script/generate scaffold album name:string
+</span><span class='line'>script/generate model photo album:references
+</span><span class='line'>script/generate paperclip photo data
+</span><span class='line'>rake db:migrate
+</span><span class='line'>script/server</span></code></pre></td></tr></table></div></figure>
 
 
-<p>在merge/rebase的过程中，也许会出现冲突（conflict）。在这种情况，Git会停止merge/rebase并让你去解决冲突，冲突内容以下列形式存在：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
-</span><span class='line'>Here is the original change.
-</span><span class='line'>=======
-</span><span class='line'>Here is the modified chagne.
-</span><span class='line'>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD下面的是当前版本里的内容；=======和>>>>>>>之间的则表示分支里与之对应的有冲突的内容。修复冲突要做的就是把&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD和>>>>>>>之间的改成我们想要的内容。在解决完冲突后，用git add命令去更新这些内容的索引（index），如果是rebase，那么你无需执行git commit，只要执行git rebase &#8211;continue命令，这样Git会继续应用（apply）余下的补丁。</p>
-
-<p>rebase是将目前branch的commits，一个个重新apply（或者叫patch）到要被rebase的branch上。例如，当前branch是A，然后执行git rebase B，就会把原本分支点之后所有A的commits记录，重新在B分支上再commit一遍，这时新分支点变成B分支的最新的commit。</p>
-
-<p>fast-forward在Git中是一种merge术语，当B分支是从A分支的最新版（HEAD）分出来的，那么当A要把B merge进来时，因为B的parent commit是A的HEAD，所以这两个分支唯一的差异就是B后来的commit而已，而不会有任何conflict。所以实际上的动作只是把A的HEAD改成B的HEAD而已，线图上来看两个分支根本是同一条线。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2011/08/01/how-to-create-splash-screen-for-android-app/">如何创建Android应用启动界面</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2011-08-01T15:47:50+08:00" pubdate data-updated="true">Aug 1<sup>st</sup>, 2011</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>1、制作一张启动图片splash.jpg，放在res/drawable文件夹中。</p>
-
-<p>2、新建布局文件splash.xml：</p>
+<p>修改album.rb添加photo_attributes属性：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1122,21 +1590,19 @@ CREATE TABLE xzqhdm ( _id INTEGER PRIMARY KEY, code NUMERIC, region TEXT, parent
 <span class='line-number'>8</span>
 <span class='line-number'>9</span>
 <span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
-</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-</span><span class='line'>    android:orientation="vertical"
-</span><span class='line'>    android:layout_width="fill_parent"
-</span><span class='line'>    android:layout_height="fill_parent"&gt;
-</span><span class='line'>    &lt;ImageView
-</span><span class='line'>        android:layout_width="fill_parent"
-</span><span class='line'>        android:layout_height="fill_parent"
-</span><span class='line'>        android:scaleType="fitXY"
-</span><span class='line'>        android:src="@drawable/splash" /&gt;
-</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class Album &lt; ActiveRecord::Base
+</span><span class='line'>  has_many :photos
+</span><span class='line'>  validates_presence_of :name
+</span><span class='line'>
+</span><span class='line'>  def photo_attributes=(photo_attributes)
+</span><span class='line'>    photo_attributes.each do |attributes|
+</span><span class='line'>      photos.build(attributes)
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
 
 
-<p>3、建立SplashActivity，代码如下：</p>
+<p>修改photo.rb添加附件相关属性：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1148,95 +1614,127 @@ CREATE TABLE xzqhdm ( _id INTEGER PRIMARY KEY, code NUMERIC, region TEXT, parent
 <span class='line-number'>8</span>
 <span class='line-number'>9</span>
 <span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-<span class='line-number'>44</span>
-<span class='line-number'>45</span>
-<span class='line-number'>46</span>
-<span class='line-number'>47</span>
-<span class='line-number'>48</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.splash;
+</pre></td><td class='code'><pre><code class=''><span class='line'>class Photo &lt; ActiveRecord::Base
+</span><span class='line'>  belongs_to :album
+</span><span class='line'> 
+</span><span class='line'>  has_attached_file :data,
+</span><span class='line'>    :url =&gt; "/uploads/:style_:basename.:extension",
+</span><span class='line'>    :styles =&gt; {:thumb =&gt; "50x50#", :large =&gt; "640x480#"}
+</span><span class='line'>  validates_attachment_presence :data
+</span><span class='line'>  validates_attachment_content_type :data,
+</span><span class='line'>    :content_type =&gt; ['image/jpeg', 'image/jpg', 'image/png']
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>修改new.html.erb为以下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;h1&gt;New album&lt;/h1&gt;
+</span><span class='line'> 
+</span><span class='line'>&lt;% form_for @album, :html =&gt; { :multipart =&gt; true } do |f| %&gt;
+</span><span class='line'>  &lt;%= render :partial =&gt; 'form', :locals =&gt; { :f =&gt; f } %&gt;
+</span><span class='line'>  &lt;p&gt;&lt;%= f.submit "Create" %&gt;&lt;/p&gt;
+</span><span class='line'>&lt;% end %&gt;
+</span><span class='line'> 
+</span><span class='line'>&lt;%= link_to 'Back', albums_path %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>对edit.html.erb做同样的修改：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;h1&gt;Editing album&lt;/h1&gt;
+</span><span class='line'> 
+</span><span class='line'>&lt;% form_for @album, :html =&gt; { :multipart =&gt; true } do |f| %&gt;
+</span><span class='line'>  &lt;%= render :partial =&gt; 'form', :locals =&gt; { :f =&gt; f } %&gt;
+</span><span class='line'>  &lt;p&gt;&lt;%= f.submit "Update" %&gt;&lt;/p&gt;
+</span><span class='line'>&lt;% end %&gt;
+</span><span class='line'> 
+</span><span class='line'>&lt;%= link_to 'Show', @album %&gt; |
+</span><span class='line'>&lt;%= link_to 'Back', albums_path %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>把从new.html.erb和edit.html.erb中抽取出来的代码保存为_form.html.erb文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= f.error_messages %&gt;
 </span><span class='line'>
-</span><span class='line'>import android.app.Activity;
-</span><span class='line'>import android.content.Intent;
-</span><span class='line'>import android.os.Bundle;
-</span><span class='line'>import android.view.MotionEvent;
+</span><span class='line'>&lt;p&gt;
+</span><span class='line'>  &lt;%= f.label :name %&gt;
+</span><span class='line'>  &lt;%= f.text_field :name %&gt;
+</span><span class='line'>&lt;/p&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>然后在后面添加如下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div id="photos"&gt;
+</span><span class='line'>  &lt;% if @album.new_record? %&gt;
+</span><span class='line'>    &lt;%= render :partial =&gt; 'photo', :collection =&gt; @album.photos %&gt;
+</span><span class='line'>  &lt;% end %&gt;
+</span><span class='line'>&lt;/div&gt;
 </span><span class='line'>
-</span><span class='line'>public class SplashActivity extends Activity {
-</span><span class='line'>    private boolean active = true;
-</span><span class='line'>    private int splashTime = 5000;    // time to display the splash screen in ms
-</span><span class='line'>
-</span><span class='line'>    @Override
-</span><span class='line'>    public void onCreate(Bundle savedInstanceState) {
-</span><span class='line'>        super.onCreate(savedInstanceState);
-</span><span class='line'>        setContentView(R.layout.splash);
-</span><span class='line'>
-</span><span class='line'>        new Thread() {
-</span><span class='line'>            @Override
-</span><span class='line'>            public void run() {
-</span><span class='line'>                try {
-</span><span class='line'>                    int waited = 0;
-</span><span class='line'>                    while (active && (waited &lt; splashTime)) {
-</span><span class='line'>                        sleep(100);
-</span><span class='line'>                        if (active) {
-</span><span class='line'>                            waited += 100;
-</span><span class='line'>                        }
-</span><span class='line'>                    }
-</span><span class='line'>                } catch(InterruptedException e) {
-</span><span class='line'>                } finally {
-</span><span class='line'>                    finish();
-</span><span class='line'>
-</span><span class='line'>                    // Run next activity
-</span><span class='line'>                    Intent intent = new Intent(SplashActivity.this, MainActivity.class);
-</span><span class='line'>                    startActivity(intent);
-</span><span class='line'>                    //stop();
-</span><span class='line'>                }
-</span><span class='line'>            }
-</span><span class='line'>        }.start();
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    @Override
-</span><span class='line'>    public boolean onTouchEvent(MotionEvent event) {
-</span><span class='line'>        if (event.getAction() == MotionEvent.ACTION_DOWN) {
-</span><span class='line'>            active = false;
-</span><span class='line'>        }
-</span><span class='line'>        return true;
-</span><span class='line'>    }
+</span><span class='line'>&lt;%= link_to_function "Add Photo" do |page| page.insert_html :bottom, :photos, :partial =&gt; 'photo', :object =&gt; Photo.new end %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>创建_photo.html.erb文件，代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div class="photo"&gt;
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>  &lt;% fields_for "album[photo_attributes][]", photo do |p| %&gt;
+</span><span class='line'>    &lt;%= p.label :photo %&gt;&lt;br /&gt;
+</span><span class='line'>    &lt;%= p.file_field :data, :index =&gt; nil %&gt;
+</span><span class='line'>    &lt;%= link_to_function "delete", "remove_field($(this), ('.photo'))" %&gt;
+</span><span class='line'>  &lt;% end %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>&lt;/div&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>再在application.js中添加下列代码，这样就可以删除file字段了。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>function remove_field(element, item) {
+</span><span class='line'>  element.up(item).remove();
 </span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
 
-<p>4、修改AndroidManifest.xml文件，将启动界面Activity改为默认启动，并且设置标题栏不可见。</p>
+<p>然后修改albums_controller.rb中的new方法：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1246,366 +1744,147 @@ CREATE TABLE xzqhdm ( _id INTEGER PRIMARY KEY, code NUMERIC, region TEXT, parent
 <span class='line-number'>6</span>
 <span class='line-number'>7</span>
 <span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
-</span><span class='line'>&lt;manifest xmlns:android="http://schemas.android.com/apk/res/android"
-</span><span class='line'>    package="com.codemany.splash"
-</span><span class='line'>    android:versionCode="1"
-</span><span class='line'>    android:versionName="1.0"&gt;
+</pre></td><td class='code'><pre><code class=''><span class='line'>def new
+</span><span class='line'>  @album = Album.new
+</span><span class='line'>  1.upto(3) { @album.photos.build }
 </span><span class='line'>
-</span><span class='line'>    &lt;application android:icon="@drawable/icon" android:label="@string/app_name"&gt;
-</span><span class='line'>        &lt;activity android:name=".SplashActivity"
-</span><span class='line'>                  android:theme="@android:style/Theme.NoTitleBar"&gt;
-</span><span class='line'>            &lt;intent-filter&gt;
-</span><span class='line'>                &lt;action android:name="android.intent.action.MAIN" /&gt;
-</span><span class='line'>                &lt;category android:name="android.intent.category.LAUNCHER" /&gt;
-</span><span class='line'>            &lt;/intent-filter&gt;
-</span><span class='line'>        &lt;/activity&gt;
-</span><span class='line'>
-</span><span class='line'>        &lt;activity android:name=".MainActivity"
-</span><span class='line'>                  android:label="@string/app_name"&gt;
-</span><span class='line'>            &lt;intent-filter&gt;
-</span><span class='line'>                &lt;action android:name="android.intent.action.MAIN" /&gt;
-</span><span class='line'>                &lt;category android:name="android.intent.category.DEFAULT" /&gt;
-</span><span class='line'>            &lt;/intent-filter&gt;
-</span><span class='line'>        &lt;/activity&gt;    
-</span><span class='line'>    &lt;/application&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;uses-sdk android:minSdkVersion="4" /&gt;
-</span><span class='line'>&lt;/manifest&gt;</span></code></pre></td></tr></table></div></figure>
-
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2011/07/02/import-uc-browser-bookmarks-into-firefox/">导入UC Browser书签到Firefox中</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2011-07-02T16:03:41+08:00" pubdate data-updated="true">Jul 2<sup>nd</sup>, 2011</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>UC Browser保存的书签后缀名是aucf，不能直接导入到Firefox中，必须要把aucf格式转成Firefox支持的格式才行。</p>
-
-<p>先把UC Browser和Firefox的书签格式都分析了一下。Firefox的格式非常简单，就是个HTML文件。UC的是二进制格式，文件以字符串android开头，接着是n个byte的信息，没有分析出来是啥。然后4个byte是书签的数目，再接着的n个byte没去分析，再下来就是每个书签的信息了。书签信息分两部分：名称和地址。都是第1个byte说明后面字符串的长度，字符串以00结尾。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>android    &lt;- 文件头
-</span><span class='line'>xxx...     &lt;- n个byte
-</span><span class='line'>xxxx       &lt;- 保存的书签数目
-</span><span class='line'>xxx...     &lt;- n个byte
-</span><span class='line'>xx         &lt;- 书签名称长度
-</span><span class='line'>xxx...     &lt;- 书签名称
-</span><span class='line'>xx         &lt;- 书签地址长度
-</span><span class='line'>xxx...     &lt;- 书签地址</span></code></pre></td></tr></table></div></figure>
-
-
-<p>用文本文件打开时可以查看英文字符。书签的地址通常由英文字母组成，所以我们不需要再去分析整个aucf文件的格式，只要把所有书签地址提取出来就行了。下面就是完整的Ruby代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># aucf2ff.rb
-</span><span class='line'>if ARGV.length != 1 then
-</span><span class='line'>  puts "USAGE: ruby aucf2ff.rb ucfavorite"
-</span><span class='line'>  exit
-</span><span class='line'>end
-</span><span class='line'>
-</span><span class='line'>ucfavorite = ARGV[0]
-</span><span class='line'>if !FileTest.exist?(ucfavorite) then
-</span><span class='line'>  puts "File #{ucfavorite} was not found"
-</span><span class='line'>  exit
-</span><span class='line'>end
-</span><span class='line'>
-</span><span class='line'>ff = File.new(ucfavorite.gsub(".aucf", "_ff.html"), "w")
-</span><span class='line'>ff.puts '&lt;!DOCTYPE NETSCAPE-Bookmark-file-1&gt;'
-</span><span class='line'>ff.puts '&lt;!-- This is an automatically generated file.'
-</span><span class='line'>ff.puts '     It will be read and overwritten.'
-</span><span class='line'>ff.puts '     DO NOT EDIT! --&gt;'
-</span><span class='line'>ff.puts '&lt;META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8"&gt;'
-</span><span class='line'>ff.puts '&lt;TITLE&gt;Bookmarks&lt;/TITLE&gt;'
-</span><span class='line'>ff.puts '&lt;H1&gt;Bookmarks Menu&lt;/H1&gt;'
-</span><span class='line'>ff.puts
-</span><span class='line'>ff.puts '&lt;DL&gt;&lt;p&gt;'
-</span><span class='line'>ff.puts '    &lt;DT&gt;&lt;H3&gt;UC Bookmarks&lt;/H3&gt;'
-</span><span class='line'>ff.puts '    &lt;DL&gt;&lt;p&gt;'
-</span><span class='line'>
-</span><span class='line'>buffer = IO.read(ucfavorite)
-</span><span class='line'>index = buffer.index("http://")
-</span><span class='line'>favorites = buffer.slice(index, buffer.length - index)
-</span><span class='line'>favorites.split("http://").each do |fav|
-</span><span class='line'>  uri = ''
-</span><span class='line'>  fav.each_byte do |c|
-</span><span class='line'>    break if c == 00
-</span><span class='line'>    uri += c.chr
+</span><span class='line'>  respond_to do |format|
+</span><span class='line'>    format.html # new.html.erb
 </span><span class='line'>  end
-</span><span class='line'>  if (!uri.empty?) then
-</span><span class='line'>    ff.puts '&lt;DT&gt;&lt;A HREF="http://' + uri + '" LAST_CHARSET="utf-8"&gt;' + uri + '&lt;/A&gt;'
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>这样，上传多文件的功能基本就完成了。下面就来实现显示和修改的功能。</p>
+
+<p>在show.html.erb的末尾添加下列代码，上传成功后用来显示图片：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>#loop through the albums photos
+</span><span class='line'>&lt;% for photo in @album.photos %&gt;
+</span><span class='line'>  &lt;%= image_tag photo.data.url(:thumb) %&gt;
+</span><span class='line'>&lt;% end %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>修改albums_controller.rb中的edit和update方法，用来删除图片：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def edit
+</span><span class='line'>  @album = Album.find(params[:id])
+</span><span class='line'>  if @album.photos.first.nil?
+</span><span class='line'>    1.upto(3) { @album.photos.build }
 </span><span class='line'>  end
 </span><span class='line'>end
 </span><span class='line'>
-</span><span class='line'>ff.puts '    &lt;/DL&gt;&lt;p&gt;'
-</span><span class='line'>ff.puts '&lt;/DL&gt;&lt;p&gt;'
-</span><span class='line'>ff.close</span></code></pre></td></tr></table></div></figure>
-
-
-<p>通过上面的程序就可以将UC Browser的书签转成Firefox格式，然后在Firefox中导入就可以了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2011/07/01/decompile-android-apk-file/">反编译Android APK文件</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2011-07-01T06:07:07+08:00" pubdate data-updated="true">Jul 1<sup>st</sup>, 2011</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>classes.dex是Java源码编译后生成的字节码文件。由于Android使用的Dalvik虚拟机与标准的Java虚拟机是不兼容的，dex文件与class文件相比，不论是文件结构还是opcode都不一样。</p>
-
-<p>目前有下面这几种反编译的工具:</p>
-
-<ul>
-<li>dexdump</li>
-<li><a href="http://dedexer.sourceforge.net/">Dedexer</a></li>
-<li><a href="http://code.google.com/p/android4me/">AXMLPrinter2</a></li>
-<li><a href="http://code.google.com/p/android-apktool/">apktool</a></li>
-<li><a href="http://code.google.com/p/dex2jar/">dex2jar</a> + <a href="http://java.decompiler.free.fr/?q=jdgui">JD-GUI</a></li>
-<li><a href="http://code.google.com/p/smali/">smali</a></li>
-</ul>
-
-
-<p>dexdump是Android开发包提供的反编译工具。用法为首先启动Android模拟器，把要反编译的dex文件用adb push上传到模拟器中，然后通过adb shell登录，找到该dex文件，执行dexdump xxx.dex。总的来说dexdump功能比较弱，且用起来麻烦，另外反编译的结果的可读性也很差。</p>
-
-<p>另一个反编译工具是Dedexer，反编译的效果比较好。它可以读取dex格式的文件，生成一种类似于汇编语言的输出。这种输出与Jasmin的输出相似，但包含的是Dalvik的字节码。与dexdump相比它至少有3个优点：</p>
-
-<ol>
-<li>不需要在Android模拟器中运行；</li>
-<li>反编译后的文件目录结构和源代码结构相近，每个class文件对应一个ddx文件。不像dexdump那样把所有的结果都放在一起；</li>
-<li>可以作为反编译引擎。目前好多强大的反编译工具都是以Jasmin作为反编译引擎的。</li>
-</ol>
-
-
-<p>可以下载已经编译好的ddx1.11.jar文件（对应Java 1.6版本）。用法：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>java -jar ddx1.11.jar -o -D -r -d src classes.dex  # 在src目录下生成ddx文件</span></code></pre></td></tr></table></div></figure>
-
-
-<p>APK中的资源是经过压缩的，用文本工具看都是乱码，可以通过AXMLPrinter2将其转换为可读的XML文件。具体命令为：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>java -jar AXMLPrinter2.jar xxx.xml output.xml</span></code></pre></td></tr></table></div></figure>
-
-
-<p>目前最好的反编译工具是apktool。可以帮助我们把APK文件反编译，输出smali格式的代码、图片和资源等文件，还可以在修改后重新打包。将下载下来的apktool和apktool-install-windows解压到同一目录，有三个文件：aapt.exe，apktool.bat和apktool.jar。使用方法：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>apktool d xxx.apk zzz  # 反编译xxx.apk到zzz目录，得到APK的图片和配置资源文件等
-</span><span class='line'>apktool b zzz  # 从文件夹zzz重建APK，输出到zzz/dist/out.apk</span></code></pre></td></tr></table></div></figure>
-
-
-<p>dex2jar是一个将Dalvik虚拟机的dex文件转换回标准Java的class文件的工具：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>dex2jar xxx.apk  # 生成jar文件，可以用JD GUI工具直接打开查看</span></code></pre></td></tr></table></div></figure>
-
-
-<p>smali可以反编译dex文件，也可以把你修改过的代码重新编译成dex：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>java -jar baksmali.jar classes.dex -o classes
-</span><span class='line'>java -jar smali.jar classes -o classes.dex</span></code></pre></td></tr></table></div></figure>
-
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2011/06/21/transfer-sms-from-nokia-6670-to-htc-hero-g3/">将Nokia 6670的短信导入HTC Hero G3</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2011-06-21T08:43:10+08:00" pubdate data-updated="true">Jun 21<sup>st</sup>, 2011</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>这事本该N久前就该干了（09年末把手机从Nokia 6670换到HTC Hero G3），却一直拖着没有做，今天终于把这事作了一个了结。</p>
-
-<p>Nokia下导出的短信是如Messages_Nokia 6670_20091215.xml这样的一个XML文件，文件内容的编码是unicode，格式就像下面这样：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="unicode"?&gt;
-</span><span class='line'>&lt;SMS PhoneModel="Nokia 6670"&gt;
-</span><span class='line'>  &lt;Message DateTime="2011-06-21 10:10:10"&gt;
-</span><span class='line'>    &lt;Sender&gt;路人甲&lt;/Sender&gt;
-</span><span class='line'>    &lt;PhoneNumber&gt;+8613988888888&lt;/PhoneNumber&gt;
-</span><span class='line'>    &lt;Location&gt;Inbox&lt;/Location&gt;
-</span><span class='line'>    &lt;Text&gt;我是路人甲&lt;/Text&gt;
-</span><span class='line'>  &lt;/Message&gt;
+</span><span class='line'>def update
+</span><span class='line'>  params[:photo_ids] ||= []
+</span><span class='line'>  @album = Album.find(params[:id])
+</span><span class='line'>  unless params[:photo_ids].empty?
+</span><span class='line'>    Photo.destroy_pics(params[:id], params[:photo_ids])
+</span><span class='line'>  end
 </span><span class='line'>
-</span><span class='line'>  &lt;Message DateTime="2011-06-21 11:11:11"&gt;
-</span><span class='line'>    &lt;Sender&gt;路人乙&lt;/Sender&gt;
-</span><span class='line'>    &lt;PhoneNumber&gt;+8613966666666&lt;/PhoneNumber&gt;
-</span><span class='line'>    &lt;Location&gt;Outbox&lt;/Location&gt;
-</span><span class='line'>    &lt;Text&gt;我是路人乙&lt;/Text&gt;
-</span><span class='line'>  &lt;/Message&gt;
-</span><span class='line'>&lt;/SMS&gt;</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>  respond_to do |format|
+</span><span class='line'>    if @album.update_attributes(params[:album])
+</span><span class='line'>      flash[:notice] = 'Album was successfully updated.'
+</span><span class='line'>      format.html { redirect_to(@album) }
+</span><span class='line'>    else
+</span><span class='line'>      format.html { render :action =&gt; "edit" }
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>en</span></code></pre></td></tr></table></div></figure>
 
 
-<p>本来是想写个Android应用来直接导入这些备份短信的，不过在实现的过程中发现了SMS Backup&amp;Restore应用导出的备份文件和Nokia的备份文件类似，产生了做个将Nokia备份文件转换成SMS Backup&amp;Restore备份文件的念头，又在网上发现了nicholashan的《<a href="http://bbs.hiapk.com/thread-140564-1-1.html">将Nokia的短信导入Hero（可能适用所有Android机型）</a>》，坚定了我的这个想法。</p>
+<p>在photo.rb中加上下面的代码：</p>
 
-<p>分析了一下SMS Backup&amp;Restore备份文件的格式，文件内容的编码是utf-8的：</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def self.destroy_pics(album, photos)
+</span><span class='line'>  Photo.find(photos, :conditions =&gt; {:album_id =&gt; album}).each(:destroy)
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>然后新建_album_photo.html.erb，代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;% unless album_photo.new_record? %&gt;
+</span><span class='line'>  &lt;%= image_tag album_photo.data.url(:thumb) %&gt;
+</span><span class='line'>  &lt;%= check_box_tag "photo_ids[]", album_photo.id %&gt;
+</span><span class='line'>&lt;% end rescue nil %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>接着在_form.html.erb中加入下面的代码就可以删除图片了：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div class="album_photos"&gt;
+</span><span class='line'>  &lt;%= render :partial =&gt; 'album_photo', :collection =&gt; @album.photos %&gt;
+</span><span class='line'>&lt;/div&gt;</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2011/03/10/randomize-upload-filename-in-paperclip/">随机化Paperclip的上传文件名</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-03-10T09:56:32+08:00" pubdate data-updated="true">Mar 10<sup>th</sup>, 2011</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>有时我们希望可以设定上传文件名的格式。一是可以统一文件名，而不是一些乱七八糟的名字；二是可以让文件名不是那么容易被猜测出来。下面的这段代码就是在网上找到的：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1618,50 +1897,86 @@ CREATE TABLE xzqhdm ( _id INTEGER PRIMARY KEY, code NUMERIC, region TEXT, parent
 <span class='line-number'>9</span>
 <span class='line-number'>10</span>
 <span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version='1.0' encoding='utf-8' standalone='yes' ?&gt;
-</span><span class='line'>&lt;smses count="3"&gt;
-</span><span class='line'>  &lt;sms protocol="0" address="10658658" date="1308629532000"
-</span><span class='line'>    type="1" subject="null" body="我是内容" toa="null"
-</span><span class='line'>    sc_toa="null" service_center="null" read="1"
-</span><span class='line'>    status="-1" locked="0" /&gt;
-</span><span class='line'>  &lt;sms protocol="0" address="13566666666" date="1308633733000"
-</span><span class='line'>    type="2" subject="null" body="我也是内容" toa="null"
-</span><span class='line'>    sc_toa="null" service_center="null" read="1"
-</span><span class='line'>    status="-1" locked="0" /&gt;
-</span><span class='line'>  &lt;sms protocol="0" address="+8613588888888" date="1308641377000"
-</span><span class='line'>    type="1" subject="null" body="我还是内容" toa="null"
-</span><span class='line'>    sc_toa="null" service_center="null" read="1"
-</span><span class='line'>    status="-1" locked="0" /&gt;
-</span><span class='line'>&lt;/smses&gt;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class Photo &lt; ActiveRecord::Base
+</span><span class='line'>  has_attached_file :image, :url =&gt; "/uploads/:basename.:extension"
+</span><span class='line'>
+</span><span class='line'>  before_create :randomize_file_name
+</span><span class='line'>
+</span><span class='line'>  private
+</span><span class='line'>  def randomize_file_name
+</span><span class='line'>    extension = File.extname(image_file_name).downcase
+</span><span class='line'>    self.image.instance_write(:file_name, "#{Time.now.strftime("%Y%m%d%H%M%S")}#{rand(1000)}#{extension}")
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
 
 
-<p>与转换相关的就address、date、type和body四个属性。address是发信人的号码；date是短信发送日期的timestamp。这点nicholashan的确说错了，后面不需要加什么0的（实际上nicholashan自己也怀疑自己的说法）；type等于1表示别人发给你的短信，如果是2的话就是你发给其他人的短信；body就是短信内容了。</p>
+<p>代码是从 <a href="http://trevorturk.com/2009/03/22/randomize-filename-in-paperclip/">http://trevorturk.com/2009/03/22/randomize-filename-in-paperclip/</a> 找到的，这里我把随机参数给改了，这样文件名的格式就类似20110310095632768这样。还有要注意的就是在:url中必须使用:basename参数，因为修改的:file_name就是它。</p>
+</div>
+  
+  
 
-<p>将Nokia中的时间转换到SMS Backup&amp;Restore的时间可以使用下面的代码：</p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2011/03/08/upload-file-asynchronously-without-refresh-with-paperclip-rails-23/">Rails 2.3和Paperclip实现无刷新异步上传文件</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-03-08T16:09:31+08:00" pubdate data-updated="true">Mar 8<sup>th</sup>, 2011</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
 <span class='line-number'>6</span>
 <span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>DateFormat dt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-</span><span class='line'>long value = 1355296332000L;    // 2012-12-12 12:12:12
-</span><span class='line'>Element e = (Element)iter.next();
-</span><span class='line'>Attribute attr = e.attribute("DateTime");
-</span><span class='line'>try {
-</span><span class='line'>    value = dt.parse(attr.getValue()).getTime();
-</span><span class='line'>} catch (ParseException ex) {
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rails upload
+</span><span class='line'>cd upload
+</span><span class='line'>script/plugin install git://github.com/thoughtbot/paperclip.git
+</span><span class='line'>script/plugin install git://github.com/markcatley/responds_to_parent.git
+</span><span class='line'>script/generate scaffold user name:string
+</span><span class='line'>script/generate paperclip user avatar
+</span><span class='line'>rake db:migrate</span></code></pre></td></tr></table></div></figure>
 
 
-<p>完整的代码如下（使用dom4j实现XML解析）：</p>
+<p>在user.rb中增加：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>  has_attached_file :avatar, :url =&gt; "/uploads/:basename.:extension"
+</span><span class='line'>  validates_attachment_presence :avatar
+</span><span class='line'>  validates_attachment_content_type :avatar,
+</span><span class='line'>    :content_type =&gt; ['image/jpeg', 'image/jpg', 'image/png']
+</span><span class='line'>  validates_attachment_size :avatar, :less_than =&gt; 1.megabytes</span></code></pre></td></tr></table></div></figure>
+
+
+<p>修改views/users/new.html.erb文件：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1685,266 +2000,39 @@ CREATE TABLE xzqhdm ( _id INTEGER PRIMARY KEY, code NUMERIC, region TEXT, parent
 <span class='line-number'>20</span>
 <span class='line-number'>21</span>
 <span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-<span class='line-number'>44</span>
-<span class='line-number'>45</span>
-<span class='line-number'>46</span>
-<span class='line-number'>47</span>
-<span class='line-number'>48</span>
-<span class='line-number'>49</span>
-<span class='line-number'>50</span>
-<span class='line-number'>51</span>
-<span class='line-number'>52</span>
-<span class='line-number'>53</span>
-<span class='line-number'>54</span>
-<span class='line-number'>55</span>
-<span class='line-number'>56</span>
-<span class='line-number'>57</span>
-<span class='line-number'>58</span>
-<span class='line-number'>59</span>
-<span class='line-number'>60</span>
-<span class='line-number'>61</span>
-<span class='line-number'>62</span>
-<span class='line-number'>63</span>
-<span class='line-number'>64</span>
-<span class='line-number'>65</span>
-<span class='line-number'>66</span>
-<span class='line-number'>67</span>
-<span class='line-number'>68</span>
-<span class='line-number'>69</span>
-<span class='line-number'>70</span>
-<span class='line-number'>71</span>
-<span class='line-number'>72</span>
-<span class='line-number'>73</span>
-<span class='line-number'>74</span>
-<span class='line-number'>75</span>
-<span class='line-number'>76</span>
-<span class='line-number'>77</span>
-<span class='line-number'>78</span>
-<span class='line-number'>79</span>
-<span class='line-number'>80</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>import java.io.File;
-</span><span class='line'>import java.io.FileWriter;
-</span><span class='line'>import java.io.IOException;
-</span><span class='line'>import java.text.DateFormat;
-</span><span class='line'>import java.text.ParseException;
-</span><span class='line'>import java.text.SimpleDateFormat;
-</span><span class='line'>import java.util.Iterator;
-</span><span class='line'>import java.util.List;
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;% form_for(@user, :url =&gt; users_path(:format =&gt; 'js'),
+</span><span class='line'>      :html =&gt; {:id =&gt; 'upload_form', :multipart =&gt; true, :target =&gt; 'uframe'}) do |f| %&gt;
+</span><span class='line'>  &lt;%= f.error_messages %&gt;
 </span><span class='line'>
-</span><span class='line'>import org.dom4j.Attribute;
-</span><span class='line'>import org.dom4j.Document;
-</span><span class='line'>import org.dom4j.DocumentException;
-</span><span class='line'>import org.dom4j.DocumentHelper;
-</span><span class='line'>import org.dom4j.Element;
-</span><span class='line'>import org.dom4j.Node;
-</span><span class='line'>import org.dom4j.io.SAXReader;
-</span><span class='line'>import org.dom4j.io.XMLWriter;
-</span><span class='line'>
-</span><span class='line'>public class Main {
-</span><span class='line'>
-</span><span class='line'>    public static void main(String[] args) {
-</span><span class='line'>        try {
-</span><span class='line'>            SAXReader sr = new SAXReader();
-</span><span class='line'>            Document doc = sr.read(new File(args[0]));
-</span><span class='line'>
-</span><span class='line'>            generateDocument(doc);
-</span><span class='line'>        } catch (DocumentException e) {
-</span><span class='line'>            e.printStackTrace();
-</span><span class='line'>        } catch (IOException e) {
-</span><span class='line'>            e.printStackTrace();
-</span><span class='line'>        }
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    private static void generateDocument(Document doc) {
-</span><span class='line'>        List list = doc.selectNodes("//Message");
-</span><span class='line'>
-</span><span class='line'>        Document document = DocumentHelper.createDocument();
-</span><span class='line'>        Element smses = document.addElement("smses");
-</span><span class='line'>        smses.addAttribute("count", String.valueOf(list.size()));
-</span><span class='line'>
-</span><span class='line'>        DateFormat dt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-</span><span class='line'>        long value = 1355296332000L;    // 2012-12-12 12:12:12
-</span><span class='line'>        Iterator iter = list.iterator();
-</span><span class='line'>        while (iter.hasNext()) {
-</span><span class='line'>            Element e = (Element)iter.next();
-</span><span class='line'>            Attribute attr = e.attribute("DateTime");
-</span><span class='line'>            try {
-</span><span class='line'>                value = dt.parse(attr.getValue()).getTime();
-</span><span class='line'>            } catch (ParseException e) {
-</span><span class='line'>                System.out.println(e.getMessage());
-</span><span class='line'>            }
-</span><span class='line'>            Node phone = e.selectSingleNode("PhoneNumber");
-</span><span class='line'>            Node location = e.selectSingleNode("Location");
-</span><span class='line'>            Node text = e.selectSingleNode("Text");
-</span><span class='line'>
-</span><span class='line'>            Element sms = smses.addElement("sms");
-</span><span class='line'>            sms.addAttribute("protocol", "0");
-</span><span class='line'>            sms.addAttribute("address", phone.getText());
-</span><span class='line'>            sms.addAttribute("date", String.valueOf(value));
-</span><span class='line'>            if ("Inbox".equals(location.getText())) {
-</span><span class='line'>                sms.addAttribute("type", "1");
-</span><span class='line'>            } else if ("Outbox".equals(location.getText())) {
-</span><span class='line'>                sms.addAttribute("type", "2");
-</span><span class='line'>            }
-</span><span class='line'>            sms.addAttribute("subject", "null");
-</span><span class='line'>            sms.addAttribute("body", text.getText());
-</span><span class='line'>            sms.addAttribute("toa", "null");
-</span><span class='line'>            sms.addAttribute("sc_toa", "null");
-</span><span class='line'>            sms.addAttribute("service_center", "null");
-</span><span class='line'>            sms.addAttribute("read", "1");
-</span><span class='line'>            sms.addAttribute("status", "-1");
-</span><span class='line'>            sms.addAttribute("locked", "0");
-</span><span class='line'>        }
-</span><span class='line'>
-</span><span class='line'>        File f = new File("output.xml");
-</span><span class='line'>        XMLWriter output = new XMLWriter(new FileWriter(f));
-</span><span class='line'>        output.write(document);
-</span><span class='line'>        output.close();
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>    &lt;%= f.label :name %&gt;&lt;br /&gt;
+</span><span class='line'>    &lt;%= f.text_field :name %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>    &lt;%= f.label :avatar %&gt;&lt;br /&gt;
+</span><span class='line'>    &lt;%= f.file_field :avatar %&gt;
+</span><span class='line'>    &lt;div id="avatar"&gt;
+</span><span class='line'>    &lt;% if @user.avatar.exists? %&gt;
+</span><span class='line'>      &lt;%= image_tag @user.avatar.url(:medium) %&gt;
+</span><span class='line'>    &lt;% end %&gt;
+</span><span class='line'>    &lt;/div&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>    &lt;%= f.submit 'Create' %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>&lt;% end %&gt;
+</span><span class='line'>&lt;iframe id="uframe" name="uframe" style="display: none;"&gt;&lt;/iframe&gt;</span></code></pre></td></tr></table></div></figure>
 
 
-<p>代码下载：<a href="https://github.com/dohkoos/N6670Conv">https://github.com/dohkoos/N6670Conv</a></p>
-</div>
-  
-  
+<p>当点击submit按钮后，表单被提交到隐藏的iframe，相应的action被执行，执行结果会被返回给隐藏的iframe，我们需要上传后结果能返回到母窗口，这就是responds_to_parent插件提供的功能。</p>
 
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2011/06/18/how-to-obtain-install-time-and-space-of-installed-apps/">如何获得已安装应用的安装时间和占用空间</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2011-06-18T09:59:11+08:00" pubdate data-updated="true">Jun 18<sup>th</sup>, 2011</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>可以通过ApplicationInfo类中sourceDir取得应用的文件路径，再使用File类读取文件的相关属性实现。不过这可能导致:</p>
-
-<ol>
-<li>无法获取原始的创建时间，可能很早就被创建了，之后被替换了；</li>
-<li>如果这个应用在一个私有的位置，比如app-private目录（使用Market付费购买的应用在这个位置），没有ROOT权限的手机会导致读取失败。</li>
-</ol>
-
+<p>在views/layouts/user.html.erb中增加：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>List&lt;PackageInfo&gt; pkgs = getPackageManager().getInstalledPackages(0);
-</span><span class='line'>for (int i = 0; i &lt; pkgs.size(); i++) {
-</span><span class='line'>    PackageInfo pkg = pkgs.get(i);
-</span><span class='line'>
-</span><span class='line'>    File file = new File(pkg.applicationInfo.sourceDir);
-</span><span class='line'>    System.out.println("file size: " + file.length());
-</span><span class='line'>    System.out.println("file last modified: " + file.lastModified());
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= javascript_include_tag :defaults %&gt;</span></code></pre></td></tr></table></div></figure>
 
 
-<p>不过File类中文件大小和文件最后修改时间的值是long型，不是用户友好的，在显示前需要格式化一下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>String size = Formatter.formatFileSize(context, file.length())
-</span><span class='line'>
-</span><span class='line'>Date date = new Date(file.lastModified())
-</span><span class='line'>String lastModified = new SimpleDateFormat("yyyy-MM-dd").format(date)
-</span><span class='line'>
-</span><span class='line'>System.out.println("file size: " + size);
-</span><span class='line'>System.out.println("file last modified: " + lastModified);</span></code></pre></td></tr></table></div></figure>
-
-
-<p>从Android 2.3 API Level为9开始，ApplicationInfo类新增了firstInstallTime和lastUpdateTime两个字段，可以直接获取应用的创建和最后修改时间，即使是付费软件也能正常获取。</p>
-
-<p>参考资料：<br />
-<a href="http://www.android123.com.cn/androidkaifa/719.html">http://www.android123.com.cn/androidkaifa/719.html</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2011/06/06/adding-uninstall-button-to-the-listview/">给ListView添加卸载功能的Button</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2011-06-06T09:25:43+08:00" pubdate data-updated="true">Jun 6<sup>th</sup>, 2011</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>修改main.xml，添加Button控件：</p>
+<p>修改users_controller.rb中的create方法，增加：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1955,149 +2043,15 @@ CREATE TABLE xzqhdm ( _id INTEGER PRIMARY KEY, code NUMERIC, region TEXT, parent
 <span class='line-number'>7</span>
 <span class='line-number'>8</span>
 <span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
-</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-</span><span class='line'>    android:orientation="vertical"
-</span><span class='line'>    android:layout_width="fill_parent"
-</span><span class='line'>    android:layout_height="fill_parent"&gt;
-</span><span class='line'>    &lt;LinearLayout
-</span><span class='line'>        android:layout_width="fill_parent"
-</span><span class='line'>        android:layout_height="wrap_content"
-</span><span class='line'>        android:layout_weight="1.0"&gt;
-</span><span class='line'>        &lt;ListView
-</span><span class='line'>            android:id="@+id/list_view"
-</span><span class='line'>            android:layout_width="fill_parent"
-</span><span class='line'>            android:layout_height="wrap_content" /&gt;
-</span><span class='line'>    &lt;/LinearLayout&gt;
-</span><span class='line'>    &lt;LinearLayout
-</span><span class='line'>        android:layout_width="fill_parent"
-</span><span class='line'>        android:layout_height="wrap_content"&gt;
-</span><span class='line'>        &lt;Button
-</span><span class='line'>            android:id="@+id/uninstall_button"
-</span><span class='line'>            android:text="Uninstall Selected Apps"
-</span><span class='line'>            android:layout_width="fill_parent"
-</span><span class='line'>            android:layout_height="wrap_content" /&gt;
-</span><span class='line'>    &lt;/LinearLayout&gt;
-</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>然后在MainActivity类中添加卸载应用的代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-<span class='line-number'>44</span>
-<span class='line-number'>45</span>
-<span class='line-number'>46</span>
-<span class='line-number'>47</span>
-<span class='line-number'>48</span>
-<span class='line-number'>49</span>
-<span class='line-number'>50</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>private UninstallReceiver mUninstallReceiver;
-</span><span class='line'>
-</span><span class='line'>@Override
-</span><span class='line'>public void onCreate(Bundle savedInstanceState) {
-</span><span class='line'>
-</span><span class='line'>  Button btn = (Button)findViewById(R.id.uninstall_button);
-</span><span class='line'>  btn.setOnClickListener(new OnClickListener() {
-</span><span class='line'>      @Override
-</span><span class='line'>      public void onClick(View v) {
-</span><span class='line'>          for (int i = 0; i &lt; mListData.size(); i++) {
-</span><span class='line'>              HashMap&lt;String, Object&gt; map = mListData.get(i);
-</span><span class='line'>              boolean isSelected = (Boolean)map.get("app_select");
-</span><span class='line'>              if (isSelected) {
-</span><span class='line'>                  Uri packageUri = Uri.parse("package:" + map.get("app_package"));
-</span><span class='line'>                  Intent intent = new Intent(Intent.ACTION_DELETE, packageUri);
-</span><span class='line'>                  startActivity(intent);
-</span><span class='line'>              }
-</span><span class='line'>          }
-</span><span class='line'>      }
-</span><span class='line'>  });
-</span><span class='line'>
-</span><span class='line'>    // 监听卸载广播
-</span><span class='line'>  mUninstallReceiver = new UninstallReceiver();
-</span><span class='line'>  IntentFilter filter = new IntentFilter(Intent.ACTION_PACKAGE_REMOVED);
-</span><span class='line'>  filter.addDataScheme("package");
-</span><span class='line'>  registerReceiver(mUninstallReceiver, filter);
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>// 有时选择移除的程序在确认时被取消了，因此要用BroadcastReceiver监听应用是否被真正地卸载
-</span><span class='line'>private class UninstallReceiver extends BroadcastReceiver {
-</span><span class='line'>  @Override
-</span><span class='line'>  public void onReceive(Context ctx, Intent intent) {
-</span><span class='line'>      Log.d("UninstallReceiver.onReceive()", intent.getDataString());
-</span><span class='line'>
-</span><span class='line'>      for (int i = 0; i &lt; mListData.size(); i++) {
-</span><span class='line'>          HashMap&lt;String, Object&gt; map = mListData.get(i);
-</span><span class='line'>          String packageUri = "package:" + map.get("app_package");
-</span><span class='line'>          if (packageUri.equals(intent.getDataString())) {
-</span><span class='line'>              mListData.remove(map);
-</span><span class='line'>          }
-</span><span class='line'>      }
-</span><span class='line'>      mHandler.sendEmptyMessage(0);
-</span><span class='line'>  }
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>@Override
-</span><span class='line'>public void onDestroy() {
-</span><span class='line'>  super.onDestroy();
-</span><span class='line'>  unregisterReceiver(mUninstallReceiver);
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>format.js do
+</span><span class='line'>  flash[:notice] = 'avatar created'
+</span><span class='line'>  responds_to_parent do
+</span><span class='line'>    render :update do |page|
+</span><span class='line'>      page.replace_html :avatar, image_tag(@user.avatar.url(:medium))
+</span><span class='line'>      page['upload_form'].reset
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
 
 </div>
   
@@ -2153,21 +2107,21 @@ CREATE TABLE xzqhdm ( _id INTEGER PRIMARY KEY, code NUMERIC, region TEXT, parent
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 133%" href="/tags/android/">Android</a>
-<a style="font-size: 111%" href="/tags/crack/">Crack</a>
-<a style="font-size: 108%" href="/tags/database/">Database</a>
-<a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
-<a style="font-size: 139%" href="/tags/java/">Java</a>
-<a style="font-size: 97%" href="/tags/javascript/">JavaScript</a>
-<a style="font-size: 108%" href="/tags/mysql/">MySQL</a>
-<a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
-<a style="font-size: 116%" href="/tags/powerbuilder/">PowerBuilder</a>
-<a style="font-size: 120%" href="/tags/qianbao/">Qianbao</a>
+    <a style="font-size: 128%" href="/tags/android/">Android</a>
+<a style="font-size: 110%" href="/tags/crack/">Crack</a>
+<a style="font-size: 110%" href="/tags/database/">Database</a>
+<a style="font-size: 99%" href="/tags/eclipse/">Eclipse</a>
+<a style="font-size: 133%" href="/tags/java/">Java</a>
+<a style="font-size: 99%" href="/tags/listview/">ListView</a>
+<a style="font-size: 106%" href="/tags/mysql/">MySQL</a>
+<a style="font-size: 99%" href="/tags/paperclip/">Paperclip</a>
+<a style="font-size: 117%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 122%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
-<a style="font-size: 101%" href="/tags/ruby/">Ruby</a>
-<a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 105%" href="/tags/windows-server-2008/">Windows Server 2008</a>
-<a style="font-size: 108%" href="/tags/wxwidgets/">wxWidgets</a>
+<a style="font-size: 103%" href="/tags/ruby/">Ruby</a>
+<a style="font-size: 99%" href="/tags/ubuntu/">Ubuntu</a>
+<a style="font-size: 106%" href="/tags/windows-server-2008/">Windows Server 2008</a>
+<a style="font-size: 106%" href="/tags/wxwidgets/">wxWidgets</a>
 
   </ul>
 </section>
