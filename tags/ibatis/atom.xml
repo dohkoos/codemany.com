@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: iBatis | 乐者为王]]></title>
   <link href="http://codemany.com/tags/ibatis/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-09-15T18:07:54+08:00</updated>
+  <updated>2014-09-16T03:32:29+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -14,181 +14,117 @@
 
   
   <entry>
-    <title type="html"><![CDATA[在iBatis中如何将JavaBean的boolean值映射成数据库的CHAR(Y或N)值]]></title>
-    <link href="http://codemany.com/blog/2006/05/29/in-ibatis-how-will-the-boolean-value-javabean-mapping-into-the-database-char-y-or-n-value/"/>
+    <title type="html"><![CDATA[在iBatis中如何将JavaBean的boolean值映射成数据库的CHAR（Y或N）值]]></title>
+    <link href="http://codemany.com/blog/2006/05/29/how-to-map-javabean-boolean-value-into-database-char-value-in-ibatis/"/>
     <updated>2006-05-29T12:15:40+08:00</updated>
-    <id>http://codemany.com/blog/2006/05/29/in-ibatis-how-will-the-boolean-value-javabean-mapping-into-the-database-char-y-or-n-value</id>
+    <id>http://codemany.com/blog/2006/05/29/how-to-map-javabean-boolean-value-into-database-char-value-in-ibatis</id>
     <content type="html"><![CDATA[<p>Spring 1.2.8 + iBatis 2.1.5</p>
 
-<p>&#21442;&#32771;文&#29486;：<br />
-<a href="http://opensource.atlassian.com/confluence/oss/display/IBATIS/How+do+I+use+a+Custom+Type+Handler+with+complex+property+or+Type+Safe+Enumeration">http://opensource.atlassian.com/confluence/oss/display/IBATIS/How+do+I+use+a+Custom+Type+Handler+with+complex+property+or+Type+Safe+Enumeration</a><br />
-<a href="http://opensource.atlassian.com/confluence/oss/display/IBATIS/How+do+I+use+a+BLOB+or+CLOB">http://opensource.atlassian.com/confluence/oss/display/IBATIS/How+do+I+use+a+BLOB+or+CLOB</a><br />
-<a href="http://java.mblogger.cn/wuyu/posts/8416.aspx">http://java.mblogger.cn/wuyu/posts/8416.aspx</a><br />
-<a href="http://www.mail-archive.com/user-java@ibatis.apache.org/msg03985.html">http://www.mail-archive.com/user-java@ibatis.apache.org/msg03985.html</a><br />
-<a href="http://www.mail-archive.com/user-java@ibatis.apache.org/msg04107.html">http://www.mail-archive.com/user-java@ibatis.apache.org/msg04107.html</a><br /></p>
+<p>JavaBean的boolean值映射到数据库的默认值是0和1，不是非常直观，现在希望能将boolean值映射成为Y和N。iBatis 2.0.5以后的版本提供了TypeHandlerCallback，可以用来解决这个问题。</p>
 
-<br />
+<p>首先定义数据表：</p>
 
+<p>```
+CREATE TABLE users (</p>
 
-<br />
-
-
-<p>JavaBean的boolean&#20540;&#26144;&#23556;到&#25968;&#25454;&#24211;的&#40664;&#35748;&#20540;是0&#21644;1，不是&#38750;&#24120;&#30452;&#35266;。现在&#24076;&#26395;能将boolean&#20540;&#26144;&#23556;成&#20026;Y&#21644;N，iBatis 2.0.5以后<br />
-的版本&#25552;&#20379;了TypeHandlerCallback，可以&#29992;来&#35299;&#20915;&#36825;&#20010;&#38382;&#39064;。<br /></p>
-
-<br />
-
-
-<p>首先&#23450;&#20041;&#25968;&#25454;&#24211;table：<br /></p>
-
-<br />
-
-
-<p>user (<br /></p>
-
-<pre><code>username varchar(40),&lt;br /&gt;
-password varchar(255),&lt;br /&gt;
-enabled char(1),&lt;br /&gt;
-PRIMARY KEY (username)&lt;br /&gt;
+<pre><code>username varchar(40),
+password varchar(255),
+enabled char(1),
+PRIMARY KEY (username)
 </code></pre>
 
-<p>);<br /></p>
+<p>) ENGINE=InnoDB DEFAULT CHARSET=utf-8;
+```</p>
 
-<br />
+<p>YesNoTypeHandlerCallback实现代码：</p>
 
+<p>```
+public class YesNoTypeHandlerCallback implements TypeHandlerCallback {</p>
 
-<p>YesNoTypeHandlerCallback&#23454;现&#20195;&#30721;：<br /></p>
+<pre><code>public void setParameter(ParameterSetter setter, Object parameter) throws SQLException {
+    if (parameter == null) {
+        setter.setString("");
+    } else {
+        Boolean b = (Boolean)parameter;
+        if (b.booleanValue()) {
+            setter.setString("Y");
+        } else {
+            setter.setString("N");
+        }
+    }
+}
 
-<br />
+public Object getResult(ResultGetter getter) throws SQLException {
+    String string = getter.getString();
+    if (string == null) {
+        return null;
+    } else if ("Y".equalsIgnoreCase(string)) {
+        return new Boolean(true);
+    } else {
+        return new Boolean(false);
+    }
+}
 
-
-<p>public class YesNoTypeHandlerCallback implements TypeHandlerCallback {<br /></p>
-
-<br />
-
-
-<pre><code>public void setParameter(ParameterSetter setter, Object parameter) throws SQLException {&lt;br /&gt;
-    if (parameter == null) {&lt;br /&gt;
-        setter.setString("");&lt;br /&gt;
-    } else {&lt;br /&gt;
-        Boolean b = (Boolean)parameter;&lt;br /&gt;
-        if (b.booleanValue()) {&lt;br /&gt;
-            setter.setString("Y");&lt;br /&gt;
-        } else {&lt;br /&gt;
-            setter.setString("N");&lt;br /&gt;
-        }&lt;br /&gt;
-    }&lt;br /&gt;
-}&lt;br /&gt;
+public Object valueOf(String s) {
+    return s;
+}
 </code></pre>
 
-<br />
+<p>}
+```</p>
 
+<p>SQL Map Config配置代码：</p>
 
-<pre><code>public Object getResult(ResultGetter getter) throws SQLException {&lt;br /&gt;
-    String string = getter.getString();&lt;br /&gt;
-    if (string == null) {&lt;br /&gt;
-        return null;&lt;br /&gt;
-    } else if ("Y".equalsIgnoreCase(string)) {&lt;br /&gt;
-        return new Boolean(true);&lt;br /&gt;
-    } else {&lt;br /&gt;
-        return new Boolean(false);&lt;br /&gt;
-    }&lt;br /&gt;
-}&lt;br /&gt;
+<p>```
+<sqlMapConfig></p>
+
+<pre><code>&lt;typeHandler jdbcType="CHAR" javaType="boolean"
+             callback="com.example.netlink.dao.support.YesNoTypeHandlerCallback" /&gt;
+
+&lt;sqlMap resource="com/example/netlink/dao/impl/sql/UserSQL.xml" /&gt;
 </code></pre>
 
-<br />
+<p></sqlMapConfig>
+```</p>
 
+<p>jdbcType="CHAR" javaType="boolean"必须有，否则YesNoTypeHandlerCallback.setParameter()不会被调用。</p>
 
-<pre><code>public Object valueOf(String s) {&lt;br /&gt;
-    return s;&lt;br /&gt;
-}&lt;br /&gt;
+<p>UserSQL.xml部分代码：</p>
+
+<p>```
+<typeAlias alias="user" type="com.example.netlink.model.User" /></p>
+
+<p><resultMap id="userResult" class="user"></p>
+
+<pre><code>&lt;result property="username" column="username" /&gt;
+&lt;result property="password" column="password" /&gt;
+&lt;result property="enabled" column="enabled" jdbcType="CHAR" javaType="boolean" /&gt;
 </code></pre>
 
-<p>}<br /></p>
+<p></resultMap></p>
 
-<br />
+<p><select id="getUser" parameterClass="string" resultMap="userResult">
+&lt;![CDATA[</p>
 
-
-<p>下&#38754;是SQL Map Config：<br /></p>
-
-<br />
-
-
-<p><sqlMapConfig><br /></p>
-
-<pre><code>&lt;typeHandler jdbcType="CHAR" javaType="boolean"&lt;br /&gt;
-             callback="org.company.project.dao.support.YesNoTypeHandlerCallback" /&gt;&lt;br /&gt;
+<pre><code>SELECT username, password, enabled
+FROM user WHERE username = #username#
 </code></pre>
 
-<br />
+<p>]]&gt;
+</select></p>
 
+<p><insert id="addUser" parameterClass="user">
+&lt;![CDATA[</p>
 
-<pre><code>&lt;sqlMap resource="org/company/project/dao/impl/sql/UserSQL.xml" /&gt;&lt;br /&gt;
+<pre><code>INSERT INTO user (username, password, enabled)
+VALUES (#username#, #password#, #enabled,jdbcType=CHAR,javaType=boolean#)
 </code></pre>
 
-<p></sqlMapConfig><br /></p>
+<p>]]&gt;
+</insert>
+```</p>
 
-<br />
-
-
-<p>jdbcType="CHAR" javaType="boolean"&#24517;&#39035;&#26377;，&#21542;&#21017;YesNoTypeHandlerCallback.setParameter()不会&#34987;&#35843;&#29992;。<br /></p>
-
-<br />
-
-
-<p>UserSQL.xml&#37096;&#20998;：<br /></p>
-
-<br />
-
-
-<p><typeAlias alias="user" type="org.company.project.model.User" /><br /></p>
-
-<br />
-
-
-<p><resultMap id="userResult" class="user"><br /></p>
-
-<pre><code>&lt;result property="username" column="username" /&gt;&lt;br /&gt;
-&lt;result property="password" column="password" /&gt;&lt;br /&gt;
-&lt;result property="enabled" column="enabled" jdbcType="CHAR" javaType="boolean" /&gt;&lt;br /&gt;
-</code></pre>
-
-<p></resultMap><br /></p>
-
-<br />
-
-
-<p><select id="getUser" parameterClass="string" resultMap="userResult"><br />
-&lt;![CDATA[<br /></p>
-
-<pre><code>SELECT username, password, enabled&lt;br /&gt;
-FROM user WHERE username = #username#&lt;br /&gt;
-</code></pre>
-
-<p>]]&gt;<br />
-</select><br /></p>
-
-<br />
-
-
-<p><insert id="addUser" parameterClass="user"><br />
-&lt;![CDATA[<br /></p>
-
-<pre><code>INSERT INTO user (username, password, enabled)&lt;br /&gt;
-VALUES (#username#, #password#, #enabled,jdbcType=CHAR,javaType=boolean#)&lt;br /&gt;
-</code></pre>
-
-<p>]]&gt;<br />
-</insert><br /></p>
-
-<br />
-
-
-<p>jdbcType="CHAR" javaType="boolean"&#24517;&#39035;&#26377;，&#21542;&#21017;YesNoTypeHandlerCallback.getResult()不会&#34987;&#35843;&#29992;；<br /></p>
-
-<h1>enabled,jdbcType=CHAR,javaType=boolean#&#20063;&#24517;&#39035;&#36825;样写，&#21542;&#21017;YesNoTypeHandlerCallback.setParameter()<br /></h1>
-
-<p>不会&#34987;&#35843;&#29992;，写成#enabled:CHAR#&#21644;#enabled#&#37117;&#27809;&#26377;&#20160;么&#20316;&#29992;。</p></p>
+<p>jdbcType="CHAR" javaType="boolean"必须有，否则YesNoTypeHandlerCallback.getResult()不会被调用；#enabled,jdbcType=CHAR,javaType=boolean#也必须这样写，否则YesNoTypeHandlerCallback.setParameter()也不会被调用，写成#enabled:CHAR#或#enabled#都不起作用。</p>
 ]]></content>
   </entry>
   

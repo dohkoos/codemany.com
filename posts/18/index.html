@@ -373,7 +373,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2007/01/22/integrated-p6spy-to-spring-did-not-have-a-log-file-problem/">集成P6Spy到Spring后没有产生log文件的问题的解决</a></h1>
+      <h1 class="entry-title"><a href="/blog/2007/01/22/problem-does-not-generate-log-file-when-integrate-p6spy-into-spring/">集成P6Spy到Spring后没有产生log文件的问题</a></h1>
     
     
       <p class="meta">
@@ -396,12 +396,73 @@
   </header>
 
 
-  <div class="entry-content"><p>网上关于集成p6spy到spring的帖子说：在spring的配置文件中添加<br /><bean id="dataSource" class="com.p6spy.engine.spy.P6DataSource" destroy-method="close"><br />    &lt;constructor-arg ref=&#8221;dataSourceTarget&#8221; /><br /></bean><br />然后将原来dataSource bean definition的id值改为dataSourceTarget，如下：<br /><bean id="myDataSourceTarget" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close"><br />    &#8230;<br /></bean><br />但是照着这样做了以后却发现没有生成log文件。下载p6spy的源代码进行阅读之后终于找到了问题所在（我的<br />syp.properties放在了C:\Tomcat 5.5\webapps\p6spy\WEB-INF\classes目录下）。<br />打开P6Util.java文件，在classPathFile方法中有这样一条语句（file的值就是spy.properties）<br />fp = classLoadPropertyFile(Thread.currentThread().getContextClassLoader().getResource(file))<br />它调用web容器Tomcat的classloader来取得资源文件，通常web容器默认编码是iso-8859-1，<br />所以它返回的URL的file值是C:/Tomcat%205.5/webapps/netlink/WEB-INF/classes/spy.properties，<br />其中Tomcat 5.5中的空格被编码成了%20。<br />接着在classLoadPropertyFile方法中p6spy就直接使用了URL的file值来创建File对象，而没有使用任何的编码格式，</p>
+  <div class="entry-content"><p>网上关于集成P6Spy到Spring的帖子说：在Spring的配置文件中添加：</p>
 
-<pre><code>public static File classLoadPropertyFile(java.net.URL purl) {&lt;br /&gt;        try {&lt;br /&gt;            if (purl != null) {&lt;br /&gt;                // modified by jayakumar for JDK 1.2 support&lt;br /&gt;                //return new File(purl.getPath());&lt;br /&gt;                return new File(getPath(purl));&lt;br /&gt;                // end of modification&lt;br /&gt;            }&lt;br /&gt;        } catch (Exception e) {&lt;br /&gt;            // we ignore this, since JDK 1.2 does not suppport this method&lt;br /&gt;        }&lt;br /&gt;        return null;&lt;br /&gt;    }
-</code></pre>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;bean id="dataSource" class="com.p6spy.engine.spy.P6DataSource" destroy-method="close"&gt;
+</span><span class='line'>    &lt;constructor-arg ref="dataSourceTarget" /&gt;
+</span><span class='line'>&lt;/bean&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p>然后在classPathFile方法中通过判断fp.exists()来决定是否返回log文件的路径。因为使用的中文操作系统，<br />本地编码是gbk，可以知道fp.exists()肯定不可能为true了，因此log文件也就不可能被创建了。那么该怎样解<br />决这个问题呢？其实我们只要将classLoadPropertyFile()方法中的return new File(getPath(purl))改成<br />return new File(URLDecoder.decode(getPath(purl)))就可以了。</p></p></p>
+
+<p>然后将原来dataSource定义的id值改为dataSourceTarget：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;bean id="dataSourceTarget" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close"&gt;
+</span><span class='line'>    &lt;property name="driverClassName" value="${driver}" /&gt;
+</span><span class='line'>    &lt;property name="url" value="${url}" /&gt;
+</span><span class='line'>    &lt;property name="username" value="${username}" /&gt;
+</span><span class='line'>    &lt;property name="password" value="${password}" /&gt;
+</span><span class='line'>&lt;/bean&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>但是照着这样做了以后却发现没有生成log文件。</p>
+
+<p>下载P6Spy的源代码进行阅读后找到了问题所在。打开P6Util.java文件，在classPathFile()方法中有这样一条语句：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>fp = classLoadPropertyFile(Thread.currentThread().getContextClassLoader().getResource(file))</span></code></pre></td></tr></table></div></figure>
+
+
+<p>getResource(file)用来读取spy.properties配置文件，file的值就是spy.properties的文件路径。我的syp.properties放在了C:\Tomcat 5.5\webapps\netlink\WEB-INF\classes目录下，所以它返回的值是C:/Tomcat%205.5/webapps/netlink/WEB-INF/classes/spy.properties，Tomcat 5.5中的空格被编码成了%20。然后在classLoadPropertyFile()方法中就直接使用该值来创建File对象。可想而知，肯定创建失败。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static File classLoadPropertyFile(java.net.URL purl) {
+</span><span class='line'>    try {
+</span><span class='line'>        if (purl != null) {
+</span><span class='line'>            // modified by jayakumar for JDK 1.2 support
+</span><span class='line'>            //return new File(purl.getPath());
+</span><span class='line'>            return new File(getPath(purl));
+</span><span class='line'>            // end of modification
+</span><span class='line'>        }
+</span><span class='line'>    } catch (Exception e) {
+</span><span class='line'>        // we ignore this, since JDK 1.2 does not suppport this method
+</span><span class='line'>    }
+</span><span class='line'>    return null;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>在classPathFile()方法中通过判断fp.exists()来决定是否返回log文件的路径，既然上面创建File对象失败了，那fp.exists()肯定不可能为true了，log文件也就不可能被创建了。</p>
+
+<p>解决问题的方法超简单，把Tomcat 5.5中的空格去掉就行了。</p>
 </div>
   
   
@@ -894,12 +955,12 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 133%" href="/tags/android/">Android</a>
+    <a style="font-size: 97%" href="/tags/algorithm/">Algorithm</a>
+<a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 111%" href="/tags/crack/">Crack</a>
 <a style="font-size: 108%" href="/tags/database/">Database</a>
 <a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
-<a style="font-size: 139%" href="/tags/java/">Java</a>
-<a style="font-size: 97%" href="/tags/javascript/">JavaScript</a>
+<a style="font-size: 141%" href="/tags/java/">Java</a>
 <a style="font-size: 108%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
 <a style="font-size: 116%" href="/tags/powerbuilder/">PowerBuilder</a>
