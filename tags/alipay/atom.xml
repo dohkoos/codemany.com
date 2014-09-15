@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Alipay | 乐者为王]]></title>
   <link href="http://codemany.com/tags/alipay/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-09-15T16:54:32+08:00</updated>
+  <updated>2014-09-15T18:07:54+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -15,94 +15,92 @@
   
   <entry>
     <title type="html"><![CDATA[在Rails应用中集成支付宝]]></title>
-    <link href="http://codemany.com/blog/2011/03/18/rails-applications-integrated-in-the-payment-of-po/"/>
+    <link href="http://codemany.com/blog/2011/03/18/integrate-alipay-into-rails-application/"/>
     <updated>2011-03-18T06:28:29+08:00</updated>
-    <id>http://codemany.com/blog/2011/03/18/rails-applications-integrated-in-the-payment-of-po</id>
-    <content type="html"><![CDATA[<p>注意事项：<br />
-notify_url为服务器通知，支付宝可以保证99.9999%的通知到达率，前提是您的网络通畅。<br />
-notify_url中可以做对数据库的业务操作。return_url中可以做数据库的更新也可以做显示。<br />
-第一次交易状态改变（即时到帐中的交易完成的交易状态）时，支付宝发起的通知的时间与返回页自动跳转回的时间近乎同时。</p>
+    <id>http://codemany.com/blog/2011/03/18/integrate-alipay-into-rails-application</id>
+    <content type="html"><![CDATA[<p>注意：notify_url为服务器通知，支付宝可以保证99.9999%的通知到达率，前提是您的网络通畅，在notify_url中可以做对数据库的业务操作。return_url中可以做数据库的更新也可以做显示。第一次交易状态改变（即时到帐中的交易完成的交易状态）时，支付宝发起的通知的时间与返回页自动跳转回的时间近乎同时。</p>
 
-<p>支付处理代码：<br />
-```
-class OrdersController &lt; ApplicationController<br />
+<p>支付处理代码：</p>
+
+<p>```
+class OrdersController &lt; ApplicationController
   before_filter :login_required</p>
 
-<p>  # place order<br />
-  def place_order<br /></p>
+<p>  # place order
+  def place_order</p>
 
-<pre><code>parameters = {&lt;br /&gt;
-  'service' =&gt; 'create_direct_pay_by_user',&lt;br /&gt;
-  'partner' =&gt; ALIPAY_ACCOUNT,&lt;br /&gt;
-  'seller_email' =&gt; ALIPAY_EMAIL,&lt;br /&gt;
-  'out_trade_no' =&gt; @order.out_trade_no,&lt;br /&gt;
-  'subject' =&gt; 'payment subject',&lt;br /&gt;
-  'body' =&gt; 'payment body',&lt;br /&gt;
-  'price' =&gt; @order.price.to_s,&lt;br /&gt;
-  'quantity' =&gt; @order.quantity.to_s,&lt;br /&gt;
-  'payment_type' =&gt; '1',&lt;br /&gt;
-  '_input_charset' =&gt; 'utf-8',&lt;br /&gt;
-  'notify_url' =&gt; url_for(:only_path =&gt; false, :action =&gt; 'notify'),&lt;br /&gt;
-  'return_url' =&gt; url_for(:only_path =&gt; false, :action =&gt; 'done')&lt;br /&gt;
+<pre><code>parameters = {
+  'service' =&gt; 'create_direct_pay_by_user',
+  'partner' =&gt; ALIPAY_ACCOUNT,
+  'seller_email' =&gt; ALIPAY_EMAIL,
+  'out_trade_no' =&gt; @order.out_trade_no,
+  'subject' =&gt; 'payment subject',
+  'body' =&gt; 'payment body',
+  'price' =&gt; @order.price.to_s,
+  'quantity' =&gt; @order.quantity.to_s,
+  'payment_type' =&gt; '1',
+  '_input_charset' =&gt; 'utf-8',
+  'notify_url' =&gt; url_for(:only_path =&gt; false, :action =&gt; 'notify'),
+  'return_url' =&gt; url_for(:only_path =&gt; false, :action =&gt; 'done')
 }
 
-# 即时到帐中交易状态为“等待买家付款”的状态默认是不会发送通知的，自己手动设置一下&lt;br /&gt;
-@order.status = 'WAIT_BUYER_PAY'&lt;br /&gt;
-@order.user = current_user&lt;br /&gt;
+# 即时到帐中交易状态为“等待买家付款”的状态默认是不会发送通知的，自己手动设置一下
+@order.status = 'WAIT_BUYER_PAY'
+@order.user = current_user
 @order.save
 
-values = {}&lt;br /&gt;
-# 支付宝要求传递的参数必须要按照首字母的顺序传递，所以这里要sort&lt;br /&gt;
-parameters.keys.sort.each do |k|&lt;br /&gt;
-  values[k] = parameters[k];&lt;br /&gt;
+values = {}
+# 支付宝要求传递的参数必须要按照首字母的顺序传递，所以这里要sort
+parameters.keys.sort.each do |k|
+  values[k] = parameters[k];
 end
 
-# 一定要先unescape后再生成sign，否则支付宝会报ILLEGAL SIGN &lt;br /&gt;
-sign = Digest::MD5.hexdigest(CGI.unescape(values.to_query) + ALIPAY_KEY)&lt;br /&gt;
-gateway = 'https://www.alipay.com/cooperate/gateway.do?'&lt;br /&gt;
-redirect_to gateway + values.to_query + '&amp;sign=' + sign + '&amp;sign_type=MD5'&lt;br /&gt;
+# 一定要先unescape后再生成sign，否则支付宝会报ILLEGAL SIGN 
+sign = Digest::MD5.hexdigest(CGI.unescape(values.to_query) + ALIPAY_KEY)
+gateway = 'https://www.alipay.com/cooperate/gateway.do?'
+redirect_to gateway + values.to_query + '&amp;sign=' + sign + '&amp;sign_type=MD5'
 </code></pre>
 
 <p>  end</p>
 
-<p>  # 返回success或fail。如果返回fail，支付宝会每隔一段时间就自动调用notify_url通信接口 <br />
-  def notify<br /></p>
+<p>  # 返回success或fail。如果返回fail，支付宝会每隔一段时间就自动调用notify_url通信接口
+  def notify</p>
 
-<pre><code>render :text =&gt; 'success'&lt;br /&gt;
+<pre><code>render :text =&gt; 'success'
 </code></pre>
 
 <p>  end</p>
 
-<p>  def done<br /></p>
+<p>  def done</p>
 
-<pre><code>if verify_sign&lt;br /&gt;
-  order = Order.find_by_out_trade_no(params[:out_trade_no])&lt;br /&gt;
-  # 支付宝即时到帐接口只有一种交易状态，就是“交易成功”，更新一下&lt;br /&gt;
-  order.update_attributes(params[:trade_status])&lt;br /&gt;
-  render :text =&gt; 'Payment successful'&lt;br /&gt;
-else&lt;br /&gt;
-  render :text =&gt; 'Alipay Error: ILLEGAL_SIGN'&lt;br /&gt;
-end&lt;br /&gt;
+<pre><code>if verify_sign
+  order = Order.find_by_out_trade_no(params[:out_trade_no])
+  # 支付宝即时到帐接口只有一种交易状态，就是“交易成功”，更新一下
+  order.update_attributes(params[:trade_status])
+  render :text =&gt; 'Payment successful'
+else
+  render :text =&gt; 'Alipay Error: ILLEGAL_SIGN'
+end
 </code></pre>
 
 <p>  end</p>
 
-<p>protected<br />
-  def verify_sign<br /></p>
+<p>protected
+  def verify_sign</p>
 
-<pre><code>params.delete("sign_type")&lt;br /&gt;
+<pre><code>params.delete("sign_type")
 sign = params.delete("sign")
 
-values = {}&lt;br /&gt;
-params.keys.sort.each do |k|&lt;br /&gt;
-  values[k] = params[k];&lt;br /&gt;
+values = {}
+params.keys.sort.each do |k|
+  values[k] = params[k];
 end
 
-sign.downcase == Digest::MD5.hexdigest(CGI.unescape(values.to_query) + ALIPAY_KEY)&lt;br /&gt;
+sign.downcase == Digest::MD5.hexdigest(CGI.unescape(values.to_query) + ALIPAY_KEY)
 </code></pre>
 
-<p>  end<br />
-end<br />
+<p>  end
+end
 ```</p>
 
 <p>参考资料：<br />
