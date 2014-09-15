@@ -211,6 +211,212 @@
       
   <header>
     
+      <h1 class="entry-title"><a href="/blog/2013/04/25/library-management-by-scanning-isbn-barcode/">扫描ISBN条码实现藏书管理</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2013-04-25T12:17:14+08:00" pubdate data-updated="true">Apr 25<sup>th</sup>, 2013</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>每个程序猿家里都有一堆技术书籍，偶也不例外，因此想写个Android应用来管理自己的藏书以及想买的书籍。在网上找到marshal的<a href="http://marshal.easymorse.com/archives/2745">识别图书ISBN号并输出查询结果的示例</a>和<a href="http://marshal.easymorse.com/archives/2756">完善图书查询原型，增加收藏夹功能</a>两篇文章，写的非常不错，还提供源代码。下载代码研究后发现已基本具备了想要的功能，决定在它的基础上做些修改供自己使用。</p>
+
+<p>把原来uses-sdk的minSdkVersion改成了9，增加android:targetSdkVersion=&#8221;17&#8221;。然后使用手机测试程序时发现，在连接网络时后台会抛出了android.os.NetworkOnMainThreadException异常，并且应用崩溃打不开。通过查阅相关资料了解到，自从Android 2.3之后，系统增加了一个类StrictMode。这个类对网络的访问方式进行了一定的改变。官方文档给出了这个类设置的目的：</p>
+
+<blockquote><p>StrictMode is a developer tool which detects things you might be doing by accident and brings them to your attention so you can fix them.</p>
+
+<p>StrictMode is most commonly used to catch accidental disk or network access on the application&#8217;s main thread, where UI operations are received and animations take place. Keeping disk and network operations off the main thread makes for much smoother, more responsive applications. By keeping your application&#8217;s main thread responsive, you also prevent ANR dialogs from being shown to users.</p>
+
+<p>Note that even though an Android device&#8217;s disk is often on flash memory, many devices run a filesystem on top of that memory with very limited concurrency. It&#8217;s often the case that almost all disk accesses are fast, but may in individual cases be dramatically slower when certain I/O is happening in the background from other processes. If possible, it&#8217;s best to assume that such things are not fast.</p></blockquote>
+
+<p>因为marshal把访问网络的代码直接放到UI线程中，造成和主线程的首要工作UI交互相矛盾。解决这类问题很容易，把访问网络的代码放到AsyncTask中就行了。官方有个<a href="http://developer.android.com/training/basics/network-ops/index.html">NetworkUsage</a>例子是个不错的参考。</p>
+
+<p>接着发现豆瓣API查询返回的是500错误，在浏览器上访问却又正常，后来给HttpClient加上Agent头就没问题了，不知道是不是期间豆瓣的API在实现上作了改变。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>HttpClient client = new DefaultHttpClient();
+</span><span class='line'>String agent = System.getProperty("http.agent");
+</span><span class='line'>client.getParams().setParameter(CoreProtocolPNames.USER_AGENT, agent);</span></code></pre></td></tr></table></div></figure>
+
+
+<p>解析豆瓣XML查询结果的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+</span><span class='line'>factory.setNamespaceAware(true);
+</span><span class='line'>XmlPullParser parser = factory.newPullParser();
+</span><span class='line'>parser.setInput(inputStream, "utf-8");
+</span><span class='line'>Book book = new Book();
+</span><span class='line'>
+</span><span class='line'>int eventType = parser.getEventType();
+</span><span class='line'>while (eventType != XmlPullParser.END_DOCUMENT) {
+</span><span class='line'>    switch (eventType) {
+</span><span class='line'>    case XmlPullParser.START_TAG:
+</span><span class='line'>        if ("link".equals(parser.getName())
+</span><span class='line'>                && "image".equals(parser.getAttributeValue(null, "rel"))) {
+</span><span class='line'>            book.setImageUrl(parser.getAttributeValue(null, "href"));
+</span><span class='line'>            eventType = parser.next();
+</span><span class='line'>        } else if ("summary".equals(parser.getName())) {
+</span><span class='line'>            book.setSummary(parser.nextText());
+</span><span class='line'>        } else if ("attribute".equals(parser.getName())) {
+</span><span class='line'>            String name = parser.getAttributeValue(null, "name");
+</span><span class='line'>            if ("title".equals(name)) {
+</span><span class='line'>                book.setTitle(parser.nextText());
+</span><span class='line'>            } else if ("author".equals(name)) {
+</span><span class='line'>                book.setAuthor(parser.nextText());
+</span><span class='line'>            } else if ("isbn10".equals(name)) {
+</span><span class='line'>                book.setIsbn10(parser.nextText());
+</span><span class='line'>            } else if ("isbn13".equals(name)) {
+</span><span class='line'>                book.setIsbn13(parser.nextText());
+</span><span class='line'>            } else if ("publisher".equals(name)) {  
+</span><span class='line'>                book.setPublisher(parser.getText());
+</span><span class='line'>            }                 
+</span><span class='line'>        }
+</span><span class='line'>        break;
+</span><span class='line'>    case XmlPullParser.END_TAG:
+</span><span class='line'>        break;
+</span><span class='line'>    }
+</span><span class='line'>    eventType = parser.next();
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>然后，然后就是结果页面不显示图书信息。想要找到原因，肿么办？看来要调试WebView了！<a href="http://developer.android.com/guide/webapps/debugging.html">http://developer.android.com/guide/webapps/debugging.html</a> 告诉了我们如何调试。</p>
+
+<p>首先在WebView上设置setWebChromeClient方法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>webView.setWebChromeClient(new WebChromeClient() {
+</span><span class='line'>    public void onConsoleMessage(String message,
+</span><span class='line'>            int lineNumber, String sourceID) {
+</span><span class='line'>        Log.d(TAG, message + " -- From line "
+</span><span class='line'>                + lineNumber + " of " + sourceID);
+</span><span class='line'>    }
+</span><span class='line'>});</span></code></pre></td></tr></table></div></figure>
+
+
+<p>然后在JavaScript脚本中使用以下方法就可以在logcat中看到调试信息了。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>console.log(String)
+</span><span class='line'>console.info(String)
+</span><span class='line'>console.warn(String)
+</span><span class='line'>console.error(String)</span></code></pre></td></tr></table></div></figure>
+
+
+<p>重新运行程序，果然在logcat中看到报如下错误：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Uncaught TypeError: Object [object Object] has no method...</span></code></pre></td></tr></table></div></figure>
+
+
+<p>搜索后在Stack Overflow找到了<a href="http://stackoverflow.com/questions/14031635/android-4-2-1-webview-and-javascript-interface-breaks">问题的答案</a>（Stack Overflow真的非常不错，问题的回答都非常详尽）。<a href="http://developer.android.com/guide/webapps/webview.html#BindingJavaScript">http://developer.android.com/guide/webapps/webview.html#BindingJavaScript</a> 是官方文档的解释。</p>
+
+<p>解决方法就是在要被JavaScript调用的方法上加@JavascriptInterface注解：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class Book {
+</span><span class='line'>
+</span><span class='line'>  @JavascriptInterface
+</span><span class='line'>  public String getAuthor() {
+</span><span class='line'>      return author;
+</span><span class='line'>  }
+</span><span class='line'>  
+</span><span class='line'>  public void setAuthor(String author) {
+</span><span class='line'>      if (this.author != null) {
+</span><span class='line'>          this.author += ", " + author;
+</span><span class='line'>      } else {
+</span><span class='line'>          this.author = author;
+</span><span class='line'>      }
+</span><span class='line'>  }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
       <h1 class="entry-title"><a href="/blog/2013/04/11/the-proper-way-to-draw-rounded-corners/">绘制圆角的正确方法</a></h1>
     
     
@@ -979,91 +1185,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2013/02/24/logic-problems-100-lamps/">逻辑题-100盏电灯</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2013-02-24T08:56:21+08:00" pubdate data-updated="true">Feb 24<sup>th</sup>, 2013</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>房间里有100盏电灯，编号为1，2，3&#8230;100，每盏灯上有一个按钮，初始时灯全都是关的。</p>
-
-<p>编好号的100位同学由房间外依次走进去，将自己编号的倍数的灯的按钮全部按一次，例如第一位同学把编号是1的倍数的灯的按钮按一下（此时100盏灯全亮），第二位同学把编号是2的倍数的灯的按钮按一下（此时只有50盏灯亮着，50盏被这个人按灭了）&#8230;第100位同学把编号是100的倍数的灯（即编号为100的灯）的按钮按一下，请问依次走完后，还有多少盏灯亮着？</p>
-
-<p>解题思路：<br />
-被按过奇数次的灯亮着，偶数次的灯关了。<br />
-因为每个同学会把自己编号的倍数的灯全部按一次，所以：<br />
-1号灯会被1号同学按下；<br />
-2号灯会被1，2号同学按下；<br />
-3号灯会被1，3号同学按下；<br />
-4号灯会被1，2，4号同学按下；<br />
-&#8230;<br />
-10号灯会被1，2，5，10号同学按下；<br />
-&#8230;</p>
-
-<p>从上面可以总结出n号灯会被以它所有约数为编号的同学按下。</p>
-
-<p>这样，问题就变成了求每盏灯的编号有多少个约数的数学问题。如果约数个数为奇数，灯亮着；反之，灯关着。</p>
-
-<p>Ruby代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># Light state: ON/OFF = true/false
-</span><span class='line'>lamps = Array.new(100, false)
-</span><span class='line'>
-</span><span class='line'>1.upto(lamps.length) do |lno|
-</span><span class='line'>  1.upto(lno) do |fno|
-</span><span class='line'>    lamps[lno - 1] = !lamps[lno - 1] if lno % fno == 0
-</span><span class='line'>  end
-</span><span class='line'>end
-</span><span class='line'>
-</span><span class='line'>lamps.each_index do |i|
-</span><span class='line'>  print "Light #{i + 1} is "
-</span><span class='line'>  puts lamps[i] ? "ON" : "OFF"
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-
-<p>最后，我们会发现编号1，4，9，16，25&#8230;100的灯是亮着的，其它都是灭的。即编号值可以开出整数平方根的灯是亮的。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/3">&larr; Older</a>
@@ -1111,21 +1232,21 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 128%" href="/tags/android/">Android</a>
-<a style="font-size: 110%" href="/tags/crack/">Crack</a>
-<a style="font-size: 110%" href="/tags/database/">Database</a>
-<a style="font-size: 99%" href="/tags/eclipse/">Eclipse</a>
-<a style="font-size: 133%" href="/tags/java/">Java</a>
-<a style="font-size: 99%" href="/tags/listview/">ListView</a>
-<a style="font-size: 106%" href="/tags/mysql/">MySQL</a>
-<a style="font-size: 99%" href="/tags/paperclip/">Paperclip</a>
-<a style="font-size: 117%" href="/tags/powerbuilder/">PowerBuilder</a>
-<a style="font-size: 122%" href="/tags/qianbao/">Qianbao</a>
+    <a style="font-size: 133%" href="/tags/android/">Android</a>
+<a style="font-size: 111%" href="/tags/crack/">Crack</a>
+<a style="font-size: 108%" href="/tags/database/">Database</a>
+<a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
+<a style="font-size: 139%" href="/tags/java/">Java</a>
+<a style="font-size: 97%" href="/tags/javascript/">JavaScript</a>
+<a style="font-size: 108%" href="/tags/mysql/">MySQL</a>
+<a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
+<a style="font-size: 116%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 120%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
-<a style="font-size: 103%" href="/tags/ruby/">Ruby</a>
-<a style="font-size: 99%" href="/tags/ubuntu/">Ubuntu</a>
-<a style="font-size: 106%" href="/tags/windows-server-2008/">Windows Server 2008</a>
-<a style="font-size: 106%" href="/tags/wxwidgets/">wxWidgets</a>
+<a style="font-size: 101%" href="/tags/ruby/">Ruby</a>
+<a style="font-size: 101%" href="/tags/struts/">Struts</a>
+<a style="font-size: 105%" href="/tags/windows-server-2008/">Windows Server 2008</a>
+<a style="font-size: 108%" href="/tags/wxwidgets/">wxWidgets</a>
 
   </ul>
 </section>

@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Android | 乐者为王]]></title>
   <link href="http://codemany.com/tags/android/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-09-15T15:50:49+08:00</updated>
+  <updated>2014-09-15T16:48:04+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,133 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[扫描ISBN条码实现藏书管理]]></title>
+    <link href="http://codemany.com/blog/2013/04/25/library-management-by-scanning-isbn-barcode/"/>
+    <updated>2013-04-25T12:17:14+08:00</updated>
+    <id>http://codemany.com/blog/2013/04/25/library-management-by-scanning-isbn-barcode</id>
+    <content type="html"><![CDATA[<p>每个程序猿家里都有一堆技术书籍，偶也不例外，因此想写个Android应用来管理自己的藏书以及想买的书籍。在网上找到marshal的<a href="http://marshal.easymorse.com/archives/2745">识别图书ISBN号并输出查询结果的示例</a>和<a href="http://marshal.easymorse.com/archives/2756">完善图书查询原型，增加收藏夹功能</a>两篇文章，写的非常不错，还提供源代码。下载代码研究后发现已基本具备了想要的功能，决定在它的基础上做些修改供自己使用。</p>
+
+<p>把原来uses-sdk的minSdkVersion改成了9，增加android:targetSdkVersion="17"。然后使用手机测试程序时发现，在连接网络时后台会抛出了android.os.NetworkOnMainThreadException异常，并且应用崩溃打不开。通过查阅相关资料了解到，自从Android 2.3之后，系统增加了一个类StrictMode。这个类对网络的访问方式进行了一定的改变。官方文档给出了这个类设置的目的：</p>
+
+<blockquote><p>StrictMode is a developer tool which detects things you might be doing by accident and brings them to your attention so you can fix them.</p>
+
+<p>StrictMode is most commonly used to catch accidental disk or network access on the application's main thread, where UI operations are received and animations take place. Keeping disk and network operations off the main thread makes for much smoother, more responsive applications. By keeping your application's main thread responsive, you also prevent ANR dialogs from being shown to users.</p>
+
+<p>Note that even though an Android device's disk is often on flash memory, many devices run a filesystem on top of that memory with very limited concurrency. It's often the case that almost all disk accesses are fast, but may in individual cases be dramatically slower when certain I/O is happening in the background from other processes. If possible, it's best to assume that such things are not fast.</p></blockquote>
+
+<p>因为marshal把访问网络的代码直接放到UI线程中，造成和主线程的首要工作UI交互相矛盾。解决这类问题很容易，把访问网络的代码放到AsyncTask中就行了。官方有个<a href="http://developer.android.com/training/basics/network-ops/index.html">NetworkUsage</a>例子是个不错的参考。</p>
+
+<p>接着发现豆瓣API查询返回的是500错误，在浏览器上访问却又正常，后来给HttpClient加上Agent头就没问题了，不知道是不是期间豆瓣的API在实现上作了改变。</p>
+
+<p><code>
+HttpClient client = new DefaultHttpClient();
+String agent = System.getProperty("http.agent");
+client.getParams().setParameter(CoreProtocolPNames.USER_AGENT, agent);
+</code></p>
+
+<p>解析豆瓣XML查询结果的代码：</p>
+
+<p>```
+XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+factory.setNamespaceAware(true);
+XmlPullParser parser = factory.newPullParser();
+parser.setInput(inputStream, "utf-8");
+Book book = new Book();</p>
+
+<p>int eventType = parser.getEventType();
+while (eventType != XmlPullParser.END_DOCUMENT) {</p>
+
+<pre><code>switch (eventType) {
+case XmlPullParser.START_TAG:
+    if ("link".equals(parser.getName())
+            &amp;&amp; "image".equals(parser.getAttributeValue(null, "rel"))) {
+        book.setImageUrl(parser.getAttributeValue(null, "href"));
+        eventType = parser.next();
+    } else if ("summary".equals(parser.getName())) {
+        book.setSummary(parser.nextText());
+    } else if ("attribute".equals(parser.getName())) {
+        String name = parser.getAttributeValue(null, "name");
+        if ("title".equals(name)) {
+            book.setTitle(parser.nextText());
+        } else if ("author".equals(name)) {
+            book.setAuthor(parser.nextText());
+        } else if ("isbn10".equals(name)) {
+            book.setIsbn10(parser.nextText());
+        } else if ("isbn13".equals(name)) {
+            book.setIsbn13(parser.nextText());
+        } else if ("publisher".equals(name)) {  
+            book.setPublisher(parser.getText());
+        }                   
+    }
+    break;
+case XmlPullParser.END_TAG:
+    break;
+}
+eventType = parser.next();
+</code></pre>
+
+<p>}
+```</p>
+
+<p>然后，然后就是结果页面不显示图书信息。想要找到原因，肿么办？看来要调试WebView了！<a href="http://developer.android.com/guide/webapps/debugging.html">http://developer.android.com/guide/webapps/debugging.html</a> 告诉了我们如何调试。</p>
+
+<p>首先在WebView上设置setWebChromeClient方法：</p>
+
+<p>```
+webView.setWebChromeClient(new WebChromeClient() {</p>
+
+<pre><code>public void onConsoleMessage(String message,
+        int lineNumber, String sourceID) {
+    Log.d(TAG, message + " -- From line "
+            + lineNumber + " of " + sourceID);
+}
+</code></pre>
+
+<p>});
+```</p>
+
+<p>然后在JavaScript脚本中使用以下方法就可以在logcat中看到调试信息了。</p>
+
+<p><code>
+console.log(String)
+console.info(String)
+console.warn(String)
+console.error(String)
+</code></p>
+
+<p>重新运行程序，果然在logcat中看到报如下错误：</p>
+
+<p><code>
+Uncaught TypeError: Object [object Object] has no method...
+</code></p>
+
+<p>搜索后在Stack Overflow找到了<a href="http://stackoverflow.com/questions/14031635/android-4-2-1-webview-and-javascript-interface-breaks">问题的答案</a>（Stack Overflow真的非常不错，问题的回答都非常详尽）。<a href="http://developer.android.com/guide/webapps/webview.html#BindingJavaScript">http://developer.android.com/guide/webapps/webview.html#BindingJavaScript</a> 是官方文档的解释。</p>
+
+<p>解决方法就是在要被JavaScript调用的方法上加@JavascriptInterface注解：</p>
+
+<p>```
+public class Book {</p>
+
+<pre><code>@JavascriptInterface
+public String getAuthor() {
+    return author;
+}
+
+public void setAuthor(String author) {
+    if (this.author != null) {
+        this.author += ", " + author;
+    } else {
+        this.author = author;
+    }
+}
+</code></pre>
+
+<p>}
+```</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[使用fastboot给Galaxy Nexus刷官方ROM]]></title>
@@ -75,11 +202,94 @@ image-yakju-imm76i.zip
 
 <p>7、然后开始刷机，基带和BL能不刷就不刷，防止变砖头。不过我在刷的过程中就提示必须刷基带和BL。</p>
 
-<p><img src="/uploads/gn-flash-fail.png" title="gn-flash-fail" ></p>
+<p>{% img /uploads/gn-flash-fail.png gn-flash-fail %}</p>
 
 <p>PS：顺带着把同事的日版机也刷到4.0.4版本。在刷的过程中出现了莫名其妙的事情。刷机一切正常，但是重启之后，就无限在第一屏重启。抠电池重新再刷，还是老样子，但多重启两次后竟然进去了。唉，搞不懂！</p>
 
 <p>刷机工具下载：<a href="https://github.com/dohkoos/galaxy-nexus-flash-tools">https://github.com/dohkoos/galaxy-nexus-flash-tools</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[实现Android底部工具栏]]></title>
+    <link href="http://codemany.com/blog/2011/11/16/make-bottom-toolbar-in-android/"/>
+    <updated>2011-11-16T01:08:52+08:00</updated>
+    <id>http://codemany.com/blog/2011/11/16/make-bottom-toolbar-in-android</id>
+    <content type="html"><![CDATA[<p>在网上大部分教程中，底部工具栏通常由TabHost和RadioGroup结合完成，每个工具栏项对应一个独立的Activity。不过，我们要实现的是多个工具栏项在单独的一个Activity上起作用。</p>
+
+<p><a href="http://www.cnblogs.com/figoyu/archive/2010/11/20/1882691.html">http://www.cnblogs.com/figoyu/archive/2010/11/20/1882691.html</a> 就是这个。不过该教程对每个工具栏项设置了固定宽度80dip，导致工具栏项或屏幕大小不定时代码布局会有问题。</p>
+
+<p>这里对该教程做了些改进，使之能做到适应不定的工具栏项或屏幕大小。改进后的布局代码如下：</p>
+
+<p>```
+&lt;?xml version="1.0" encoding="utf-8"?>
+&lt;LinearLayout xmlns:android="<a href="http://schemas.android.com/apk/res/android">http://schemas.android.com/apk/res/android</a>"</p>
+
+<pre><code>android:orientation="vertical"
+android:layout_width="fill_parent"
+android:layout_height="fill_parent"&gt;
+&lt;LinearLayout
+    android:layout_width="fill_parent"
+    android:layout_height="0dip"
+    android:layout_weight="1.0"&gt;
+    &lt;ScrollView
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:scrollbars="vertical"
+        android:fadingEdge="vertical"&gt;
+        &lt;TextView
+            android:id="@+id/content"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:textSize="17dip" /&gt;
+    &lt;/ScrollView&gt;
+&lt;/LinearLayout&gt;
+
+&lt;include layout="@layout/toolbar" /&gt;
+</code></pre>
+
+<p></LinearLayout>
+```</p>
+
+<p>以下是工具栏toolbar.xml的布局代码：</p>
+
+<p>```
+&lt;?xml version="1.0" encoding="utf-8"?>
+&lt;LinearLayout xmlns:android="<a href="http://schemas.android.com/apk/res/android">http://schemas.android.com/apk/res/android</a>"</p>
+
+<pre><code>android:orientation="horizontal"
+android:layout_width="fill_parent"
+android:layout_height="wrap_content"
+android:background="@drawable/toolbar_bg"&gt;
+&lt;ImageButton
+    android:id="@+id/btn_index"
+    android:src="@drawable/index"
+    android:text="@string/index"
+    style="@style/toolbar" /&gt;
+&lt;ImageButton
+    android:id="@+id/btn_prev"
+    android:src="@drawable/btn_prev_bg"
+    android:text="@string/prev"
+    style="@style/toolbar" /&gt;
+&lt;ImageButton
+    android:id="@+id/btn_next"
+    android:src="@drawable/btn_next_bg"
+    android:text="@string/next"
+    style="@style/toolbar" /&gt;
+&lt;ImageButton
+    android:id="@+id/btn_zoomin"
+    android:src="@drawable/zoomin"
+    android:text="@string/zoomin"
+    style="@style/toolbar" /&gt;
+&lt;ImageButton
+    android:id="@+id/btn_zoomout"
+    android:src="@drawable/zoomout"
+    android:text="@string/zoomout"
+    style="@style/toolbar" /&gt;
+</code></pre>
+
+<p></LinearLayout>
+```</p>
 ]]></content>
   </entry>
   
@@ -92,7 +302,7 @@ image-yakju-imm76i.zip
 
 <p>注意，这篇文章不是教你如何创建输入法，如果你想创建自己的输入法，可以研究文章<a href="http://developer.android.com/resources/articles/creating-input-method.html">Creating an Input Method</a>和Android Sample中的SoftKeyboard项目。</p>
 
-<p><img src="/uploads/android-custom-keyboard.png" title="android-custom-keyboard" ></p>
+<p>{% img /uploads/android-custom-keyboard.png android-custom-keyboard %}</p>
 
 <p>软键盘实现：在Android中软键盘是很容易实现的，通过android.inputmethodservice.Keyboard类来创建软键盘，该类从XML文件中读取软键盘信息。有多少行，每行有多少按键，每个按键代表什么内容等。下面是软键盘的XML代码：</p>
 
@@ -374,116 +584,6 @@ android:versionName="1.0"&gt;
 
 <p></manifest>
 ```</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[反编译Android APK文件]]></title>
-    <link href="http://codemany.com/blog/2011/07/01/decompile-android-apk-file/"/>
-    <updated>2011-07-01T06:07:07+08:00</updated>
-    <id>http://codemany.com/blog/2011/07/01/decompile-android-apk-file</id>
-    <content type="html"><![CDATA[<p>classes.dex是Java源码编译后生成的字节码文件。由于Android使用的Dalvik虚拟机与标准的Java虚拟机是不兼容的，dex文件与class文件相比，不论是文件结构还是opcode都不一样。</p>
-
-<p>目前有下面这几种反编译的工具:</p>
-
-<ul>
-<li>dexdump</li>
-<li><a href="http://dedexer.sourceforge.net/">Dedexer</a></li>
-<li><a href="http://code.google.com/p/android4me/">AXMLPrinter2</a></li>
-<li><a href="http://code.google.com/p/android-apktool/">apktool</a></li>
-<li><a href="http://code.google.com/p/dex2jar/">dex2jar</a> + <a href="http://java.decompiler.free.fr/?q=jdgui">JD-GUI</a></li>
-<li><a href="http://code.google.com/p/smali/">smali</a></li>
-</ul>
-
-
-<p>dexdump是Android开发包提供的反编译工具。用法为首先启动Android模拟器，把要反编译的dex文件用adb push上传到模拟器中，然后通过adb shell登录，找到该dex文件，执行dexdump xxx.dex。总的来说dexdump功能比较弱，且用起来麻烦，另外反编译的结果的可读性也很差。</p>
-
-<p>另一个反编译工具是Dedexer，反编译的效果比较好。它可以读取dex格式的文件，生成一种类似于汇编语言的输出。这种输出与Jasmin的输出相似，但包含的是Dalvik的字节码。与dexdump相比它至少有3个优点：</p>
-
-<ol>
-<li>不需要在Android模拟器中运行；</li>
-<li>反编译后的文件目录结构和源代码结构相近，每个class文件对应一个ddx文件。不像dexdump那样把所有的结果都放在一起；</li>
-<li>可以作为反编译引擎。目前好多强大的反编译工具都是以Jasmin作为反编译引擎的。</li>
-</ol>
-
-
-<p>可以下载已经编译好的ddx1.11.jar文件（对应Java 1.6版本）。用法：</p>
-
-<p><code>
-java -jar ddx1.11.jar -o -D -r -d src classes.dex  # 在src目录下生成ddx文件
-</code></p>
-
-<p>APK中的资源是经过压缩的，用文本工具看都是乱码，可以通过AXMLPrinter2将其转换为可读的XML文件。具体命令为：</p>
-
-<p><code>
-java -jar AXMLPrinter2.jar xxx.xml output.xml
-</code></p>
-
-<p>目前最好的反编译工具是apktool。可以帮助我们把APK文件反编译，输出smali格式的代码、图片和资源等文件，还可以在修改后重新打包。将下载下来的apktool和apktool-install-windows解压到同一目录，有三个文件：aapt.exe，apktool.bat和apktool.jar。使用方法：</p>
-
-<p><code>
-apktool d xxx.apk zzz  # 反编译xxx.apk到zzz目录，得到APK的图片和配置资源文件等
-apktool b zzz  # 从文件夹zzz重建APK，输出到zzz/dist/out.apk
-</code></p>
-
-<p>dex2jar是一个将Dalvik虚拟机的dex文件转换回标准Java的class文件的工具：</p>
-
-<p><code>
-dex2jar xxx.apk  # 生成jar文件，可以用JD GUI工具直接打开查看
-</code></p>
-
-<p>smali可以反编译dex文件，也可以把你修改过的代码重新编译成dex：</p>
-
-<p><code>
-java -jar baksmali.jar classes.dex -o classes
-java -jar smali.jar classes -o classes.dex
-</code></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[如何获得已安装应用的安装时间和占用空间]]></title>
-    <link href="http://codemany.com/blog/2011/06/18/how-to-obtain-install-time-and-space-of-installed-apps/"/>
-    <updated>2011-06-18T09:59:11+08:00</updated>
-    <id>http://codemany.com/blog/2011/06/18/how-to-obtain-install-time-and-space-of-installed-apps</id>
-    <content type="html"><![CDATA[<p>可以通过ApplicationInfo类中sourceDir取得应用的文件路径，再使用File类读取文件的相关属性实现。不过这可能导致:</p>
-
-<ol>
-<li>无法获取原始的创建时间，可能很早就被创建了，之后被替换了；</li>
-<li>如果这个应用在一个私有的位置，比如app-private目录（使用Market付费购买的应用在这个位置），没有ROOT权限的手机会导致读取失败。</li>
-</ol>
-
-
-<p>```
-List<PackageInfo> pkgs = getPackageManager().getInstalledPackages(0);
-for (int i = 0; i &lt; pkgs.size(); i++) {</p>
-
-<pre><code>PackageInfo pkg = pkgs.get(i);
-
-File file = new File(pkg.applicationInfo.sourceDir);
-System.out.println("file size: " + file.length());
-System.out.println("file last modified: " + file.lastModified());
-</code></pre>
-
-<p>}
-```</p>
-
-<p>不过File类中文件大小和文件最后修改时间的值是long型，不是用户友好的，在显示前需要格式化一下：</p>
-
-<p>```
-String size = Formatter.formatFileSize(context, file.length())</p>
-
-<p>Date date = new Date(file.lastModified())
-String lastModified = new SimpleDateFormat("yyyy-MM-dd").format(date)</p>
-
-<p>System.out.println("file size: " + size);
-System.out.println("file last modified: " + lastModified);
-```</p>
-
-<p>从Android 2.3 API Level为9开始，ApplicationInfo类新增了firstInstallTime和lastUpdateTime两个字段，可以直接获取应用的创建和最后修改时间，即使是付费软件也能正常获取。</p>
-
-<p>参考资料：<br />
-<a href="http://www.android123.com.cn/androidkaifa/719.html">http://www.android123.com.cn/androidkaifa/719.html</a></p>
 ]]></content>
   </entry>
   

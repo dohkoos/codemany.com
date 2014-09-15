@@ -9,22 +9,8 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="测试代码如下： 1
-2
-3
-4
-5
-6
-7
-8
-9
-10
-11
-12
-13
-14
-&lt;% String str = "first line\r\nsecond line";
-%&gt; &lt;body&gt; &lt;textarea id="editor" name="editor"&gt &hellip;">
+  <meta name="description" content="Spring 1.2.8 + iBatis 2.1.5 &#21442;&#32771;文&#29486;：
+http://opensource.atlassian.com/confluence/oss/display/IBATIS/How+do+I+use+a+Custom+Type+ &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -86,7 +72,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2005/01/12/how-to-insert-line-breaks-into-textarea-with-jsp/">JSP中怎样输出\r\n到textarea中</a></h1>
+      <h1 class="entry-title"><a href="/blog/2006/05/29/in-ibatis-how-will-the-boolean-value-javabean-mapping-into-the-database-char-y-or-n-value/">在iBatis中如何将JavaBean的boolean值映射成数据库的CHAR(Y或N)值</a></h1>
     
     
       <p class="meta">
@@ -102,14 +88,222 @@
   
 
 
-<time datetime="2005-01-12T12:47:51+08:00" pubdate data-updated="true">Jan 12<sup>th</sup>, 2005</time>
+<time datetime="2006-05-29T12:15:40+08:00" pubdate data-updated="true">May 29<sup>th</sup>, 2006</time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>测试代码如下：</p>
+  <div class="entry-content"><p>Spring 1.2.8 + iBatis 2.1.5</p>
+
+<p>&#21442;&#32771;文&#29486;：<br />
+<a href="http://opensource.atlassian.com/confluence/oss/display/IBATIS/How+do+I+use+a+Custom+Type+Handler+with+complex+property+or+Type+Safe+Enumeration">http://opensource.atlassian.com/confluence/oss/display/IBATIS/How+do+I+use+a+Custom+Type+Handler+with+complex+property+or+Type+Safe+Enumeration</a><br />
+<a href="http://opensource.atlassian.com/confluence/oss/display/IBATIS/How+do+I+use+a+BLOB+or+CLOB">http://opensource.atlassian.com/confluence/oss/display/IBATIS/How+do+I+use+a+BLOB+or+CLOB</a><br />
+<a href="http://java.mblogger.cn/wuyu/posts/8416.aspx">http://java.mblogger.cn/wuyu/posts/8416.aspx</a><br />
+<a href="http://www.mail-archive.com/user-java@ibatis.apache.org/msg03985.html">http://www.mail-archive.com/user-java@ibatis.apache.org/msg03985.html</a><br />
+<a href="http://www.mail-archive.com/user-java@ibatis.apache.org/msg04107.html">http://www.mail-archive.com/user-java@ibatis.apache.org/msg04107.html</a><br /></p>
+
+<br />
+
+
+<br />
+
+
+<p>JavaBean的boolean&#20540;&#26144;&#23556;到&#25968;&#25454;&#24211;的&#40664;&#35748;&#20540;是0&#21644;1，不是&#38750;&#24120;&#30452;&#35266;。现在&#24076;&#26395;能将boolean&#20540;&#26144;&#23556;成&#20026;Y&#21644;N，iBatis 2.0.5以后<br />
+的版本&#25552;&#20379;了TypeHandlerCallback，可以&#29992;来&#35299;&#20915;&#36825;&#20010;&#38382;&#39064;。<br /></p>
+
+<br />
+
+
+<p>首先&#23450;&#20041;&#25968;&#25454;&#24211;table：<br /></p>
+
+<br />
+
+
+<p>user (<br /></p>
+
+<pre><code>username varchar(40),&lt;br /&gt;
+password varchar(255),&lt;br /&gt;
+enabled char(1),&lt;br /&gt;
+PRIMARY KEY (username)&lt;br /&gt;
+</code></pre>
+
+<p>);<br /></p>
+
+<br />
+
+
+<p>YesNoTypeHandlerCallback&#23454;现&#20195;&#30721;：<br /></p>
+
+<br />
+
+
+<p>public class YesNoTypeHandlerCallback implements TypeHandlerCallback {<br /></p>
+
+<br />
+
+
+<pre><code>public void setParameter(ParameterSetter setter, Object parameter) throws SQLException {&lt;br /&gt;
+    if (parameter == null) {&lt;br /&gt;
+        setter.setString("");&lt;br /&gt;
+    } else {&lt;br /&gt;
+        Boolean b = (Boolean)parameter;&lt;br /&gt;
+        if (b.booleanValue()) {&lt;br /&gt;
+            setter.setString("Y");&lt;br /&gt;
+        } else {&lt;br /&gt;
+            setter.setString("N");&lt;br /&gt;
+        }&lt;br /&gt;
+    }&lt;br /&gt;
+}&lt;br /&gt;
+</code></pre>
+
+<br />
+
+
+<pre><code>public Object getResult(ResultGetter getter) throws SQLException {&lt;br /&gt;
+    String string = getter.getString();&lt;br /&gt;
+    if (string == null) {&lt;br /&gt;
+        return null;&lt;br /&gt;
+    } else if ("Y".equalsIgnoreCase(string)) {&lt;br /&gt;
+        return new Boolean(true);&lt;br /&gt;
+    } else {&lt;br /&gt;
+        return new Boolean(false);&lt;br /&gt;
+    }&lt;br /&gt;
+}&lt;br /&gt;
+</code></pre>
+
+<br />
+
+
+<pre><code>public Object valueOf(String s) {&lt;br /&gt;
+    return s;&lt;br /&gt;
+}&lt;br /&gt;
+</code></pre>
+
+<p>}<br /></p>
+
+<br />
+
+
+<p>下&#38754;是SQL Map Config：<br /></p>
+
+<br />
+
+
+<p><sqlMapConfig><br /></p>
+
+<pre><code>&lt;typeHandler jdbcType="CHAR" javaType="boolean"&lt;br /&gt;
+             callback="org.company.project.dao.support.YesNoTypeHandlerCallback" /&gt;&lt;br /&gt;
+</code></pre>
+
+<br />
+
+
+<pre><code>&lt;sqlMap resource="org/company/project/dao/impl/sql/UserSQL.xml" /&gt;&lt;br /&gt;
+</code></pre>
+
+<p></sqlMapConfig><br /></p>
+
+<br />
+
+
+<p>jdbcType=&#8221;CHAR&#8221; javaType=&#8221;boolean&#8221;&#24517;&#39035;&#26377;，&#21542;&#21017;YesNoTypeHandlerCallback.setParameter()不会&#34987;&#35843;&#29992;。<br /></p>
+
+<br />
+
+
+<p>UserSQL.xml&#37096;&#20998;：<br /></p>
+
+<br />
+
+
+<p><typeAlias alias="user" type="org.company.project.model.User" /><br /></p>
+
+<br />
+
+
+<p><resultMap id="userResult" class="user"><br /></p>
+
+<pre><code>&lt;result property="username" column="username" /&gt;&lt;br /&gt;
+&lt;result property="password" column="password" /&gt;&lt;br /&gt;
+&lt;result property="enabled" column="enabled" jdbcType="CHAR" javaType="boolean" /&gt;&lt;br /&gt;
+</code></pre>
+
+<p></resultMap><br /></p>
+
+<br />
+
+
+<p><select id="getUser" parameterClass="string" resultMap="userResult"><br />
+&lt;![CDATA[<br /></p>
+
+<pre><code>SELECT username, password, enabled&lt;br /&gt;
+FROM user WHERE username = #username#&lt;br /&gt;
+</code></pre>
+
+<p>]]><br />
+</select><br /></p>
+
+<br />
+
+
+<p><insert id="addUser" parameterClass="user"><br />
+&lt;![CDATA[<br /></p>
+
+<pre><code>INSERT INTO user (username, password, enabled)&lt;br /&gt;
+VALUES (#username#, #password#, #enabled,jdbcType=CHAR,javaType=boolean#)&lt;br /&gt;
+</code></pre>
+
+<p>]]><br />
+</insert><br /></p>
+
+<br />
+
+
+<p>jdbcType=&#8221;CHAR&#8221; javaType=&#8221;boolean&#8221;&#24517;&#39035;&#26377;，&#21542;&#21017;YesNoTypeHandlerCallback.getResult()不会&#34987;&#35843;&#29992;；<br /></p>
+
+<h1>enabled,jdbcType=CHAR,javaType=boolean#&#20063;&#24517;&#39035;&#36825;样写，&#21542;&#21017;YesNoTypeHandlerCallback.setParameter()<br /></h1>
+
+<p>不会&#34987;&#35843;&#29992;，写成#enabled:CHAR#&#21644;#enabled#&#37117;&#27809;&#26377;&#20160;么&#20316;&#29992;。</p></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2006/04/11/spring-for-dbunit-combination-of-unit-testing-sqlmap/">DbUnit结合Spring进行SqlMap的单元测试</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2006-04-11T04:39:04+08:00" pubdate data-updated="true">Apr 11<sup>th</sup>, 2006</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>使用DbUnit，开发人员可以控制测试数据库的状态。进行一个DAO单元测试之前，DbUnit为数据库准备好初始化数据；而在测试结束时，DbUnit会把数据库状态恢复到测试前的状态。下面的例子使用DbUnit为SqlMap编写单元测试。</p>
+
+<p>SqlMap映射文件如下所示：<br /></p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -125,115 +319,37 @@
 <span class='line-number'>12</span>
 <span class='line-number'>13</span>
 <span class='line-number'>14</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%
-</span><span class='line'>    String str = "first line\r\nsecond line";
-</span><span class='line'>%&gt;
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;select id="getUser" parameterClass="String" resultClass="User"&gt;
+</span><span class='line'>    SELECT username, password, first_name, last_name&lt;br /&gt;
+</span><span class='line'>    FROM user WHERE username = #username#
+</span><span class='line'>&lt;/select&gt;
 </span><span class='line'>
-</span><span class='line'>&lt;body&gt;
-</span><span class='line'>    &lt;textarea id="editor" name="editor"&gt;&lt;/textarea&gt;;
-</span><span class='line'>&lt;/body&gt;
+</span><span class='line'>&lt;delete id="removeUser" parameterClass="String"&gt;
+</span><span class='line'>    DELETE FROM user WHERE username = #username#
+</span><span class='line'>&lt;/delete&gt;
 </span><span class='line'>
-</span><span class='line'>&lt;script language="javascript"&gt;
-</span><span class='line'>&lt;!–-
-</span><span class='line'>    var editor = document.getElementById('editor');
-</span><span class='line'>    editor.value = '&lt;%= str.replaceAll("\r\n", "\\\\r\\\\n") %&gt;';
-</span><span class='line'>//-–&gt;
-</span><span class='line'>&lt;/script&gt;</span></code></pre></td></tr></table></div></figure>
-
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2004/12/04/forgot-root-password-for-linux/">忘记Linux的root密码后</a></h1>
-    
-    
-      <p class="meta">
-        
+</span><span class='line'>&lt;update id="updateUser" parameterClass="User"&gt;
+</span><span class='line'>    UPDATE user SET&lt;br /&gt;
+</span><span class='line'>        password = #password#,&lt;br /&gt;
+</span><span class='line'>        first_name = #firstName#,&lt;br /&gt;
+</span><span class='line'>        last_name = #lastName#&lt;br /&gt;
+</span><span class='line'>    WHERE username =#username#
+</span><span class='line'>&lt;/update&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;insert id="insertUser" parameterClass="User"&gt;
+</span><span class='line'>    INSERT INTO user (username, password, first_name, last_name)&lt;br /&gt;
+</span><span class='line'>    VALUES (#username#, #password#, #firstName#, #lastName#)
+</span><span class='line'>&lt;/insert&gt;</span></code></pre></td></tr></table></div></figure>
 
 
-
-
-
-
-
-
-  
-
-
-<time datetime="2004-12-04T18:29:10+08:00" pubdate data-updated="true">Dec 4<sup>th</sup>, 2004</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>一不小心忘记了Linux的root密码，只能以普通用户ffat的身份进入系统了。</p>
-
-<p>找到Linux的DISC 1安装光盘，从光盘启动，出现boot:引导符后输入（其中，/dev/hda3是Linux系统所在的分区）：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>linux single root=/dev/hda3 initrd=</span></code></pre></td></tr></table></div></figure>
-
-
-<p>进入系统，拷贝/etc目录下的shadow和passwd文件到/home/ffat目录下，修改shadow文件的属性。再到 <a href="http://www.openwall.com/john/">http://www.openwall.com/john/</a> 下载一个John the Ripper，编译安装好后输入：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>./unshadow passwd shadow &gt; passwd.1</span></code></pre></td></tr></table></div></figure>
-
-
-<p>接着运行破解：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>john passwd.1</span></code></pre></td></tr></table></div></figure>
-
-
-<p>这样过了半个多小时我的root密码就回来了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2004/12/01/install-and-configure-jdk-150-on-linux/">Linux下JDK 1.5.0的安装和配置</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2004-12-01T11:28:09+08:00" pubdate data-updated="true">Dec 1<sup>st</sup>, 2004</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>先是在网上找了两篇在Linux上安装JDK的文章：<a href="http://www.cnblogs.com/sirsunny/archive/2004/11/22/67029.html">http://www.cnblogs.com/sirsunny/archive/2004/11/22/67029.html</a> 和 <a href="http://dev.csdn.net/article/46/article/46/46877.shtm">http://dev.csdn.net/article/46/article/46/46877.shtm</a> 。</p>
-
-<p>觉得后者写的比较详细，就照着它来了。步骤1、2、3没问题，把JDK安装好了，现在要配置环境变量了，有3种方法，哪种好呢？第1种不方便，换个shell登陆就不行了，第3种也不好，所有登陆用户都能用，那就只能选择第2种方法了。用vi打开.bashrc文件，在文件末尾添加以下内容：</p>
+<p>SqlMapConfig配置文件内容如下：<br /></p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -241,15 +357,69 @@
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
 <span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>set JAVA_HOME=/usr/java/jdk1.5.0
-</span><span class='line'>export JAVA_HOME
-</span><span class='line'>set PATH=$PATH:$JAVA_HOME/bin
-</span><span class='line'>export PATH
-</span><span class='line'>set CLASSPATH=.:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar
-</span><span class='line'>export CLASSPATH</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;sqlMapConfig&gt;
+</span><span class='line'>    &lt;settings lazyLoadingEnabled="true"&lt;br /&gt;
+</span><span class='line'>              cacheModelsEnabled="true"&lt;br /&gt;
+</span><span class='line'>              enhancementEnabled="true"&lt;br /&gt;
+</span><span class='line'>              maxSessions="64"&lt;br /&gt;
+</span><span class='line'>              maxTransactions="8"&lt;br /&gt;
+</span><span class='line'>              maxRequests="128" /&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;sqlMap resource="org/dbunit/example/dao/impl/sql/UserSQL.xml" /&gt;
+</span><span class='line'>&lt;/sqlMapConfig&gt;</span></code></pre></td></tr></table></div></figure>
 
 
-<p>现在文件内容为：</p>
+<p>首先，要为单元测试准备测试数据。我们可以用DbUnit的Flat XML格式来准备测试数据集。下面的XML文件称为目标数据库的Seed File，它为测试准备了两条数据。其中元素名user对应数据库的表名，属性username，password，first_name和last_name是表user的列名，属性值就是记录值。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;dataset&gt;
+</span><span class='line'>    &lt;user username="john"&lt;br /&gt;
+</span><span class='line'>        password="john"&lt;br /&gt;
+</span><span class='line'>        first_name="dbunit"&lt;br /&gt;
+</span><span class='line'>        last_name="john" /&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;user username="peter"&lt;br /&gt;
+</span><span class='line'>        password="peter"&lt;br /&gt;
+</span><span class='line'>        first_name="ibatis"&lt;br /&gt;
+</span><span class='line'>        last_name="peter" /&gt;
+</span><span class='line'>&lt;/dataset&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>缺省情况下，DbUnit在单元测试开始之前执行CLEAN_INSERT操作，删除Seed File中所有表的数据，并导入Seed File的测试数据。我们可以通过覆盖getSetUpOperation()和getTearDownOperation()方法来控制单元测试前和测试后的数据库状态。一种高效的实施方案就是让getSetUpOperation()方法执行REFRESH操作，通过执行这个操作，我们可以用Seed File中的数据去更新目标数据库里的数据。接下来，就是getTearDownOperation()，让他执行一个NONE操作，也就是什么也不执行。<br /></p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>protected DatabaseOperation getSetUpOperation() throws Exception {&lt;br /&gt;
+</span><span class='line'>    return DatabaseOperation.REFRESH;&lt;br /&gt;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>protected DatabaseOperation getTearDownOperation() throws Exception {&lt;br /&gt;
+</span><span class='line'>    return DatabaseOperation.NONE;&lt;br /&gt;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>为了方便测试，我们为SqlMap的单元测试编写一个抽象的测试基类，代码如下：<br /></p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -265,23 +435,205 @@
 <span class='line-number'>12</span>
 <span class='line-number'>13</span>
 <span class='line-number'>14</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># .bashrc
-</span><span class='line'># User specific aliases and functions
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public abstract class SqlMapTestCase extends DatabaseTestCase {&lt;br /&gt;
+</span><span class='line'>    protected SqlMapClient sqlMapClient = null;&lt;br /&gt;
+</span><span class='line'>    protected Properties props = new Properties();
 </span><span class='line'>
-</span><span class='line'># Source global definitions
-</span><span class='line'>if [ -f /etc/bashrc ]; then
-</span><span class='line'>    . /etc/bashrc
-</span><span class='line'>fi
+</span><span class='line'>    protected IDatabaseConnection getConnection() throws Exception {&lt;br /&gt;
+</span><span class='line'>        props.load(Resources.getResourceAsStream("properties/database.properties"));
 </span><span class='line'>
-</span><span class='line'>set JAVA_HOME=/usr/java/jdk1.5.0
-</span><span class='line'>export JAVA_HOME
-</span><span class='line'>set PATH=$PATH:$JAVA_HOME/bin
-</span><span class='line'>export PATH
-</span><span class='line'>set CLASSPATH=.:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar
-</span><span class='line'>export CLASSPATH</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>        Class.forName(props.getProperty("driver"));&lt;br /&gt;
+</span><span class='line'>        Connection conn = DriverManager.getConnection(props.getProperty("url"),&lt;br /&gt;
+</span><span class='line'>                props.getProperty("username"), props.getProperty("password"));&lt;br /&gt;
+</span><span class='line'>        return new DatabaseConnection(conn);&lt;br /&gt;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    protected IDataSet getDataSet() throws Exception {&lt;br /&gt;
+</span><span class='line'>        String resource = "org/dbunit/example/dao/impl/sql/dataset.xml";&lt;br /&gt;
+</span><span class='line'>        return new FlatXmlDataSet(Resources.getResourceAsStream(resource));&lt;br /&gt;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    protected void setUp() throws Exception {&lt;br /&gt;
+</span><span class='line'>        super.setUp();
+</span><span class='line'>
+</span><span class='line'>        // Build the SqlMapClient&lt;br /&gt;
+</span><span class='line'>        Reader reader = Resources.getResourceAsReader("sql-map-config.xml");&lt;br /&gt;
+</span><span class='line'>        sqlMapClient = SqlMapClientBuilder.buildSqlMapClient(reader);
+</span><span class='line'>
+</span><span class='line'>        // Tell the SqlMapClient to use the given DataSource&lt;br /&gt;
+</span><span class='line'>        DataSource dataSource = getDataSource();&lt;br /&gt;
+</span><span class='line'>        TransactionConfig transactionConfig = getTransactionConfig(dataSource);&lt;br /&gt;
+</span><span class='line'>        // Apply the given TransactionConfig to the SqlMapClient&lt;br /&gt;
+</span><span class='line'>        applyTransactionConfig(sqlMapClient, transactionConfig);&lt;br /&gt;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    protected void tearDown() throws Exception {&lt;br /&gt;
+</span><span class='line'>        super.tearDown();
+</span><span class='line'>
+</span><span class='line'>        if (sqlMapClient != null) {&lt;br /&gt;
+</span><span class='line'>            DataSource ds = sqlMapClient.getDataSource();&lt;br /&gt;
+</span><span class='line'>            Connection conn = ds.getConnection();&lt;br /&gt;
+</span><span class='line'>            conn.close();&lt;br /&gt;
+</span><span class='line'>        }&lt;br /&gt;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    private DataSource getDataSource() throws Exception {&lt;br /&gt;
+</span><span class='line'>        DriverManagerDataSource dataSource = new DriverManagerDataSource();&lt;br /&gt;
+</span><span class='line'>        dataSource.setDriverClassName(props.getProperty("driver"));&lt;br /&gt;
+</span><span class='line'>        dataSource.setUrl(props.getProperty("url"));&lt;br /&gt;
+</span><span class='line'>        dataSource.setUsername(props.getProperty("username"));&lt;br /&gt;
+</span><span class='line'>        dataSource.setPassword(props.getProperty("password"));&lt;br /&gt;
+</span><span class='line'>        return dataSource;&lt;br /&gt;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    private TransactionConfig getTransactionConfig(DataSource dataSource) throws Exception {&lt;br /&gt;
+</span><span class='line'>        Properties transactionConfigProperties = new Properties();&lt;br /&gt;
+</span><span class='line'>        transactionConfigProperties.setProperty("SetAutoCommitAllowed", "false");
+</span><span class='line'>
+</span><span class='line'>        TransactionConfig transactionConfig = (TransactionConfig)ExternalTransactionConfig.class.newInstance();&lt;br /&gt;
+</span><span class='line'>        transactionConfig.setDataSource(dataSource);&lt;br /&gt;
+</span><span class='line'>        transactionConfig.initialize(transactionConfigProperties);&lt;br /&gt;
+</span><span class='line'>        return transactionConfig;&lt;br /&gt;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    private void applyTransactionConfig(SqlMapClient sqlMapClient, TransactionConfig transactionConfig) {&lt;br /&gt;
+</span><span class='line'>        if (!(sqlMapClient instanceof ExtendedSqlMapClient)) {&lt;br /&gt;
+</span><span class='line'>            throw new IllegalArgumentException("Cannot set TransactionConfig with DataSource"&lt;br /&gt;
+</span><span class='line'>                    + "for SqlMapClient if not of type ExtendedSqlMapClient: " + sqlMapClient);&lt;br /&gt;
+</span><span class='line'>        }&lt;br /&gt;
+</span><span class='line'>        ExtendedSqlMapClient extendedClient = (ExtendedSqlMapClient)sqlMapClient;&lt;br /&gt;
+</span><span class='line'>        transactionConfig.setMaximumConcurrentTransactions(extendedClient.getDelegate().getMaxTransactions());&lt;br /&gt;
+</span><span class='line'>        extendedClient.getDelegate().setTxManager(new TransactionManager(transactionConfig));&lt;br /&gt;
+</span><span class='line'>    }&lt;br /&gt;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
 
-<p>然后重新登陆，用echo $JAVA_HOME查看环境变量，咦，怎么是空的呢？肯定有什么地方出错了，是不是不要什么set啊，试试把set去掉看看，修改后的.bashrc文件内容如下：</p>
+<p>然后为每个SqlMap映射文件编写一个测试类，继承上面的抽象类：<br /></p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class UserSqlMapTest extends SqlMapTestCase {
+</span><span class='line'>
+</span><span class='line'>    public void testGetUser() throws Exception {&lt;br /&gt;
+</span><span class='line'>        User user = (User)sqlMapClient.queryForObject("getUser", "john");&lt;br /&gt;
+</span><span class='line'>        assertNotNull(user);&lt;br /&gt;
+</span><span class='line'>        assertEquals("john", user.getName());&lt;br /&gt;
+</span><span class='line'>    }&lt;br /&gt;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>如此就可以进行单元测试了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2006/03/30/webwork-document-how-the-resources-to-obtain-verification-of-dynamic-field-values/">WebWork的资源文件中如何动态取得验证字段的值</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2006-03-30T14:56:37+08:00" pubdate data-updated="true">Mar 30<sup>th</sup>, 2006</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>WebWork是一个非常不错的MVC框架，有着众多的优点，不过也有许多的缺陷。在实现一个用户注册验证的例子时，发现在资源文件中不能动态的或的验证字段的值。只能每个字段一个message。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class User {
+</span><span class='line'>    private String username;
+</span><span class='line'>    private String password;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -297,203 +649,1109 @@
 <span class='line-number'>12</span>
 <span class='line-number'>13</span>
 <span class='line-number'>14</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># .bashrc
-</span><span class='line'># User specific aliases and functions
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;field name="username"&gt;
+</span><span class='line'>    &lt;field-validator type="stringlength" short-circuit="true"&gt;
+</span><span class='line'>        &lt;param name="minLength"&gt;5&lt;/param&gt;
+</span><span class='line'>        &lt;param name="maxLength"&gt;15&lt;/param&gt;
+</span><span class='line'>        &lt;message key="errors.username.range" /&gt;
+</span><span class='line'>    &lt;/field-validator&gt;
+</span><span class='line'>&lt;/field&gt;
 </span><span class='line'>
-</span><span class='line'># Source global definitions
-</span><span class='line'>if [ -f /etc/bashrc ]; then
-</span><span class='line'>    . /etc/bashrc
-</span><span class='line'>fi
-</span><span class='line'>
-</span><span class='line'>JAVA_HOME=/usr/java/j2sdk1.5.0
-</span><span class='line'>export JAVA_HOME
-</span><span class='line'>PATH=$PATH:$JAVA_HOME/bin
-</span><span class='line'>export PATH
-</span><span class='line'>CLASSPATH=.:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar
-</span><span class='line'>export CLASSPATH</span></code></pre></td></tr></table></div></figure>
-
-
-<p>再执行echo $JAVA_HOME命令：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>/usr/java/jdk1.5.0/</span></code></pre></td></tr></table></div></figure>
-
-
-<p>果然，去掉set后环境变量就正确了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2004/11/23/inside-protected-mode/">Inside Protected Mode</a></h1>
-    
-    
-      <p class="meta">
-        
+</span><span class='line'>&lt;field name="password"&gt;
+</span><span class='line'>    &lt;field-validator type="stringlength" short-circuit="true"&gt;
+</span><span class='line'>        &lt;param name="minLength"&gt;5&lt;/param&gt;
+</span><span class='line'>        &lt;param name="maxLength"&gt;15&lt;/param&gt;
+</span><span class='line'>        &lt;message key="errors.password.range" /&gt;
+</span><span class='line'>    &lt;/field-validator&gt;
+</span><span class='line'>&lt;/field&gt;</span></code></pre></td></tr></table></div></figure>
 
 
 
-
-
-
-
-
-  
-
-
-<time datetime="2004-11-23T13:10:07+08:00" pubdate data-updated="true">Nov 23<sup>rd</sup>, 2004</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>以下所说的书指的是杨季文的《80X86汇编语言程序设计教程》。</p>
-
-<p>在380页，他说是“在实方式下被预取，在保护方式下被执行”。这个说法不太正确。现在就来说说在进/出保护模式时究竟发生了什么？</p>
-
-<p>在实模式时，通过指令lgdt fword ptr vgdtr把vgdtr处6个字节的内容装入GDTR中（记住，仅仅只是装入）。然后打开A20地址线（打开A20地址线是为了能存取1M以上的内存，和进不进保护模式其实没有必然的联系，也就是说不打开A20也能进入保护模式，只不过这时在保护模式下就不能存取1M以上的内存了）。然后把CR0寄存器的PE位置1，这是告诉CPU开启保护模式。</p>
-
-<p>讲到这里，就要先来说说shadow cache了。shadow cache的layout可以看388页。在实模式下的时候有些位是只读的。大家还记的实模式下取址的方法吗？对，段寄存器值 * 16 + offset。是直接由MMU这样做然后再取址的吗？不是，实际上是：当你往段寄存器（比如说CS）送值后，MMU同时会把CS * 16的值放入到CS的shadow cache中。这样以后只要不改变CS的值，那么，在同一段代码段中的寻址将是offset加上shadow cache中的段基址部分。明白了吗？好，我们再回过来讲。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mov eax, cr0
-</span><span class='line'>or eax, 1
-</span><span class='line'>mov cr0, eax</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>errors.username.range=${username} is not in the range ${minLength} through ${maxLength}.
+</span><span class='line'>errors.password.range=${password} is not in the range ${minLength} through ${maxLength}.</span></code></pre></td></tr></table></div></figure>
 
 
-<p>这段代码究竟做了什么呢？其实它做的是开放段寄存器shadow cache的每个位（也就是每个位的值都能修改了，而在实模式下有些位是只读的）。还有就是告诉CPU开启保护模式。记住，这时候在shadow cache中的内容还没有变，还是原来实模式下的地址值。</p>
+<p>到xwork的站点上去查找解决方法，在Issue Tracker里看到有人提交了一个Feature，采用的办法是给message传递参数(<a href="http://jira.opensymphony.com/browse/XW-184">http://jira.opensymphony.com/browse/XW-184</a>)，看了xwork的代码后，发现这样子的做法要修改的代码量非常大，所以只能另外想办法解决。</p>
 
-<p>现在再来谈谈保护模式下的寻址。在386以后的机器，保护模式下的寻址其实和在实模式下的寻址是一样的，也是offset加上shadow cache中的段基址部分。这样就可以理解为什么把CR0的PE位置1后还能执行后面的指令了。因为把CR0的PE位置1虽然使系统进入了保护模式。但因为在shadow cache中的内容还是实模式下的内容，所以才能在保护模式下执行实地址处的指令。然后呢！看看jump指令做了什么？</p>
+<p>在资源文件中可以用${fieldName}来获取要验证的字段变量名，那是否可以用${fieldValue}来得到验证字段的值呢？查看代码后发现这种办法也不可行。既然${fieldName}获得的是字段变量名，那么是否可以用${${fieldName}}来获取字段变量的值呢？验证失败后会调用Validator.getMessage()方法，追踪代码来到TextParseUtil.translateVariables()方法中，找到代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>jump selector, offset</span></code></pre></td></tr></table></div></figure>
-
-
-<p>这个指令做了什么？它的意思是要跳到选择子为selector的段的偏移为offset处，执行那里的指令。这时CPU究竟做了什么呢？因为是段间跳转（就是带selector的跳转啦）。又因为现在是在保护模式下，所以MMU根据selector从GDT（知道LDGT的作用了吧）来找到段的真实段基址，然后再把它放入到相应段的shadow cache中。接着MMU再把offset和（shadow cache中的段基址部分）相加。这样就得到了下一个指令的地址。同样的道理，从保护模式出来时用</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mov eax，cr0
-</span><span class='line'>and eax，0xffffffff
-</span><span class='line'>mov cr0，eax</span></code></pre></td></tr></table></div></figure>
-
-
-<p>使各段的shadow cache中一部分位固定，并且宣告进入实模式，即以后的寻址将采用实模式方式。然后通过执行jump cs, offset来把CS * 16的值装入shadow cache中。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2004/11/03/source-not-found-for-in-eclipse-when-debugging-servlet/">在Eclipse下调试Servlet时出现Source Not Found For</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2004-11-03T11:03:19+08:00" pubdate data-updated="true">Nov 3<sup>rd</sup>, 2004</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在Eclipse下调试Servlet出现了Source not found for HelloAction.execute (&#8230;)的问题，猜想是没有将Servlet代码加入到debug路径下以致在调试的时候找不到source，虽然知道原因，却不知道怎么解决。就在Eclipse里乱逛，东点西击，最后终于找到了解决问题所在。</p>
-
-<p>进入Window -> Preferences -> Tomcat -> Source Path，在Source Path标签下有行文字：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Add java projects to source path (Eclipse debugger will search for source files in these projects).</span></code></pre></td></tr></table></div></figure>
-
-
-<p>将要调试的project选中然后再调试，果然不再出现Source not found for了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2004/10/24/the-meaning-of-the-thread-dump/">Thread Dump信息的含义</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2004-10-24T14:37:00+08:00" pubdate data-updated="true">Oct 24<sup>th</sup>, 2004</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
 <span class='line-number'>6</span>
 <span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>"Thread-0" prio=5 tid=0xafde0 nid=0x72a00 runnable [0x173f000..0x173fb48]
-</span><span class='line'>    at java.net.PlainSocketImpl.socketAccept(Native Method)
-</span><span class='line'>    at java.net.PlainSocketImpl.accept(PlainSocketImpl.java:421)
-</span><span class='line'>    at java.net.ServerSocket.implAccept(ServerSocket.java:243)
-</span><span class='line'>    at java.net.ServerSocket.accept(ServerSocket.java:222)
-</span><span class='line'>    at com.generationjava.net.PortListener.run(PortListener.java:333)
-</span><span class='line'>    at java.lang.Thread.run(Thread.java:496)</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>while (start != -1 && x &lt; length && count != 0) { // 该部分代码负责查找变量，即${}包围的字符串
+</span><span class='line'>    c = expression.charAt(x++);
+</span><span class='line'>    if (c == '{') {
+</span><span class='line'>        count++;
+</span><span class='line'>    } else if (c == '}') {
+</span><span class='line'>        count--;
+</span><span class='line'>    }
+</span><span class='line'>}
+</span><span class='line'>end = x - 1;
+</span><span class='line'>
+</span><span class='line'>if ((start != -1) && (end != -1) && (count == 0)) {
+</span><span class='line'>    String var = expression.substring(start + 2, end);
+</span><span class='line'>
+</span><span class='line'>    Object o = stack.findValue(var, asType); // 此处就是获取变量值的地方
+</span><span class='line'>
+</span><span class='line'>    String left = expression.substring(0, start);
+</span><span class='line'>    String right = expression.substring(end + 1);
+</span><span class='line'>    ...</span></code></pre></td></tr></table></div></figure>
 
 
-<p>Thread-0表示线程名，prio表示这个线程的优先级，tid是这个线程的id号，nid是这个线程对应的本地线程id号。</p>
+<p>由上面的代码可以看出WebWork只处理了最外围的${}，所以要让它处理像${${}}这样的格式就需要在获取变量前再次处理变量。修改后的代码如下：</p>
 
-<p>runnable是线程的状态，其它状态可查看jvmti.h头文件。</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if ((start != -1) && (end != -1) && (count == 0)) {
+</span><span class='line'>    String nestedExpression = expression.substring(start + 2, end);
+</span><span class='line'>    String var = translateVariables(nestedExpression, stack);
+</span><span class='line'>    //String var = expression.substring(start + 2, end);
+</span><span class='line'>
+</span><span class='line'>    Object o = stack.findValue(var, asType);    // 此处就是获取变量值的地方
+</span><span class='line'>
+</span><span class='line'>    String left = expression.substring(0, start);
+</span><span class='line'>    String right = expression.substring(end + 1);</span></code></pre></td></tr></table></div></figure>
 
-<p>[0x173f000..0x173fb48]是线程占用内存地址情况的说明。</p>
 
-<p>java.net.PlainSocketImpl.socketAccept(Native Method)表示调用了java.net.PlainSocketImpl类中的socketAccept方法，socketAccept方法是一个本地方法，且在调用这个本地方法时出了错。</p>
+<p>现在就可以处理资源文件中的多重嵌套变量了。接着把修改验证文件和资源文件修改一下就可以了。</p>
 
-<p>java.net.PlainSocketImpl.accept(PlainSocketImpl.java:421)表示调用了java.net.PlainSocketImpl类中的accept方法。accept在PlainSocketImpl.java文件中的421行。</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;field name="username"&gt;
+</span><span class='line'>    &lt;field-validator type="stringlength" short-circuit="true"&gt;
+</span><span class='line'>        &lt;param name="minLength"&gt;5&lt;/param&gt;
+</span><span class='line'>        &lt;param name="maxLength"&gt;15&lt;/param&gt;
+</span><span class='line'>        &lt;message key="errors.range" /&gt;
+</span><span class='line'>    &lt;/field-validator&gt;
+</span><span class='line'>&lt;/field&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;field name="password"&gt;
+</span><span class='line'>    &lt;field-validator type="stringlength" short-circuit="true"&gt;
+</span><span class='line'>        &lt;param name="minLength"&gt;5&lt;/param&gt;
+</span><span class='line'>        &lt;param name="maxLength"&gt;15&lt;/param&gt;
+</span><span class='line'>        &lt;message key="errors.range" /&gt;
+</span><span class='line'>    &lt;/field-validator&gt;
+</span><span class='line'>&lt;/field&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>errors.range=${${fieldName}} is not in the range ${minLength} through ${maxLength}.</span></code></pre></td></tr></table></div></figure>
+
+
+<p>注：以上的解决方案只是权宜之计，可能会出现多重嵌套降低效率的问题。最好的方法我觉得还是 <a href="http://jira.opensymphony.com/browse/XW-184">http://jira.opensymphony.com/browse/XW-184</a> 建议的那样传递参数。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2006/03/23/how-to-remove-registration-prompt-for-winrar-330/">如何去除WinRAR 3.30的注册提示框</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2006-03-23T22:50:59+08:00" pubdate data-updated="true">Mar 23<sup>rd</sup>, 2006</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>WinRAR在使用到期后，每次打开都会弹出如下图所示的对话框窗口，十分烦人。</p>
+
+<p><img src="/uploads/winrar-nag.png" title="winrar-nag" ></p>
+
+<p>去除Nag窗口常用的几种方法是：</p>
+
+<ol>
+<li>使用资源修改工具将可执行文件中的Nag窗口的属性改成透明、不可见，可以变相的去除Nag窗口；</li>
+<li>找到创建和显示Nag窗口的代码，跳过即可。显示窗口的常用函数有MessageBox、MessageBoxEx、DialogBoxParam、CreateWindowEx、CreateWindowEx、ShowWindow等；</li>
+<li>找到创建和显示Nag窗口的函数，更改其参数，让其调用失败就可以了；</li>
+<li>在Nag窗口弹出来后，给可以关闭它的BUTTON 送一个WM_COMMAND消息；</li>
+<li>通过静态和动态分析找到注册码。</li>
+</ol>
+
+
+<p>由于WinRAR未注册版本没有功能限制，用不着去找注册码注册。所以在这里可以用2和3两种方法去掉WinRAR的注册提示窗口。</p>
+
+<p>使用Resource Hacker打开WinRAR.exe，显示Nag窗口的资源如图所示：</p>
+
+<p><img src="/uploads/winrar-reminder.png" title="winrar-reminder" ></p>
+
+<p>Nag窗口的ID号是1049，换算成16进制是0x419。用W32dsm打开WinRAR.exe，打开Dialog References查找Dialog: DialogID_0419，结果没找到。由上图可知Nag窗口的资源名是REMINDER，打开String Data References查找REMINDER字符串试试，果然找到了，双击该项就可以来到相关代码处。</p>
+
+<p><img src="/uploads/winrar-w32dsm.png" title="winrar-w32dsm" ></p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>* Referenced by a (U)nconditional or (C)onditional Jump at Address:
+</span><span class='line'>|:0043FE89(C)
+</span><span class='line'>|
+</span><span class='line'>:0043FE8F C6055037490001          mov byte ptr [00493750], 01
+</span><span class='line'>:0043FE96 6A00                    push 00000000
+</span><span class='line'>:0043FE98 68143F4400              push 00443F14
+</span><span class='line'>:0043FE9D FF3588EC4A00            push dword ptr [004AEC88]
+</span><span class='line'>
+</span><span class='line'>* Possible StringData Ref from Data Obj -&gt;"REMINDER"
+</span><span class='line'>|
+</span><span class='line'>:0043FEA3 68C93C4900              push 00493CC9
+</span><span class='line'>:0043FEA8 FF3560D04900            push dword ptr [0049D060]
+</span><span class='line'>
+</span><span class='line'>* Reference To: USER32.DialogBoxParamA, Ord:0000h
+</span><span class='line'>|
+</span><span class='line'>:0043FEAE E837E30400              Call 0048E1EA
+</span><span class='line'>
+</span><span class='line'>* Referenced by a (U)nconditional or (C)onditional Jump at Addresses:
+</span><span class='line'>|:0043FE64(C), :0043FE6D(C), :0043FE76(C), :0043FE7F(C), :0043FE8D(C)
+</span><span class='line'>|
+</span><span class='line'>:0043FEB3 833DF8104B0000          cmp dword ptr [004B10F8], 00000000
+</span><span class='line'>:0043FEBA 752D                    jne 0043FEE9
+</span><span class='line'>:0043FEBC 833DF0104B0000          cmp dword ptr [004B10F0], 00000000
+</span><span class='line'>:0043FEC3 7524                    jne 0043FEE9
+</span><span class='line'>:0043FEC5 833D08114B00FF          cmp dword ptr [004B1108], FFFFFFFF
+</span><span class='line'>:0043FECC 741B                    je 0043FEE9
+</span><span class='line'>:0043FECE 6A0A                    push 0000000A
+</span><span class='line'>:0043FED0 FF3508114B00            push dword ptr [004B1108]</span></code></pre></td></tr></table></div></figure>
+
+
+<p>可以看到，REMINDER字符串地址是作为参数传给了DialogBoxParamA函数，而DialogBoxParamA函数正是创建对话框的API函数。这时只需将0043FEA3处的push 00493CC9改为push 0，将一个NULL传入DialogBoxParamA函数，这个函数就会调用失败。当然之后它也就不能正常显示了，就达到了去除的目的。</p>
+
+<p>现在再打开WinRAR，呵呵，大功告成，再也不会有Nag窗口出来Nag我了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2006/03/12/struts-menu-allow-webwork-to-read-through-the-resourcebundle/">让Struts-Menu通过WebWork来读取ResourceBundle</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2006-03-12T07:01:48+08:00" pubdate data-updated="true">Mar 12<sup>th</sup>, 2006</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>struts-menu默认是通过jstl或者struts来读取ResourceBundle的，&#36825;就&#38656;&#35201;在web.xml中&#37197;&#32622;&#35201;读取的properties文件&#65288;jstl&#65289;或在struts-config.xml中&#37197;&#32622;&#65288;struts&#65289;。<br />
+webwork&#20063;&#26377;&#33258;&#24049;的ResourceBundle&#37197;&#32622;&#26041;&#24335;，&#36825;样&#24863;&#35273;&#36215;来&#22826;不&#32479;&#19968;了，&#32780;&#19988;如果&#35201;&#35753;struts-menu通过spring&#20043;&#31867;的web&#26694;&#26550;来读ResourceBundle的&#35805;&#20063;&#20570;不到。&#25152;以&#21442;&#32771;&#30528;displaytag的&#23454;现&#23545;struts-menu&#36827;行了&#19968;&#30058;&#20462;改，&#23454;现了可通过web&#26694;&#26550;来读取ResourceBundle的&#21151;能。<br /></p>
+
+<br />
+
+
+<p>&#26242;时&#21482;是&#23454;现了webwork，下&#38754;是&#20462;改步骤<br />
+1、&#22686;加net.sf.navigator.localization&#21253;，将org.displaytag.localization中的*.java&#31227;到&#35813;&#21253;中<br />
+2、将org.displaytag下的Message.java&#21644;messages.properties&#31227;到net.sf.navigator目录下<br />
+3、&#32473;MenuDisplayerMapping添加&#20004;个&#23646;&#24615;localeResover&#21644;ResourceProvider，&#19988;&#37117;&#23454;现get&#21644;set&#26041;&#27861;<br />
+4、在struts-menu.xml的Displayer标签下添加：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;setProperty property="localeResover" value="net.sf.navigator.localization.I18nWebworkAdapter" /&gt;
+</span><span class='line'>&lt;setProperty property="resourceProvider" value="net.sf.navigator.localization.I18nWebworkAdapter" /&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>5、在MenuDisplayer添加四个&#25509;&#21475;&#26041;&#27861;</p>
+
+<p>&#8220;`</p>
+
+<pre><code>public LocaleResolver getLocaleResolver();&lt;br /&gt;
+  public void setLocaleResolver(LocaleResolver localeResolver);&lt;br /&gt;
+  public I18nResourceProvider getResourceProvider();&lt;br /&gt;
+  public void setResourceProvider(I18nResourceProvider resourceProvider);&lt;br /&gt;
+   &amp;#24182;在AbstractMenuDisplayer&amp;#37324;&amp;#23454;现&amp;#36825;四个&amp;#26041;&amp;#27861;&lt;br /&gt;
+</code></pre>
+
+<p>6、在AbstractMenuDisplayer&#37324;添加protected的PageContext&#23545;&#35937;，&#24182;在init&#26041;&#27861;&#37324;&#21021;&#22987;&#21270;&#23427;<br />
+7、&#37325;写MessageResourcesMenuDisplayer.getMessage&#26041;&#27861;，&#20195;&#30721;如下<br /></p>
+
+<pre><code>  public String getMessage(String key) {&lt;br /&gt;
+      String message = null;&lt;br /&gt;
+</code></pre>
+
+<br />
+
+
+<pre><code>      if (resourceProvider != null) {&lt;br /&gt;
+          message = resourceProvider.getResource(key, "???", null, pageContext);&lt;br /&gt;
+      }&lt;br /&gt;
+      if (message == null) {&lt;br /&gt;
+          message = key;&lt;br /&gt;
+      }&lt;br /&gt;
+</code></pre>
+
+<br />
+
+
+<pre><code>      return message;&lt;br /&gt;
+  }&lt;br /&gt;
+</code></pre>
+
+<p>8、在UseMenuDisplayerTag文件&#37324;添加&#20195;&#30721;&#65288;+后的&#20195;&#30721;是&#22686;加的&#65289;<br /></p>
+
+<pre><code>  //get an instance of the menu displayer&lt;br /&gt;
+  MenuDisplayer displayerInstance = null;&lt;br /&gt;
++ LocaleResolver localeResolver = null;&lt;br /&gt;
++ I18nResourceProvider resourceProvider = null;&lt;br /&gt;
+</code></pre>
+
+<br />
+
+
+<pre><code>  // default to use the config on the mapping&lt;br /&gt;
+  if (displayerMapping.getConfig() != null) {&lt;br /&gt;
+      // this value (config) is set on the displayer below&lt;br /&gt;
+      setConfig(displayerMapping.getConfig());&lt;br /&gt;
+  }&lt;br /&gt;
++ localeResolver =&lt;br /&gt;
++         (LocaleResolver) Class.forName(displayerMapping.getLocaleResover()).newInstance();&lt;br /&gt;
++ resourceProvider =&lt;br /&gt;
++         (I18nResourceProvider) Class.forName(displayerMapping.getLocaleProvider()).newInstance();&lt;br /&gt;
+</code></pre>
+
+<br />
+
+
+<pre><code>  displayerInstance.setConfig(config);&lt;br /&gt;
++ displayerInstance.setResourceProvider(resourceProvider);&lt;br /&gt;
++ displayerInstance.setLocaleResolver(localeResolver);&lt;br /&gt;
+</code></pre>
+
+<br />
+
+
+<p>如果&#35201;&#23454;现jstl、spring等&#26694;&#26550;的&#35805;，可以将org.displaytag.localization&#30456;&#24212;的java文件&#31227;到net.sf.navigator.localization目录下就可以了。</p></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2006/01/16/ant-series-emma-measuring-test-coverage-with-the-question-of-when/">Ant系列之用EMMA测量测试覆盖率时的问题</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2006-01-16T09:12:26+08:00" pubdate data-updated="true">Jan 16<sup>th</sup>, 2006</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>EMMA是一个coverage工具，有on-the-fly和offline两种使用方式，在Ant里通常采用offline方式。</p>
+
+<p>到sourceforge下载了2.0版本的EMMA下来，由于将EMMA的生成文件做了重定向，因此遇到了些问题，比如出现以下错误：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>nothing to do: no runtime coverage data found in any of the data files</span></code></pre></td></tr></table></div></figure>
+
+
+<p>查找EMMA的FAQ 3.7节，只是告诉你可能少了metadata和runtime coverate date（对Ant用户来说一般是少了runtime coveraget date，它的后缀名默认是ec）。</p>
+
+<p>由FAQ 3.15节可以知道runtime coverage data文件默认是生成在user.dir目录下的（即build.xml中的basedir目录下），而由instr指令生成的metadata文件（后缀名默认为em）则已经被重定向到另外的目录（用来生成coverage report的地方），所以必须重新设置coverage.out.file的值，用来重定向生成的runtime coverage data。因为runtime coverage data是在junit任务执行时产生的，所以我们可以在junit任务中添加一行代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;sysproperty key="emma.coverage.out.file" value="${coverage.dir}/coverage.emma" /&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>注意：<br />
+1、metadata和runtime文件的后缀名最好设置相同；<br />
+2、一定要将junit task的fork属性设置为true，这是因为EMMA 2.0的runtime coverage data是在JVM退出后生成的；<br />
+3、instrumented classes必须是第一个被JVM执行的，所以instrumented classes目录必须处在junit task的classpath的第一行，具体原因不明，如果谁知道还请说一下。</p>
+
+<p>其实EMMA附带的examples目录下的build-offline.xml里已经说明的很详细了，只不过下载后没有仔细看，才遇到了一些问题。下面是build.xml的部分代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;path id="classpath"&gt;
+</span><span class='line'>  &lt;pathelement location="${instrumentedclasses}" /&gt;
+</span><span class='line'>  &lt;pathelement location="${classes}" /&gt;
+</span><span class='line'>  &lt;pathelement location="${testclasses}" /&gt;
+</span><span class='line'>  &lt;fileset dir="${lib}" includes="**/*.jar" /&gt;
+</span><span class='line'>&lt;/path&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;target name="compile" depends="prepare"&gt;
+</span><span class='line'>  &lt;javac srcdir="${src}" destdir="${classes}" debug="on"&gt;
+</span><span class='line'>    &lt;classpath refid="classpath" /&gt;
+</span><span class='line'>  &lt;/javac&gt;
+</span><span class='line'>  &lt;javac srcdir="${test}" destdir="${testclasses}" debug="on"&gt;
+</span><span class='line'>    &lt;classpath refid="classpath" /&gt;
+</span><span class='line'>  &lt;/javac&gt;
+</span><span class='line'>&lt;/target&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;target name="coverage.instrument" depends="compile"&gt;
+</span><span class='line'>  &lt;emma enabled="yes"&gt;
+</span><span class='line'>    &lt;instr instrpath="${classes}" destdir="${instrumentedclasses}"&lt;br /&gt;
+</span><span class='line'>        metadatafile="{coveragereports}/metadata.emma" merge="true"&gt;
+</span><span class='line'>    &lt;/instr&gt;
+</span><span class='line'>  &lt;/emma&gt;
+</span><span class='line'>&lt;/target&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;target name="test" depends="coverage.instrument"&gt;
+</span><span class='line'>  &lt;junit printsummary="yes" haltonfailure="no" fork="true"&gt;
+</span><span class='line'>    &lt;sysproperty key="emma.coverage.out.file" value="${coveragereports}/coverage.emma" /&gt;
+</span><span class='line'>    &lt;classpath refid="classpath" /&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;formatter type="xml" /&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;batchtest fork="yes" todir="${junitreports}"&gt;
+</span><span class='line'>      &lt;fileset dir="${test}"&gt;
+</span><span class='line'>        &lt;include name="**/*Test*.java" /&gt;
+</span><span class='line'>      &lt;/fileset&gt;
+</span><span class='line'>    &lt;/batchtest&gt;
+</span><span class='line'>  &lt;/junit&gt;
+</span><span class='line'>&lt;/target&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;target name="coverage.report" depends="test"&gt;
+</span><span class='line'>  &lt;emma enabled="yes"&gt;
+</span><span class='line'>    &lt;report sourcepath="${src}"&gt;
+</span><span class='line'>      &lt;fileset dir="${coveragereports}"&gt;
+</span><span class='line'>        &lt;include name="*.emma" /&gt;
+</span><span class='line'>      &lt;/fileset&gt;
+</span><span class='line'>
+</span><span class='line'>      &lt;html outfile="${coveragereports}/coverage.html" depth="method" /&gt;
+</span><span class='line'>    &lt;/report&gt;
+</span><span class='line'>  &lt;/emma&gt;
+</span><span class='line'>&lt;/target&gt;</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2005/12/30/checkstyle-repair-part-of-the-investigation-report-will-document-the-number-of-summary-errors/">修复CheckStyle检查报告中Summary部分文件数目错误问题</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2005-12-30T22:22:44+08:00" pubdate data-updated="true">Dec 30<sup>th</sup>, 2005</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在使用CheckStyle时用了它提供的checkstyle-frames.xsl作为样式文件，<br />
+不过checkstyle-frames.xsl生成报告时有些问题，主要是统计数据有点问<br />
+题，Summary中报告的文件数目比真实的多，所以对xsl文件的summary模板<br />
+作了小小的一些修改，解决了这个问题，且添加了一个统计有错误的文件<br />
+个数的功能。</p>
+
+<p>原来的xsl内容：<br /></p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;xsl:template match="checkstyle" mode="summary"&gt;
+</span><span class='line'>    &lt;h3&gt;Summary&lt;/h3&gt;
+</span><span class='line'>    &lt;xsl:variable name="fileCount" select="count(file)"/&gt;
+</span><span class='line'>    &lt;xsl:variable name="errorCount" select="count(file/error)"/&gt;
+</span><span class='line'>    &lt;table class="log" border="0" cellpadding="5" cellspacing="2" width="100%"&gt;
+</span><span class='line'>        &lt;tr&gt;
+</span><span class='line'>            &lt;th&gt;Files&lt;/th&gt;
+</span><span class='line'>            &lt;th&gt;Errors&lt;/th&gt;
+</span><span class='line'>        &lt;/tr&gt;
+</span><span class='line'>        &lt;tr&gt;
+</span><span class='line'>            &lt;xsl:call-template name="alternated-row"/&gt;
+</span><span class='line'>            &lt;td&gt;&lt;xsl:value-of select="$fileCount"/&gt;&lt;/td&gt;
+</span><span class='line'>            &lt;td&gt;&lt;xsl:value-of select="$errorCount"/&gt;&lt;/td&gt;
+</span><span class='line'>        &lt;/tr&gt;
+</span><span class='line'>    &lt;/table&gt;
+</span><span class='line'>&lt;/xsl:template&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>修改后的内容：<br /></p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;xsl:template match="checkstyle" mode="summary"&gt;
+</span><span class='line'>    &lt;h3&gt;Summary&lt;/h3&gt;
+</span><span class='line'>    &lt;xsl:variable name="fileCount"&gt;
+</span><span class='line'>        &lt;xsl:value-of select="count(file[not(./@name = preceding-sibling::file/@name)])" /&gt;
+</span><span class='line'>    &lt;/xsl:variable&gt;
+</span><span class='line'>    &lt;xsl:variable name="fileErrorCount" select="count(file[count(error) &gt; 0])" /&gt;
+</span><span class='line'>    &lt;xsl:variable name="errorCount" select="count(file/error)" /&gt;
+</span><span class='line'>    &lt;table class="log" border="0" cellpadding="5" cellspacing="2" width="100%"&gt;
+</span><span class='line'>        &lt;tr&gt;
+</span><span class='line'>            &lt;th&gt;Total Files&lt;/th&gt;
+</span><span class='line'>            &lt;th&gt;Files With Errors&lt;/th&gt;
+</span><span class='line'>            &lt;th&gt;Errors&lt;/th&gt;
+</span><span class='line'>        &lt;/tr&gt;
+</span><span class='line'>        &lt;tr&gt;
+</span><span class='line'>            &lt;xsl:call-template name="alternated-row" /&gt;
+</span><span class='line'>            &lt;td&gt;&lt;xsl:value-of select="$fileCount" /&gt;&lt;/td&gt;
+</span><span class='line'>            &lt;td&gt;&lt;xsl:value-of select="$fileErrorCount" /&gt;&lt;/td&gt;
+</span><span class='line'>            &lt;td&gt;&lt;xsl:value-of select="$errorCount" /&gt;&lt;/td&gt;
+</span><span class='line'>        &lt;/tr&gt;
+</span><span class='line'>    &lt;/table&gt;
+</span><span class='line'>&lt;/xsl:template&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>following-sibling 按文档顺序选择文档中此后出现的当前节点的所有兄弟节点。<br />
+preceding-silbling 按与文档顺序相反的方向选择文档中此前出现的当前节点的所有兄弟节点。<br />
+following 除当前节点的所有后代节点外，按顺序选择文档中当前节点之后出现的所有节点，不包括属性节点或名称空间节点。<br />
+preceding 按与文档方向顺序相反的方向选择文档中在当前节点之前出现的所有节点。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2005/12/29/ant-series-jdepend-generated-by-the-issue-of-package-dependent-measure/">Ant系列之用JDepend生成package依赖性度量的问题</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2005-12-29T18:04:59+08:00" pubdate data-updated="true">Dec 29<sup>th</sup>, 2005</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>首先获取JDepend的最新jar文件，当前最新版本是2.9。把jdepend-2.9.jar添加到ANT_HOME/lib目录下。</p>
+
+<p>在build.xml中添加：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;target name="jdepend" description="Generate dependency metrics for each package"&gt;
+</span><span class='line'>    &lt;jdepend format="xml" outputfile="${jdepend.dir}/jdepend-report.xml"&gt;
+</span><span class='line'>        &lt;classpath&gt;
+</span><span class='line'>            &lt;pathelement path="classes" /&gt;
+</span><span class='line'>        &lt;/classpath&gt;
+</span><span class='line'>    &lt;/jdepend&gt;
+</span><span class='line'>&lt;/target&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>运行任务后出现如下的错误：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>BUILD FAILED
+</span><span class='line'>build.xml:59: Missing classespath required argument
+</span><span class='line'>    at org.apache.tools.ant.taskdefs.optional.jdepend.JDependTask.execute(JDependTask.java:397)
+</span><span class='line'>    at org.apache.tools.ant.UnknownElement.execute(UnknownElement.java:275)
+</span><span class='line'>    at org.apache.tools.ant.Task.perform(Task.java:364)
+</span><span class='line'>    at org.apache.tools.ant.Target.execute(Target.java:341)
+</span><span class='line'>    at org.apache.tools.ant.Target.performTasks(Target.java:369)
+</span><span class='line'>    at org.apache.tools.ant.Project.executeSortedTargets(Project.java:1216)
+</span><span class='line'>    at org.apache.tools.ant.Project.executeTarget(Project.java:1185)
+</span><span class='line'>    at org.apache.tools.ant.helper.DefaultExecutor.executeTargets(DefaultExecutor.java:40)
+</span><span class='line'>    at org.eclipse.ant.internal.ui.antsupport.EclipseDefaultExecutor.executeTargets(EclipseDefaultExecutor.java:32)
+</span><span class='line'>    at org.apache.tools.ant.Project.executeTargets(Project.java:1068)
+</span><span class='line'>    at org.eclipse.ant.internal.ui.antsupport.InternalAntRunner.run(InternalAntRunner.java:423)
+</span><span class='line'>    at org.eclipse.ant.internal.ui.antsupport.InternalAntRunner.main(InternalAntRunner.java:137)</span></code></pre></td></tr></table></div></figure>
+
+
+<p>查看JDependTask.java文件的397行：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if (getSourcespath() == null && getClassespath() == null) {
+</span><span class='line'>    throw new BuildException("Missing classespath required argument");
+</span><span class='line'>} else if (getClassespath() == null) {
+</span><span class='line'>    String msg = "sourcespath is deprecated in JDepend &gt;= 2.5 "
+</span><span class='line'>            + "- please convert to classespath";
+</span><span class='line'>    log(msg);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>发现是getClassespath() == null了，跳到221行：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public Path getClassespath() {
+</span><span class='line'>    return classesPath;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>不是写了classpath吗？怎么classesPath的值会等于null呢？结果发现在247行有：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void setClasspath(Path classpath) {
+</span><span class='line'>    if (compileClasspath == null) {
+</span><span class='line'>        compileClasspath = classpath;
+</span><span class='line'>    } else {
+</span><span class='line'>        compileClasspath.append(classpath);
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>原来是在build.xml中把classespath错写成classpath了，那样当然有问题啦。改过来，再运行就可以了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2005/12/17/ant-series-checkstyle-check-code-with-the-problem-of-norms/">Ant系列之用Checkstyle检查代码规范的问题</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2005-12-17T04:33:54+08:00" pubdate data-updated="true">Dec 17<sup>th</sup>, 2005</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>首先将checkstyle-all-4.1.jar文件拷贝到项目的lib目录下，并建立CheckStyle配置文件。</p>
+
+<p>然后在build.xml文件中声明CheckStyle任务:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;taskdef resource="checkstyletask.properties" classpath="${lib.dir}/checkstyle-all-4.1.jar" /&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>接着是建立CheckStyle任务：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;target name="checkstyle" description="Generates a report of code convention violations."&gt;
+</span><span class='line'>    &lt;checkstyle config="${docs.dir}/checkstyle_checks.xml" failOnViolation="false"&gt;
+</span><span class='line'>        &lt;fileset dir="${src.dir}" includes="**/*.java" /&gt;
+</span><span class='line'>        &lt;formatter type="xml" toFile="${checkstyle.dir}/checkstyle_report.xml" /&gt;
+</span><span class='line'>    &lt;/checkstyle&gt;
+</span><span class='line'>    &lt;xslt basedir="${checkstyle.dir}" destdir="${checkstyle.dir}/html" extension=".html"
+</span><span class='line'>            style="${docs.dir}/checkstyle-frames.xsl"&gt;
+</span><span class='line'>        &lt;param name="output.dir" expression="${checkstyle.dir}/html" /&gt;
+</span><span class='line'>    &lt;/xslt&gt;
+</span><span class='line'>&lt;/target&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>其中output.dir是checkstyle-frames.xsl中的参数：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;xsl:param name="output.dir" /&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>在运行任务时可能会出现如下异常：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>javax.xml.transform.TransformerException: java.lang.RuntimeException: Unrecognized XSLTC extension 'org.apache.xalan.xslt.extensions.Redirect:write'</span></code></pre></td></tr></table></div></figure>
+
+
+<p>可以将checkstyle-frames.xsl中的</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>xmlns:redirect="org.apache.xalan.xslt.extensions.Redirect"</span></code></pre></td></tr></table></div></figure>
+
+
+<p>改成下面的内容就行。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>xmlns:redirect="http://xml.apache.org/xalan/redirect"</span></code></pre></td></tr></table></div></figure>
+
+
+<p>如果出现这样的异常：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Got an exception - java.lang.RuntimeException: Unable to get class information for HelloException.</span></code></pre></td></tr></table></div></figure>
+
+
+<p>可以修改对Throws的限制：允许Throws Unchecked Exception以及Throws Subclass Of Another Declared Exception。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;module name="RedundantThrows"&gt;&lt;br /&gt;
+</span><span class='line'>    &lt;property name="allowUnchecked" value="true" /&gt;
+</span><span class='line'>    &lt;property name="allowSubclasses" value="true" /&gt;
+</span><span class='line'>&lt;/module&gt;</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2005/11/17/webwork-how-to-achieve-i18n/">WebWork如何实现I18n</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2005-11-17T13:57:14+08:00" pubdate data-updated="true">Nov 17<sup>th</sup>, 2005</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>ognl-2.6.5.jar<br />
+oscore-2.2.4.jar<br />
+webwork-2.1.7.jar<br />
+xwork-1.0.5.jar</p>
+
+<p>web.xml配置文件内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;!DOCTYPE web-app PUBLIC
+</span><span class='line'>    "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN"
+</span><span class='line'>    "http://java.sun.com/dtd/web-app_2_3.dtd"&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;web-app&gt;
+</span><span class='line'>    &lt;display-name&gt;i18n&lt;/display-name&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;servlet&gt;
+</span><span class='line'>        &lt;servlet-name&gt;action&lt;/servlet-name&gt;
+</span><span class='line'>        &lt;servlet-class&gt;com.opensymphony.webwork.dispatcher.ServletDispatcher&lt;/servlet-class&gt;
+</span><span class='line'>        &lt;load-on-startup&gt;1&lt;/load-on-startup&gt;
+</span><span class='line'>    &lt;/servlet&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;servlet-mapping&gt;
+</span><span class='line'>        &lt;servlet-name&gt;action&lt;/servlet-name&gt;
+</span><span class='line'>        &lt;url-pattern&gt;*.html&lt;/url-pattern&gt;
+</span><span class='line'>    &lt;/servlet-mapping&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;taglib&gt;
+</span><span class='line'>        &lt;taglib-uri&gt;webwork&lt;/taglib-uri&gt;
+</span><span class='line'>        &lt;taglib-location&gt;/WEB-INF/webwork.tld&lt;/taglib-location&gt;
+</span><span class='line'>    &lt;/taglib&gt;
+</span><span class='line'>&lt;/web-app&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>// webwork.properties<br /></p>
+
+<h3>This can be used to set your locale and encoding scheme<br /></h3>
+
+<h1>webwork.locale=en_US    &lt;&#8212;&#8211; &#36825;&#19968;&#34892;&#19968;&#23450;&#35201;&#27880;&#37322;&#25481;&#65292;&#22240;&#20026;webwork&#39318;&#20808;&#21028;&#26029;webwork.locale&#26377;&#27809;&#26377;&#34987;&#35774;&#32622;&#65292;<br /></h1>
+
+<p>&#12288;&#12288;&#12288;&#12288;&#12288;&#12288;&#12288;&#12288;&#12288;&#12288;&#12288;&#12288;&#12288;&#12288;&#12288;&#22914;&#26377;&#21017;&#22987;&#32456;&#20197;&#35813;locale&#20026;&#20934;&#65292;&#24573;&#30053;&#27983;&#35272;&#22120;&#30340;locale<br />
+webwork.i18n.encoding=utf-8<br /></p>
+
+<h3>Load custom default resource bundles<br /></h3>
+
+<p>webwork.custom.i18n.resources=ApplicationResources<br /></p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>
+</span><span class='line'>xwork.xml配置文件：</span></code></pre></td></tr></table></div></figure>
+
+
+<p>&lt;?xml version=&#8221;1.0&#8221; encoding=&#8221;utf-8&#8221;?>
+&lt;!DOCTYPE xwork PUBLIC</p>
+
+<pre><code>"-//OpenSymphony Group//XWork 1.0//EN"
+"http://www.opensymphony.com/xwork/xwork-1.0.dtd"&gt;
+</code></pre>
+
+<p><xwork></p>
+
+<pre><code>&lt;include file="webwork-default.xml" /&gt;
+
+&lt;package name="default" extends="webwork-default"&gt;
+    &lt;action name="hello" class="com.example.i18n.action.HelloAction"&gt;
+        &lt;result name="success" type="dispatcher"&gt;/i18n.jsp&lt;/result&gt;&lt;br /&gt;
+    &lt;/action&gt;&lt;br /&gt;
+&lt;/package&gt;&lt;br /&gt;
+</code></pre>
+
+<p></xwork><br /></p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>
+</span><span class='line'>I18NAction.java</span></code></pre></td></tr></table></div></figure>
+
+
+<p>package com.example.i18n;<br /></p>
+
+<br />
+
+
+<p>import com.opensymphony.xwork.ActionSupport;<br /></p>
+
+<br />
+
+
+<p>public class I18NAction extends ActionSupport {<br /></p>
+
+<br />
+
+
+<pre><code>public String execute() throws Exception {&lt;br /&gt;
+    return SUCCESS;&lt;br /&gt;
+}&lt;br /&gt;
+</code></pre>
+
+<p>}<br /></p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>
+</span><span class='line'>// i18n.jsp</span></code></pre></td></tr></table></div></figure>
+
+
+<p>&lt;%@ page pageEncoding=&#8221;utf-8&#8221; contentType=&#8221;text/html; charset=utf-8&#8221; %><br /></p>
+
+<br />
+
+
+<p>&lt;%@ taglib uri=&#8221;webwork&#8221; prefix=&#8221;ww&#8221; %><br /></p>
+
+<br />
+
+
+<p><html><br />
+<head><br /></p>
+
+<pre><code>&lt;meta http-equiv="Content-Type" content="text/html; charset=utf-8" /&gt;&lt;br /&gt;
+</code></pre>
+
+<p></head><br /></p>
+
+<br />
+
+
+<p><body><br /></p>
+
+<pre><code>&lt;ww:property value="getText(&amp;#39;i18n.value&amp;#39;)" /&gt;&lt;br /&gt;
+</code></pre>
+
+<p></body><br />
+</html><br />
+&#8220;`</p>
+
+<p>// ApplicationResources_zh_CN.properties<br />
+i18n.value=&#22269;&#38469;&#21270;<br /></p>
+
+<p>// ApplicationResources_en_US.properties<br />
+i18n.value=internationalization</p></p>
 </div>
   
   
@@ -502,6 +1760,8 @@
     </article>
   
   <div class="pagination">
+    
+      <a class="prev" href="/posts/20">&larr; Older</a>
     
     <a href="/blog/archives">Blog Archives</a>
     
@@ -546,21 +1806,21 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 128%" href="/tags/android/">Android</a>
-<a style="font-size: 110%" href="/tags/crack/">Crack</a>
-<a style="font-size: 110%" href="/tags/database/">Database</a>
-<a style="font-size: 99%" href="/tags/eclipse/">Eclipse</a>
-<a style="font-size: 133%" href="/tags/java/">Java</a>
-<a style="font-size: 99%" href="/tags/listview/">ListView</a>
-<a style="font-size: 106%" href="/tags/mysql/">MySQL</a>
-<a style="font-size: 99%" href="/tags/paperclip/">Paperclip</a>
-<a style="font-size: 117%" href="/tags/powerbuilder/">PowerBuilder</a>
-<a style="font-size: 122%" href="/tags/qianbao/">Qianbao</a>
+    <a style="font-size: 133%" href="/tags/android/">Android</a>
+<a style="font-size: 111%" href="/tags/crack/">Crack</a>
+<a style="font-size: 108%" href="/tags/database/">Database</a>
+<a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
+<a style="font-size: 139%" href="/tags/java/">Java</a>
+<a style="font-size: 97%" href="/tags/javascript/">JavaScript</a>
+<a style="font-size: 108%" href="/tags/mysql/">MySQL</a>
+<a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
+<a style="font-size: 116%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 120%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
-<a style="font-size: 103%" href="/tags/ruby/">Ruby</a>
-<a style="font-size: 99%" href="/tags/ubuntu/">Ubuntu</a>
-<a style="font-size: 106%" href="/tags/windows-server-2008/">Windows Server 2008</a>
-<a style="font-size: 106%" href="/tags/wxwidgets/">wxWidgets</a>
+<a style="font-size: 101%" href="/tags/ruby/">Ruby</a>
+<a style="font-size: 101%" href="/tags/struts/">Struts</a>
+<a style="font-size: 105%" href="/tags/windows-server-2008/">Windows Server 2008</a>
+<a style="font-size: 108%" href="/tags/wxwidgets/">wxWidgets</a>
 
   </ul>
 </section>
