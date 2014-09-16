@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="Spring 1.2.8 + iBatis 2.1.5 JavaBean的boolean值映射到数据库的默认值是0和1，不是非常直观，现在希望能将boolean值映射成为Y和N。iBatis 2.0.5以后的版本提供了TypeHandlerCallback，可以用来解决这个问题。 首先定义数据表 &hellip;">
+  <meta name="description" content="在介绍本讲内容之前，先提出一个问题？普通的黑白针式打印机能打出灰度图来吗？如果说能，从针式打印机的打印原理来分析，似乎是不可能的。因为针打是靠撞针击打色带在纸上形成黑点的，不可能打出灰色的点来；如果说不能，可是我们的确见过用针式打印机打印出来的灰色图象。到底是怎么回事呢？ &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -65,6 +65,444 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2007/01/02/images-halftone-dithering/">图象的半影调和抖动技术</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2007-01-02T16:58:06+08:00" pubdate data-updated="true">Jan 2<sup>nd</sup>, 2007</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在介绍本讲内容之前，先提出一个问题？普通的黑白针式打印机能打出灰度图来吗？如果说能，从针式打印机的打印原理来分析，似乎是不可能的。因为针打是靠撞针击打色带在纸上形成黑点的，不可能打出灰色的点来；如果说不能，可是我们的确见过用针式打印机打印出来的灰色图象。到底是怎么回事呢？你再仔细看看那些打印出来的所谓的灰色图象，最好用放大镜看。你会发现，原来这些灰色图象都是由一些黑点组成的，黑点多一些，图象就暗一些；黑点少一些，图案就亮一些。下面这几张图就能说明这一点。</p>
+
+<p><img src="/uploads/halftone-l401.gif" title="halftone-l401" >
+图1. 用黑白两种颜色打印出灰度效果</p>
+
+<p>图中最左边的是原图，是一幅真正的灰度图，另外三张图都是黑白二值图。容易看出，最左的那幅和原图最接近。由二值图象显示出灰度效果的方法，就是我们今天要讲的半影调（halftone）技术，它的一个主要用途就是在只有二值输出的打印机上打印图象。我们介绍两种方法：图案法和抖动法。</p>
+
+<p>1、图案法（patterning）</p>
+
+<p>图案法是指灰度可以用一定比例的黑白点组成的区域表示，从而达到整体图象的灰度感。黑白点的位置选择称为图案化。在具体介绍图案法之前，先介绍一下分辨率的概念。计算机显示器，打印机，扫描仪等设备的一个重要指标就是分辨率，单位是dpi（dot per inch），即每英寸点数，点数越多，分辨率就越高，图象就越清晰。让我们来计算一下，计算机显示器的分辨率有多高。设显示器为15英寸（指对角线长度），最多显示1280 * 1024个点。因为宽高比为4:3，则宽有12英寸，高有9英寸，则该显示器的水平分辨率为106dpi，垂直分辨率为113.8dpi。一般的激光打印机的分辨率有300dpi * 300dpi的，有600dpi * 600dpi的，720dpi * 720dpi。所以打出来的图象要比计算机显示出来的清晰的多。扫描仪的分辨率要高一些，数码相机的分辨率更高。</p>
+
+<p>言归正传，前面讲了，图案化使用图案来表示像素的灰度，那么我们来做一道计算题。假设有一幅240 * 180 * 8bit的灰度图，当用分辨率为300dpi * 300dpi的激光打印机将其打印到12.8 * 9.6英寸的纸上时，每个像素的图案有多大？这道题很简单，这张纸最多可以打(300 * 12.8) * (300 * 9.6) = 3840 * 2880个点，所以每个像素可以用(3840 / 240) * (2880 / 180) = 16 * 16个点大小的图案来表示，即一个像素256个点。如果这16 * 16的方块中一个黑点也没有，就可以表示灰度256，有一个黑点，就表示灰度255，依次类推，当都是黑点时，表示灰度0，这样，16 * 16的方块可以表示257级灰度。比要求的8bit共256级灰度还多了一个，所以上面的那幅图的灰度级别完全能够打印出来。</p>
+
+<p>这里有一个图案构成的问题，即黑点打在哪里？比如说，只有一个黑点时，我们可以打在正中央，也可以打16 * 16的左上角。图案可以是规则的，也可以是不规则的。一般情况下，有规则的图案比随即图案能够避免点的丛集，但有时会导致图象中有明显的线条。如图2中，2 * 2的图案可以表示5级灰度，当图象中有一片灰度为的1的区域时，如图3所示，有明显的水平和垂直线条。</p>
+
+<p><img src="/uploads/halftone-l402.gif" title="halftone-l402" >
+图2. 2 * 2的图案</p>
+
+<p><img src="/uploads/halftone-l403.gif" title="halftone-l403" >
+图3. 规则图案导致线条</p>
+
+<p>如果想存储256级灰度的图案，就需要256 * 16 * 16的二值点阵，占用的空间还是相当可观的。有一个更好的办法是：只存储一个整数矩阵，称为标准图案，其中的每个值从0到255。图象的实际灰度和阵列中的每个值比较，当该值大于等于灰度时，对应点打一黑点。下面举一个25级灰度的例子加以说明。</p>
+
+<p><img src="/uploads/halftone-l404.gif" title="halftone-l404" >
+图4. 标准图案举例</p>
+
+<p>图4中，左边为标准图案，右边为灰度为15的图案，共有10个黑点，15个白点。其实道理很简单，灰度为0时全是黑点，灰度每增加1，减少一个黑点。要注意的是，5 * 5的图案可以表示26种灰度，灰度25才是全白点，而不是24。下面介绍一种设计标准图案的算法，是由Limb在1969年提出的。以一个2 * 2的矩阵开始<img src="/uploads/halftone-l4formu01.gif" title="halftone-l4formu01" >，通过递归关系有<img src="/uploads/halftone-l4formu02.gif" title="halftone-l4formu02" >，其中2n * 2n是阵列中元素的个数，Un是一个2n * 2n 的方阵，所有元素都是1。根据这个算法，可以得到<img src="/uploads/halftone-l4matrix01.gif" title="halftone-l4matrix01" >，为16级灰度的标准图案。M3（8 * 8阵）比较特殊，称为Bayer抖动表。M4是一个16 * 16的矩阵。根据上面的算法，如果利用M3，一个像素要用8 * 8的图案表示，则一幅N * N的图将变成8N * 8N大小。如果利用M4，就更不得了，变成16N * 16N了。能不能在保持原图大小的情况下利用图案化技术呢？一种很自然的想法是：如果用M2阵，则将原图中每8 * 8个点中取一点，即重新采样，然后再应用图案化技术，就能够保持原图大小。实际上，这种方法并不可行。首先，你不知道这8 * 8个点中找哪一点比较合适，另外，8 * 8的间隔实在太大了，生成的图象和原图肯定相差很大，就象图1最右边的那幅图一样。我们可以采用这样的做法：假设原图是256级灰度，利用Bayer抖动表，做如下处理if (g[y][x] >> 2) > bayer[y &amp; 7][x &amp; 7] then 打一白点 else 打一黑点。其中，x，y代表原图的像素坐标，g[y][x]代表该点灰度。首先将灰度右移两位，变成64级，然后将x，y做模8运算，找到Bayer表中的对应点，两者做比较，根据上面给出的判据做处理。</p>
+
+<p>我们可以看到，模8运算使得原图分成了一个个8 * 8的小块，每个小块和8 * 8的Bayer表相对应。小块中的每个点都参与了比较，这样就避免了上面提到的选点和块划分过大的问题。模8运算实质上是引入了随机成分，这就是我们下面要讲到的抖动技术。</p>
+
+<p>下面的图5就是利用这个算法，使用M3（Bayer抖动表）阵得到的，图6是使用M4阵得到的，可见两者的差别并不是很大，所以一般用Bayer表就可以了。</p>
+
+<p><img src="/uploads/halftone-l405.gif" title="halftone-l405" >
+图5. 利用M3抖动生成的图</p>
+
+<p><img src="/uploads/halftone-l406.gif" title="halftone-l406" >
+图6. 利用M4抖动生成的图</p>
+
+<p><a href="/uploads/limbpatternm3.txt" title="limbpatternm3.txt">图案法源程序</a></p>
+
+<p>2、抖动法（dithering）</p>
+
+<p>让我们考虑更坏的情况：即使使用了图案化技术，仍然得不到要求的灰度级别。举例说明：假设有一幅600 * 450 * 8bit的灰度图，当用分辨率为300dpi * 300dpi的激光打印机将其打印到8 * 6英寸的纸上时，每个像素可以用(2400 / 600) * (1800 / 450) = 4 * 4个点大小的图案来表示，最多能表示17级灰度，无法满足256级灰度的要求。可有两种解决方案：1.减小图象尺寸，由600 * 450变为150 * 113；2.降低图象灰度级，由256级变成16级。这两种方案都不理想。这时，我们就可以采用抖动法的技术来解决这个问题。其实刚才给出的算法就是一种抖动算法，称为规则抖动（regular dithering）。规则抖动的优点是算法简单；缺点是图案化有时很明显，这是因为取模运算虽然引入了随机成分，但还是有规律的，另外，点之间进行比较时，只要比标准图案上点的值大就打白点，这种做法并不理想，因为，如果当标准图案点的灰度值本身就很小，而图象中点的灰度只比它大一点儿时，图象中的点更接近黑色，而不是白色。一种更好的方法是将这个误差传播到邻近的像素。下面介绍的Floyd-Steinberg算法就采用了这种方案。</p>
+
+<p>假设灰度级别的范围从b（black）到w（white），中间值t为(b + w) /2，对应256级灰度，b = 0, w = 255, t = 127.5；设原图中像素的灰度为g，误差值为e，则新图中对应像素的值用如下的方法得到：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if g &gt; t then
+</span><span class='line'>    打白点
+</span><span class='line'>    e = g - w
+</span><span class='line'>else
+</span><span class='line'>    打黑点
+</span><span class='line'>    e = g - b
+</span><span class='line'>    3 / 8 * e 加到右边的像素
+</span><span class='line'>    3 / 8 * e 加到下边的像素
+</span><span class='line'>    1 / 4 * e 加到右下方的像素</span></code></pre></td></tr></table></div></figure>
+
+
+<p>算法的意思很明白，以256级灰度为例，假设一个点的灰度为130，在灰度图中应该是一个灰点。由于一般图象中灰度是连续变化的，相邻像素的灰度值很可能与本像素非常接近，所以该点及周围应该是一片灰色区域。在新图中，130大于128，所以打了白点，但130离真正的白点255还差的比较远，误差e = 130 - 255 = -125 比较大。将3 / 8 * (-125)加到相邻像素后，使得相邻像素的值接近0而打黑点。下一次，e又变成正的，使得相邻像素的相邻像素打白点，这样一白一黑一白，表现出来刚好就是灰色。如果不传递误差，就是一片白色了。再举个例子，如果一个点的灰度为250，在灰度图中应该是一个白点，该点及周围应该是一片白色区域。在新图中，虽然e = -5也是负的，但其值很小，对相邻像素的影响不大，所以还是能够打出一片白色区域来。这样就验证了算法的正确性。其它的情况可以自己推敲。图7是利用Floyd-Steinberg算法抖动生成的图</p>
+
+<p><img src="/uploads/halftone-l407.gif" title="halftone-l407" >
+图7. 利用Floyd-Steinberg算法抖动生成的图</p>
+
+<p><a href="/uploads/steinberg.txt" title="steinberg.txt">Floyd-Steinberg算法的源代码</a></p>
+
+<p>3、bmp2txt（bmp to txt）</p>
+
+<p>在讲图案化技术时，我突然想到了一个非常有趣的应用，那就是bmp2txt。如果你喜欢上BBS（电子公告牌系统），你可能想做一个花哨的签名档。瞧，这是我好朋友Casper的签名档，胖乎乎的，是不是特别可爱？</p>
+
+<p><img src="/uploads/halftone-l408.gif" title="halftone-l408" >
+图8. Casper的签名档</p>
+
+<p>你仔细观察一下，就会发现，这是一幅全部由字符组成的图，因为在BBS中只能出现文字的东西。那么，这幅图是怎么做出来的呢？难道是自己一个字符一个字符拼出来的。当然不是了，有一种叫bmp2txt的应用程序（2的发音和“to”一样，所以如此命名），能把位图文件转换成和图案很相似的字符文本。是不是觉得很神奇？其实原理很简单，用到了和图案化技术类似的思想：首先将位图分成同样大小的小块，求出每一块灰度的平均值，然后和每个字符的灰度做比较，找出最接近的那个字符，来代表这一小块图象。那么，怎么确定字符的灰度呢？做下面的实验就明白了。</p>
+
+<p>打开Notepad，输入字符“1”，选定该字符，使其反色。按Alt+PrintScreen键拷贝窗口屏幕。打开Paintbrush，粘贴，然后把图放到最大（*8），打开“查看” -> “缩放” -> “显示网格”菜单，如下图所示：</p>
+
+<p><img src="/uploads/halftone-l409.gif" title="halftone-l409" >
+图9. 字符“1”的灰度</p>
+
+<p>这时数数字符“1”用了几个点？是22个。我想你已经明白了，字符的灰度和它所占的黑色点数有关，点越少，灰度值越大，空格字符的灰度最大，为全白，因为它一个黑点也没有；而字符“W”的灰度值就比较低了。每个字符的面积是8 * 16（宽 * 高），所以一个字符的灰度值可以用如下的公式计算(1 - 所占的黑点数 / (8 * 16)) * 255。下面是可显示的字符，及对应的灰度，共有95个。这可是casper辛辛苦苦整理出来的呦！</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>static char ch[95] = {
+</span><span class='line'>    ' ',
+</span><span class='line'>    '`', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\\',
+</span><span class='line'>    'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']',
+</span><span class='line'>    'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', ''',
+</span><span class='line'>    'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/',
+</span><span class='line'>    '~', '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '|',
+</span><span class='line'>    'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}',
+</span><span class='line'>    'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"',
+</span><span class='line'>    'Z', 'X', 'C', 'V', 'B', 'N', 'M', '&lt;', '&gt;', '?'
+</span><span class='line'>};
+</span><span class='line'>
+</span><span class='line'>static int gr[95] = {
+</span><span class='line'>    0,
+</span><span class='line'>    7, 22, 28, 31, 31, 27, 32, 22, 38, 32, 40, 6, 12, 20, 38, 32, 26, 20, 24, 40,
+</span><span class='line'>    29, 24, 28, 38, 32, 32, 26, 22, 34, 24, 44, 33, 32, 32, 24, 16, 6, 22, 26, 22,
+</span><span class='line'>    26, 34, 29, 35, 10, 6, 20, 14, 22, 47, 42, 34, 40, 10, 35, 21, 22, 22, 16, 14,
+</span><span class='line'>    26, 40, 39, 29, 38, 22, 28, 36, 22, 36, 30, 22, 22, 36, 26, 36, 25, 34, 38, 24,
+</span><span class='line'>    36, 22, 12, 12, 26, 30, 30, 34, 39, 42, 41, 18, 18, 22
+</span><span class='line'>};</span></code></pre></td></tr></table></div></figure>
+
+
+<p><a href="/uploads/bmp2txt.txt" title="bmp2txt.txt">bmp2txt源程序</a></p>
+
+<p>其实利用图案化技术，还可以实现更有趣的应用，如下面这幅图，你仔细看看，贝多芬的头像是由许多个音乐符号组成的。</p>
+
+<p><img src="/uploads/halftone-l410.gif" title="halftone-l410" >
+图10. 贝多芬的头像</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2006/12/18/the-story-about-the-best-salesman-in-the-world/">世界上最好的推销员的故事</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2006-12-18T18:01:12+08:00" pubdate data-updated="true">Dec 18<sup>th</sup>, 2006</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>一个乡下来的小伙子去应聘城里“世界最大”的“应有尽有”百货公司的销售员。老板问他：“你以前做过销售员吗？”他回答说：“我以前是村里挨家挨户推销的小贩子。”老板喜欢他的机灵：“你明天可以来上班了。等下班的时候，我会来看一下。”</p>
+
+<p>一天的光阴对这个乡下来的穷小子来说太长了，而且还有些难熬。但是年轻人还是熬到了5点，差不多该下班了。老板真的来了，问他说：“你今天做了几单买卖”</p>
+
+<p>“一单。”年轻人回答说。</p>
+
+<p>“只有一单？”老板很吃惊地说：“我们这儿的售货员一天基本上可以完成20到30单生意呢。你卖了多少钱?”</p>
+
+<p>“300,000美元，”年轻人回答道。</p>
+
+<p>“你怎么卖到那么多钱的？”目瞪口呆，半晌才回过神来的老板问道。</p>
+
+<p>“是这样的，”乡下来的年轻人说，“一个男士进来买东西，我先卖给他一个小号的鱼钩，然后中号的鱼钩，最后大号的鱼钩。接着，我卖给他小号的鱼线，中号的鱼线，最后是大号的鱼线。我问他上哪儿钓鱼，他说海边。我建议他买条船，所以我带他到卖船的专柜，卖给他长20英尺有两个发动机的纵帆船。然后他说他的大众牌汽车可能拖不动这么大的船。我于是带他去汽车销售区，卖给他一辆丰田新款豪华型‘巡洋舰’。”</p>
+
+<p>老板后退两步，几乎难以置信地问道：“一个顾客仅仅来买个鱼钩，你就能卖给他这么多东西？”</p>
+
+<p>“不是的，”乡下来的年轻售货员回答道，“他是来给他妻子买卫生棉的。我就告诉他‘你的周末算是毁了，干吗不去钓鱼呢？’”</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2006/12/13/powerscript-identifier/">PowerScript标识符</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2006-12-13T12:47:45+08:00" pubdate data-updated="true">Dec 13<sup>th</sup>, 2006</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在使用减号（-）、负号（-）、减1（<code>--</code>）运算符时，必须在这些符号的前面加上空格，原因在于PowerScript会把这些符号当成标识符的一部分。</p>
+
+<p>PowerScript标识符规则：</p>
+
+<ol>
+<li>必须以字母或下划线（_）开头；</li>
+<li>其余字符可以是字母、数字、下划线（_）、美元符号（$）、短横线（-）、号码符号（#），百分号（%）；</li>
+<li>最长40个字符（实际最大长度可达99个），中间不能有空格；</li>
+<li>不区分大小写。</li>
+</ol>
+
+
+<p>如何禁止在标志符中使用短横线（-）？</p>
+
+<p>在PB.INI的[pb]节中将DashesInIdentifiers=1修改为DashesInIdentifiers=0即可。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2006/12/08/the-story-about-hunter-and-hound/">猎狗与猎人的故事</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2006-12-08T14:34:47+08:00" pubdate data-updated="true">Dec 8<sup>th</sup>, 2006</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>目标</p>
+
+<p>一条猎狗将兔子赶出了窝，一直追赶他，追了很久仍没有捉到。牧羊看到此种情景，讥笑猎狗说，“你们两个当中小的反而跑得快得多。”猎狗回答说：“你不知道我们两个的跑是完全不同的！我仅仅为了一顿饭而跑，他却是为了性命而跑呀！”</p>
+
+<p>动力</p>
+
+<p>这话被猎人听到了，猎人想：猎狗说的对啊，那我要想得到更多的猎物，得想个好法子。于是，猎人又买来几条猎狗，凡是能够在打猎中捉到兔子的，就可以得到几根骨头，捉不到的就没有饭吃。这一招果然有用，猎狗们纷纷去努力追兔子，因为谁都不愿意看着别人有骨头吃，自己没吃的。就这样过了一段时间，问题又出现了。大兔子非常难捉到，小兔子好捉。但捉到大兔子得到的奖赏和捉到小兔子得到的骨头差不多，猎狗们善于观察，发现了这个窍门，专门去捉小兔子。慢慢地，大家都发现了这个窍门。猎人对猎狗说：最近你们捉的兔子越来越小了，为什么？猎狗们说：反正结果没有什么大的区别，为什么费那么大的劲去捉那些大的呢？</p>
+
+<p>保障</p>
+
+<p>猎人经过思考后，决定不将分得骨头的数量与是否捉到兔子挂钩，而是每过一段时间就统计一次猎狗捉到兔子的总重量，按照重量来评价猎狗，从而决定它们一段时间内的待遇。于是，猎狗们捉到兔子的数量和重量都增加了。猎人很开心。但是，过了一段时间，猎人发现猎狗们捉兔子的数量又少了，而且越有经验的猎狗捉兔子的数量下降得越利害。于是，猎人又去问猎狗是怎么回事。猎狗说，“我们把最好的时间都奉献给了您，主人，随着时间的推移我们会慢慢变老，当我们捉不到兔子的时候，您还会给我们骨头吃吗？”</p>
+
+<p>回报</p>
+
+<p>猎人做出了论功行赏的决定，分析与汇总了所有猎狗捉到兔子的数量与重量，规定如果捉到的兔子超过一定的数量后，即使捉不到兔子，每顿饭也可以得到一定数量的骨头。猎狗们都很高兴，大家都努力去争取达到猎人规定的数量。一段时间过后，终于有一些猎狗达到了猎人规定的数量。这时，其中一只猎狗说：“我们这么努力，只得到几根骨头，而我们捉的猎物远远超过了这几根骨头。我们为什么不能给自己捉兔子呢？”于是，有些猎狗离开了猎人，自己捉兔子去了。</p>
+
+<p>归宿</p>
+
+<p>猎人意识到猎狗正在流失，并且那些流失的猎狗像野狗一般与自己的猎狗抢兔子。情况变得越来越糟，猎人不得已引诱了一条野狗，问他到底野狗比猎狗强在那里。野狗说：“猎狗吃的是骨头，吐出来的是肉啊！”接着又道：“也不是所有的野狗都顿顿有肉吃，大部分最后骨头都没的舔！不然也不至于被你诱惑。”于是，猎人又进行了改革，使得每条猎狗除基本骨头外，可获得其所猎兔肉总量的n%，而且随着服务时间加长，贡献加大，该比例还可递增，并有权分享猎人所拥有兔肉总量的m%。就这样，猎狗们与猎人一起努力，将野狗们逼得叫苦连天，纷纷要求重归猎狗队伍。</p>
+
+<p>故事还在继续……</p>
+
+<p>只有永远的利益，没有永远的朋友</p>
+
+<p>日子一天一天地过去，冬天到了，兔子越来越少，猎人们的收成也一天不如一天。那些服务时间长的老猎狗们已老得捉不到兔子，但却仍然无忧无虑地享受着他们自以为应得的大份食物。终于有一天，猎人再也不能忍受，把他们扫地出门了，因为猎人更需要身强力壮的猎狗……</p>
+
+<p>Birth of MicroBone Co.</p>
+
+<p>被扫地出门的老猎狗们得到一笔不菲的赔偿金，于是，他们成立了MicroBone公司。他们采用连锁加盟的方式招募野狗，向野狗们传授猎兔的技巧，他们从猎得的兔子中抽取一部分作为管理费。当赔偿金几乎全部用于广告后，他们终于有了足够多的野狗加盟，公司开始盈利了。一年后，他们收购了猎人的家当……</p>
+
+<p>Development of MicroBone Co.</p>
+
+<p>MicroBone公司许诺，加盟的野狗可以得到公司n%的股份。这实在是太有诱惑力了。那些自认为怀才不遇的野狗们都以为找到了知音：终于可以做公司的主人了，不用再忍受猎人呼来唤去的不快，不用再为捉到足够多的兔子而累死累活，也不用眼巴巴地乞求猎人多给两根骨头。这一切对野狗们来说，比多得到两根骨头更加受用。于是，野狗们拖家带口地加入了MicroBone。一些在猎人门下服务的年轻猎狗也蠢蠢欲动，甚至很多自以为聪明、实际上愚蠢的猎人也想加入。好多同类型的公司雨后春笋般地成立了，BoneEase、Bone.com、ChinaBone……一时间，森林里热闹非凡。</p>
+
+<p>干活的总是拿得少的，拿得多的都是不干活的</p>
+
+<p>猎人凭借出售公司的钱走上了老猎狗走过的路，历经千辛万苦重新发达起来，最后又来与MicroBone公司谈判收购事宜，老猎狗出人意料地把MicroBone公司卖给了猎人。老猎狗们从此不再经营公司，转而开始靠写作赚钱，写完自传《老猎狗的一生》，又写了《如何成为出色的猎狗》、《成功猎狗500条法则》、《猎狗成功秘诀》、《如何成为一只进入管理层的猎狗》、《穷猎狗，富猎狗》等一系列成功自助读物，并且将老猎狗的故事搬上了屏幕，取名《猎狗花园》——从此，老猎狗成为家喻户晓的名人，坐收版权费，既没有风险，利润又可观，轻轻松松地过上了富人闲人的日子。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2006/09/05/todolet-tool-for-taking-todo-from-the-document/">Todolet - 抽取文档中TODO注释的工具</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2006-09-05T06:40:11+08:00" pubdate data-updated="true">Sep 5<sup>th</sup>, 2006</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>todolet是一个建立在<a href="http://jtopas.sourceforge.net/jtopas/">JTopas (Java tokenizer and parser tools)</a>基础上的Ant任务。用来搜集任意文档（不仅仅是Java格式，也可以是XML、Properties等格式）中的TODO注释。目前只支持<code>/**/、//、#、&lt;!-- --&gt;</code>等类型注释。</p>
+
+<p>假如我们在applicationContext.xml里写了一个bean定义，如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;bean id="hello" class="com.example.lesson.Hello" /&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>以后可能要给这个定义添加一些属性，但又怕到时记不住具体是哪个文件，这时候就可以通过在该文件中添加TODO注释来记住它，就像在Java文件中添加TODO注释一样。添加后的样式如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;!-- TODO: comments --&gt;
+</span><span class='line'>&lt;bean id="hello" class="com.example.lesson.Hello" /&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>然后就可以编写一个Ant任务来收集这些TODO注释：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;taskdef resource="todo.properties" classpath="${lib.dir}/todolet.jar" /&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;target name="todolet" description="Generate report of todos in specified files"&gt;
+</span><span class='line'>    &lt;property name="todo.report.dir" value="${build.dir}/docs/todo" /&gt;
+</span><span class='line'>    
+</span><span class='line'>    &lt;empty dir="${todo.report.dir}" /&gt;
+</span><span class='line'>    &lt;todo destdir="${todo.report.dir}"&gt;
+</span><span class='line'>        &lt;fileset dir="${basedir}"&gt;
+</span><span class='line'>            &lt;patternset includes="**/*.java" /&gt;
+</span><span class='line'>            &lt;patternset includes="**/*.xml" /&gt;
+</span><span class='line'>            &lt;patternset includes="**/*.sql" /&gt;
+</span><span class='line'>            &lt;patternset includes="**/*.properties" /&gt;
+</span><span class='line'>        &lt;/fileset&gt;
+</span><span class='line'>    &lt;/todo&gt;
+</span><span class='line'>&lt;/target&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>执行todolet任务后就会生成一个类似于以下样式的todo.txt文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>(applicationContext.xml) comments</span></code></pre></td></tr></table></div></figure>
+
+
+<p>代码下载：<a href="https://github.com/dohkoos/todolet">https://github.com/dohkoos/todolet</a></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -271,7 +709,7 @@
   
 
 
-<time datetime="2006-04-11T04:39:04+08:00" pubdate data-updated="true">Apr 11<sup>th</sup>, 2006</time>
+<time datetime="2006-04-11T20:39:04+08:00" pubdate data-updated="true">Apr 11<sup>th</sup>, 2006</time>
         
       </p>
     
@@ -1022,739 +1460,6 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2006/01/16/ant-series-problem-using-emma-measure-test-coverage/">Ant系列之用EMMA测量测试覆盖率的问题</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2006-01-16T09:12:26+08:00" pubdate data-updated="true">Jan 16<sup>th</sup>, 2006</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>EMMA是一个coverage工具，有on-the-fly和offline两种使用方式，在Ant里通常采用offline方式。</p>
-
-<p>到sourceforge下载了2.0版本的EMMA下来，由于将EMMA的生成文件做了重定向，因此遇到了些问题，比如出现以下错误：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>nothing to do: no runtime coverage data found in any of the data files</span></code></pre></td></tr></table></div></figure>
-
-
-<p>查找EMMA的FAQ 3.7节，只是告诉你可能少了metadata和runtime coverate date（对Ant用户来说一般是少了runtime coveraget date，它的后缀名默认是ec）。</p>
-
-<p>由FAQ 3.15节可以知道runtime coverage data文件默认是生成在user.dir目录下的（即build.xml中的basedir目录下），而由instr指令生成的metadata文件（后缀名默认为em）则已经被重定向到另外的目录（用来生成coverage report的地方），所以必须重新设置coverage.out.file的值，用来重定向生成的runtime coverage data。因为runtime coverage data是在junit任务执行时产生的，所以我们可以在junit任务中添加一行代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;sysproperty key="emma.coverage.out.file" value="${coverage.dir}/coverage.emma" /&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>注意：</p>
-
-<ol>
-<li>metadata和runtime文件的后缀名最好设置相同；</li>
-<li>一定要将junit任务的fork属性设置为true，这是因为EMMA 2.0的runtime coverage data是在JVM退出后生成的；</li>
-<li>instrumented classes必须是第一个被JVM执行的，所以instrumented classes目录必须处在junit任务的classpath的第一行，具体原因不明，如果谁知道还请告知下。</li>
-</ol>
-
-
-<p>其实EMMA附带的examples目录下的build-offline.xml里已经说明的很详细了，只不过下载后没有仔细看，才遇到了一些问题。下面是build.xml的部分代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-<span class='line-number'>44</span>
-<span class='line-number'>45</span>
-<span class='line-number'>46</span>
-<span class='line-number'>47</span>
-<span class='line-number'>48</span>
-<span class='line-number'>49</span>
-<span class='line-number'>50</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;path id="classpath"&gt;
-</span><span class='line'>  &lt;pathelement location="${instrumentedclasses}" /&gt;
-</span><span class='line'>  &lt;pathelement location="${classes}" /&gt;
-</span><span class='line'>  &lt;pathelement location="${testclasses}" /&gt;
-</span><span class='line'>  &lt;fileset dir="${lib}" includes="**/*.jar" /&gt;
-</span><span class='line'>&lt;/path&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;target name="compile" depends="prepare"&gt;
-</span><span class='line'>  &lt;javac srcdir="${src}" destdir="${classes}" debug="on"&gt;
-</span><span class='line'>    &lt;classpath refid="classpath" /&gt;
-</span><span class='line'>  &lt;/javac&gt;
-</span><span class='line'>  &lt;javac srcdir="${test}" destdir="${testclasses}" debug="on"&gt;
-</span><span class='line'>    &lt;classpath refid="classpath" /&gt;
-</span><span class='line'>  &lt;/javac&gt;
-</span><span class='line'>&lt;/target&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;target name="coverage.instrument" depends="compile"&gt;
-</span><span class='line'>  &lt;emma enabled="yes"&gt;
-</span><span class='line'>    &lt;instr instrpath="${classes}" destdir="${instrumentedclasses}"
-</span><span class='line'>        metadatafile="{coveragereports}/metadata.emma" merge="true"&gt;
-</span><span class='line'>    &lt;/instr&gt;
-</span><span class='line'>  &lt;/emma&gt;
-</span><span class='line'>&lt;/target&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;target name="junit" depends="coverage.instrument"&gt;
-</span><span class='line'>  &lt;junit printsummary="yes" haltonfailure="no" fork="true"&gt;
-</span><span class='line'>    &lt;sysproperty key="emma.coverage.out.file" value="${coveragereports}/coverage.emma" /&gt;
-</span><span class='line'>    &lt;classpath refid="classpath" /&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;formatter type="xml" /&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;batchtest fork="yes" todir="${junitreports}"&gt;
-</span><span class='line'>      &lt;fileset dir="${test}"&gt;
-</span><span class='line'>        &lt;include name="**/*Test*.java" /&gt;
-</span><span class='line'>      &lt;/fileset&gt;
-</span><span class='line'>    &lt;/batchtest&gt;
-</span><span class='line'>  &lt;/junit&gt;
-</span><span class='line'>&lt;/target&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;target name="coverage.report" depends="test"&gt;
-</span><span class='line'>  &lt;emma enabled="yes"&gt;
-</span><span class='line'>    &lt;report sourcepath="${src}"&gt;
-</span><span class='line'>      &lt;fileset dir="${coveragereports}"&gt;
-</span><span class='line'>        &lt;include name="*.emma" /&gt;
-</span><span class='line'>      &lt;/fileset&gt;
-</span><span class='line'>
-</span><span class='line'>      &lt;html outfile="${coveragereports}/coverage.html" depth="method" /&gt;
-</span><span class='line'>    &lt;/report&gt;
-</span><span class='line'>  &lt;/emma&gt;
-</span><span class='line'>&lt;/target&gt;</span></code></pre></td></tr></table></div></figure>
-
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2005/12/30/fix-problem-incorrect-file-count-in-summary-section-of-checkstyle-report/">修复CheckStyle报告中Summary部分文件数目错误问题</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2005-12-30T22:22:44+08:00" pubdate data-updated="true">Dec 30<sup>th</sup>, 2005</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在使用CheckStyle时用了它提供的checkstyle-frames.xsl作为样式文件，不过checkstyle-frames.xsl生成报告时有些问题，主要是统计数据有点问题，Summary中报告的文件数目比真实的多，所以对xsl文件的summary模板作了小小的一些修改，解决了这个问题，且添加了一个统计有错误的文件个数的功能。</p>
-
-<p>原来的xsl内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;xsl:template match="checkstyle" mode="summary"&gt;
-</span><span class='line'>    &lt;h3&gt;Summary&lt;/h3&gt;
-</span><span class='line'>    &lt;xsl:variable name="fileCount" select="count(file)"/&gt;
-</span><span class='line'>    &lt;xsl:variable name="errorCount" select="count(file/error)"/&gt;
-</span><span class='line'>    &lt;table class="log" border="0" cellpadding="5" cellspacing="2" width="100%"&gt;
-</span><span class='line'>        &lt;tr&gt;
-</span><span class='line'>            &lt;th&gt;Files&lt;/th&gt;
-</span><span class='line'>            &lt;th&gt;Errors&lt;/th&gt;
-</span><span class='line'>        &lt;/tr&gt;
-</span><span class='line'>        &lt;tr&gt;
-</span><span class='line'>            &lt;xsl:call-template name="alternated-row"/&gt;
-</span><span class='line'>            &lt;td&gt;&lt;xsl:value-of select="$fileCount"/&gt;&lt;/td&gt;
-</span><span class='line'>            &lt;td&gt;&lt;xsl:value-of select="$errorCount"/&gt;&lt;/td&gt;
-</span><span class='line'>        &lt;/tr&gt;
-</span><span class='line'>    &lt;/table&gt;
-</span><span class='line'>&lt;/xsl:template&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>修改后的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;xsl:template match="checkstyle" mode="summary"&gt;
-</span><span class='line'>    &lt;h3&gt;Summary&lt;/h3&gt;
-</span><span class='line'>    &lt;xsl:variable name="fileCount"&gt;
-</span><span class='line'>        &lt;xsl:value-of select="count(file[not(./@name = preceding-sibling::file/@name)])" /&gt;
-</span><span class='line'>    &lt;/xsl:variable&gt;
-</span><span class='line'>    &lt;xsl:variable name="fileErrorCount" select="count(file[count(error) &gt; 0])" /&gt;
-</span><span class='line'>    &lt;xsl:variable name="errorCount" select="count(file/error)" /&gt;
-</span><span class='line'>    &lt;table class="log" border="0" cellpadding="5" cellspacing="2" width="100%"&gt;
-</span><span class='line'>        &lt;tr&gt;
-</span><span class='line'>            &lt;th&gt;Total Files&lt;/th&gt;
-</span><span class='line'>            &lt;th&gt;Files With Errors&lt;/th&gt;
-</span><span class='line'>            &lt;th&gt;Errors&lt;/th&gt;
-</span><span class='line'>        &lt;/tr&gt;
-</span><span class='line'>        &lt;tr&gt;
-</span><span class='line'>            &lt;xsl:call-template name="alternated-row" /&gt;
-</span><span class='line'>            &lt;td&gt;&lt;xsl:value-of select="$fileCount" /&gt;&lt;/td&gt;
-</span><span class='line'>            &lt;td&gt;&lt;xsl:value-of select="$fileErrorCount" /&gt;&lt;/td&gt;
-</span><span class='line'>            &lt;td&gt;&lt;xsl:value-of select="$errorCount" /&gt;&lt;/td&gt;
-</span><span class='line'>        &lt;/tr&gt;
-</span><span class='line'>    &lt;/table&gt;
-</span><span class='line'>&lt;/xsl:template&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<ul>
-<li>following-sibling 按文档顺序选择文档中此后出现的当前节点的所有兄弟节点。</li>
-<li>preceding-silbling 按与文档顺序相反的方向选择文档中此前出现的当前节点的所有兄弟节点。</li>
-<li>following 除当前节点的所有后代节点外，按顺序选择文档中当前节点之后出现的所有节点，不包括属性节点或名称空间节点。</li>
-<li>preceding 按与文档方向顺序相反的方向选择文档中在当前节点之前出现的所有节点。</li>
-</ul>
-
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2005/12/29/ant-series-problem-using-jdepend-generate-package-dependency-metrics/">Ant系列之用JDepend生成包依赖性度量的问题</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2005-12-29T18:04:59+08:00" pubdate data-updated="true">Dec 29<sup>th</sup>, 2005</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>首先获取JDepend的最新jar文件jdepend-2.9.jar，把它添加到ANT_HOME/lib目录里。</p>
-
-<p>在build.xml中添加：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;target name="jdepend" description="Generate dependency metrics for each package"&gt;
-</span><span class='line'>    &lt;jdepend format="xml" outputfile="${jdepend.dir}/jdepend-report.xml"&gt;
-</span><span class='line'>        &lt;classpath&gt;
-</span><span class='line'>            &lt;pathelement path="classes" /&gt;
-</span><span class='line'>        &lt;/classpath&gt;
-</span><span class='line'>    &lt;/jdepend&gt;
-</span><span class='line'>&lt;/target&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>运行任务后出现如下的错误：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>BUILD FAILED
-</span><span class='line'>build.xml:59: Missing classespath required argument
-</span><span class='line'>    at org.apache.tools.ant.taskdefs.optional.jdepend.JDependTask.execute(JDependTask.java:397)
-</span><span class='line'>    at org.apache.tools.ant.UnknownElement.execute(UnknownElement.java:275)
-</span><span class='line'>    at org.apache.tools.ant.Task.perform(Task.java:364)
-</span><span class='line'>    at org.apache.tools.ant.Target.execute(Target.java:341)
-</span><span class='line'>    at org.apache.tools.ant.Target.performTasks(Target.java:369)
-</span><span class='line'>    at org.apache.tools.ant.Project.executeSortedTargets(Project.java:1216)
-</span><span class='line'>    at org.apache.tools.ant.Project.executeTarget(Project.java:1185)
-</span><span class='line'>    at org.apache.tools.ant.helper.DefaultExecutor.executeTargets(DefaultExecutor.java:40)
-</span><span class='line'>    at org.eclipse.ant.internal.ui.antsupport.EclipseDefaultExecutor.executeTargets(EclipseDefaultExecutor.java:32)
-</span><span class='line'>    at org.apache.tools.ant.Project.executeTargets(Project.java:1068)
-</span><span class='line'>    at org.eclipse.ant.internal.ui.antsupport.InternalAntRunner.run(InternalAntRunner.java:423)
-</span><span class='line'>    at org.eclipse.ant.internal.ui.antsupport.InternalAntRunner.main(InternalAntRunner.java:137)</span></code></pre></td></tr></table></div></figure>
-
-
-<p>查看JDependTask.java文件的397行：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if (getSourcespath() == null && getClassespath() == null) {
-</span><span class='line'>    throw new BuildException("Missing classespath required argument");
-</span><span class='line'>} else if (getClassespath() == null) {
-</span><span class='line'>    String msg = "sourcespath is deprecated in JDepend &gt;= 2.5 - please convert to classespath";
-</span><span class='line'>    log(msg);
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>发现是getClassespath() == null了，跳到221行：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public Path getClassespath() {
-</span><span class='line'>    return classesPath;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>不是写了classpath吗？怎么classesPath的值会等于null呢？结果发现在247行有：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void setClasspath(Path classpath) {
-</span><span class='line'>    if (compileClasspath == null) {
-</span><span class='line'>        compileClasspath = classpath;
-</span><span class='line'>    } else {
-</span><span class='line'>        compileClasspath.append(classpath);
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>原来是在build.xml中把classespath错写成classpath了，那样当然有问题啦。改过来，再运行就可以了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2005/12/17/ant-series-problem-using-checkstyle-check-code-style/">Ant系列之用Checkstyle检查代码规范的问题</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2005-12-17T04:33:54+08:00" pubdate data-updated="true">Dec 17<sup>th</sup>, 2005</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>首先将checkstyle-all-4.1.jar文件拷贝到项目的lib目录下，并建立CheckStyle配置文件。</p>
-
-<p>然后在build.xml文件中声明CheckStyle任务:</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;taskdef resource="checkstyletask.properties" classpath="${lib.dir}/checkstyle-all-4.1.jar" /&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>接着是建立CheckStyle任务：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;target name="checkstyle" description="Generates a report of code convention violations."&gt;
-</span><span class='line'>    &lt;checkstyle config="${docs.dir}/checkstyle_checks.xml" failOnViolation="false"&gt;
-</span><span class='line'>        &lt;fileset dir="${src.dir}" includes="**/*.java" /&gt;
-</span><span class='line'>        &lt;formatter type="xml" toFile="${checkstyle.dir}/checkstyle_report.xml" /&gt;
-</span><span class='line'>    &lt;/checkstyle&gt;
-</span><span class='line'>    &lt;xslt basedir="${checkstyle.dir}" destdir="${checkstyle.dir}/html" extension=".html"
-</span><span class='line'>            style="${docs.dir}/checkstyle-frames.xsl"&gt;
-</span><span class='line'>        &lt;param name="output.dir" expression="${checkstyle.dir}/html" /&gt;
-</span><span class='line'>    &lt;/xslt&gt;
-</span><span class='line'>&lt;/target&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>其中output.dir是checkstyle-frames.xsl中的参数：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;xsl:param name="output.dir" /&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>在运行任务时可能会出现如下异常：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>javax.xml.transform.TransformerException: java.lang.RuntimeException: Unrecognized XSLTC extension 'org.apache.xalan.xslt.extensions.Redirect:write'</span></code></pre></td></tr></table></div></figure>
-
-
-<p>可以将checkstyle-frames.xsl中的：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>xmlns:redirect="org.apache.xalan.xslt.extensions.Redirect"</span></code></pre></td></tr></table></div></figure>
-
-
-<p>改成下面的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>xmlns:redirect="http://xml.apache.org/xalan/redirect"</span></code></pre></td></tr></table></div></figure>
-
-
-<p>如果出现这样的异常：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Got an exception - java.lang.RuntimeException: Unable to get class information for</span></code></pre></td></tr></table></div></figure>
-
-
-<p>可以修改对Throws的限制：允许Throws Unchecked Exception以及Throws Subclass Of Another Declared Exception。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;module name="RedundantThrows"&gt;
-</span><span class='line'>    &lt;property name="allowUnchecked" value="true" /&gt;
-</span><span class='line'>    &lt;property name="allowSubclasses" value="true" /&gt;
-</span><span class='line'>&lt;/module&gt;</span></code></pre></td></tr></table></div></figure>
-
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2005/11/17/how-to-implement-i18n-in-webwork/">WebWork中如何实现i18n</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2005-11-17T13:57:14+08:00" pubdate data-updated="true">Nov 17<sup>th</sup>, 2005</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>ognl-2.6.5.jar + oscore-2.2.4.jar + webwork-2.1.7.jar + xwork-1.0.5.jar</p>
-
-<p>web.xml配置文件的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
-</span><span class='line'>&lt;!DOCTYPE web-app PUBLIC
-</span><span class='line'>    "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN"
-</span><span class='line'>    "http://java.sun.com/dtd/web-app_2_3.dtd"&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;web-app&gt;
-</span><span class='line'>    &lt;display-name&gt;i18n&lt;/display-name&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;servlet&gt;
-</span><span class='line'>        &lt;servlet-name&gt;action&lt;/servlet-name&gt;
-</span><span class='line'>        &lt;servlet-class&gt;com.opensymphony.webwork.dispatcher.ServletDispatcher&lt;/servlet-class&gt;
-</span><span class='line'>        &lt;load-on-startup&gt;1&lt;/load-on-startup&gt;
-</span><span class='line'>    &lt;/servlet&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;servlet-mapping&gt;
-</span><span class='line'>        &lt;servlet-name&gt;action&lt;/servlet-name&gt;
-</span><span class='line'>        &lt;url-pattern&gt;*.html&lt;/url-pattern&gt;
-</span><span class='line'>    &lt;/servlet-mapping&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;taglib&gt;
-</span><span class='line'>        &lt;taglib-uri&gt;webwork&lt;/taglib-uri&gt;
-</span><span class='line'>        &lt;taglib-location&gt;/WEB-INF/webwork.tld&lt;/taglib-location&gt;
-</span><span class='line'>    &lt;/taglib&gt;
-</span><span class='line'>&lt;/web-app&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>webwork.properties配置文件：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>### This can be used to set your locale and encoding scheme
-</span><span class='line'>#webwork.locale=en_US    &lt;- 这行一定要注释掉，因为WebWork首先判断webwork.locale有没有被设置，
-</span><span class='line'>                            如有则始终以该locale为准，忽略浏览器的locale
-</span><span class='line'>webwork.i18n.encoding=utf-8
-</span><span class='line'>
-</span><span class='line'>### Load custom default resource bundles
-</span><span class='line'>webwork.custom.i18n.resources=ApplicationResources</span></code></pre></td></tr></table></div></figure>
-
-
-<p>xwork.xml配置文件的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
-</span><span class='line'>&lt;!DOCTYPE xwork PUBLIC
-</span><span class='line'>    "-//OpenSymphony Group//XWork 1.0//EN"
-</span><span class='line'>    "http://www.opensymphony.com/xwork/xwork-1.0.dtd"&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;xwork&gt;
-</span><span class='line'>    &lt;include file="webwork-default.xml" /&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;package name="default" extends="webwork-default"&gt;
-</span><span class='line'>        &lt;action name="hello" class="com.example.i18n.action.HelloAction"&gt;
-</span><span class='line'>            &lt;result name="success" type="dispatcher"&gt;/i18n.jsp&lt;/result&gt;
-</span><span class='line'>        &lt;/action&gt;
-</span><span class='line'>    &lt;/package&gt;
-</span><span class='line'>&lt;/xwork&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>I18NAction.java实现代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>package com.example.i18n;
-</span><span class='line'>
-</span><span class='line'>import com.opensymphony.xwork.ActionSupport;
-</span><span class='line'>
-</span><span class='line'>public class I18NAction extends ActionSupport {
-</span><span class='line'>
-</span><span class='line'>    public String execute() throws Exception {
-</span><span class='line'>        return SUCCESS;
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>i18n.jsp的代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%@ page pageEncoding="utf-8" contentType="text/html; charset=utf-8" %&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;%@ taglib uri="webwork" prefix="ww" %&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;html&gt;
-</span><span class='line'>&lt;head&gt;
-</span><span class='line'>    &lt;meta http-equiv="Content-Type" content="text/html; charset=utf-8" /&gt;
-</span><span class='line'>&lt;/head&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;body&gt;
-</span><span class='line'>    &lt;ww:property value="getText('i18n.value')" /&gt;
-</span><span class='line'>&lt;/body&gt;
-</span><span class='line'>&lt;/html&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>ApplicationResources_zh_CN.properties的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>i18n.value=国际化</span></code></pre></td></tr></table></div></figure>
-
-
-<p>ApplicationResources_en_US.properties的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>i18n.value=internationalization</span></code></pre></td></tr></table></div></figure>
-
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/20">&larr; Older</a>
@@ -1802,21 +1507,21 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 97%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 133%" href="/tags/android/">Android</a>
+    <a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 111%" href="/tags/crack/">Crack</a>
-<a style="font-size: 108%" href="/tags/database/">Database</a>
+<a style="font-size: 111%" href="/tags/database/">Database</a>
 <a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
 <a style="font-size: 141%" href="/tags/java/">Java</a>
+<a style="font-size: 97%" href="/tags/misc/">Misc</a>
 <a style="font-size: 108%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
 <a style="font-size: 116%" href="/tags/powerbuilder/">PowerBuilder</a>
 <a style="font-size: 120%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
-<a style="font-size: 101%" href="/tags/ruby/">Ruby</a>
+<a style="font-size: 105%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
 <a style="font-size: 105%" href="/tags/windows-server-2008/">Windows Server 2008</a>
-<a style="font-size: 108%" href="/tags/wxwidgets/">wxWidgets</a>
+<a style="font-size: 111%" href="/tags/wxwidgets/">wxWidgets</a>
 
   </ul>
 </section>

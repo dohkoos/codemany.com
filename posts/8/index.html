@@ -9,10 +9,19 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="wizardly是一个非常容易使用的创建multi-step wizard的Rails插件，只需要三步就可以。 安装插件： 1
+  <meta name="description" content="1
 2
-gem install wizardly
-script/generate scaffold user first_name:string last_name: &hellip;">
+3
+4
+5
+6
+7
+8
+9
+rails upload
+cd upload
+script/plugin install git://github.com/thoughtbot/paperclip.git
+script/plugin install git://github.com/ &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -74,6 +83,504 @@ script/generate scaffold user first_name:string last_name: &hellip;">
       
   <header>
     
+      <h1 class="entry-title"><a href="/blog/2011/04/24/upload-multiple-images-with-paperclip-rails-23/">Rails 2.3和Paperclip实现多图片上传</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-04-24T12:12:29+08:00" pubdate data-updated="true">Apr 24<sup>th</sup>, 2011</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rails upload
+</span><span class='line'>cd upload
+</span><span class='line'>script/plugin install git://github.com/thoughtbot/paperclip.git
+</span><span class='line'>script/plugin install git://github.com/aaronchi/jrails.git
+</span><span class='line'>script/generate scaffold album name:string
+</span><span class='line'>script/generate model photo album:references
+</span><span class='line'>script/generate paperclip photo data
+</span><span class='line'>rake db:migrate
+</span><span class='line'>script/server</span></code></pre></td></tr></table></div></figure>
+
+
+<p>修改album.rb添加photo_attributes属性：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class Album &lt; ActiveRecord::Base
+</span><span class='line'>  has_many :photos
+</span><span class='line'>  validates_presence_of :name
+</span><span class='line'>
+</span><span class='line'>  def photo_attributes=(photo_attributes)
+</span><span class='line'>    photo_attributes.each do |attributes|
+</span><span class='line'>      photos.build(attributes)
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>修改photo.rb添加附件相关属性：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class Photo &lt; ActiveRecord::Base
+</span><span class='line'>  belongs_to :album
+</span><span class='line'> 
+</span><span class='line'>  has_attached_file :data,
+</span><span class='line'>    :url =&gt; "/uploads/:style_:basename.:extension",
+</span><span class='line'>    :styles =&gt; {:thumb =&gt; "50x50#", :large =&gt; "640x480#"}
+</span><span class='line'>  validates_attachment_presence :data
+</span><span class='line'>  validates_attachment_content_type :data,
+</span><span class='line'>    :content_type =&gt; ['image/jpeg', 'image/jpg', 'image/png']
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>修改new.html.erb为以下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;h1&gt;New album&lt;/h1&gt;
+</span><span class='line'> 
+</span><span class='line'>&lt;% form_for @album, :html =&gt; { :multipart =&gt; true } do |f| %&gt;
+</span><span class='line'>  &lt;%= render :partial =&gt; 'form', :locals =&gt; { :f =&gt; f } %&gt;
+</span><span class='line'>  &lt;p&gt;&lt;%= f.submit "Create" %&gt;&lt;/p&gt;
+</span><span class='line'>&lt;% end %&gt;
+</span><span class='line'> 
+</span><span class='line'>&lt;%= link_to 'Back', albums_path %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>对edit.html.erb做同样的修改：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;h1&gt;Editing album&lt;/h1&gt;
+</span><span class='line'> 
+</span><span class='line'>&lt;% form_for @album, :html =&gt; { :multipart =&gt; true } do |f| %&gt;
+</span><span class='line'>  &lt;%= render :partial =&gt; 'form', :locals =&gt; { :f =&gt; f } %&gt;
+</span><span class='line'>  &lt;p&gt;&lt;%= f.submit "Update" %&gt;&lt;/p&gt;
+</span><span class='line'>&lt;% end %&gt;
+</span><span class='line'> 
+</span><span class='line'>&lt;%= link_to 'Show', @album %&gt; |
+</span><span class='line'>&lt;%= link_to 'Back', albums_path %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>把从new.html.erb和edit.html.erb中抽取出来的代码保存为_form.html.erb文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= f.error_messages %&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;p&gt;
+</span><span class='line'>  &lt;%= f.label :name %&gt;
+</span><span class='line'>  &lt;%= f.text_field :name %&gt;
+</span><span class='line'>&lt;/p&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>然后在后面添加如下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div id="photos"&gt;
+</span><span class='line'>  &lt;% if @album.new_record? %&gt;
+</span><span class='line'>    &lt;%= render :partial =&gt; 'photo', :collection =&gt; @album.photos %&gt;
+</span><span class='line'>  &lt;% end %&gt;
+</span><span class='line'>&lt;/div&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;%= link_to_function "Add Photo" do |page| page.insert_html :bottom, :photos, :partial =&gt; 'photo', :object =&gt; Photo.new end %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>创建_photo.html.erb文件，代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div class="photo"&gt;
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>  &lt;% fields_for "album[photo_attributes][]", photo do |p| %&gt;
+</span><span class='line'>    &lt;%= p.label :photo %&gt;&lt;br /&gt;
+</span><span class='line'>    &lt;%= p.file_field :data, :index =&gt; nil %&gt;
+</span><span class='line'>    &lt;%= link_to_function "delete", "remove_field($(this), ('.photo'))" %&gt;
+</span><span class='line'>  &lt;% end %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>&lt;/div&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>再在application.js中添加下列代码，这样就可以删除file字段了。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>function remove_field(element, item) {
+</span><span class='line'>  element.up(item).remove();
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>然后修改albums_controller.rb中的new方法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def new
+</span><span class='line'>  @album = Album.new
+</span><span class='line'>  1.upto(3) { @album.photos.build }
+</span><span class='line'>
+</span><span class='line'>  respond_to do |format|
+</span><span class='line'>    format.html # new.html.erb
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>这样，上传多文件的功能基本就完成了。下面就来实现显示和修改的功能。</p>
+
+<p>在show.html.erb的末尾添加下列代码，上传成功后用来显示图片：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>#loop through the albums photos
+</span><span class='line'>&lt;% for photo in @album.photos %&gt;
+</span><span class='line'>  &lt;%= image_tag photo.data.url(:thumb) %&gt;
+</span><span class='line'>&lt;% end %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>修改albums_controller.rb中的edit和update方法，用来删除图片：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def edit
+</span><span class='line'>  @album = Album.find(params[:id])
+</span><span class='line'>  if @album.photos.first.nil?
+</span><span class='line'>    1.upto(3) { @album.photos.build }
+</span><span class='line'>  end
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>def update
+</span><span class='line'>  params[:photo_ids] ||= []
+</span><span class='line'>  @album = Album.find(params[:id])
+</span><span class='line'>  unless params[:photo_ids].empty?
+</span><span class='line'>    Photo.destroy_pics(params[:id], params[:photo_ids])
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  respond_to do |format|
+</span><span class='line'>    if @album.update_attributes(params[:album])
+</span><span class='line'>      flash[:notice] = 'Album was successfully updated.'
+</span><span class='line'>      format.html { redirect_to(@album) }
+</span><span class='line'>    else
+</span><span class='line'>      format.html { render :action =&gt; "edit" }
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>en</span></code></pre></td></tr></table></div></figure>
+
+
+<p>在photo.rb中加上下面的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def self.destroy_pics(album, photos)
+</span><span class='line'>  Photo.find(photos, :conditions =&gt; {:album_id =&gt; album}).each(:destroy)
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>然后新建_album_photo.html.erb，代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;% unless album_photo.new_record? %&gt;
+</span><span class='line'>  &lt;%= image_tag album_photo.data.url(:thumb) %&gt;
+</span><span class='line'>  &lt;%= check_box_tag "photo_ids[]", album_photo.id %&gt;
+</span><span class='line'>&lt;% end rescue nil %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>接着在_form.html.erb中加入下面的代码就可以删除图片了：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div class="album_photos"&gt;
+</span><span class='line'>  &lt;%= render :partial =&gt; 'album_photo', :collection =&gt; @album.photos %&gt;
+</span><span class='line'>&lt;/div&gt;</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2011/03/18/integrate-alipay-into-rails-application/">在Rails应用中集成支付宝</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-03-18T06:28:29+08:00" pubdate data-updated="true">Mar 18<sup>th</sup>, 2011</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>注意：notify_url为服务器通知，支付宝可以保证99.9999%的通知到达率，前提是您的网络通畅，在notify_url中可以做对数据库的业务操作。return_url中可以做数据库的更新也可以做显示。第一次交易状态改变（即时到帐中的交易完成的交易状态）时，支付宝发起的通知的时间与返回页自动跳转回的时间近乎同时。</p>
+
+<p>支付处理代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class OrdersController &lt; ApplicationController
+</span><span class='line'>  before_filter :login_required
+</span><span class='line'>
+</span><span class='line'>  # place order
+</span><span class='line'>  def place_order
+</span><span class='line'>    parameters = {
+</span><span class='line'>      'service' =&gt; 'create_direct_pay_by_user',
+</span><span class='line'>      'partner' =&gt; ALIPAY_ACCOUNT,
+</span><span class='line'>      'seller_email' =&gt; ALIPAY_EMAIL,
+</span><span class='line'>      'out_trade_no' =&gt; @order.out_trade_no,
+</span><span class='line'>      'subject' =&gt; 'payment subject',
+</span><span class='line'>      'body' =&gt; 'payment body',
+</span><span class='line'>      'price' =&gt; @order.price.to_s,
+</span><span class='line'>      'quantity' =&gt; @order.quantity.to_s,
+</span><span class='line'>      'payment_type' =&gt; '1',
+</span><span class='line'>      '_input_charset' =&gt; 'utf-8',
+</span><span class='line'>      'notify_url' =&gt; url_for(:only_path =&gt; false, :action =&gt; 'notify'),
+</span><span class='line'>      'return_url' =&gt; url_for(:only_path =&gt; false, :action =&gt; 'done')
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    # 即时到帐中交易状态为“等待买家付款”的状态默认是不会发送通知的，自己手动设置一下
+</span><span class='line'>    @order.status = 'WAIT_BUYER_PAY'
+</span><span class='line'>    @order.user = current_user
+</span><span class='line'>    @order.save
+</span><span class='line'>
+</span><span class='line'>    values = {}
+</span><span class='line'>    # 支付宝要求传递的参数必须要按照首字母的顺序传递，所以这里要sort
+</span><span class='line'>    parameters.keys.sort.each do |k|
+</span><span class='line'>      values[k] = parameters[k];
+</span><span class='line'>    end
+</span><span class='line'>
+</span><span class='line'>    # 一定要先unescape后再生成sign，否则支付宝会报ILLEGAL SIGN 
+</span><span class='line'>    sign = Digest::MD5.hexdigest(CGI.unescape(values.to_query) + ALIPAY_KEY)
+</span><span class='line'>    gateway = 'https://www.alipay.com/cooperate/gateway.do?'
+</span><span class='line'>    redirect_to gateway + values.to_query + '&sign=' + sign + '&sign_type=MD5'
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  # 返回success或fail。如果返回fail，支付宝会每隔一段时间就自动调用notify_url通信接口 
+</span><span class='line'>  def notify
+</span><span class='line'>    render :text =&gt; 'success'
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  def done
+</span><span class='line'>    if verify_sign
+</span><span class='line'>      order = Order.find_by_out_trade_no(params[:out_trade_no])
+</span><span class='line'>      # 支付宝即时到帐接口只有一种交易状态，就是“交易成功”，更新一下
+</span><span class='line'>      order.update_attributes(params[:trade_status])
+</span><span class='line'>      render :text =&gt; 'Payment successful'
+</span><span class='line'>    else
+</span><span class='line'>      render :text =&gt; 'Alipay Error: ILLEGAL_SIGN'
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>protected
+</span><span class='line'>  def verify_sign
+</span><span class='line'>    params.delete("sign_type")
+</span><span class='line'>    sign = params.delete("sign")
+</span><span class='line'>
+</span><span class='line'>    values = {}
+</span><span class='line'>    params.keys.sort.each do |k|
+</span><span class='line'>      values[k] = params[k];
+</span><span class='line'>    end
+</span><span class='line'>
+</span><span class='line'>    sign.downcase == Digest::MD5.hexdigest(CGI.unescape(values.to_query) + ALIPAY_KEY)
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
       <h1 class="entry-title"><a href="/blog/2011/03/14/create-multi-step-wizard-with-wizardly-plugin/">使用wizardly插件创建multi-step Wizard</a></h1>
     
     
@@ -90,7 +597,7 @@ script/generate scaffold user first_name:string last_name: &hellip;">
   
 
 
-<time datetime="2011-03-14T02:53:51+08:00" pubdate data-updated="true">Mar 14<sup>th</sup>, 2011</time>
+<time datetime="2011-03-14T18:53:51+08:00" pubdate data-updated="true">Mar 14<sup>th</sup>, 2011</time>
         
       </p>
     
@@ -348,7 +855,7 @@ script/generate scaffold user first_name:string last_name: &hellip;">
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2011/03/08/restful-authentication-authenticate-with-email/">Restful_authentication实现用email登录</a></h1>
+      <h1 class="entry-title"><a href="/blog/2011/03/07/restful-authentication-authenticate-with-email/">Restful_authentication实现用email登录</a></h1>
     
     
       <p class="meta">
@@ -364,7 +871,7 @@ script/generate scaffold user first_name:string last_name: &hellip;">
   
 
 
-<time datetime="2011-03-08T04:02:36+08:00" pubdate data-updated="true">Mar 8<sup>th</sup>, 2011</time>
+<time datetime="2011-03-07T20:02:36+08:00" pubdate data-updated="true">Mar 7<sup>th</sup>, 2011</time>
         
       </p>
     
@@ -406,7 +913,7 @@ script/generate scaffold user first_name:string last_name: &hellip;">
 <span class='line-number'>5</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'>def self.authenticate(email, password)
 </span><span class='line'>  return nil if email.blank? || password.blank?
-</span><span class='line'>  u = find_by_email(email.downcase) # need to get the salt
+</span><span class='line'>  u = find_by_email(email.downcase)  # need to get the salt
 </span><span class='line'>  u && u.authenticated?(password) ? u : nil
 </span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
 
@@ -652,6 +1159,52 @@ script/generate scaffold user first_name:string last_name: &hellip;">
       
   <header>
     
+      <h1 class="entry-title"><a href="/blog/2011/02/13/invalid-char-xxx-in-expression/">Invalid Char &#8216;\xxx&#8217; in Expression</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-02-13T21:10:24+08:00" pubdate data-updated="true">Feb 13<sup>th</sup>, 2011</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Ruby文件中包含中文字符串，编译时提示错误：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Invalid char '\243' in expression
+</span><span class='line'>Invalid char '\254' in expression
+</span><span class='line'>Invalid char '\273' in expression</span></code></pre></td></tr></table></div></figure>
+
+
+<p>在网上搜索原因是因为Ruby不支持带BOM的UTF-8文件（用16进制编辑器打开会发现最前面有EF BB BF三个隐藏字符）。我用的编辑器是Notepad++，它有个功能是Encoding in UTF-8 without BOM，先删除Ruby文件中的中文字符串，然后选中该选项，再输入中文字符串后编译就可以了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
       <h1 class="entry-title"><a href="/blog/2011/01/05/add-feedback-for-rails-application/">为Rails应用添加feedback功能</a></h1>
     
     
@@ -668,7 +1221,7 @@ script/generate scaffold user first_name:string last_name: &hellip;">
   
 
 
-<time datetime="2011-01-05T05:44:39+08:00" pubdate data-updated="true">Jan 5<sup>th</sup>, 2011</time>
+<time datetime="2011-01-05T21:44:39+08:00" pubdate data-updated="true">Jan 5<sup>th</sup>, 2011</time>
         
       </p>
     
@@ -705,389 +1258,13 @@ script/generate scaffold user first_name:string last_name: &hellip;">
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'>def feedback(feedback)
 </span><span class='line'>  @recipients = 'webmaster@example.com'
 </span><span class='line'>  @from = 'noreply@example.com'
-</span><span class='line'>  @subject = "[Feedback for example.com] #{feedback.subject}"
-</span><span class='line'>  ...
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>  @subject = "[Feedback for example.com] #{feedback.subject}"</span></code></pre></td></tr></table></div></figure>
 
 
 <p>这样feedback功能就加上了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/12/23/add-rss-output-for-rails-application/">为Rails应用增加RSS输出功能</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-12-23T04:55:17+08:00" pubdate data-updated="true">Dec 23<sup>rd</sup>, 2010</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在EntriesController中增加action，内容如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>def feed
-</span><span class='line'>  @entries = Entry.all
-</span><span class='line'>  respond_to do |format|
-</span><span class='line'>    format.rss { render :layout =&gt; false }  # feed.rss.rxml
-</span><span class='line'>  end
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-
-<p>在app/views/entries中增加feed.rss.rxml视图模板：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>xml.instruct! "xml", :version =&gt; "1.0"
-</span><span class='line'>xml.rss "version" =&gt; "2.0" do
-</span><span class='line'>  xml.channel do
-</span><span class='line'>    xml.title "example.com Entries"
-</span><span class='line'>    xml.description "Listing Entries for example.com"
-</span><span class='line'>    xml.link entries_url
-</span><span class='line'>
-</span><span class='line'>    @entries.each do |entry|
-</span><span class='line'>      xml.item do
-</span><span class='line'>        xml.title entry.title
-</span><span class='line'>        xml.link entry_url(entry)
-</span><span class='line'>        xml.description entry.content
-</span><span class='line'>        xml.guid entry_url(entry)
-</span><span class='line'>      end
-</span><span class='line'>    end
-</span><span class='line'>  end
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-
-<p>然后在config/routes.rb中添加：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>map.feed '/feed', :controller =&gt; 'entries', :action =&gt; 'feed'</span></code></pre></td></tr></table></div></figure>
-
-
-<p>这样，当访问<code>http://example.com/feed</code>时就可看到所有内容的RSS输出了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/12/09/implement-captcha-using-simple-captcha-plugin/">用simple_captcha插件实现验证码</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-12-09T02:42:26+08:00" pubdate data-updated="true">Dec 9<sup>th</sup>, 2010</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p><a href="https://github.com/eshopworks/simple_captcha">simple_captcha</a>是一个可以帮我们在Rails中轻松实现验证码功能的插件，它使用简单，并且支持图片和数字验证。</p>
-
-<p>安装插件</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>script/plugin install git://github.com/eshopworks/simple_captcha.git
-</span><span class='line'>rake simple_captcha:setup
-</span><span class='line'>rake db:migrate</span></code></pre></td></tr></table></div></figure>
-
-
-<p>在config/routes.rb中添加：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>map.simple_captcha '/simple_captcha/:action', :controller =&gt; 'simple_captcha'</span></code></pre></td></tr></table></div></figure>
-
-
-<p>在app/controllers/application.rb中添加：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ApplicationController &lt; ActionController::Base
-</span><span class='line'>  include SimpleCaptcha::ControllerHelpers</span></code></pre></td></tr></table></div></figure>
-
-
-<p>在app/views/entries/new.html.erb的form中加上：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= show_simple_captcha(:ojbect =&gt; 'entry') %&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>在app/models/entry.rb中添加：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class Entry &lt; ActiveRecord::Base
-</span><span class='line'>  apply_simple_captcha</span></code></pre></td></tr></table></div></figure>
-
-
-<p>将app/controllers/entries_controller.rb中的create方法里的</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if @entry.save</span></code></pre></td></tr></table></div></figure>
-
-
-<p>改为</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if @entry.save_with_captcha</span></code></pre></td></tr></table></div></figure>
-
-
-<p>2011/2/17更新</p>
-
-<p>当看不清楚，需要换个验证码时稍麻烦，需要借助Ajax实现，simple_captcha没有提供这个功能，还好小日本写好了一段代码可以参考：<a href="http://d.hatena.ne.jp/kusakari/20080130/1201666383">http://d.hatena.ne.jp/kusakari/20080130/1201666383</a> 。不过可惜使用的是Prototype库，花了点时间将它改成了jQuery代码。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;span id="captcha_image"&gt;
-</span><span class='line'>  &lt;%= show_simple_captcha(:object =&gt; "user", :label =&gt; 'Please type the text from the image.')) %&gt;
-</span><span class='line'>&lt;/span&gt;
-</span><span class='line'>&lt;a href="javascript:void(0);" id="recognize_captcha"&gt;I cannot recognize.&lt;/a&gt;
-</span><span class='line'>&lt;script type="text/javascript"&gt;
-</span><span class='line'>//&lt;![CDATA[
-</span><span class='line'>$("#recognize_captcha").click(function() {
-</span><span class='line'>  $.ajax({
-</span><span class='line'>  url: "&lt;%= url_for(:action =&gt; 'update_captcha') %&gt;",
-</span><span class='line'>  success: function(response) {
-</span><span class='line'>    $("#captcha_image").html(response);
-</span><span class='line'>  }
-</span><span class='line'>  });
-</span><span class='line'>});
-</span><span class='line'>//]]&gt;
-</span><span class='line'>&lt;/script&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>在controller中加上：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>def update_captcha
-</span><span class='line'>  render :layout =&gt; false
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-
-<p>创建update_captcha.html.erb，代码如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= show_simple_captcha(:object =&gt; "user", :label =&gt; 'Please type the text from the image.') %&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>还有就是要在routes.rb中添加个映射，不然会找不到action：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>map.update_captcha '/user/update_captcha', :controller =&gt; 'user', :action =&gt; 'update_captcha'</span></code></pre></td></tr></table></div></figure>
-
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/12/07/using-spreadsheet-to-import-excel-file-in-rails/">Rails中使用spreadsheet导入Excel文件</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-12-07T05:59:38+08:00" pubdate data-updated="true">Dec 7<sup>th</sup>, 2010</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p><a href="http://spreadsheet.rubyforge.org/">spreadsheet</a>是设计来代替ParseExcel和Spreadsheet::Excel，该插件可以读取和生成Excel文件。</p>
-
-<p>首先安装gem包</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>gem install spreadsheet</span></code></pre></td></tr></table></div></figure>
-
-
-<p>导入Excel文件页面的代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;% form_for(@entry, :html =&gt; {:multipart =&gt; true}) do |f| %&gt;
-</span><span class='line'>  &lt;%= f.error_messages %&gt;
-</span><span class='line'>
-</span><span class='line'>  &lt;p&gt;
-</span><span class='line'>    Select your EXECL file:&lt;br /&gt;
-</span><span class='line'>    &lt;%= file_field 'file', 'xlsfile' %&gt;
-</span><span class='line'>  &lt;/p&gt;
-</span><span class='line'>
-</span><span class='line'>  &lt;p&gt;
-</span><span class='line'>    &lt;%= f.submit 'Import' %&gt;
-</span><span class='line'>  &lt;/p&gt;
-</span><span class='line'>&lt;% end %&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>在相应的controller中添加以下代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>require 'spreadsheet'
-</span><span class='line'>
-</span><span class='line'>xlsfile = upload_file(params[:file]['xlsfile'])
-</span><span class='line'>book = Spreadsheet.open("#{RAILS_ROOT}/public/uploads/#{xlsfile}")
-</span><span class='line'>sheet = book.worksheet(0)
-</span><span class='line'>sheet.each_with_index do |row, i|
-</span><span class='line'>  entry = Entry.new
-</span><span class='line'>  entry.save
-</span><span class='line'>end
-</span><span class='line'>
-</span><span class='line'>protected
-</span><span class='line'>  def upload_file(file)
-</span><span class='line'>    if !file.original_filename.empty?
-</span><span class='line'>      @filename = get_file_name(file.original_filename)
-</span><span class='line'>      File.open("#{RAILS_ROOT}/public/uploads/#{@filename}", "wb") do |f|
-</span><span class='line'>        f.write(file.read)
-</span><span class='line'>      end
-</span><span class='line'>      return @filename
-</span><span class='line'>    end
-</span><span class='line'>  end
-</span><span class='line'>
-</span><span class='line'>  def get_file_name(filename)
-</span><span class='line'>    if !filename.nil?
-</span><span class='line'>      # chinese filename not supported?
-</span><span class='line'>      Time.now.strftime("%Y%m%d%H%M%S") + '.xls'
-</span><span class='line'>    end
-</span><span class='line'>  end
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
 </div>
   
   
@@ -1142,21 +1319,21 @@ script/generate scaffold user first_name:string last_name: &hellip;">
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 97%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 133%" href="/tags/android/">Android</a>
+    <a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 111%" href="/tags/crack/">Crack</a>
-<a style="font-size: 108%" href="/tags/database/">Database</a>
+<a style="font-size: 111%" href="/tags/database/">Database</a>
 <a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
 <a style="font-size: 141%" href="/tags/java/">Java</a>
+<a style="font-size: 97%" href="/tags/misc/">Misc</a>
 <a style="font-size: 108%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
 <a style="font-size: 116%" href="/tags/powerbuilder/">PowerBuilder</a>
 <a style="font-size: 120%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
-<a style="font-size: 101%" href="/tags/ruby/">Ruby</a>
+<a style="font-size: 105%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
 <a style="font-size: 105%" href="/tags/windows-server-2008/">Windows Server 2008</a>
-<a style="font-size: 108%" href="/tags/wxwidgets/">wxWidgets</a>
+<a style="font-size: 111%" href="/tags/wxwidgets/">wxWidgets</a>
 
   </ul>
 </section>

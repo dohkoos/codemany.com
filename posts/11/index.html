@@ -9,10 +9,10 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="导入/导出Heroku上应用的数据需要安装Taps包： 1
-gem install taps 导入数据到Heroku里： 1
-heroku db:push 导出数据到本地： 1
-heroku db:pull 其中导入/导出数据由config/database.yml配置设定。 &hellip;">
+  <meta name="description" content="在这以前我们把tags作为Entry的一个字段来实现，这样做有很大的局限性，而且还有好多插件可以实现这个功能，现在我们就来把它替换用插件acts_as_taggable_on_steroids实现。 安装插件 1
+2
+3
+script/plugin install git://github.com &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,350 @@ heroku db:pull 其中导入/导出数据由config/database.yml配置设定。 &h
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/01/08/using-rails-23-to-create-a-simple-accounting-app-part12/">用Rails 2.3打造简单记账软件（12）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-01-08T08:31:28+08:00" pubdate data-updated="true">Jan 8<sup>th</sup>, 2010</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在这以前我们把tags作为Entry的一个字段来实现，这样做有很大的局限性，而且还有好多插件可以实现这个功能，现在我们就来把它替换用插件<a href="https://github.comjviney/acts_as_taggable_on_steroids">acts_as_taggable_on_steroids</a>实现。</p>
+
+<p>安装插件</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>script/plugin install git://github.com/jviney/acts_as_taggable_on_steroids.git
+</span><span class='line'>script/generate acts_as_taggable_migration
+</span><span class='line'>rake db:migrate</span></code></pre></td></tr></table></div></figure>
+
+
+<p>在Entry中添加一句代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class Entry &lt; ActiveRecord::Base
+</span><span class='line'>  acts_as_taggable
+</span><span class='line'>
+</span><span class='line'>  belongs_to :user
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>还要将所有视图中原来的tags字段替换成tag_list字段。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># index.html.erb
+</span><span class='line'>&lt;%= h entry.tag_list %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># edit.html.erb
+</span><span class='line'>&lt;%= f.text_field :tag_list %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># new.html.erb
+</span><span class='line'>&lt;%= f.text_field :tag_list %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>还要将Entry模型中的验证字段tags改成tag_list。做完这些插件也就安装完成了。</p>
+
+<p>既然用了插件，那么原来的tags字段就不需要了，写个迁移任务把它处理掉吧！</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>script/generate migration remove_tags_from_entry</span></code></pre></td></tr></table></div></figure>
+
+
+<p>迁移代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class RemoveTagsFromEntry &lt; ActiveRecord::Migration
+</span><span class='line'>  def self.up
+</span><span class='line'>    remove_column :entries, :tags
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  def self.down
+</span><span class='line'>    add_column :entries, :tags, :string
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/01/05/using-rails-23-to-create-a-simple-accounting-app-part11/">用Rails 2.3打造简单记账软件（11）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-01-05T20:43:29+08:00" pubdate data-updated="true">Jan 5<sup>th</sup>, 2010</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>当网站出现问题时，让它发送一份错误报告到你的邮箱是件挺不错的事，这样你就不必再担心不能及时发现问题了。</p>
+
+<p><a href="https://github.comrails/exception_notification">exception_notification</a>插件的功能就是当你的Rails应用出错时，它会向指定的邮箱地址发送错误日志。</p>
+
+<p>使用很简单，安装插件后配置一下邮件接受者就可以了。</p>
+
+<p>安装插件</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>script/plugin install git://github.com/rails/exception_notification.git</span></code></pre></td></tr></table></div></figure>
+
+
+<p>在config/environment.rb中增加邮件接收者的地址：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Rails::Initializer.run do |config|
+</span><span class='line'>  ...
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>ExceptionNotifier.exception_recipients = %w(yourname@example.com)</span></code></pre></td></tr></table></div></figure>
+
+
+<p>然后告诉Exception Notifier哪些controller出错才发送日志，当然是全部啦：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class ApplicationController &lt; ActionController::Base
+</span><span class='line'>  include ExceptionNotifiable</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Exception Notifier采用Rails中的ActionMailer发送邮件，所以使用的前提是确保ActionMailer可以正常发送邮件。还有就是Exception Notifier默认只在production环境下才会生效，如果想要在development下也生效，需要将development.rb文件中的：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>config.action_mailer.raise_delivery_errors = false</span></code></pre></td></tr></table></div></figure>
+
+
+<p>修改为</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>config.action_mailer.raise_delivery_errors = true</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/01/04/using-rails-23-to-create-a-simple-accounting-app-part10/">用Rails 2.3打造简单记账软件（10）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-01-04T20:34:41+08:00" pubdate data-updated="true">Jan 4<sup>th</sup>, 2010</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>从2.2版本起Rails开始内置支持i18n，因此以后实现国际化/本地化就可以不再需要各种各样的插件了。</p>
+
+<p>Rails默认的Locale文件夹是config/locales，假设你要支持中文和英文，那么你需要在这个文件夹下放置zh.yml和en.yml两个文件。</p>
+
+<p>相应的入门教程网上有不少，我也就不多讲了。这里主要说一下如何在记账应用中实现可以让用户指定语言的i18n实现，即当用户选择English，那么界面就切换成英文界面，并且以后打开的页面也是以英文出现，反之亦如此。</p>
+
+<p>首先在header区添加以下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt; %= link_to 'Chinese', :locale =&gt; 'zh' %&gt;
+</span><span class='line'>&lt; %= link_to 'English', :locale =&gt; 'en' %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>点击其中某个链接后，浏览器就会传递对应的参数zh或en到后台。</p>
+
+<p>然后在app/controllers/application_controller.rb中添加以下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>before_filter :set_locale
+</span><span class='line'>
+</span><span class='line'>def set_locale
+</span><span class='line'>  I18n.locale = params[:locale]
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>不过这里有个问题就是url中必须得带着参数，不然的话用户的选择就会失效。要想使选择达到持续的效果，可以考虑把这些信息保存在session中，改进后的代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def set_locale
+</span><span class='line'>  I18n.locale = params[:locale] || session[:locale]
+</span><span class='line'>  session[:locale] = I18n.locale
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>现在这样就基本上差不多了。剩下的就是处理第一次访问时的语言，这个可以从http头中的ACCEPT_LANGUAGE参数获取。最终实现的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def set_locale
+</span><span class='line'>  accept_lang = request.env['HTTP_ACCEPT_LANGUAGE'].scan(/^[a-z]{2}/).first
+</span><span class='line'>  I18n.locale = params[:locale] || session[:locale] || accept_lang || 'zh'
+</span><span class='line'>  session[:locale] = I18n.locale
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>不过当用户设置Locale后，在添加Entry时会报以下错误：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>can't convert Symbol into String
+</span><span class='line'>
+</span><span class='line'>Extracted source (around line #8):
+</span><span class='line'>
+</span><span class='line'>    6:   &lt;p&gt;
+</span><span class='line'>    7:     &lt; %= t(:effective_date) %&gt;&lt;br /&gt;
+</span><span class='line'>    8:     &lt; %= f.date_select :effective_date %&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>查找资料后发现可以通过在date_select中加入order来解决。但日期下拉列表中的月份还有问题，出现的不是正常月份，而是一些随机数。这个可以通过添加month_names解决。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># new.html.erb
+</span><span class='line'>&lt;p&gt;
+</span><span class='line'>  &lt; %= t(:effective_date) %&gt;&lt;br /&gt;
+</span><span class='line'>  &lt; %= f.date_select :effective_date %&gt;
+</span><span class='line'>&lt;/p&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># en.yml
+</span><span class='line'>en:
+</span><span class='line'>  date:
+</span><span class='line'>    month_names: [~, January, February, ..., November, December]
+</span><span class='line'>    order: [ :year, :month, :day ]</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># zh.yml
+</span><span class='line'>zh:
+</span><span class='line'>  date:
+</span><span class='line'>    month_names: [~, 一月, 二月, ..., 十一月, 十二月]
+</span><span class='line'>    order: [ :year, :month, :day ]</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -146,7 +490,7 @@ heroku db:pull 其中导入/导出数据由config/database.yml配置设定。 &h
   
 
 
-<time datetime="2009-12-26T03:54:41+08:00" pubdate data-updated="true">Dec 26<sup>th</sup>, 2009</time>
+<time datetime="2009-12-26T19:54:41+08:00" pubdate data-updated="true">Dec 26<sup>th</sup>, 2009</time>
         
       </p>
     
@@ -190,7 +534,7 @@ heroku db:pull 其中导入/导出数据由config/database.yml配置设定。 &h
   
 
 
-<time datetime="2009-12-20T04:45:19+08:00" pubdate data-updated="true">Dec 20<sup>th</sup>, 2009</time>
+<time datetime="2009-12-20T20:45:19+08:00" pubdate data-updated="true">Dec 20<sup>th</sup>, 2009</time>
         
       </p>
     
@@ -764,7 +1108,7 @@ heroku db:pull 其中导入/导出数据由config/database.yml配置设定。 &h
   
 
 
-<time datetime="2009-12-17T03:40:14+08:00" pubdate data-updated="true">Dec 17<sup>th</sup>, 2009</time>
+<time datetime="2009-12-17T19:40:14+08:00" pubdate data-updated="true">Dec 17<sup>th</sup>, 2009</time>
         
       </p>
     
@@ -1479,511 +1823,6 @@ heroku db:pull 其中导入/导出数据由config/database.yml配置设定。 &h
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2009/12/08/using-rails-23-to-create-a-simple-accounting-app-part5/">用Rails 2.3打造简单记账软件（5）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2009-12-08T16:09:59+08:00" pubdate data-updated="true">Dec 8<sup>th</sup>, 2009</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>虽然在前面已经调整了记账应用的页面流程，但在登录系统进入entries页面后却没有登出的链接，这次就来把这个完成。同时也给entries页面加上一个三行两列的布局，使之看上去更像一个应用。</p>
-
-<p>在public/stylesheets下加入qianbao.css，内容如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>body {
-</span><span class='line'>  padding: 0;
-</span><span class='line'>  margin: 0;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>#container {
-</span><span class='line'>  width: 960px;
-</span><span class='line'>  margin: 5px auto;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>#header {
-</span><span class='line'>  background-color: #ddd;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>#content {
-</span><span class='line'>  background-color: #e6e6e6;
-</span><span class='line'>  float: right;
-</span><span class='line'>  width: 720px;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>#menu {
-</span><span class='line'>  background-color: #ccc;
-</span><span class='line'>  float: left;
-</span><span class='line'>  width: 230px;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>#footer {
-</span><span class='line'>  clear: both;
-</span><span class='line'>  background-color: #bbb;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>修改app/views/layouts/entries.html.erb的代码为以下内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt; !DOCTYPE html PUBLIC
-</span><span class='line'>  "-//W3C//DTD XHTML 1.0 Transitional//EN"
-</span><span class='line'>  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"&gt;
-</span><span class='line'>&lt;head&gt;
-</span><span class='line'>  &lt;meta http-equiv="content-type" content="text/html; charset=utf-8" /&gt;
-</span><span class='line'>  &lt;title&gt;Entries: &lt; %= controller.action_name %&gt;&lt;/title&gt;
-</span><span class='line'>  &lt; %= stylesheet_link_tag 'scaffold' %&gt;
-</span><span class='line'>  &lt; %= stylesheet_link_tag 'qianbao' %&gt;
-</span><span class='line'>&lt;/head&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;body&gt;
-</span><span class='line'>  &lt;div id="container"&gt;
-</span><span class='line'>    &lt;div id="header"&gt;
-</span><span class='line'>      &lt; % if logged_in? %&gt;
-</span><span class='line'>        &lt;strong&gt;You are logged in as &lt; %=h current_user.login %&gt;&lt;/strong&gt;
-</span><span class='line'>        &lt; %= link_to 'Logout', logout_path %&gt;
-</span><span class='line'>      &lt; % end %&gt;
-</span><span class='line'>    &lt;/div&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;div id="content"&gt;
-</span><span class='line'>      &lt;p style="color: green"&gt;&lt; %= flash[:notice] %&gt;&lt;/p&gt;
-</span><span class='line'>
-</span><span class='line'>      &lt; %= yield %&gt;
-</span><span class='line'>    &lt;/div&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;div id="menu"&gt;
-</span><span class='line'>      &lt;ul&gt;
-</span><span class='line'>        &lt;li&gt;&lt; %= link_to 'All entries', entries_path %&gt;&lt;/li&gt;
-</span><span class='line'>      &lt;/ul&gt;
-</span><span class='line'>    &lt;/div&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;div id="footer"&gt;
-</span><span class='line'>      &copy 2009 Unnamed
-</span><span class='line'>    &lt;/div&gt;
-</span><span class='line'>  &lt;/div&gt;
-</span><span class='line'>&lt;/body&gt;
-</span><span class='line'>&lt;/html&gt;</span></code></pre></td></tr></table></div></figure>
-
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2009/12/03/using-rails-23-to-create-a-simple-accounting-app-part4/">用Rails 2.3打造简单记账软件（4）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2009-12-03T07:05:52+08:00" pubdate data-updated="true">Dec 3<sup>rd</sup>, 2009</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>今天我们来继续完善我们的记账应用。</p>
-
-<p>首先，修改app/views/home/index.html.erb为如下内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;h1&gt;Welcom to Qianbao!&lt;/h1&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;% if logged_in? %&gt;
-</span><span class='line'>  &lt;p&gt;&lt;strong&gt;You are logged in as &lt;%=h current_user.login %&gt;&lt;/strong&gt;&lt;/p&gt;
-</span><span class='line'>  &lt;p&gt;&lt;%= link_to 'Logout', logout_path %&gt;&lt;/p&gt;
-</span><span class='line'>&lt;% else %&gt;
-</span><span class='line'>  &lt;p&gt;&lt;strong&gt;You are currently not logged in.&lt;/strong&gt;&lt;/p&gt;
-</span><span class='line'>  &lt;p&gt;
-</span><span class='line'>    &lt;%= link_to 'Login', login_path %&gt; or
-</span><span class='line'>    &lt;%= link_to 'Sign up', signup_path %&gt;
-</span><span class='line'>  &lt;/p&gt;
-</span><span class='line'>&lt;% end %&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<p>要在views中使用logged_in?和current_user这两个helper方法，还需要在app/controllers/ApplicationController中增加引入AuthenticatedSystem语句：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class ApplicationController &lt; ActionController::Base
-</span><span class='line'>  include AuthenticatedSystem
-</span><span class='line'>
-</span><span class='line'>  helper :all # include all helpers, all the time
-</span><span class='line'>  protect_from_forgery # See ActionController::RequestForgeryProtection for details
-</span><span class='line'>
-</span><span class='line'>  # Scrub sensitive parameters from your log
-</span><span class='line'>  # filter_parameter_logging :password
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-
-<p>否则会报告下面的错误：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>undefined method 'logged_in?'</span></code></pre></td></tr></table></div></figure>
-
-
-<p>既然在ApplicationController中已经包含了该模块，那么其它controller中的也就可以删除了。</p>
-
-<p>另外，还需要把entries保护起来，不能让未登录的用户访问。可以在app/controllers/entries_controller.rb中添加一个before_filter做到：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class EntriesController &lt; ApplicationController
-</span><span class='line'>  before_filter :login_required
-</span><span class='line'>
-</span><span class='line'>  # GET /entries
-</span><span class='line'>  # GET /entries.xml
-</span><span class='line'>  def index
-</span><span class='line'>  end
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-
-<p>还要将登录后的页面改成entries列表，这需要将app/controllers/sessions_controller.rb中create方法下的：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>redirect_back_or_default('/')</span></code></pre></td></tr></table></div></figure>
-
-
-<p>改为</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>redirect_back_or_default('/entries')</span></code></pre></td></tr></table></div></figure>
-
-
-<p>并且，还要修复一个bug，即新用户注册后不激活就登录了系统。通过注释掉app/controllers/users_controller.rb中create方法中的</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>self.current_user = @user</span></code></pre></td></tr></table></div></figure>
-
-
-<p>语句就可以修复它了。</p>
-
-<p>最后，还要修改一下entries各个页面之间的流转顺序，把show这个页面去掉，使得在添加或更新记录后就直接跳到entries列表，而不再是首页。</p>
-
-<ol>
-<li>先将app/views/entries/show.html.erb删除；</li>
-<li>删除app/views/entries/index.html.erb中的show链接；</li>
-<li>删除app/views/entries/edit.html.erb中的show链接；</li>
-<li>然后删除app/controllers/entries_controller.erb中的show方法；</li>
-<li>再修改app/controllers/entries_controller.erb中的update和create方法：</li>
-</ol>
-
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>def create
-</span><span class='line'>  # format.html { redirect_to(@entry) }
-</span><span class='line'>  format.html { redirect_to(entries_url) }
-</span><span class='line'>end
-</span><span class='line'>
-</span><span class='line'>def update
-</span><span class='line'>  # format.html { redirect_to(@entry) }
-</span><span class='line'>  format.html { redirect_to(entries_url) }
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2009/11/15/using-rails-23-to-create-a-simple-accounting-app-part3/">用Rails 2.3打造简单记账软件（3）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2009-11-15T16:21:33+08:00" pubdate data-updated="true">Nov 15<sup>th</sup>, 2009</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>这次要给应用加上一个认证系统（注册、激活、登录、登出）。当用户输入注册信息时，必须输入有效的邮箱地址，注册成功后，用户并不能立即登录系统，而是要登录注册时输入的邮箱，通过该邮箱内的激活邮件来激活账户。通过这种方式可以防止用户的恶意注册。</p>
-
-<p><a href="https://github.comtechnoweenie/restful-authentication">restful_authentication</a>是一个支持Rails 2.0的认证系统插件，它为你生成REST风格的认证系统模板，除了提供最基本的用户注册登录登出功能外，还有一个可选的邮件激活功能。只要一个命令，它就为你生成了User模型、管理注册和登录的控制器、相应的视图页面、mailer等等。</p>
-
-<p>安装插件和生成框架代码</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>script/plugin install http://svn.techno-weenie.net/projects/plugins/restful_authentication
-</span><span class='line'>script/generate authenticated user sessions --include-activation
-</span><span class='line'>rake db:migrate</span></code></pre></td></tr></table></div></figure>
-
-
-<p>include-activation参数决定是否生成向新注册用户发送激活码邮件的代码。</p>
-
-<p>如果你想你的URL看起来更符合惯例一些，那么可以在config/routes.rb中添加：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>map.signup '/signup', :controller =&gt; 'users', :action =&gt; 'new'
-</span><span class='line'>map.login '/login', :controller =&gt; 'sessions', :action =&gt; 'new'
-</span><span class='line'>map.logout '/logout', :controller =&gt; 'sessions', :action =&gt; 'destroy'</span></code></pre></td></tr></table></div></figure>
-
-
-<p>因为使用了include-activation参数，所以还要在config/routes.rb中增加以下映射：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>map.activate '/activate/:activation_code',
-</span><span class='line'>             :controller =&gt; 'users', :action =&gt; 'activate', :activation_code =&gt; nil</span></code></pre></td></tr></table></div></figure>
-
-
-<p>最后，还需要添加一个observer到config/environment.rb的Rails::Initializer块中：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>config.active_record.observers = :user_observer</span></code></pre></td></tr></table></div></figure>
-
-
-<p>设置ActionMailer，在config/environments/development.rb中添加：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># Don't care if the mailer can't send
-</span><span class='line'>config.action_mailer.raise_delivery_errors = true
-</span><span class='line'>config.action_mailer.perform_deliveries = true
-</span><span class='line'>config.action_mailer.delivery_method = :smtp
-</span><span class='line'>config.action_mailer.smtp_settings = {
-</span><span class='line'>  :address =&gt; "smtp.example.com",
-</span><span class='line'>  :port =&gt; 25,
-</span><span class='line'>  :domain =&gt; "example.com",
-</span><span class='line'>  :authentication =&gt; :login,
-</span><span class='line'>  :user_name =&gt; "yourname@example.com",
-</span><span class='line'>  :password =&gt; "yourpassword"
-</span><span class='line'>}
-</span><span class='line'>config.action_mailer.default_charset = "utf-8"
-</span><span class='line'>
-</span><span class='line'>HOST = "localhost:3000"
-</span><span class='line'>ADMINEMAIL = "yourname@example.com"</span></code></pre></td></tr></table></div></figure>
-
-
-<p>打开app/models/user_mailer.rb，修改</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>@body[:url]  = "http://YOURSITE/activate/#{user.activation_code}"
-</span><span class='line'>@body[:url]  = "http://YOURSITE/"
-</span><span class='line'>@subject     = "[YOURSITE] "
-</span><span class='line'>@from        = "ADMINEMAIL"</span></code></pre></td></tr></table></div></figure>
-
-
-<p>为以下代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>@body[:url]  = "http://#{HOST}/activate/#{user.activation_code}"
-</span><span class='line'>@body[:url]  = "http://#{HOST}/"
-</span><span class='line'>@subject     = "[#{HOST}] "
-</span><span class='line'>@from        = "#{ADMINEMAIL}"</span></code></pre></td></tr></table></div></figure>
-
-
-<p>如果出现以下错误信息，那么可能是smtp_settings中的domain没有填写：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Net::SMTPSyntaxError (500 Error: bad syntax):
-</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:679:in 'check_response'
-</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:652:in 'getok'
-</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:622:in 'helo'</span></code></pre></td></tr></table></div></figure>
-
-
-<p>user_mailer.rb中的ADMINEMAIL必须是一个有效的邮件账号，否则会出现：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Net::SMTPFatalError (550 Invalid User):
-</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:679:in 'check_response'
-</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:652:in 'getok'
-</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:630:in 'mailfrom'</span></code></pre></td></tr></table></div></figure>
-
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/12">&larr; Older</a>
@@ -2031,21 +1870,21 @@ heroku db:pull 其中导入/导出数据由config/database.yml配置设定。 &h
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 97%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 133%" href="/tags/android/">Android</a>
+    <a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 111%" href="/tags/crack/">Crack</a>
-<a style="font-size: 108%" href="/tags/database/">Database</a>
+<a style="font-size: 111%" href="/tags/database/">Database</a>
 <a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
 <a style="font-size: 141%" href="/tags/java/">Java</a>
+<a style="font-size: 97%" href="/tags/misc/">Misc</a>
 <a style="font-size: 108%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
 <a style="font-size: 116%" href="/tags/powerbuilder/">PowerBuilder</a>
 <a style="font-size: 120%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
-<a style="font-size: 101%" href="/tags/ruby/">Ruby</a>
+<a style="font-size: 105%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
 <a style="font-size: 105%" href="/tags/windows-server-2008/">Windows Server 2008</a>
-<a style="font-size: 108%" href="/tags/wxwidgets/">wxWidgets</a>
+<a style="font-size: 111%" href="/tags/wxwidgets/">wxWidgets</a>
 
   </ul>
 </section>
