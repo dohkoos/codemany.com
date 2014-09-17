@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Ruby | 乐者为王]]></title>
   <link href="http://codemany.com/tags/ruby/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-09-17T11:16:21+08:00</updated>
+  <updated>2014-09-17T16:56:59+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -49,59 +49,6 @@ doc = Nokogiri::HTML(open(url))
 </code></p>
 
 <p>发现果然OK了。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[使用Pry调试Rails应用]]></title>
-    <link href="http://codemany.com/blog/2014/07/07/debugging-rails-application-with-pry/"/>
-    <updated>2014-07-07T23:26:08+08:00</updated>
-    <id>http://codemany.com/blog/2014/07/07/debugging-rails-application-with-pry</id>
-    <content type="html"><![CDATA[<p>调试Rails程序的工具有ruby-debug、irb、rails-console等，不过现在这些工具都可以歇着了，因为有了Pry。</p>
-
-<p>首先，在Gemfile中申明gem包：</p>
-
-<p><code>
-gem 'pry', group: :development
-</code></p>
-
-<p>然后执行</p>
-
-<p><code>
-bundle install
-</code></p>
-
-<p>用Pry代替irb，直接运行：</p>
-
-<p><code>
-pry
-</code></p>
-
-<p>用Pry代替rails console，运行：</p>
-
-<p><code>
-pry -r ./config/environment.rb
-</code></p>
-
-<p>调试Rails项目时，在需要调试的地方添加binding.pry，当rails server运行到这行代码时会自动调出一个pry窗口，可以在这里进行交互，退出调试用exit-all。例如：</p>
-
-<p><code>
-def index
-  @articles = Article.all
-  binding.pry
-end
-</code></p>
-
-<p>可以使用exit-program命令无条件地退出循环。</p>
-
-<p><code>
-(1..100).each do |i|
-  binding.pry
-  puts i
-end
-</code></p>
-
-<p>Pry默认没有调试中经常用到的上一步，下一步等命令，可以安装pry-nav，然后就可以使用step, next, continue跳来跳去了。</p>
 ]]></content>
   </entry>
   
@@ -217,6 +164,55 @@ Invalid char '\273' in expression
 </code></p>
 
 <p>在网上搜索原因是因为Ruby不支持带BOM的UTF-8文件（用16进制编辑器打开会发现最前面有EF BB BF三个隐藏字符）。我用的编辑器是Notepad++，它有个功能是Encoding in UTF-8 without BOM，先删除Ruby文件中的中文字符串，然后选中该选项，再输入中文字符串后编译就可以了。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Plugin not found]]></title>
+    <link href="http://codemany.com/blog/2010/09/17/plugin-not-found/"/>
+    <updated>2010-09-17T19:24:50+08:00</updated>
+    <id>http://codemany.com/blog/2010/09/17/plugin-not-found</id>
+    <content type="html"><![CDATA[<p>使用Ruby 1.8.7和Rails 2.3.5，每次执行script/plugin install命令都出现：</p>
+
+<p><code>
+Plugin not found: [...]
+</code></p>
+
+<p>无论是使用http或https协议，还是在末尾添加斜杠都不起作用。</p>
+
+<p>出现这个问题的原因是因为Ruby 1.8.7是用mingw32编译的，可以通过ruby -v查看：</p>
+
+<p><code>
+ruby 1.8.7 (2010-08-16 patchlevel 302) [i386-mingw32]
+</code></p>
+
+<p>RUBY_PLATFORM的值是i386-mingw32-{version}，而许多库在判断当前操作系统时是这么做的：</p>
+
+<p><code>
+file.open(RUBY_PLATFORM.match(/mswin/) ? 'NUL', '/dev/null')
+</code></p>
+
+<p>这些库只判断了RUBY_PLATFORM里是否含有mswin，如果没有就认为是*nix平台，从而使用/dev/null，结果可想而知，文件必然打开失败，于是就会出现上述错误。</p>
+
+<p>解决方式（推荐使用第4种方式）:</p>
+
+<p>方法1：打开script/plugin文件加入一行RUBY_PLATFORM = 'mswin'，运行时会打印一条警告说常量重新赋值，不过不影响使用。</p>
+
+<p>方法2：卸载掉1.8.7，重新安装Ruby 1.8.6-p26，这个版本是使用VC6编译的，RUBY_PLATFORM的值是mswin，不会出现平台判断错误。</p>
+
+<p>方法3：使用VC自己编译Ruby 1.8.7，确保RUBY_PLATFORM的值是mswin即可。</p>
+
+<p>方法4：打开RUBY_GEMS/activesupport-2.3.5/lib/active_support/core_ext/kernel/reporting.rb，找到</p>
+
+<p><code>
+stream.reopen(RUBY_PLATFORM =~ /mswin/ ? 'NUL:' : '/dev/null')
+</code></p>
+
+<p>将之修改以下代码即可</p>
+
+<p><code>
+stream.reopen(RUBY_PLATFORM =~ /mswin|mingw/ ? 'NUL:' : '/dev/null')
+</code></p>
 ]]></content>
   </entry>
   
