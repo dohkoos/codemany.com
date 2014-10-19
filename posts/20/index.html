@@ -9,7 +9,8 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="Struts-Menu默认是通过JSTL或者Struts来读取ResourceBundle的，这就需要在web.xml中配置要读取的properties文件（JSTL方式）或在struts-config.xml中配置（Struts方式）。 &hellip;">
+  <meta name="description" content="EMMA是一个coverage工具，有on-the-fly和offline两种使用方式，在Ant里通常采用offline方式。 到sourceforge下载了2.0版本的EMMA下来，由于将EMMA的生成文件做了重定向，因此遇到了些问题，比如出现以下错误： 1
+nothing to do: no &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -71,150 +72,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2006/03/12/allow-struts-menu-to-access-resourcebundle-of-webwork/">让Struts-Menu能访问WebWork的ResourceBundle</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2006-03-12T07:01:48+08:00" pubdate data-updated="true">Mar 12<sup>th</sup>, 2006</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Struts-Menu默认是通过JSTL或者Struts来读取ResourceBundle的，这就需要在web.xml中配置要读取的properties文件（JSTL方式）或在struts-config.xml中配置（Struts方式）。
-WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持访问WebWork的ResourceBundle的功能。所以参考着DisplayTag的实现对Struts-Menu进行了一番手术，实现了可访问WebWork的ResourceBundle的功能。</p>
-
-<p>下面是修改步骤：</p>
-
-<ul>
-<li>在Struts-Menu项目中增加net/sf/navigator/localization目录，将org.displaytag.localization中的*.java移到该目录中；</li>
-<li>将org.displaytag下的Message.java和messages.properties移到net/sf/navigator目录下；</li>
-<li>给MenuDisplayerMapping添加两个属性localeResover和ResourceProvider；</li>
-<li>在struts-menu.xml的Displayer标签下添加：</li>
-</ul>
-
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;setProperty property="localeResover" value="net.sf.navigator.localization.I18nWebworkAdapter" /&gt;
-</span><span class='line'>&lt;setProperty property="resourceProvider" value="net.sf.navigator.localization.I18nWebworkAdapter" /&gt;</span></code></pre></td></tr></table></div></figure>
-
-
-<ul>
-<li>在MenuDisplayer中添加以下四个接口方法，并在AbstractMenuDisplayer里实现它们：</li>
-</ul>
-
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public LocaleResolver getLocaleResolver();
-</span><span class='line'>public void setLocaleResolver(LocaleResolver localeResolver);
-</span><span class='line'>public I18nResourceProvider getResourceProvider();
-</span><span class='line'>public void setResourceProvider(I18nResourceProvider resourceProvider);</span></code></pre></td></tr></table></div></figure>
-
-
-<ul>
-<li>在AbstractMenuDisplayer里添加protected的PageContext对象，并在init方法里初始化它；</li>
-<li>重写MessageResourcesMenuDisplayer.getMessage方法，代码如下：</li>
-</ul>
-
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public String getMessage(String key) {
-</span><span class='line'>    String message = null;
-</span><span class='line'>
-</span><span class='line'>    if (resourceProvider != null) {
-</span><span class='line'>        message = resourceProvider.getResource(key, "???", null, pageContext);
-</span><span class='line'>    }
-</span><span class='line'>    if (message == null) {
-</span><span class='line'>        message = key;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    return message;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<ul>
-<li>在UseMenuDisplayerTag文件里添加代码（+后的代码是增加的）：</li>
-</ul>
-
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>  // get an instance of the menu displayer
-</span><span class='line'>  MenuDisplayer displayerInstance = null;
-</span><span class='line'>+ LocaleResolver localeResolver = null;
-</span><span class='line'>+ I18nResourceProvider resourceProvider = null;
-</span><span class='line'>
-</span><span class='line'>  // default to use the config on the mapping
-</span><span class='line'>  if (displayerMapping.getConfig() != null) {
-</span><span class='line'>      // this value (config) is set on the displayer below
-</span><span class='line'>      setConfig(displayerMapping.getConfig());
-</span><span class='line'>  }
-</span><span class='line'>+ localeResolver =
-</span><span class='line'>+         (LocaleResolver) Class.forName(displayerMapping.getLocaleResover()).newInstance();
-</span><span class='line'>+ resourceProvider =
-</span><span class='line'>+         (I18nResourceProvider) Class.forName(displayerMapping.getLocaleProvider()).newInstance();
-</span><span class='line'>
-</span><span class='line'>  displayerInstance.setConfig(config);
-</span><span class='line'>+ displayerInstance.setResourceProvider(resourceProvider);
-</span><span class='line'>+ displayerInstance.setLocaleResolver(localeResolver);</span></code></pre></td></tr></table></div></figure>
-
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2006/01/16/ant-series-problem-using-emma-measure-test-coverage/">Ant系列之用EMMA测量测试覆盖率的问题</a></h1>
+      <h1 class="entry-title"><a href="/blog/ant-series-problem-using-emma-measure-test-coverage">Ant系列之用EMMA测量测试覆盖率的问题</a></h1>
     
     
       <p class="meta">
@@ -377,7 +235,7 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2005/12/30/fix-problem-incorrect-file-count-in-summary-section-of-checkstyle-report/">修复CheckStyle报告中Summary部分文件数目错误问题</a></h1>
+      <h1 class="entry-title"><a href="/blog/fix-problem-incorrect-file-count-in-summary-section-of-checkstyle-report">修复CheckStyle报告中Summary部分文件数目错误问题</a></h1>
     
     
       <p class="meta">
@@ -503,7 +361,7 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2005/12/29/ant-series-problem-using-jdepend-generate-package-dependency-metrics/">Ant系列之用JDepend生成包依赖性度量的问题</a></h1>
+      <h1 class="entry-title"><a href="/blog/ant-series-problem-using-jdepend-generate-package-dependency-metrics">Ant系列之用JDepend生成包依赖性度量的问题</a></h1>
     
     
       <p class="meta">
@@ -635,7 +493,7 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2005/12/17/ant-series-problem-using-checkstyle-check-code-style/">Ant系列之用Checkstyle检查代码规范的问题</a></h1>
+      <h1 class="entry-title"><a href="/blog/ant-series-problem-using-checkstyle-check-code-style">Ant系列之用Checkstyle检查代码规范的问题</a></h1>
     
     
       <p class="meta">
@@ -743,7 +601,7 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2005/11/17/how-to-implement-i18n-in-webwork/">WebWork中如何实现i18n</a></h1>
+      <h1 class="entry-title"><a href="/blog/how-to-implement-i18n-in-webwork">WebWork中如何实现i18n</a></h1>
     
     
       <p class="meta">
@@ -943,7 +801,7 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2005/11/13/learn-to-crack-cosh-crackme2/">练习破解&#8217;Crackme2 - by CoSH&#8217;</a></h1>
+      <h1 class="entry-title"><a href="/blog/learn-to-crack-cosh-crackme2">练习破解&#8217;Crackme2 - by CoSH&#8217;</a></h1>
     
     
       <p class="meta">
@@ -1176,7 +1034,7 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2005/11/02/remove-popup-ie-window-at-china-games-exit/">去除退出中国游戏中心时弹出的IE窗口</a></h1>
+      <h1 class="entry-title"><a href="/blog/remove-popup-ie-window-at-china-games-exit">去除退出中国游戏中心时弹出的IE窗口</a></h1>
     
     
       <p class="meta">
@@ -1274,7 +1132,7 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2005/09/26/webwork-and-spring-integration-step-by-step/">一步一步整合WebWork和Spring</a></h1>
+      <h1 class="entry-title"><a href="/blog/webwork-and-spring-integration-step-by-step">一步一步整合WebWork和Spring</a></h1>
     
     
       <p class="meta">
@@ -1460,7 +1318,7 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2005/09/13/system-io-address-table/">系统I/O地址表</a></h1>
+      <h1 class="entry-title"><a href="/blog/system-io-address-table">系统I/O地址表</a></h1>
     
     
       <p class="meta">
@@ -1672,6 +1530,52 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
 
     </article>
   
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/posix-conventions-for-command-line-arguments">POSIX Conventions for Command Line Arguments</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2005-09-10T00:03:07+08:00" pubdate data-updated="true">Sep 10<sup>th</sup>, 2005</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><ol>
+<li>An option is a hyphen followed by a single alphanumeric character, like this: -o.</li>
+<li>An option may require an argument (which must appear immediately after the option); for example, -oargument or -o argument.</li>
+<li>Options that do not require arguments can be grouped after a hyphen, so, for example, -lst is equivalent to -t -l -s.</li>
+<li>Options can appear in any order; thus -lst is equivalent to -tls.</li>
+<li>Options can appear multiple times.</li>
+<li>Options precede other nonoption arguments: -lst nonoption.</li>
+<li>The <code>--</code> argument terminates options.</li>
+<li>The - option is typically used to represent one of the standard input streams.</li>
+</ol>
+
+</div>
+  
+  
+
+
+    </article>
+  
   <div class="pagination">
     
       <a class="prev" href="/posts/21">&larr; Older</a>
@@ -1689,23 +1593,23 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/2014/10/09/read-binary-file-give-wrong-size-in-ruby/">Ruby中读二进制文件时大小错误</a>
+        <a href="/blog/read-binary-file-give-wrong-size-in-ruby">Ruby中读二进制文件时大小错误</a>
       </li>
     
       <li class="post">
-        <a href="/blog/2014/09/15/tricks-and-tips-for-octopress/">Octopress 2.0使用技巧</a>
+        <a href="/blog/tricks-and-tips-for-octopress">Octopress 2.0使用技巧</a>
       </li>
     
       <li class="post">
-        <a href="/blog/2014/08/05/migrating-wordpress-to-octopress/">Wordpress迁移到Octopress</a>
+        <a href="/blog/migrating-wordpress-to-octopress">Wordpress迁移到Octopress</a>
       </li>
     
       <li class="post">
-        <a href="/blog/2014/07/17/problem-with-nokogiri-when-url-containing-chinese-character/">Nokogiri抓取页面URL含有中文参数的问题</a>
+        <a href="/blog/problem-with-nokogiri-when-url-containing-chinese-character">Nokogiri抓取页面URL含有中文参数的问题</a>
       </li>
     
       <li class="post">
-        <a href="/blog/2014/07/09/logic-problems-how-many-sick-dogs/">逻辑题-几条病狗</a>
+        <a href="/blog/logic-problems-how-many-sick-dogs">逻辑题-几条病狗</a>
       </li>
     
   </ul>
@@ -1719,19 +1623,19 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 97%" href="/tags/algorithm/">Algorithm</a>
+    <a style="font-size: 98%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 111%" href="/tags/crack/">Crack</a>
 <a style="font-size: 111%" href="/tags/database/">Database</a>
 <a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
 <a style="font-size: 141%" href="/tags/java/">Java</a>
-<a style="font-size: 97%" href="/tags/misc/">Misc</a>
+<a style="font-size: 98%" href="/tags/misc/">Misc</a>
 <a style="font-size: 108%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 116%" href="/tags/powerbuilder/">PowerBuilder</a>
 <a style="font-size: 120%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
 <a style="font-size: 105%" href="/tags/ruby/">Ruby</a>
-<a style="font-size: 101%" href="/tags/struts/">Struts</a>
+<a style="font-size: 102%" href="/tags/struts/">Struts</a>
 <a style="font-size: 105%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 111%" href="/tags/wxwidgets/">wxWidgets</a>
 

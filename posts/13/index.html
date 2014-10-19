@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="域名信息的查询原理非常简单，主要是基于RFC 954（RFC 812已被废弃）提供的WHOIS协议。WHOIS服务器是一个基于“查询/响应”的TCP事务服务器，用户程序通过访问WHOIS服务器，从WHOIS数据库中查询得到我们所需要的内容。其主要过程有以下三步： &hellip;">
+  <meta name="description" content="在Windows Server 2008下安装FreeMind后不能运行（0.8.1和0.9.0-RC4均是如此），使用的JRE是1.6.0_13。网上有的解决方法是在环境变量中添加jre\bin的路径。但是我不想这样做，想试试别的方法。 后来，从FreeMind的bug2750047中得到了启示 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -71,154 +71,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2009/09/16/using-whois-protocol-to-query-domain-information/">利用WHOIS协议查询域名信息</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2009-09-16T06:15:04+08:00" pubdate data-updated="true">Sep 16<sup>th</sup>, 2009</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>域名信息的查询原理非常简单，主要是基于RFC 954（RFC 812已被废弃）提供的WHOIS协议。WHOIS服务器是一个基于“查询/响应”的TCP事务服务器，用户程序通过访问WHOIS服务器，从WHOIS数据库中查询得到我们所需要的内容。其主要过程有以下三步：</p>
-
-<ol>
-<li>在TCP服务端口43连接WHOIS服务主机；</li>
-<li>发送一个命令，以回车换行符结尾；</li>
-<li>接受相应命令的返回信息，一旦输出结束，服务器将关闭连接。</li>
-</ol>
-
-
-<p>命令的格式非常简单。可以直接输入域名（例如example.com）查询相关域名信息；也可以使用help得到详细的帮助信息。以下是查询的代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>wxString Whois::Lookup(wxString& host, wxString& szAddress)
-</span><span class='line'>{
-</span><span class='line'>    char szQuery[512];
-</span><span class='line'>    char szBuffer[512];
-</span><span class='line'>    wxString szResult;
-</span><span class='line'>
-</span><span class='line'>    strcpy(szQuery, szAddress);
-</span><span class='line'>    strcat(szQuery, "\r\n");
-</span><span class='line'>
-</span><span class='line'>    wxIPV4address addr;
-</span><span class='line'>    addr.Hostname(host);
-</span><span class='line'>    addr.Service(43);
-</span><span class='line'>
-</span><span class='line'>    wxSocketClient socket;
-</span><span class='line'>    socket.Connect(addr, false);
-</span><span class='line'>    socket.WaitOnConnect(30);
-</span><span class='line'>
-</span><span class='line'>    if (socket.IsConnected())
-</span><span class='line'>    {
-</span><span class='line'>        socket.Write(szQuery, strlen(szQuery));
-</span><span class='line'>        szResult = "";
-</span><span class='line'>        while (true)
-</span><span class='line'>        {
-</span><span class='line'>            // Clear buffer before each iteration
-</span><span class='line'>            memset(szBuffer, 0, 512);
-</span><span class='line'>
-</span><span class='line'>            // Try to receive some data
-</span><span class='line'>            socket.Read(szBuffer, 500);
-</span><span class='line'>            if (socket.LastCount() &lt;= 0)
-</span><span class='line'>            {
-</span><span class='line'>                break;
-</span><span class='line'>            }
-</span><span class='line'>            szResult += szBuffer;
-</span><span class='line'>        }
-</span><span class='line'>    }
-</span><span class='line'>    else
-</span><span class='line'>    {
-</span><span class='line'>        szResult = wxT("Failed! Unable to connect\n");
-</span><span class='line'>    }
-</span><span class='line'>    socket.Close();
-</span><span class='line'>
-</span><span class='line'>    return wxString::FromUTF8(szResult);
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>常用的WHOIS服务器：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>.cn=whois.cnnic.net.cn
-</span><span class='line'>.com=whois.internic.com
-</span><span class='line'>.net=whois.internic.com
-</span><span class='line'>.name=www.whois.name
-</span><span class='line'>.cc=whois.nic.cc</span></code></pre></td></tr></table></div></figure>
-
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2009/08/18/problem-freemind-does-not-work-on-windows-server-2008/">FreeMind在Windows Server 2008中不能运行的问题</a></h1>
+      <h1 class="entry-title"><a href="/blog/problem-freemind-does-not-work-on-windows-server-2008">FreeMind在Windows Server 2008中不能运行的问题</a></h1>
     
     
       <p class="meta">
@@ -256,7 +109,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2009/07/09/allow-remote-client-to-connect-to-mysql-on-lunarpages/">允许客户端远程连接Lunarpages上的MySQL数据库</a></h1>
+      <h1 class="entry-title"><a href="/blog/allow-remote-client-to-connect-to-mysql-on-lunarpages">允许客户端远程连接Lunarpages上的MySQL数据库</a></h1>
     
     
       <p class="meta">
@@ -298,7 +151,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2009/02/05/make-wireless-work-on-ubuntu-810/">Ubuntu 8.10下实现无线上网</a></h1>
+      <h1 class="entry-title"><a href="/blog/make-wireless-work-on-ubuntu-810">Ubuntu 8.10下实现无线上网</a></h1>
     
     
       <p class="meta">
@@ -372,7 +225,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2009/01/04/git-notes-create-project/">Git笔记之项目创建</a></h1>
+      <h1 class="entry-title"><a href="/blog/git-notes-create-project">Git笔记之项目创建</a></h1>
     
     
       <p class="meta">
@@ -469,7 +322,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2008/12/02/virtualbox-shared-folder-between-ubuntu-guest-and-windows-server-2008-host/">VirtualBox虚拟Ubuntu 8.10时共享文件夹的使用</a></h1>
+      <h1 class="entry-title"><a href="/blog/virtualbox-shared-folder-between-ubuntu-guest-and-windows-server-2008-host">VirtualBox虚拟Ubuntu 8.10时共享文件夹的使用</a></h1>
     
     
       <p class="meta">
@@ -559,7 +412,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2008/11/30/cursor-positioning-about-input-text/">关于input[text]里的光标定位</a></h1>
+      <h1 class="entry-title"><a href="/blog/cursor-positioning-about-input-text">关于input[text]里的光标定位</a></h1>
     
     
       <p class="meta">
@@ -671,7 +524,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2008/11/17/install-fcitx-chinese-input-method-under-english-locale-on-ubuntu-810/">Ubuntu 8.10英文Locale下安装Fcitx中文输入法</a></h1>
+      <h1 class="entry-title"><a href="/blog/install-fcitx-chinese-input-method-under-english-locale-on-ubuntu-810">Ubuntu 8.10英文Locale下安装Fcitx中文输入法</a></h1>
     
     
       <p class="meta">
@@ -811,7 +664,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2008/11/14/change-sources-list-on-ubuntu-810/">修改Ubuntu 8.10的sources.list</a></h1>
+      <h1 class="entry-title"><a href="/blog/change-sources-list-on-ubuntu-810">修改Ubuntu 8.10的sources.list</a></h1>
     
     
       <p class="meta">
@@ -895,7 +748,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2008/10/18/how-to-setup-background-color-of-cell-on-datawindow/">如何设置数据窗口中某行某列的背景颜色</a></h1>
+      <h1 class="entry-title"><a href="/blog/how-to-setup-background-color-of-cell-on-datawindow">如何设置数据窗口中某行某列的背景颜色</a></h1>
     
     
       <p class="meta">
@@ -938,6 +791,110 @@
 
     </article>
   
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/fix-bug-wxwidgets-wizard-for-visual-studio-2005-and-2008">修复wxWidgets Wizard for Visual Studio 2005/2008中的一个bug</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2008-10-16T17:41:47+08:00" pubdate data-updated="true">Oct 16<sup>th</sup>, 2008</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>前面发布的wxWidgets Wizard for Visual Studio 2005/2008存在一个bug，安装在VS2008中后不能创建新的wxWidgets项目。原因是没有将wxAppWiz.vsz文件中VsWizardEngine的版本号改为9.0。现在做了一些修改，修改后的代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>procedure CurStepChanged(CurStep: TSetupStep);
+</span><span class='line'>var
+</span><span class='line'>    i: Integer;
+</span><span class='line'>    Signature: String;
+</span><span class='line'>    ConfigLine: String;
+</span><span class='line'>    ConfigFile: String;
+</span><span class='line'>    ConfigFileLines: TArrayOfString;
+</span><span class='line'>begin
+</span><span class='line'>    if CurStep = ssPostInstall then begin
+</span><span class='line'>        if (Pos('Visual Studio 9.0', ExpandConstant('{app}')) &gt; 0) then begin
+</span><span class='line'>            Signature := 'Wizard=VsWizard.VsWizardEngine';
+</span><span class='line'>            ConfigFile := ExpandConstant('{app}\VCProjects\wxAppWiz.vsz');
+</span><span class='line'>            LoadStringsFromFile(ConfigFile, ConfigFileLines);
+</span><span class='line'>            for i := 0 to GetArrayLength(ConfigFileLines) - 1 do begin
+</span><span class='line'>                if (Pos(Signature, ConfigFileLines[i]) &gt; 0) then begin
+</span><span class='line'>                    ConfigFileLines[i] := 'Wizard=VsWizard.VsWizardEngine.9.0'
+</span><span class='line'>                    SaveStringsToFile(ConfigFile, ConfigFileLines, False);
+</span><span class='line'>                    break;
+</span><span class='line'>                end;
+</span><span class='line'>            end;
+</span><span class='line'>        end;
+</span><span class='line'>
+</span><span class='line'>        Signature := 'wxWidgets';
+</span><span class='line'>        ConfigLine := 'wxWidgets|{1B027A40-8F43-11D0-8D11-00A0C91BC942}|#1043|70' + #13#10;
+</span><span class='line'>        ConfigFile := ExpandConstant('{app}\VCProjects\vc.vsdir');
+</span><span class='line'>        LoadStringsFromFile(ConfigFile, ConfigFileLines);
+</span><span class='line'>        for i := 0 to GetArrayLength(ConfigFileLines) - 1 do begin
+</span><span class='line'>            if (Pos(Signature, ConfigFileLines[i]) &gt; 0) then abort;
+</span><span class='line'>        end;
+</span><span class='line'>        SaveStringToFile(ConfigFile, ConfigLine, True);
+</span><span class='line'>    end;
+</span><span class='line'>end;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>代码下载：<a href="https://github.com/dohkoos/wxwizard">https://github.com/dohkoos/wxwizard</a></p>
+</div>
+  
+  
+
+
+    </article>
+  
   <div class="pagination">
     
       <a class="prev" href="/posts/14">&larr; Older</a>
@@ -955,23 +912,23 @@
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/2014/10/09/read-binary-file-give-wrong-size-in-ruby/">Ruby中读二进制文件时大小错误</a>
+        <a href="/blog/read-binary-file-give-wrong-size-in-ruby">Ruby中读二进制文件时大小错误</a>
       </li>
     
       <li class="post">
-        <a href="/blog/2014/09/15/tricks-and-tips-for-octopress/">Octopress 2.0使用技巧</a>
+        <a href="/blog/tricks-and-tips-for-octopress">Octopress 2.0使用技巧</a>
       </li>
     
       <li class="post">
-        <a href="/blog/2014/08/05/migrating-wordpress-to-octopress/">Wordpress迁移到Octopress</a>
+        <a href="/blog/migrating-wordpress-to-octopress">Wordpress迁移到Octopress</a>
       </li>
     
       <li class="post">
-        <a href="/blog/2014/07/17/problem-with-nokogiri-when-url-containing-chinese-character/">Nokogiri抓取页面URL含有中文参数的问题</a>
+        <a href="/blog/problem-with-nokogiri-when-url-containing-chinese-character">Nokogiri抓取页面URL含有中文参数的问题</a>
       </li>
     
       <li class="post">
-        <a href="/blog/2014/07/09/logic-problems-how-many-sick-dogs/">逻辑题-几条病狗</a>
+        <a href="/blog/logic-problems-how-many-sick-dogs">逻辑题-几条病狗</a>
       </li>
     
   </ul>
@@ -985,19 +942,19 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 97%" href="/tags/algorithm/">Algorithm</a>
+    <a style="font-size: 98%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 111%" href="/tags/crack/">Crack</a>
 <a style="font-size: 111%" href="/tags/database/">Database</a>
 <a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
 <a style="font-size: 141%" href="/tags/java/">Java</a>
-<a style="font-size: 97%" href="/tags/misc/">Misc</a>
+<a style="font-size: 98%" href="/tags/misc/">Misc</a>
 <a style="font-size: 108%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 116%" href="/tags/powerbuilder/">PowerBuilder</a>
 <a style="font-size: 120%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
 <a style="font-size: 105%" href="/tags/ruby/">Ruby</a>
-<a style="font-size: 101%" href="/tags/struts/">Struts</a>
+<a style="font-size: 102%" href="/tags/struts/">Struts</a>
 <a style="font-size: 105%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 111%" href="/tags/wxwidgets/">wxWidgets</a>
 
