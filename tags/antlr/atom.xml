@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: ANTLR | 乐者为王]]></title>
   <link href="http://codemany.com/tags/antlr/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-11-01T15:23:01+08:00</updated>
+  <updated>2014-11-02T04:09:41+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -26,15 +26,14 @@
 
 <p>到现在PowerScript的词法分析已经写的差不多了，接下来就要开始写语法分析。语法分析的主要组成部分是表达式（expression），而表达式的主要组成部分则是主表达式。主表达式包含了大部分简单的表达式，如字面量（literals），字段存取，方法调用和数组存取等。带圆括号的表达式通常也被认为是主表达式。其常见形式如下：</p>
 
-<p><code>
-(x)
+<pre><code>(x)
 x.y
 f(x)
 a[x]
 x++
 x--
 new
-</code></p>
+</code></pre>
 
 <p>当直接子类存有和父类相同签名的事件或函数时，可以通过super调用父类的事件或函数，但是：</p>
 
@@ -55,95 +54,80 @@ new
 
 <p>收集的一些语句：</p>
 
-<p>```
-this.ls_array[1]
+<pre><code>this.ls_array[1]
 this.event pfc_addrow()
 this.event rowfocuschanged(ll_row)
 this.uo_1.function hallo()
 post function column_order_update_from_grid()
-event ue_process()</p>
+event ue_process()
 
-<p>close(parent)
+close(parent)
 parent.enabled
 parent.hide()
 parent.event ue_postconstructor()
-parent.function static trigger wf_process( )</p>
+parent.function static trigger wf_process( )
 
-<p>super::create
+super::create
 super::clicked;
 super::event clicked()
 super::event clicked(xpos, ypos, row, dwo)
 super::of_remove_tail(anv_tailnode)
-super::event trigger selectionchanging(oldindex, newindex)</p>
+super::event trigger selectionchanging(oldindex, newindex)
 
-<p>iu_tab_postings.post of_enable_sort(dw_main, dw_detail, false)
+iu_tab_postings.post of_enable_sort(dw_main, dw_detail, false)
 w_main.event doubleclicked(flags, xpos, ypos)
 dw_main.event pfc_retrieve()
 cb_ok.event trigger clicked()
 cb_ok.triggerevent(clicked!)
-```</p>
+</code></pre>
 
 <p>主表达式语法：</p>
 
-<p>```
-primary_expression</p>
+<pre><code>primary_expression
+    : '(' expression ')'
+    | IDENTIFIER '!'?                   // build-in constant
+    | literal
+    | '::' IDENTIFIER                   // global variables
+    | call_type IDENTIFIER arguments    // example: post function to_string()
+    | 'create' 'using'? (STRING_LITERAL|IDENTIFIER)
+    | 'destroy' IDENTIFIER
+    | 'super' '::' call_type? IDENTIFIER arguments?
+    | object_name ('.' IDENTIFIER)* identifier_suffix?
+    ;
 
-<pre><code>: '(' expression ')'
-| IDENTIFIER '!'?                   // build-in constant
-| literal
-| '::' IDENTIFIER                   // global variables
-| call_type IDENTIFIER arguments    // example: post function to_string()
-| 'create' 'using'? (STRING_LITERAL|IDENTIFIER)
-| 'destroy' IDENTIFIER
-| 'super' '::' call_type? IDENTIFIER arguments?
-| object_name ('.' IDENTIFIER)* identifier_suffix?
-;
+object_name
+    : 'this'
+    | 'parent'
+    | IDENTIFIER
+    ;
+
+call_type
+    : ( 'function'
+      | 'event'
+      | 'static'
+      | 'dynamic'
+      | 'trigger'
+      | 'post'
+      )+
+    ;
+
+identifier_suffix
+    : arguments ('.' IDENTIFIER arguments)*    // cascaded calling
+    | '[' expression_list? ']'
+    | call_type IDENTIFIER arguments
+    ;
+
+arguments
+    : '(' expression_list? ')'
+    ;
+
+literal
+    : STRING_LITERAL
+    | INTEGER_LITERAL
+    | FLOAT_LITERAL
+    | BOOLEAN_LITERAL
+    ;
 </code></pre>
-
-<p>object_name</p>
-
-<pre><code>: 'this'
-| 'parent'
-| IDENTIFIER
-;
-</code></pre>
-
-<p>call_type</p>
-
-<pre><code>: ( 'function'
-  | 'event'
-  | 'static'
-  | 'dynamic'
-  | 'trigger'
-  | 'post'
-  )+
-;
-</code></pre>
-
-<p>identifier_suffix</p>
-
-<pre><code>: arguments ('.' IDENTIFIER arguments)*    // cascaded calling
-| '[' expression_list? ']'
-| call_type IDENTIFIER arguments
-;
-</code></pre>
-
-<p>arguments</p>
-
-<pre><code>: '(' expression_list? ')'
-;
-</code></pre>
-
-<p>literal</p>
-
-<pre><code>: STRING_LITERAL
-| INTEGER_LITERAL
-| FLOAT_LITERAL
-| BOOLEAN_LITERAL
-;
-</code></pre>
-
-<p>```</p>
 ]]></content>
   </entry>
   
@@ -175,141 +159,105 @@ primary_expression</p>
 
 <p>这里是转义字符的词法代码：</p>
 
-<p>```
-ESCAPE</p>
+<pre><code>ESCAPE
+    : '~' ('n'|'t'|'v'|'r'|'f'|'b'|'\"'|'\''|'~')
+    | DecimalEscape
+    | HexEscape
+    | OctalEscape
+    ;
 
-<pre><code>: '~' ('n'|'t'|'v'|'r'|'f'|'b'|'\"'|'\''|'~')
-| DecimalEscape
-| HexEscape
-| OctalEscape
-;
+fragment
+DecimalEscape
+    : '~' ('0'..'1') ('0'..'9') ('0'..'9')    // 000 - 199
+    | '~' '2' ('0'..'5') ('0'..'5')           // 200 - 255
+    ;
+
+fragment
+HexEscape
+    : '~h' ('0'..'9'|'a'..'f'|'A'..'F') ('0'..'9'|'a'..'f'|'A'..'F')    // 00 - FF
+    ;
+
+fragment
+OctalEscape
+    : '~o' ('0'..'3') ('0'..'7') ('0'..'7')   // 000 - 377
+    ;
 </code></pre>
-
-<p>fragment
-DecimalEscape</p>
-
-<pre><code>: '~' ('0'..'1') ('0'..'9') ('0'..'9')    // 000 - 199
-| '~' '2' ('0'..'5') ('0'..'5')           // 200 - 255
-;
-</code></pre>
-
-<p>fragment
-HexEscape</p>
-
-<pre><code>: '~h' ('0'..'9'|'a'..'f'|'A'..'F') ('0'..'9'|'a'..'f'|'A'..'F')    // 00 - FF
-;
-</code></pre>
-
-<p>fragment
-OctalEscape</p>
-
-<pre><code>: '~o' ('0'..'3') ('0'..'7') ('0'..'7')   // 000 - 377
-;
-</code></pre>
-
-<p>```</p>
 
 <p>续行（Statement Continuation）</p>
 
 <p>通常情况下，PowerScript的一条语句书写在一行上，语句书写完毕后，按Enter键转到下一行，开始下一条语句。有时候，为了阅读方便等原因，需要把一条语句书写在几行上，这时就需要使用续行符了。PowerScript的续行符是“&amp;”字符，它放在一行的末尾指示下一行是当前行的继续，并且续行符必须是一行的最后一个字符。</p>
 
-<p>```
-CONTINUEDLINE</p>
-
-<pre><code>: '&amp;' NEWLINE
-;
+<pre><code>CONTINUEDLINE
+    : '&amp;' NEWLINE
+    ;
 </code></pre>
-
-<p>```</p>
 
 <p>字符和字符串字面量（Character and String Literal）</p>
 
-<p>PowerScript程序中字符和字符串字面量没有明显的区别。字符是指由单引号（'）或双引号（"）括起来的一个ASCII字符，例如：</p>
+<p>PowerScript程序中字符和字符串字面量没有明显的区别。字符是指由单引号（&#8217;）或双引号（&#8221;）括起来的一个ASCII字符，例如：</p>
 
-<p><code>
-char c
+<pre><code>char c
 c = 'T'
 c = "T"
-</code></p>
+</code></pre>
 
 <p>字符串字面量则是指由单引号或双引号括起来的不多于1024个的ASCII字符串，例如：</p>
 
-<p><code>
-string s
+<pre><code>string s
 s = 'This is a string'
 s = "This is a string"
-</code></p>
+</code></pre>
 
 <p>由于两者没有明显区别，因此在词法分析阶段只能将两者都作为字符串字面量来处理。至于到底是字符还是字符串，只有到了语意分析阶段才能作出判断（字符串字面量支持续行符）。</p>
 
-<p>```
-STRING_LITERAL</p>
-
-<pre><code>: ( '\'' (ESCAPE|CONTINUEDLINE|~('~'|'r'|'n'|'\''))* '\''
-  | '\"' (ESCAPE|CONTINUEDLINE|~('~'|'r'|'n'|'\"'))* '\"'
-  )
-  {
-      System.out.println("string&gt;" + getText());
-  }
-;
+<pre><code>STRING_LITERAL
+    : ( '\'' (ESCAPE|CONTINUEDLINE|~('~'|'r'|'n'|'\''))* '\''
+      | '\"' (ESCAPE|CONTINUEDLINE|~('~'|'r'|'n'|'\"'))* '\"'
+      )
+      {
+          System.out.println("string&gt;" + getText());
+      }
+    ;
 </code></pre>
-
-<p>```</p>
 
 <p>数字和布尔字面量（Numeric and Boolean Literal）</p>
 
-<p>```
-INTEGER_LITERAL</p>
+<pre><code>INTEGER_LITERAL
+    : ('0'|'1'..'9' ('0'..'9')*)
+    ;
 
-<pre><code>: ('0'|'1'..'9' ('0'..'9')*)
-;
+FLOAT_LITERAL
+    : ('0'..'9')+ '.' ('0'..'9')* Exponent?
+    | '.' ('0'..'9')+ Exponent?
+    | ('0'..'9')+ Exponent?
+    ;
+
+BOOLEAN_LITERAL
+    : ('true'|'false')
+    ;
+
+fragment
+Exponent
+    : ('e'|'E') ('+'|'-')? ('0'..'9')+
+    ;
 </code></pre>
-
-<p>FLOAT_LITERAL</p>
-
-<pre><code>: ('0'..'9')+ '.' ('0'..'9')* Exponent?
-| '.' ('0'..'9')+ Exponent?
-| ('0'..'9')+ Exponent?
-;
-</code></pre>
-
-<p>BOOLEAN_LITERAL</p>
-
-<pre><code>: ('true'|'false')
-;
-</code></pre>
-
-<p>fragment
-Exponent</p>
-
-<pre><code>: ('e'|'E') ('+'|'-')? ('0'..'9')+
-;
-</code></pre>
-
-<p>```</p>
 
 <p>标识符（Identifier）</p>
 
 <p>标识符规则可以参看<a href="http://codemany.com/blog/powerscript-identifier/">PowerScript标识符</a>一文，以下是标识符的词法代码。</p>
 
-<p>```
-IDENTIFIER</p>
+<pre><code>IDENTIFIER
+    : Letter (Letter|'0'..'9'|'$'|'#'|'%')*    // 暂时不支持短横线（-）
+      {
+          System.out.println("identifier&gt;" + getText());
+      }
+    ;
 
-<pre><code>: Letter (Letter|'0'..'9'|'$'|'#'|'%')*    // 暂时不支持短横线（-）
-  {
-      System.out.println("identifier&gt;" + getText());
-  }
-;
+fragment
+Letter
+    : ('A'..'Z'|'a'..'z'|'_')
+    ;
 </code></pre>
-
-<p>fragment
-Letter</p>
-
-<pre><code>: ('A'..'Z'|'a'..'z'|'_')
-;
-</code></pre>
-
-<p>```</p>
 
 <p>PowerScript是否支持变量名的续行？</p>
 
@@ -332,49 +280,37 @@ Letter</p>
 </ol>
 
 
-<p><code>
-bc&gt;/* comments /* nested comments */
+<pre><code>bc&gt;/* comments /* nested comments */
 bc&gt;/* comments /* nested comments */ */
-</code></p>
+</code></pre>
 
 <p>第1个问题比较容易解决，只要将EndOfLine前的fragment去掉，再将WS改成下面这样就可以。</p>
 
-<p>```
-WS</p>
-
-<pre><code>: (' '|'\t'|'\u000C') {$channel=HIDDEN;}
-;
+<pre><code>WS
+    : (' '|'\t'|'\u000C') {$channel=HIDDEN;}
+    ;
 </code></pre>
-
-<p>```</p>
 
 <p>第2个问题则可以通过计数器来处理。先初始化一个计数器变量depthOfComments来标记块注释的深度，当遇到<code>“/*”</code>时就加1，遇到“*/”时则减1。输出时只要判断depthOfComments是否等于0就行了。</p>
 
-<p>```
-BLOCK_COMMENT
-@init {</p>
-
-<pre><code>int depthOfComments = 0;
-</code></pre>
-
-<p>}</p>
-
-<pre><code>: '/*' {depthOfComments++;}
-  ( options {greedy=false;}
-  : ('/' '*')=&gt; BLOCK_COMMENT {depthOfComments++;}
-  | '/' ~('*')
-  | ~('/')
-  )*
-  '*/' {depthOfComments--;}
-  {
-      if (depthOfComments == 0) {
-          System.out.println("bc&gt;" + getText());
+<pre><code>BLOCK_COMMENT
+@init {
+    int depthOfComments = 0;
+}
+    : '/*' {depthOfComments++;}
+      ( options {greedy=false;}
+      : ('/' '*')=&gt; BLOCK_COMMENT {depthOfComments++;}
+      | '/' ~('*')
+      | ~('/')
+      )*
+      '*/' {depthOfComments--;}
+      {
+          if (depthOfComments == 0) {
+              System.out.println("bc&gt;" + getText());
+          }
       }
-  }
-;
+    ;
 </code></pre>
-
-<p>```</p>
 ]]></content>
   </entry>
   
@@ -387,72 +323,51 @@ BLOCK_COMMENT
 
 <p>单行注释以双斜杠（//）起头，直到遇到行结束符为止，所以在这里要先明确一下行结束符用什么表示。在DOS系统中行结束符用“\r\n”表示，在Unix系统中行结束符用“\n”表示，现在的Mac系统也是以“\n”表示行结束符，但早期的Mac系统中行结束符则是以“\r”表示。所以兼容这几种操作系统的行结束符定义为：</p>
 
-<p>```
-fragment
-EndOfLine</p>
-
-<pre><code>: '\r' '\n'    // DOS
-| '\r'         // Mac
-| '\n'         // Unix
-;
+<pre><code>fragment
+EndOfLine
+    : '\r' '\n'    // DOS
+    | '\r'         // Mac
+    | '\n'         // Unix
+    ;
 </code></pre>
-
-<p>```</p>
 
 <p>现在，有了行结束符定义，就可以定义单行注释的词法规则了：</p>
 
-<p>```
-LINE_COMMENT</p>
-
-<pre><code>: '//' ~('\n'|'\r')* EndOfLine
-;
+<pre><code>LINE_COMMENT
+    : '//' ~('\n'|'\r')* EndOfLine
+    ;
 </code></pre>
-
-<p>```</p>
 
 <p>通常的多行注释词法规则是这样的：</p>
 
-<p>```
-BLOCK_COMMENT</p>
-
-<pre><code>: '/*' ( options {greedy=false;} : . )* '*/'
-;
+<pre><code>BLOCK_COMMENT
+    : '/*' ( options {greedy=false;} : . )* '*/'
+    ;
 </code></pre>
-
-<p>```</p>
 
 <p>但由于PowerScript支持嵌套注释，所以上面的规则无效，必须重新定义。当词法分析器遇到<code>“/*”</code>后就进入了多行注释。这时假如遇到了“/”符号，词法分析器必须预取一个字符，看这个字符是否是“*”。如果是的话，就进入了嵌套的多行注释，否则，则还是处在多行注释中。</p>
 
-<p>```
-BLOCK_COMMENT</p>
-
-<pre><code>: '/*'
-  ( options {greedy=false;}
-  : ('/' '*')=&gt; BLOCK_COMMENT    // 在多行注释中遇到“/*”，用语法断言确定是嵌套多行注释
-  | '/' ~('*')                   // 在多行注释中只遇到“/”，而没有紧跟着的“*”
-  | ~('/')                       // 在多行注释中没有遇到“/”
-  )*
-  '*/'
-;
+<pre><code>BLOCK_COMMENT
+    : '/*'
+      ( options {greedy=false;}
+      : ('/' '*')=&gt; BLOCK_COMMENT    // 在多行注释中遇到“/*”，用语法断言确定是嵌套多行注释
+      | '/' ~('*')                   // 在多行注释中只遇到“/”，而没有紧跟着的“*”
+      | ~('/')                       // 在多行注释中没有遇到“/”
+      )*
+      '*/'
+    ;
 </code></pre>
-
-<p>```</p>
 
 <p>当然，我们还希望忽略空格、制表符、回车符、换行符等无意义字符。</p>
 
-<p>```
-WS</p>
-
-<pre><code>: (' '|'\r'|'\t'|'\u000C'|'\n') {$channel=HIDDEN;}
-;
+<pre><code>WS
+    : (' '|'\r'|'\t'|'\u000C'|'\n') {$channel=HIDDEN;}
+    ;
 </code></pre>
-
-<p>```</p>
 
 <p>测试代码：</p>
 
-<p><code>
-/* This is a single-line comment.   */
+<pre><code>/* This is a single-line comment.   */
 /* /This is a single-line comment. */
 /* *This is a single-line comment. */
 /* This comment /* */*/
@@ -470,60 +385,48 @@ WS</p>
 // /This entire line is a comment.
 // This entire line is a comment. */
 // This entire line is a comment. /*
-</code></p>
+</code></pre>
 
 <p>PowerScript.g的内容如下：</p>
 
-<p>```
-grammar PowerScript;</p>
+<pre><code>grammar PowerScript;
 
-<p>program</p>
+program
+    : LINE_COMMENT+
+    | BLOCK_COMMENT+
+    ;
 
-<pre><code>: LINE_COMMENT+
-| BLOCK_COMMENT+
-;
+LINE_COMMENT
+    : '//' ~('\n'|'\r')* EndOfLine
+      {
+          System.out.println("lc&gt;" + getText());
+      }
+    ;
+
+BLOCK_COMMENT
+    : '/*'
+      ( options {greedy=false;}
+      : ('/' '*')=&gt;; BLOCK_COMMENT
+      | '/' ~('*')
+      | ~('/')
+      )*
+      '*/'
+      {
+          System.out.println("bc&gt;" + getText());
+      }
+    ;
+
+WS
+    : (' '|'\r'|'\t'|'\u000C'|'\n') {$channel=HIDDEN;}
+    ;
+
+fragment
+EndOfLine
+    : '\r' '\n' // DOS
+    | '\r'      // Mac
+    | '\n'      // Unix
+    ;
 </code></pre>
-
-<p>LINE_COMMENT</p>
-
-<pre><code>: '//' ~('\n'|'\r')* EndOfLine
-  {
-      System.out.println("lc&gt;" + getText());
-  }
-;
-</code></pre>
-
-<p>BLOCK_COMMENT</p>
-
-<pre><code>: '/*'
-  ( options {greedy=false;}
-  : ('/' '*')=&gt;; BLOCK_COMMENT
-  | '/' ~('*')
-  | ~('/')
-  )*
-  '*/'
-  {
-      System.out.println("bc&gt;" + getText());
-  }
-;
-</code></pre>
-
-<p>WS</p>
-
-<pre><code>: (' '|'\r'|'\t'|'\u000C'|'\n') {$channel=HIDDEN;}
-;
-</code></pre>
-
-<p>fragment
-EndOfLine</p>
-
-<pre><code>: '\r' '\n' // DOS
-| '\r'      // Mac
-| '\n'      // Unix
-;
-</code></pre>
-
-<p>```</p>
 ]]></content>
   </entry>
   

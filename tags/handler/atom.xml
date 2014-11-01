@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Handler | 乐者为王]]></title>
   <link href="http://codemany.com/tags/handler/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-11-01T15:23:01+08:00</updated>
+  <updated>2014-11-02T04:09:41+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -24,56 +24,48 @@
 
 <p>我们在加载数据前显示ProgressDialog，在之后关闭对话框。示例代码如下：</p>
 
-<p>```
-ProgressDialog pd = ProgressDialog.show(this, "Wait", "loading...");</p>
+<pre><code>ProgressDialog pd = ProgressDialog.show(this, "Wait", "loading...");
 
-<p>ListView lv = (ListView)findViewById(R.id.list_view);
-adapter = new SimpleIconAdapter(this,</p>
+ListView lv = (ListView)findViewById(R.id.list_view);
+adapter = new SimpleIconAdapter(this,
+        getInstalledApps(false),
+        R.layout.list_item,
+        new String[] {APP_ICON, APP_TITLE, APP_PACKAGE},
+        new int[] {R.id.app_icon, R.id.app_title, R.id.app_package});
+lv.setAdapter(adapter);
 
-<pre><code>    getInstalledApps(false),
-    R.layout.list_item,
-    new String[] {APP_ICON, APP_TITLE, APP_PACKAGE},
-    new int[] {R.id.app_icon, R.id.app_title, R.id.app_package});
+pd.dismiss();
 </code></pre>
-
-<p>lv.setAdapter(adapter);</p>
-
-<p>pd.dismiss();
-```</p>
 
 <p>但结果ProgressDialog没有显示出来，因为加载数据的代码也执行在UI线程中，所以对话框的显示被阻塞了。怎么办呢？可以试着创建一个新线程，然后把加载数据这个耗时的操作放到这个非UI线程中去执行，这样不就可以了么：</p>
 
-<p>```
-ProgressDialog pd = ProgressDialog.show(this, "Wait", "loading...");</p>
+<pre><code>ProgressDialog pd = ProgressDialog.show(this, "Wait", "loading...");
 
-<p>new Thread() {</p>
+new Thread() {
+    @Override
+    public void run() {
+        ListView lv = (ListView)findViewById(R.id.list_view);
+        adapter = new SimpleIconAdapter(Main.this,
+                getInstalledApps(false),
+                R.layout.list_item,
+                new String[] {APP_ICON, APP_TITLE, APP_PACKAGE},
+                new int[] {R.id.app_icon, R.id.app_title, R.id.app_package});
+        lv.setAdapter(adapter);
+    }
+}.start();
 
-<pre><code>@Override
-public void run() {
-    ListView lv = (ListView)findViewById(R.id.list_view);
-    adapter = new SimpleIconAdapter(Main.this,
-            getInstalledApps(false),
-            R.layout.list_item,
-            new String[] {APP_ICON, APP_TITLE, APP_PACKAGE},
-            new int[] {R.id.app_icon, R.id.app_title, R.id.app_package});
-    lv.setAdapter(adapter);
-}
+pd.dismiss();
 </code></pre>
-
-<p>}.start();</p>
-
-<p>pd.dismiss();
-```</p>
 
 <p>这下更惨了，直接报Runtime异常，连界面都打不开了。</p>
 
 <p>深入研究一下Android的线程模型，看看Android到底是怎么处理UI线程和其它线程的交互的，为什么上面的代码会报异常?</p>
 
-<blockquote><p>When an application is launched, the system creates a thread called "main" for the application. The main thread, also called the UI thread, is very important because it is in charge of dispatching the events to the appropriate widgets, including drawing events. It is also the thread where your application interacts with running components of the Android UI toolkit.</p>
+<blockquote><p>When an application is launched, the system creates a thread called &ldquo;main&rdquo; for the application. The main thread, also called the UI thread, is very important because it is in charge of dispatching the events to the appropriate widgets, including drawing events. It is also the thread where your application interacts with running components of the Android UI toolkit.</p>
 
 <p>For instance, if you touch the a button on screen, the UI thread dispatches the touch event to the widget, which in turn sets its pressed state and posts an invalidate request to the event queue. The UI thread dequeues the request and notifies the widget to redraw itself.</p>
 
-<p>This single-thread model can yield poor performance unless your application is implemented properly. Specifically, if everything is happening in a single thread, performing long operations such as network access or database queries on the UI thread will block the whole user interface. No event can be dispatched, including drawing events, while the long operation is underway. From the user's perspective, the application appears hung. Even worse, if the UI thread is blocked for more than a few seconds (about 5 seconds currently) the user is presented with the infamous "application not responding" (ANR) dialog.</p></blockquote>
+<p>This single-thread model can yield poor performance unless your application is implemented properly. Specifically, if everything is happening in a single thread, performing long operations such as network access or database queries on the UI thread will block the whole user interface. No event can be dispatched, including drawing events, while the long operation is underway. From the user&rsquo;s perspective, the application appears hung. Even worse, if the UI thread is blocked for more than a few seconds (about 5 seconds currently) the user is presented with the infamous &ldquo;application not responding&rdquo; (ANR) dialog.</p></blockquote>
 
 <p>看了上面这段话可以知道为啥程序一打开就黑屏，像挂掉了一样。</p>
 
@@ -93,14 +85,13 @@ public void run() {
 
 <p>其实这些方案背后采用的都是Handler。所以这里仍然使用旧有的，复杂的Handler来修复上述问题。</p>
 
-<p>```
-package com.codemany.apkmgt;</p>
+<pre><code>package com.codemany.apkmgt;
 
-<p>import java.util.ArrayList;
+import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;</p>
+import java.util.List;
 
-<p>import android.app.Activity;
+import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
@@ -108,56 +99,53 @@ import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
-import android.widget.ListView;</p>
+import android.widget.ListView;
 
-<p>public class MainActivity extends Activity {</p>
+public class MainActivity extends Activity {
+    private static final String APP_ICON = "app_icon";
+    private static final String APP_TITLE = "app_title";
+    private static final String APP_PACKAGE = "app_package";
 
-<pre><code>private static final String APP_ICON = "app_icon";
-private static final String APP_TITLE = "app_title";
-private static final String APP_PACKAGE = "app_package";
+    private SimpleIconAdapter adapter;
+    private List&lt;HashMap&lt;String, Object&gt;&gt; listData;
+    private ProgressDialog pd;
 
-private SimpleIconAdapter adapter;
-private List&lt;HashMap&lt;String, Object&gt;&gt; listData;
-private ProgressDialog pd;
-
-@Override
-public void onCreate(Bundle savedInstanceState) {
-    super.onCreate(savedInstanceState);
-    setContentView(R.layout.main);
-
-    ListView lv = (ListView)findViewById(R.id.list_view);
-    listData = new ArrayList&lt;HashMap&lt;String, Object&gt;&gt;();
-    adapter = new SimpleIconAdapter(this,
-            listData,
-            R.layout.list_item,
-            new String[] {APP_ICON, APP_TITLE, APP_PACKAGE},
-            new int[] {R.id.app_icon, R.id.app_title, R.id.app_package});
-    lv.setAdapter(adapter);
-
-    pd = ProgressDialog.show(this, "Wait", "loading...");
-
-    new Thread() {
-        @Override
-        public void run() {
-            // 耗时操作，加载数据
-            listData.addAll(getInstalledApps(false));
-            handler.sendEmptyMessage(0);
-        }
-    }.start();
-}
-
-private Handler handler = new Handler() {
     @Override
-    public void handleMessage(Message msg) {
-        // 通知UI更新。必须要放在这里
-        adapter.notifyDataSetChanged();
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.main);
 
-        pd.dismiss();
+        ListView lv = (ListView)findViewById(R.id.list_view);
+        listData = new ArrayList&lt;HashMap&lt;String, Object&gt;&gt;();
+        adapter = new SimpleIconAdapter(this,
+                listData,
+                R.layout.list_item,
+                new String[] {APP_ICON, APP_TITLE, APP_PACKAGE},
+                new int[] {R.id.app_icon, R.id.app_title, R.id.app_package});
+        lv.setAdapter(adapter);
+
+        pd = ProgressDialog.show(this, "Wait", "loading...");
+
+        new Thread() {
+            @Override
+            public void run() {
+                // 耗时操作，加载数据
+                listData.addAll(getInstalledApps(false));
+                handler.sendEmptyMessage(0);
+            }
+        }.start();
     }
-};
-</code></pre>
 
-<p>```</p>
+    private Handler handler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            // 通知UI更新。必须要放在这里
+            adapter.notifyDataSetChanged();
+
+            pd.dismiss();
+        }
+    };
+</code></pre>
 ]]></content>
   </entry>
   

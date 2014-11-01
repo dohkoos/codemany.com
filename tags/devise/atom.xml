@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: devise | 乐者为王]]></title>
   <link href="http://codemany.com/tags/devise/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-11-01T15:23:01+08:00</updated>
+  <updated>2014-11-02T04:09:41+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -22,247 +22,199 @@
 
 <p>首先是创建项目：</p>
 
-<p><code>
-rails new qianbao
+<pre><code>rails new qianbao
 cd qianbao
 rails g scaffold entry amount:decimal tags:string effective_date:date
 rails g controller home index
-</code></p>
+</code></pre>
 
 <p>删除public/index.html，在config/routes.rb中添加根路由：</p>
 
-<p><code>
-root :to =&gt; 'home#index'
-</code></p>
+<pre><code>root :to =&gt; 'home#index'
+</code></pre>
 
 <p>现在要给应用加上一个认证系统（注册、激活、登录、登出），这次使用<a href="https://github.com/plataformatec/devise">devise</a>插件实现。</p>
 
 <p>在Gemfile中添加：</p>
 
-<p><code>
-gem 'devise'
-</code></p>
+<pre><code>gem 'devise'
+</code></pre>
 
 <p>然后执行下列命令：</p>
 
-<p><code>
-bundle install
+<pre><code>bundle install
 rails g devise:install
 rails g devise user
 rails g devise:views
-</code></p>
+</code></pre>
 
 <p>创建一个迁移任务，把User和Entry模型关联起来：</p>
 
-<p>```
-class AddUserIdToEntries &lt; ActiveRecord::Migration
-  def change</p>
+<pre><code>class AddUserIdToEntries &lt; ActiveRecord::Migration
+  def change
+    add_column :entries, :user_id, :integer
 
-<pre><code>add_column :entries, :user_id, :integer
-
-add_index :entries, :user_id
-</code></pre>
-
-<p>  end
+    add_index :entries, :user_id
+  end
 end
-```</p>
+</code></pre>
 
 <p>修改Entry和User模型：</p>
 
-<p>```
-class Entry &lt; ActiveRecord::Base
-  validates :effective_date, :presence => true
-  validates :amount,         :presence => true,</p>
+<pre><code>class Entry &lt; ActiveRecord::Base
+  validates :effective_date, :presence =&gt; true
+  validates :amount,         :presence =&gt; true,
+                             :numericality =&gt; {:greater_than =&gt; 0.0},
+                             :format =&gt; {:with =&gt; /^\d+??(?:\.\d{0,2})?$/}
+  validates :tags,           :presence =&gt; true,
+                             :length =&gt; { :within =&gt; 1..255 }
 
-<pre><code>                         :numericality =&gt; {:greater_than =&gt; 0.0},
-                         :format =&gt; {:with =&gt; /^\d+??(?:\.\d{0,2})?$/}
+  belongs_to :user
 </code></pre>
 
-<p>  validates :tags,           :presence => true,</p>
-
-<pre><code>                         :length =&gt; { :within =&gt; 1..255 }
-</code></pre>
-
-<p>  belongs_to :user
-```</p>
-
-<p><code>
-class User &lt; ActiveRecord::Base
+<pre><code>class User &lt; ActiveRecord::Base
   has_many :users
-</code></p>
+</code></pre>
 
 <p>修改app/views/home/index.html.erb为如下内容：</p>
 
-<p>```</p>
+<p>&#8220;`</p>
 
 <h1>Welcom to Qianbao!</h1>
 
 
 <p>&lt;% if user_signed_in? %>
-  <p></p>
-
-<pre><code>&lt;strong&gt;&lt;%=link_to current_user.email, edit_user_registration_path %&gt;&lt;/strong&gt;
-&lt;%= link_to 'Logout', destroy_user_session_path, :method =&gt; :delete %&gt;
-</code></pre>
-
-<p>  </p>
-  &lt;%= link_to "All Entries", entries_path %>
+  <p>
+    <strong>&lt;%=link_to current_user.email, edit_user_registration_path %></strong>
+    &lt;%= link_to &lsquo;Logout&rsquo;, destroy_user_session_path, :method => :delete %>
+  </p>
+  &lt;%= link_to &ldquo;All Entries&rdquo;, entries_path %>
 &lt;% else %>
-  <p></p>
-
-<pre><code>&lt;strong&gt;You are currently not logged in.&lt;/strong&gt;
-&lt;%= link_to 'Login', new_user_session_path %&gt; or
-&lt;%= link_to 'Sign up', new_user_registration_path %&gt;
-</code></pre>
-
-<p>  </p>
+  <p>
+    <strong>You are currently not logged in.</strong>
+    &lt;%= link_to &lsquo;Login&rsquo;, new_user_session_path %> or
+    &lt;%= link_to &lsquo;Sign up&rsquo;, new_user_registration_path %>
+  </p>
 &lt;% end %>
-```</p>
+&#8220;`</p>
 
 <p>修改app/controller/entries_controller.rb：</p>
 
-<p>```
-class EntriesController &lt; ApplicationController
-  before_filter :authenticate_user!</p>
+<pre><code>class EntriesController &lt; ApplicationController
+  before_filter :authenticate_user!
 
-<p>  # GET /entries
+  # GET /entries
   # GET /entries.json
-  def index</p>
+  def index
+    @entries = current_user.entries
 
-<pre><code>@entries = current_user.entries
+    respond_to do |format|
+      format.html # index.html.erb
+      format.json { render json: @entries }
+    end
+  end
 
-respond_to do |format|
-  format.html # index.html.erb
-  format.json { render json: @entries }
-end
-</code></pre>
-
-<p>  end</p>
-
-<p>  # GET /entries/1
+  # GET /entries/1
   # GET /entries/1.json
-  def show</p>
+  def show
+    @entry = current_user.entries.find(params[:id])
 
-<pre><code>@entry = current_user.entries.find(params[:id])
+    respond_to do |format|
+      format.html # show.html.erb
+      format.json { render json: @entry }
+    end
+  end
 
-respond_to do |format|
-  format.html # show.html.erb
-  format.json { render json: @entry }
-end
-</code></pre>
-
-<p>  end</p>
-
-<p>  # GET /entries/new
+  # GET /entries/new
   # GET /entries/new.json
-  def new</p>
+  def new
+    @entry = current_user.entries.new
 
-<pre><code>@entry = current_user.entries.new
+    respond_to do |format|
+      format.html # new.html.erb
+      format.json { render json: @entry }
+    end
+  end
 
-respond_to do |format|
-  format.html # new.html.erb
-  format.json { render json: @entry }
-end
-</code></pre>
+  # GET /entries/1/edit
+  def edit
+    @entry = current_user.entries.find(params[:id])
+  end
 
-<p>  end</p>
-
-<p>  # GET /entries/1/edit
-  def edit</p>
-
-<pre><code>@entry = current_user.entries.find(params[:id])
-</code></pre>
-
-<p>  end</p>
-
-<p>  # POST /entries
+  # POST /entries
   # POST /entries.json
-  def create</p>
+  def create
+    @entry = current_user.entries.new(params[:entry])
+    @entry.user = current_user
 
-<pre><code>@entry = current_user.entries.new(params[:entry])
-@entry.user = current_user
-
-respond_to do |format|
-  if @entry.save
-    format.html { redirect_to @entry, notice: 'Entry was successfully created.' }
-    format.json { render json: @entry, status: :created, location: @entry }
-  else
-    format.html { render action: "new" }
-    format.json { render json: @entry.errors, status: :unprocessable_entity }
+    respond_to do |format|
+      if @entry.save
+        format.html { redirect_to @entry, notice: 'Entry was successfully created.' }
+        format.json { render json: @entry, status: :created, location: @entry }
+      else
+        format.html { render action: "new" }
+        format.json { render json: @entry.errors, status: :unprocessable_entity }
+      end
+    end
   end
-end
-</code></pre>
 
-<p>  end</p>
-
-<p>  # PUT /entries/1
+  # PUT /entries/1
   # PUT /entries/1.json
-  def update</p>
+  def update
+    @entry = current_user.entries.find(params[:id])
 
-<pre><code>@entry = current_user.entries.find(params[:id])
+    respond_to do |format|
+      if @entry.update_attributes(params[:entry])
+        format.html { redirect_to @entry, notice: 'Entry was successfully updated.' }
+        format.json { head :no_content }
+      else
+        format.html { render action: "edit" }
+        format.json { render json: @entry.errors, status: :unprocessable_entity }
+      end
+    end
+  end
 
-respond_to do |format|
-  if @entry.update_attributes(params[:entry])
-    format.html { redirect_to @entry, notice: 'Entry was successfully updated.' }
-    format.json { head :no_content }
-  else
-    format.html { render action: "edit" }
-    format.json { render json: @entry.errors, status: :unprocessable_entity }
+  # DELETE /entries/1
+  # DELETE /entries/1.json
+  def destroy
+    @entry = current_user.entries.find(params[:id])
+    @entry.destroy
+
+    respond_to do |format|
+      format.html { redirect_to entries_url }
+      format.json { head :no_content }
+    end
   end
 end
 </code></pre>
-
-<p>  end</p>
-
-<p>  # DELETE /entries/1
-  # DELETE /entries/1.json
-  def destroy</p>
-
-<pre><code>@entry = current_user.entries.find(params[:id])
-@entry.destroy
-
-respond_to do |format|
-  format.html { redirect_to entries_url }
-  format.json { head :no_content }
-end
-</code></pre>
-
-<p>  end
-end
-```</p>
 
 <p>执行以下命令启动应用：</p>
 
-<p><code>
-rake db:migrate
+<pre><code>rake db:migrate
 rails s
-</code></p>
+</code></pre>
 
 <p>以前的版本用的CSS框架是<a href="http://blueprintcss.org/">Blueprint</a>，这次使用比它更方便快捷的<a href="https://github.com/twitter/bootstrap">Bootstrap</a>。Bootstrap建立在Less上，有个<a href="https://github.com/metaskills/less-rails-bootstrap">less-rails-bootstrap</a>，不过在安装libv8时竟然要提示缺少Python，拜托！我用的是Ruby，要我装Python，啥意思啊！还是找个Sass版的Bootstrap吧。</p>
 
 <p>下载<a href="https://github.com/jlong/sass-twitter-bootstrap">sass-twitter-bootstrap</a>：</p>
 
-<p><code>
-git clone https://github.com/jlong/sass-twitter-bootstrap.git
-</code></p>
+<pre><code>git clone https://github.com/jlong/sass-twitter-bootstrap.git
+</code></pre>
 
 <p>将sass-twitter-bootstrap/lib中的文件拷贝到app/assets/stylesheets/twitter目录下。然后将app/assets/stylesheets/application.css中的</p>
 
-<p><code>
-*= require_tree .
-</code></p>
+<pre><code>*= require_tree .
+</code></pre>
 
 <p>修改为</p>
 
-<p><code>
-*= require twitter/bootstrap
-</code></p>
+<pre><code>*= require twitter/bootstrap
+</code></pre>
 
 <p>再在文件末尾添加：</p>
 
-<p><code>
-body { padding-top: 60px; }
-</code></p>
+<pre><code>body { padding-top: 60px; }
+</code></pre>
 
 <p>现在就可以使用Bootstrap来布局美化应用了。</p>
 

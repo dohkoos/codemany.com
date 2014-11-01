@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Android | 乐者为王]]></title>
   <link href="http://codemany.com/tags/android/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-11-01T15:23:01+08:00</updated>
+  <updated>2014-11-02T04:09:41+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -20,122 +20,108 @@
     <id>http://codemany.com/blog/manage-books-by-scanning-isbn-barcode</id>
     <content type="html"><![CDATA[<p>每个程序猿家里都有一堆技术书籍，偶也不例外，因此想写个Android应用来管理自己的藏书以及想买的书籍。在网上找到marshal的<a href="http://marshal.easymorse.com/archives/2745">识别图书ISBN号并输出查询结果的示例</a>和<a href="http://marshal.easymorse.com/archives/2756">完善图书查询原型，增加收藏夹功能</a>两篇文章，写的非常不错，还提供源代码。下载代码研究后发现已基本具备了想要的功能，决定在它的基础上做些修改供自己使用。</p>
 
-<p>把原来uses-sdk的minSdkVersion改成了9，增加android:targetSdkVersion="17"。然后使用手机测试程序时发现，在连接网络时后台会抛出了android.os.NetworkOnMainThreadException异常，并且应用崩溃打不开。通过查阅相关资料了解到，自从Android 2.3之后，系统增加了一个类StrictMode。这个类对网络的访问方式进行了一定的改变。官方文档给出了这个类设置的目的：</p>
+<p>把原来uses-sdk的minSdkVersion改成了9，增加android:targetSdkVersion=&ldquo;17&#8221;。然后使用手机测试程序时发现，在连接网络时后台会抛出了android.os.NetworkOnMainThreadException异常，并且应用崩溃打不开。通过查阅相关资料了解到，自从Android 2.3之后，系统增加了一个类StrictMode。这个类对网络的访问方式进行了一定的改变。官方文档给出了这个类设置的目的：</p>
 
 <blockquote><p>StrictMode is a developer tool which detects things you might be doing by accident and brings them to your attention so you can fix them.</p>
 
-<p>StrictMode is most commonly used to catch accidental disk or network access on the application's main thread, where UI operations are received and animations take place. Keeping disk and network operations off the main thread makes for much smoother, more responsive applications. By keeping your application's main thread responsive, you also prevent ANR dialogs from being shown to users.</p>
+<p>StrictMode is most commonly used to catch accidental disk or network access on the application&rsquo;s main thread, where UI operations are received and animations take place. Keeping disk and network operations off the main thread makes for much smoother, more responsive applications. By keeping your application&rsquo;s main thread responsive, you also prevent ANR dialogs from being shown to users.</p>
 
-<p>Note that even though an Android device's disk is often on flash memory, many devices run a filesystem on top of that memory with very limited concurrency. It's often the case that almost all disk accesses are fast, but may in individual cases be dramatically slower when certain I/O is happening in the background from other processes. If possible, it's best to assume that such things are not fast.</p></blockquote>
+<p>Note that even though an Android device&rsquo;s disk is often on flash memory, many devices run a filesystem on top of that memory with very limited concurrency. It&rsquo;s often the case that almost all disk accesses are fast, but may in individual cases be dramatically slower when certain I/O is happening in the background from other processes. If possible, it&rsquo;s best to assume that such things are not fast.</p></blockquote>
 
 <p>因为marshal把访问网络的代码直接放到UI线程中，造成和主线程的首要工作——UI交互——相矛盾。解决这类问题很容易，把访问网络的代码放到AsyncTask中就行了。官方有个<a href="http://developer.android.com/training/basics/network-ops/index.html">NetworkUsage</a>例子是个不错的参考。</p>
 
 <p>接着发现豆瓣API查询返回的是500错误，在浏览器上访问却又正常，后来给HttpClient加上Agent头就没问题了，不知道是不是期间豆瓣的API在实现上作了改变。</p>
 
-<p><code>
-HttpClient client = new DefaultHttpClient();
+<pre><code>HttpClient client = new DefaultHttpClient();
 String agent = System.getProperty("http.agent");
 client.getParams().setParameter(CoreProtocolPNames.USER_AGENT, agent);
-</code></p>
+</code></pre>
 
 <p>解析豆瓣XML查询结果的代码：</p>
 
-<p>```
-XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+<pre><code>XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
 factory.setNamespaceAware(true);
 XmlPullParser parser = factory.newPullParser();
 parser.setInput(inputStream, "utf-8");
-Book book = new Book();</p>
+Book book = new Book();
 
-<p>int eventType = parser.getEventType();
-while (eventType != XmlPullParser.END_DOCUMENT) {</p>
-
-<pre><code>switch (eventType) {
-case XmlPullParser.START_TAG:
-    if ("link".equals(parser.getName())
-            &amp;&amp; "image".equals(parser.getAttributeValue(null, "rel"))) {
-        book.setImageUrl(parser.getAttributeValue(null, "href"));
-        eventType = parser.next();
-    } else if ("summary".equals(parser.getName())) {
-        book.setSummary(parser.nextText());
-    } else if ("attribute".equals(parser.getName())) {
-        String name = parser.getAttributeValue(null, "name");
-        if ("title".equals(name)) {
-            book.setTitle(parser.nextText());
-        } else if ("author".equals(name)) {
-            book.setAuthor(parser.nextText());
-        } else if ("isbn10".equals(name)) {
-            book.setIsbn10(parser.nextText());
-        } else if ("isbn13".equals(name)) {
-            book.setIsbn13(parser.nextText());
-        } else if ("publisher".equals(name)) {  
-            book.setPublisher(parser.getText());
-        }                   
+int eventType = parser.getEventType();
+while (eventType != XmlPullParser.END_DOCUMENT) {
+    switch (eventType) {
+    case XmlPullParser.START_TAG:
+        if ("link".equals(parser.getName())
+                &amp;&amp; "image".equals(parser.getAttributeValue(null, "rel"))) {
+            book.setImageUrl(parser.getAttributeValue(null, "href"));
+            eventType = parser.next();
+        } else if ("summary".equals(parser.getName())) {
+            book.setSummary(parser.nextText());
+        } else if ("attribute".equals(parser.getName())) {
+            String name = parser.getAttributeValue(null, "name");
+            if ("title".equals(name)) {
+                book.setTitle(parser.nextText());
+            } else if ("author".equals(name)) {
+                book.setAuthor(parser.nextText());
+            } else if ("isbn10".equals(name)) {
+                book.setIsbn10(parser.nextText());
+            } else if ("isbn13".equals(name)) {
+                book.setIsbn13(parser.nextText());
+            } else if ("publisher".equals(name)) {  
+                book.setPublisher(parser.getText());
+            }                   
+        }
+        break;
+    case XmlPullParser.END_TAG:
+        break;
     }
-    break;
-case XmlPullParser.END_TAG:
-    break;
+    eventType = parser.next();
 }
-eventType = parser.next();
 </code></pre>
-
-<p>}
-```</p>
 
 <p>然后，然后就是结果页面不显示图书信息。想要找到原因，肿么办？看来要调试WebView了！<a href="http://developer.android.com/guide/webapps/debugging.html">http://developer.android.com/guide/webapps/debugging.html</a> 告诉了我们如何调试。</p>
 
 <p>首先在WebView上设置setWebChromeClient方法：</p>
 
-<p>```
-webView.setWebChromeClient(new WebChromeClient() {</p>
-
-<pre><code>public void onConsoleMessage(String message,
-        int lineNumber, String sourceID) {
-    Log.d(TAG, message + " -- From line "
-            + lineNumber + " of " + sourceID);
-}
+<pre><code>webView.setWebChromeClient(new WebChromeClient() {
+    public void onConsoleMessage(String message,
+            int lineNumber, String sourceID) {
+        Log.d(TAG, message + " -- From line "
+                + lineNumber + " of " + sourceID);
+    }
+});
 </code></pre>
-
-<p>});
-```</p>
 
 <p>然后在JavaScript脚本中使用以下方法就可以在logcat中看到调试信息了。</p>
 
-<p><code>
-console.log(String)
+<pre><code>console.log(String)
 console.info(String)
 console.warn(String)
 console.error(String)
-</code></p>
+</code></pre>
 
 <p>重新运行程序，果然在logcat中看到报如下错误：</p>
 
-<p><code>
-Uncaught TypeError: Object [object Object] has no method...
-</code></p>
+<pre><code>Uncaught TypeError: Object [object Object] has no method...
+</code></pre>
 
 <p>搜索后在Stack Overflow找到了<a href="http://stackoverflow.com/questions/14031635/android-4-2-1-webview-and-javascript-interface-breaks">问题的答案</a>（Stack Overflow真的非常不错，问题的回答都非常详尽）。<a href="http://developer.android.com/guide/webapps/webview.html#BindingJavaScript">http://developer.android.com/guide/webapps/webview.html#BindingJavaScript</a> 是官方文档的解释。</p>
 
 <p>解决方法就是在要被JavaScript调用的方法上加@JavascriptInterface注解：</p>
 
-<p>```
-public class Book {</p>
+<pre><code>public class Book {
 
-<pre><code>@JavascriptInterface
-public String getAuthor() {
-    return author;
-}
-
-public void setAuthor(String author) {
-    if (this.author != null) {
-        this.author += ", " + author;
-    } else {
-        this.author = author;
+    @JavascriptInterface
+    public String getAuthor() {
+        return author;
     }
-}
-</code></pre>
 
-<p>```</p>
+    public void setAuthor(String author) {
+        if (this.author != null) {
+            this.author += ", " + author;
+        } else {
+            this.author = author;
+        }
+    }
+</code></pre>
 ]]></content>
   </entry>
   
@@ -179,21 +165,19 @@ public void setAuthor(String author) {
 
 <p>3、下载官方镜像，解压缩。成功解压缩后应该会得到五个文件：</p>
 
-<p><code>
-flash-all.sh
+<pre><code>flash-all.sh
 flash-base.sh
 radio-maguro-i9250xxla02.img
 bootloader-maguro-primela03.img
 image-yakju-imm76i.zip
-</code></p>
+</code></pre>
 
 <p>4、下载Galaxy-Nexus-fastboot-v2.0.zip，解压缩。将上面得到的官方固件拷贝到目录下重命名。规则如下：</p>
 
-<p><code>
-刷基带请将radio-{version}.img重命名为radio.img
+<pre><code>刷基带请将radio-{version}.img重命名为radio.img
 刷BL请将bootloader-{version}.img重命名为bootloader.img
 刷固件请将image-{version}.zip重命名为image.zip
-</code></p>
+</code></pre>
 
 <p>5、关机进入fastboot模式（在关机状态下同时按“音量+”和“音量-”和“电源”三个键，等待机器发出轻微震动即可放开）</p>
 
@@ -216,86 +200,78 @@ image-yakju-imm76i.zip
     <id>http://codemany.com/blog/progressbar-does-not-work-when-reopen-progressdialog-using-showdialog</id>
     <content type="html"><![CDATA[<p>先来看段代码：</p>
 
-<p>```
-&lt;?xml version="1.0" encoding="utf-8"?>
-&lt;LinearLayout xmlns:android="<a href="http://schemas.android.com/apk/res/android">http://schemas.android.com/apk/res/android</a>"</p>
-
-<pre><code>android:layout_width="fill_parent"
-android:layout_height="fill_parent"
-android:orientation="vertical"&gt;
-&lt;Button
+<pre><code>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="fill_parent"
-    android:layout_height="wrap_content"
-    android:text="Copy Contacts"
-    android:onClick="copyContacts" /&gt;
+    android:layout_height="fill_parent"
+    android:orientation="vertical"&gt;
+    &lt;Button
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:text="Copy Contacts"
+        android:onClick="copyContacts" /&gt;
+&lt;/LinearLayout&gt;
 </code></pre>
 
-<p></LinearLayout>
-```</p>
-
-<p>```
-import android.app.Activity;
+<pre><code>import android.app.Activity;
 import android.app.Dialog;
 import android.app.ProgressDialog;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.view.View;</p>
+import android.view.View;
 
-<p>public class DialogActivity extends Activity {</p>
+public class DialogActivity extends Activity {
+    private static final int COPY_CONTACTS = 0;
 
-<pre><code>private static final int COPY_CONTACTS = 0;
+    private ProgressDialog mProgressDialog;
 
-private ProgressDialog mProgressDialog;
-
-@Override
-public void onCreate(Bundle savedInstanceState) {
-    super.onCreate(savedInstanceState);
-    setContentView(R.layout.main);
-}
-
-public void copyContacts(View target) {
-    showDialog(COPY_CONTACTS);
-}
-
-@Override
-protected Dialog onCreateDialog(int id) {
-    switch (id) {
-    case COPY_CONTACTS:
-        mProgressDialog = new ProgressDialog(this);
-        mProgressDialog.setTitle("Copy contacts");
-        mProgressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
-        mProgressDialog.setMax(100);
-        new AsyncCopyContactsTask().execute();
-        break;
-    }
-    return mProgressDialog;
-}
-
-private class AsyncCopyContactsTask extends AsyncTask&lt;Void, Void, Integer&gt; {
     @Override
-    protected Integer doInBackground(Void... params) {
-        for (int i = 0; i &lt; 100; i++) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-            }
-            publishProgress();
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.main);
+    }
+
+    public void copyContacts(View target) {
+        showDialog(COPY_CONTACTS);
+    }
+
+    @Override
+    protected Dialog onCreateDialog(int id) {
+        switch (id) {
+        case COPY_CONTACTS:
+            mProgressDialog = new ProgressDialog(this);
+            mProgressDialog.setTitle("Copy contacts");
+            mProgressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+            mProgressDialog.setMax(100);
+            new AsyncCopyContactsTask().execute();
+            break;
         }
-        return 0;
+        return mProgressDialog;
     }
 
-    protected void onProgressUpdate(Void... progress) {
-        mProgressDialog.incrementProgressBy(1);
-    }
+    private class AsyncCopyContactsTask extends AsyncTask&lt;Void, Void, Integer&gt; {
+        @Override
+        protected Integer doInBackground(Void... params) {
+            for (int i = 0; i &lt; 100; i++) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                }
+                publishProgress();
+            }
+            return 0;
+        }
 
-    protected void onPostExecute(Integer result) {
-        mProgressDialog.dismiss();
+        protected void onProgressUpdate(Void... progress) {
+            mProgressDialog.incrementProgressBy(1);
+        }
+
+        protected void onPostExecute(Integer result) {
+            mProgressDialog.dismiss();
+        }
     }
 }
 </code></pre>
-
-<p>}
-```</p>
 
 <p>第一次点击按钮会显示一个进度条，上面的数字处于变动当中，到达最大值后进度条会消失不见；再次点击按钮后，就会发现进度条上的数值和消失前相同，并且不再变化，而且进度条也不会消失。这是为什么呢？</p>
 
@@ -322,75 +298,67 @@ private class AsyncCopyContactsTask extends AsyncTask&lt;Void, Void, Integer&gt;
 
 <p>这里对该教程做了些改进，使之能做到适应不定的工具栏项或屏幕大小。改进后的布局代码如下：</p>
 
-<p>```
-&lt;?xml version="1.0" encoding="utf-8"?>
-&lt;LinearLayout xmlns:android="<a href="http://schemas.android.com/apk/res/android">http://schemas.android.com/apk/res/android</a>"</p>
-
-<pre><code>android:orientation="vertical"
-android:layout_width="fill_parent"
-android:layout_height="fill_parent"&gt;
-&lt;LinearLayout
+<pre><code>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
     android:layout_width="fill_parent"
-    android:layout_height="0dip"
-    android:layout_weight="1.0"&gt;
-    &lt;ScrollView
+    android:layout_height="fill_parent"&gt;
+    &lt;LinearLayout
         android:layout_width="fill_parent"
-        android:layout_height="fill_parent"
-        android:scrollbars="vertical"
-        android:fadingEdge="vertical"&gt;
-        &lt;TextView
-            android:id="@+id/content"
+        android:layout_height="0dip"
+        android:layout_weight="1.0"&gt;
+        &lt;ScrollView
             android:layout_width="fill_parent"
-            android:layout_height="wrap_content"
-            android:textSize="17dip" /&gt;
-    &lt;/ScrollView&gt;
+            android:layout_height="fill_parent"
+            android:scrollbars="vertical"
+            android:fadingEdge="vertical"&gt;
+            &lt;TextView
+                android:id="@+id/content"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:textSize="17dip" /&gt;
+        &lt;/ScrollView&gt;
+    &lt;/LinearLayout&gt;
+
+    &lt;include layout="@layout/toolbar" /&gt;
 &lt;/LinearLayout&gt;
-
-&lt;include layout="@layout/toolbar" /&gt;
 </code></pre>
-
-<p></LinearLayout>
-```</p>
 
 <p>以下是工具栏toolbar.xml的布局代码：</p>
 
-<p>```
-&lt;?xml version="1.0" encoding="utf-8"?>
-&lt;LinearLayout xmlns:android="<a href="http://schemas.android.com/apk/res/android">http://schemas.android.com/apk/res/android</a>"</p>
-
-<pre><code>android:orientation="horizontal"
-android:layout_width="fill_parent"
-android:layout_height="wrap_content"
-android:background="@drawable/toolbar_bg"&gt;
-&lt;ImageButton
-    android:id="@+id/btn_index"
-    android:src="@drawable/index"
-    android:text="@string/index"
-    style="@style/toolbar" /&gt;
-&lt;ImageButton
-    android:id="@+id/btn_prev"
-    android:src="@drawable/btn_prev_bg"
-    android:text="@string/prev"
-    style="@style/toolbar" /&gt;
-&lt;ImageButton
-    android:id="@+id/btn_next"
-    android:src="@drawable/btn_next_bg"
-    android:text="@string/next"
-    style="@style/toolbar" /&gt;
-&lt;ImageButton
-    android:id="@+id/btn_zoomin"
-    android:src="@drawable/zoomin"
-    android:text="@string/zoomin"
-    style="@style/toolbar" /&gt;
-&lt;ImageButton
-    android:id="@+id/btn_zoomout"
-    android:src="@drawable/zoomout"
-    android:text="@string/zoomout"
-    style="@style/toolbar" /&gt;
+<pre><code>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="horizontal"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/toolbar_bg"&gt;
+    &lt;ImageButton
+        android:id="@+id/btn_index"
+        android:src="@drawable/index"
+        android:text="@string/index"
+        style="@style/toolbar" /&gt;
+    &lt;ImageButton
+        android:id="@+id/btn_prev"
+        android:src="@drawable/btn_prev_bg"
+        android:text="@string/prev"
+        style="@style/toolbar" /&gt;
+    &lt;ImageButton
+        android:id="@+id/btn_next"
+        android:src="@drawable/btn_next_bg"
+        android:text="@string/next"
+        style="@style/toolbar" /&gt;
+    &lt;ImageButton
+        android:id="@+id/btn_zoomin"
+        android:src="@drawable/zoomin"
+        android:text="@string/zoomin"
+        style="@style/toolbar" /&gt;
+    &lt;ImageButton
+        android:id="@+id/btn_zoomout"
+        android:src="@drawable/zoomout"
+        android:text="@string/zoomout"
+        style="@style/toolbar" /&gt;
+&lt;/LinearLayout&gt;
 </code></pre>
-
-<p></LinearLayout>
-```</p>
 ]]></content>
   </entry>
   
@@ -401,22 +369,17 @@ android:background="@drawable/toolbar_bg"&gt;
     <id>http://codemany.com/blog/implement-three-level-linkage-with-spinner-and-sqlite</id>
     <content type="html"><![CDATA[<p>建立省市县<a href="http://www.stats.gov.cn/tjsj/tjbz/xzqhdm/">行政区划代码</a>数据表。</p>
 
-<p>```
-CREATE TABLE xzqhdm (</p>
-
-<pre><code>_id INTEGER PRIMARY KEY,
-code NUMERIC,
-region TEXT,
-parent_code NUMERIC
+<pre><code>CREATE TABLE xzqhdm (
+    _id INTEGER PRIMARY KEY,
+    code NUMERIC,
+    region TEXT,
+    parent_code NUMERIC
+);
 </code></pre>
-
-<p>);
-```</p>
 
 <p>parent_code指上一级的行政区划代码，省属于最上级的行政单位，设置它的区划代码为999999。</p>
 
-<p><code>
-insert into xzqhdm values(NULL, 110000, "北京市", 999999);
+<pre><code>insert into xzqhdm values(NULL, 110000, "北京市", 999999);
 insert into xzqhdm values(NULL, 110100, "市辖区", 110000);
 insert into xzqhdm values(NULL, 110101, "东城区", 110100);
 insert into xzqhdm values(NULL, 110102, "西城区", 110100);
@@ -429,7 +392,7 @@ insert into xzqhdm values(NULL, 659001, "石河子市", 659000);
 insert into xzqhdm values(NULL, 659002, "阿拉尔市", 659000);
 insert into xzqhdm values(NULL, 659003, "图木舒克市", 659000);
 insert into xzqhdm values(NULL, 659004, "五家渠市", 659000);
-</code></p>
+</code></pre>
 
 <p>SQLite数据库的操作</p>
 
@@ -443,132 +406,122 @@ insert into xzqhdm values(NULL, 659004, "五家渠市", 659000);
 
 <p>如何打开res\raw目录中的数据库文件？不能直接打开res\raw目录中的数据库文件，需要在程序第一次启动时将该文件复制到手机内存或SD卡中，然后再打开。</p>
 
-<p>```
-public class DBHelper extends SQLiteOpenHelper {</p>
+<pre><code>public class DBHelper extends SQLiteOpenHelper {
+    private static String DB_PATH = "/data/data/com.codemany.linkage/databases/";
+    private static String DB_NAME = "xzqh.db";
+    private static DBHelper databaseHelper;
+    private static SQLiteDatabase db;
 
-<pre><code>private static String DB_PATH = "/data/data/com.codemany.linkage/databases/";
-private static String DB_NAME = "xzqh.db";
-private static DBHelper databaseHelper;
-private static SQLiteDatabase db;
+    private Context context;
 
-private Context context;
+    private DBHelper(Context context) {
+        super(context, DB_NAME, null, 1);
+        this.context = context;
+    }
 
-private DBHelper(Context context) {
-    super(context, DB_NAME, null, 1);
-    this.context = context;
-}
-
-public static DBHelper getInstance(Context context) {
-    if (databaseHelper == null) {
-        databaseHelper = new DBHelper(context);
-        databaseHelper.openDataBase();
-
-        if (db == null) {
-            try {
-                db = databaseHelper.getWritableDatabase();
-                databaseHelper.copyDatabase();
-            }
-            catch (Exception e) {
-                Log.d("DBHelper", "Error in database creation");
-            }
-
+    public static DBHelper getInstance(Context context) {
+        if (databaseHelper == null) {
+            databaseHelper = new DBHelper(context);
             databaseHelper.openDataBase();
+
+            if (db == null) {
+                try {
+                    db = databaseHelper.getWritableDatabase();
+                    databaseHelper.copyDatabase();
+                }
+                catch (Exception e) {
+                    Log.d("DBHelper", "Error in database creation");
+                }
+
+                databaseHelper.openDataBase();
+            }
+        }
+        return databaseHelper;
+    }
+
+    private void copyDatabase() throws IOException {
+        InputStream is = context.getResources().openRawResource(R.raw.xzqh);
+        OutputStream os = new FileOutputStream(DB_PATH + DB_NAME);
+        byte[] buffer = new byte[1024];
+        int length;
+        while ((length = is.read(buffer)) &gt; 0) {
+            os.write(buffer, 0, length);
+        }
+
+        os.flush();
+        os.close();
+        is.close();
+    }
+
+    private void openDataBase() {
+        try {
+            db = SQLiteDatabase.openDatabase(
+                    DB_PATH + DB_NAME,
+                    null,
+                    SQLiteDatabase.OPEN_READONLY | SQLiteDatabase.NO_LOCALIZED_COLLATORS);
+        } catch (SQLiteException e) {
+            // database does't exist yet
         }
     }
-    return databaseHelper;
-}
 
-private void copyDatabase() throws IOException {
-    InputStream is = context.getResources().openRawResource(R.raw.xzqh);
-    OutputStream os = new FileOutputStream(DB_PATH + DB_NAME);
-    byte[] buffer = new byte[1024];
-    int length;
-    while ((length = is.read(buffer)) &gt; 0) {
-        os.write(buffer, 0, length);
+    public SimpleCursorAdapter getListByParentCode(Context context, String parentCode) {
+        SimpleCursorAdapter list = null;
+        DBHelper dHelper = new DBHelper(context);
+        SQLiteDatabase db = dHelper.getReadableDatabase();
+        Cursor cursor = db.rawQuery(
+                "SELECT code as _id, region FROM xzqhdm WHERE parent_code = ?",
+                new String[] {parentCode});
+        if (cursor.getCount() != 0) {
+            list = new SimpleCursorAdapter(context,
+                    android.R.layout.simple_spinner_item,
+                    cursor,
+                    new String[] {"region"},
+                    new int[] {android.R.id.text1});
+            list.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        }
+        return list;
     }
 
-    os.flush();
-    os.close();
-    is.close();
-}
-
-private void openDataBase() {
-    try {
-        db = SQLiteDatabase.openDatabase(
-                DB_PATH + DB_NAME,
-                null,
-                SQLiteDatabase.OPEN_READONLY | SQLiteDatabase.NO_LOCALIZED_COLLATORS);
-    } catch (SQLiteException e) {
-        // database does't exist yet
+    @Override
+    public synchronized void close() {
+        if (db != null) {
+            db.close();
+        }
+        super.close();
     }
-}
 
-public SimpleCursorAdapter getListByParentCode(Context context, String parentCode) {
-    SimpleCursorAdapter list = null;
-    DBHelper dHelper = new DBHelper(context);
-    SQLiteDatabase db = dHelper.getReadableDatabase();
-    Cursor cursor = db.rawQuery(
-            "SELECT code as _id, region FROM xzqhdm WHERE parent_code = ?",
-            new String[] {parentCode});
-    if (cursor.getCount() != 0) {
-        list = new SimpleCursorAdapter(context,
-                android.R.layout.simple_spinner_item,
-                cursor,
-                new String[] {"region"},
-                new int[] {android.R.id.text1});
-        list.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+    @Override
+    public void onCreate(SQLiteDatabase db) {
     }
-    return list;
-}
 
-@Override
-public synchronized void close() {
-    if (db != null) {
-        db.close();
+    @Override
+    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
     }
-    super.close();
-}
-
-@Override
-public void onCreate(SQLiteDatabase db) {
-}
-
-@Override
-public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
 }
 </code></pre>
-
-<p>}
-```</p>
 
 <p>在代码实现时遇到的难题是如何在选中region的同时得到对应的code。网上有教程说定制自己的Adapter，重写bingView()方法，不过有多个Spinner就需要声明多个全局变量；还有教程指出可以直接往Adapter中传递对象（实现一个类，将code和region作为字段），然后重写对象的toString()方法。后来受到这个帖子的启发，修改了rawQuery中的select语句得以实现Spinner控件中的键值绑定。</p>
 
 <p>原来的查询语句是：</p>
 
-<p><code>
-SELECT _id, code, region FROM xzqhdm WHERE parent_code = ?
-</code></p>
+<pre><code>SELECT _id, code, region FROM xzqhdm WHERE parent_code = ?
+</code></pre>
 
 <p>因为传入到CursorAdapter中的Cursor结果集必须包含有列名为<code>_id</code>的列，否则CursorAdapter将不会起作用。而code可以被看作是整数，那么只需要将选出的code当作<code>_id</code>就行了，根据这个想法写出的查询语句如下：</p>
 
-<p><code>
-SELECT code as _id, region FROM xzqhdm WHERE parent_code = ?
-</code></p>
+<pre><code>SELECT code as _id, region FROM xzqhdm WHERE parent_code = ?
+</code></pre>
 
 <p>这样，当触发Spinner上的ItemSelected事件时就可以通过最后一个参数id得到当前的code了。</p>
 
 <p>写这篇文章的时候同时也在调试着代码，突然发现其实不需要改写查询语句也是可以实现键值绑定的。只要在onItemSelected()方法中使用如下代码就可以取得相应的值了：</p>
 
-<p>```
-Cursor cursor = (Cursor)parent.getSelectedItem();
-if (cursor != null) {</p>
-
-<pre><code>int code = cursor.getString(cursor.getColumnIndex("code"));
-String country = cursor.getString(cursor.getColumnIndex("region"));
+<pre><code>Cursor cursor = (Cursor)parent.getSelectedItem();
+if (cursor != null) {
+    int code = cursor.getString(cursor.getColumnIndex("code"));
+    String country = cursor.getString(cursor.getColumnIndex("region"));
+}
 </code></pre>
-
-<p>}
-```</p>
 
 <p><a href="/uploads/linkage.zip" title="linkage.zip">代码下载</a></p>
 ]]></content>

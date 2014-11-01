@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Log4j | 乐者为王]]></title>
   <link href="http://codemany.com/tags/log4j/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-11-01T15:23:01+08:00</updated>
+  <updated>2014-11-02T04:09:41+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -20,79 +20,69 @@
     <id>http://codemany.com/blog/log4j-does-not-output-log-in-servlet-init-method</id>
     <content type="html"><![CDATA[<p>web.xml配置文件：</p>
 
-<p>```
-&lt;web-app></p>
-
-<pre><code>&lt;servlet&gt;
-    &lt;servlet-name&gt;hello&lt;/servlet-name&gt;
-    &lt;servlet-class&gt;com.example.lesson.HelloServlet&lt;/servlet-class&gt;
-    &lt;init-param&gt;
-        &lt;param-name&gt;log4jConfig&lt;/param-name&gt;
-        &lt;param-value&gt;/WEB-INF/log4j.properties&lt;/param-value&gt;
-    &lt;/init-param&gt;
-&lt;/servlet&gt;
+<pre><code>&lt;web-app&gt;
+    &lt;servlet&gt;
+        &lt;servlet-name&gt;hello&lt;/servlet-name&gt;
+        &lt;servlet-class&gt;com.example.lesson.HelloServlet&lt;/servlet-class&gt;
+        &lt;init-param&gt;
+            &lt;param-name&gt;log4jConfig&lt;/param-name&gt;
+            &lt;param-value&gt;/WEB-INF/log4j.properties&lt;/param-value&gt;
+        &lt;/init-param&gt;
+    &lt;/servlet&gt;
+&lt;/web-app&gt;
 </code></pre>
-
-<p>&lt;/web-app>
-```</p>
 
 <p>log4j.properties配置文件：</p>
 
-<p><code>
-log4j.rootLogger=ALL, Console
+<pre><code>log4j.rootLogger=ALL, Console
 log4j.appender.Console=org.apache.log4j.ConsoleAppender
 log4j.appender.Console.layout=org.apache.log4j.PatternLayout
 log4j.appender.Console.layout.ConversionPattern=[%t] %37c %3x - %m%n
-</code></p>
+</code></pre>
 
 <p>HelloServlet.java代码：</p>
 
-<p>```
-import javax.servlet.ServletConfig;
+<pre><code>import javax.servlet.ServletConfig;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;</p>
+import javax.servlet.http.HttpServlet;
 
-<p>import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Logger;
-import org.apache.log4j.PropertyConfigurator;</p>
+import org.apache.log4j.PropertyConfigurator;
 
-<p>public class HelloServlet extends HttpServlet {</p>
+public class HelloServlet extends HttpServlet {
+    private Logger logger = Logger.getLogger(HelloServlet.class);
 
-<pre><code>private Logger logger = Logger.getLogger(HelloServlet.class);
+    public void init() throws ServletException {
+        super.init();
 
-public void init() throws ServletException {
-    super.init();
+        ServletConfig config = getServletConfig();
+        ServletContext sc = getServletContext();
 
-    ServletConfig config = getServletConfig();
-    ServletContext sc = getServletContext();
+        String log4jConfig = config.getInitParameter("log4jConfig");
+        System.out.println(log4jConfig);
 
-    String log4jConfig = config.getInitParameter("log4jConfig");
-    System.out.println(log4jConfig);
+        if (log4jConfig == null) {
+            BasicConfigurator.configure();
+        } else {
+            PropertyConfigurator.configure(sc.getRealPath(log4jConfig));
+        }
 
-    if (log4jConfig == null) {
-        BasicConfigurator.configure();
-    } else {
-        PropertyConfigurator.configure(sc.getRealPath(log4jConfig));
+        logger.info("This is an info message!");
     }
 
-    logger.info("This is an info message!");
-}
-
-public void destroy() {
+    public void destroy() {
+    }
 }
 </code></pre>
 
-<p>}
-```</p>
-
 <p>程序运行没有问题，可就是不能在Console视图中输出日志信息，而且使用System.out.println()也不能输出，不过在把private Logger logger行注释掉后System.out.println()就可以输出了。查看TOMCAT_HOME/logs中的日志文件，发现有如下异常：</p>
 
-<p><code>
------ Root Cause -----
+<pre><code>----- Root Cause -----
 java.lang.NoClassDefFoundError: org/apache/log4j/Logger
   at com.example.lesson.HelloServlet.&lt;init&gt;(HelloServlet.java:15)
-</code></p>
+</code></pre>
 
 <p>找不到Logger类？是不是WEB-INF/lib目录下没有log4j.jar呢？转到WEB-INF/lib目录，果然没有发现log4j.jar文件。把log4j.jar拷过去再试一下，真的OK了。</p>
 ]]></content>

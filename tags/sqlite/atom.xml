@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: SQLite | 乐者为王]]></title>
   <link href="http://codemany.com/tags/sqlite/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-11-01T15:23:01+08:00</updated>
+  <updated>2014-11-02T04:09:41+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -20,22 +20,17 @@
     <id>http://codemany.com/blog/implement-three-level-linkage-with-spinner-and-sqlite</id>
     <content type="html"><![CDATA[<p>建立省市县<a href="http://www.stats.gov.cn/tjsj/tjbz/xzqhdm/">行政区划代码</a>数据表。</p>
 
-<p>```
-CREATE TABLE xzqhdm (</p>
-
-<pre><code>_id INTEGER PRIMARY KEY,
-code NUMERIC,
-region TEXT,
-parent_code NUMERIC
+<pre><code>CREATE TABLE xzqhdm (
+    _id INTEGER PRIMARY KEY,
+    code NUMERIC,
+    region TEXT,
+    parent_code NUMERIC
+);
 </code></pre>
-
-<p>);
-```</p>
 
 <p>parent_code指上一级的行政区划代码，省属于最上级的行政单位，设置它的区划代码为999999。</p>
 
-<p><code>
-insert into xzqhdm values(NULL, 110000, "北京市", 999999);
+<pre><code>insert into xzqhdm values(NULL, 110000, "北京市", 999999);
 insert into xzqhdm values(NULL, 110100, "市辖区", 110000);
 insert into xzqhdm values(NULL, 110101, "东城区", 110100);
 insert into xzqhdm values(NULL, 110102, "西城区", 110100);
@@ -48,7 +43,7 @@ insert into xzqhdm values(NULL, 659001, "石河子市", 659000);
 insert into xzqhdm values(NULL, 659002, "阿拉尔市", 659000);
 insert into xzqhdm values(NULL, 659003, "图木舒克市", 659000);
 insert into xzqhdm values(NULL, 659004, "五家渠市", 659000);
-</code></p>
+</code></pre>
 
 <p>SQLite数据库的操作</p>
 
@@ -62,132 +57,122 @@ insert into xzqhdm values(NULL, 659004, "五家渠市", 659000);
 
 <p>如何打开res\raw目录中的数据库文件？不能直接打开res\raw目录中的数据库文件，需要在程序第一次启动时将该文件复制到手机内存或SD卡中，然后再打开。</p>
 
-<p>```
-public class DBHelper extends SQLiteOpenHelper {</p>
+<pre><code>public class DBHelper extends SQLiteOpenHelper {
+    private static String DB_PATH = "/data/data/com.codemany.linkage/databases/";
+    private static String DB_NAME = "xzqh.db";
+    private static DBHelper databaseHelper;
+    private static SQLiteDatabase db;
 
-<pre><code>private static String DB_PATH = "/data/data/com.codemany.linkage/databases/";
-private static String DB_NAME = "xzqh.db";
-private static DBHelper databaseHelper;
-private static SQLiteDatabase db;
+    private Context context;
 
-private Context context;
+    private DBHelper(Context context) {
+        super(context, DB_NAME, null, 1);
+        this.context = context;
+    }
 
-private DBHelper(Context context) {
-    super(context, DB_NAME, null, 1);
-    this.context = context;
-}
-
-public static DBHelper getInstance(Context context) {
-    if (databaseHelper == null) {
-        databaseHelper = new DBHelper(context);
-        databaseHelper.openDataBase();
-
-        if (db == null) {
-            try {
-                db = databaseHelper.getWritableDatabase();
-                databaseHelper.copyDatabase();
-            }
-            catch (Exception e) {
-                Log.d("DBHelper", "Error in database creation");
-            }
-
+    public static DBHelper getInstance(Context context) {
+        if (databaseHelper == null) {
+            databaseHelper = new DBHelper(context);
             databaseHelper.openDataBase();
+
+            if (db == null) {
+                try {
+                    db = databaseHelper.getWritableDatabase();
+                    databaseHelper.copyDatabase();
+                }
+                catch (Exception e) {
+                    Log.d("DBHelper", "Error in database creation");
+                }
+
+                databaseHelper.openDataBase();
+            }
+        }
+        return databaseHelper;
+    }
+
+    private void copyDatabase() throws IOException {
+        InputStream is = context.getResources().openRawResource(R.raw.xzqh);
+        OutputStream os = new FileOutputStream(DB_PATH + DB_NAME);
+        byte[] buffer = new byte[1024];
+        int length;
+        while ((length = is.read(buffer)) &gt; 0) {
+            os.write(buffer, 0, length);
+        }
+
+        os.flush();
+        os.close();
+        is.close();
+    }
+
+    private void openDataBase() {
+        try {
+            db = SQLiteDatabase.openDatabase(
+                    DB_PATH + DB_NAME,
+                    null,
+                    SQLiteDatabase.OPEN_READONLY | SQLiteDatabase.NO_LOCALIZED_COLLATORS);
+        } catch (SQLiteException e) {
+            // database does't exist yet
         }
     }
-    return databaseHelper;
-}
 
-private void copyDatabase() throws IOException {
-    InputStream is = context.getResources().openRawResource(R.raw.xzqh);
-    OutputStream os = new FileOutputStream(DB_PATH + DB_NAME);
-    byte[] buffer = new byte[1024];
-    int length;
-    while ((length = is.read(buffer)) &gt; 0) {
-        os.write(buffer, 0, length);
+    public SimpleCursorAdapter getListByParentCode(Context context, String parentCode) {
+        SimpleCursorAdapter list = null;
+        DBHelper dHelper = new DBHelper(context);
+        SQLiteDatabase db = dHelper.getReadableDatabase();
+        Cursor cursor = db.rawQuery(
+                "SELECT code as _id, region FROM xzqhdm WHERE parent_code = ?",
+                new String[] {parentCode});
+        if (cursor.getCount() != 0) {
+            list = new SimpleCursorAdapter(context,
+                    android.R.layout.simple_spinner_item,
+                    cursor,
+                    new String[] {"region"},
+                    new int[] {android.R.id.text1});
+            list.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        }
+        return list;
     }
 
-    os.flush();
-    os.close();
-    is.close();
-}
-
-private void openDataBase() {
-    try {
-        db = SQLiteDatabase.openDatabase(
-                DB_PATH + DB_NAME,
-                null,
-                SQLiteDatabase.OPEN_READONLY | SQLiteDatabase.NO_LOCALIZED_COLLATORS);
-    } catch (SQLiteException e) {
-        // database does't exist yet
+    @Override
+    public synchronized void close() {
+        if (db != null) {
+            db.close();
+        }
+        super.close();
     }
-}
 
-public SimpleCursorAdapter getListByParentCode(Context context, String parentCode) {
-    SimpleCursorAdapter list = null;
-    DBHelper dHelper = new DBHelper(context);
-    SQLiteDatabase db = dHelper.getReadableDatabase();
-    Cursor cursor = db.rawQuery(
-            "SELECT code as _id, region FROM xzqhdm WHERE parent_code = ?",
-            new String[] {parentCode});
-    if (cursor.getCount() != 0) {
-        list = new SimpleCursorAdapter(context,
-                android.R.layout.simple_spinner_item,
-                cursor,
-                new String[] {"region"},
-                new int[] {android.R.id.text1});
-        list.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+    @Override
+    public void onCreate(SQLiteDatabase db) {
     }
-    return list;
-}
 
-@Override
-public synchronized void close() {
-    if (db != null) {
-        db.close();
+    @Override
+    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
     }
-    super.close();
-}
-
-@Override
-public void onCreate(SQLiteDatabase db) {
-}
-
-@Override
-public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
 }
 </code></pre>
-
-<p>}
-```</p>
 
 <p>在代码实现时遇到的难题是如何在选中region的同时得到对应的code。网上有教程说定制自己的Adapter，重写bingView()方法，不过有多个Spinner就需要声明多个全局变量；还有教程指出可以直接往Adapter中传递对象（实现一个类，将code和region作为字段），然后重写对象的toString()方法。后来受到这个帖子的启发，修改了rawQuery中的select语句得以实现Spinner控件中的键值绑定。</p>
 
 <p>原来的查询语句是：</p>
 
-<p><code>
-SELECT _id, code, region FROM xzqhdm WHERE parent_code = ?
-</code></p>
+<pre><code>SELECT _id, code, region FROM xzqhdm WHERE parent_code = ?
+</code></pre>
 
 <p>因为传入到CursorAdapter中的Cursor结果集必须包含有列名为<code>_id</code>的列，否则CursorAdapter将不会起作用。而code可以被看作是整数，那么只需要将选出的code当作<code>_id</code>就行了，根据这个想法写出的查询语句如下：</p>
 
-<p><code>
-SELECT code as _id, region FROM xzqhdm WHERE parent_code = ?
-</code></p>
+<pre><code>SELECT code as _id, region FROM xzqhdm WHERE parent_code = ?
+</code></pre>
 
 <p>这样，当触发Spinner上的ItemSelected事件时就可以通过最后一个参数id得到当前的code了。</p>
 
 <p>写这篇文章的时候同时也在调试着代码，突然发现其实不需要改写查询语句也是可以实现键值绑定的。只要在onItemSelected()方法中使用如下代码就可以取得相应的值了：</p>
 
-<p>```
-Cursor cursor = (Cursor)parent.getSelectedItem();
-if (cursor != null) {</p>
-
-<pre><code>int code = cursor.getString(cursor.getColumnIndex("code"));
-String country = cursor.getString(cursor.getColumnIndex("region"));
+<pre><code>Cursor cursor = (Cursor)parent.getSelectedItem();
+if (cursor != null) {
+    int code = cursor.getString(cursor.getColumnIndex("code"));
+    String country = cursor.getString(cursor.getColumnIndex("region"));
+}
 </code></pre>
-
-<p>}
-```</p>
 
 <p><a href="/uploads/linkage.zip" title="linkage.zip">代码下载</a></p>
 ]]></content>
@@ -202,19 +187,17 @@ String country = cursor.getString(cursor.getColumnIndex("region"));
 
 <p>创建项目后在运行rake db:migrate时出现了以下错误：</p>
 
-<p><code>
-** Invoke db:migrate (first_time)
+<pre><code>** Invoke db:migrate (first_time)
 ** Invoke environment (first_time)
 ** Execute environment
 ** Execute db:migrate
 rake aborted!
 uninitialized constant Encoding
-</code></p>
+</code></pre>
 
 <p>具体错误信息如下：</p>
 
-<p><code>
-/active_support/dependencies.rb:443:in 'load_missing_constant'
+<pre><code>/active_support/dependencies.rb:443:in 'load_missing_constant'
 /active_support/dependencies.rb:80:in 'const_missing'
 /active_support/dependencies.rb:92:in 'const_missing'
 /sqlite3-0.0.8/lib/sqlite3/encoding.rb:9:in 'find'
@@ -227,7 +210,7 @@ uninitialized constant Encoding
 /active_record/connection_adapters/abstract/connection_pool.rb:188:in 'checkout'
 /active_record/connection_adapters/abstract/connection_pool.rb:184:in 'loop'
 /active_record/connection_adapters/abstract/connection_pool.rb:184:in 'checkout'
-</code></p>
+</code></pre>
 
 <p>从 <a href="http://stackoverflow.com/questions/1797199/uninitialized-constant-encoding-with-sqlite3-ruby-on-windows">http://stackoverflow.com/questions/1797199/uninitialized-constant-encoding-with-sqlite3-ruby-on-windows</a> 查到原因说是因为安装了非sqlite3-ruby包所导致。记起安装SQLite时使用的命令是gem install sqlite3，而实际上sqlite3包仅是针对ruby 1.9版本，在1.8.6上需要使用sqlite3-ruby包。用gem list查看发现果然安装的是sqlite3包。gem uninstall sqlite3把它卸载掉，然后装上sqlite3-ruby包，再次运行rake db:migrate，可以了，不再出现错误信息了。</p>
 ]]></content>

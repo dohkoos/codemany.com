@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: DbUnit | 乐者为王]]></title>
   <link href="http://codemany.com/tags/dbunit/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-11-01T15:23:01+08:00</updated>
+  <updated>2014-11-02T04:09:41+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -22,191 +22,156 @@
 
 <p>SqlMap映射文件User.xml的内容如下：</p>
 
-<p>```
-<select id="getUser" parameterClass="String" resultClass="User"></p>
+<pre><code>&lt;select id="getUser" parameterClass="String" resultClass="User"&gt;
+    SELECT username, password, first_name, last_name
+    FROM user WHERE username = #username#
+&lt;/select&gt;
 
-<pre><code>SELECT username, password, first_name, last_name
-FROM user WHERE username = #username#
+&lt;delete id="removeUser" parameterClass="String"&gt;
+    DELETE FROM user WHERE username = #username#
+&lt;/delete&gt;
+
+&lt;update id="updateUser" parameterClass="User"&gt;
+    UPDATE user SET
+        password = #password#,
+        first_name = #firstName#,
+        last_name = #lastName#
+    WHERE username =#username#
+&lt;/update&gt;
+
+&lt;insert id="insertUser" parameterClass="User"&gt;
+    INSERT INTO user (username, password, first_name, last_name)
+    VALUES (#username#, #password#, #firstName#, #lastName#)
+&lt;/insert&gt;
 </code></pre>
-
-<p></select></p>
-
-<p><delete id="removeUser" parameterClass="String"></p>
-
-<pre><code>DELETE FROM user WHERE username = #username#
-</code></pre>
-
-<p></delete></p>
-
-<p><update id="updateUser" parameterClass="User"></p>
-
-<pre><code>UPDATE user SET
-    password = #password#,
-    first_name = #firstName#,
-    last_name = #lastName#
-WHERE username =#username#
-</code></pre>
-
-<p></update></p>
-
-<p><insert id="insertUser" parameterClass="User"></p>
-
-<pre><code>INSERT INTO user (username, password, first_name, last_name)
-VALUES (#username#, #password#, #firstName#, #lastName#)
-</code></pre>
-
-<p></insert>
-```</p>
 
 <p>配置文件sql-map-config.xml中的内容如下：</p>
 
-<p>```
-<sqlMapConfig></p>
+<pre><code>&lt;sqlMapConfig&gt;
+    &lt;settings lazyLoadingEnabled="true"
+              cacheModelsEnabled="true"
+              enhancementEnabled="true"
+              maxSessions="64"
+              maxTransactions="8"
+              maxRequests="128" /&gt;
 
-<pre><code>&lt;settings lazyLoadingEnabled="true"
-          cacheModelsEnabled="true"
-          enhancementEnabled="true"
-          maxSessions="64"
-          maxTransactions="8"
-          maxRequests="128" /&gt;
-
-&lt;sqlMap resource="com/example/netlink/dao/impl/User.xml" /&gt;
+    &lt;sqlMap resource="com/example/netlink/dao/impl/User.xml" /&gt;
+&lt;/sqlMapConfig&gt;
 </code></pre>
-
-<p></sqlMapConfig>
-```</p>
 
 <p>首先，要为单元测试准备测试数据。我们可以用DbUnit的Flat XML格式来准备测试数据集。下面的XML文件称为目标数据库的Seed File，它为测试准备了两条数据。其中元素名user对应数据库的表名，属性username，password，first_name和last_name是表user的列名，属性值就是记录值。</p>
 
-<p>```
-&lt;?xml version="1.0" encoding="utf-8"?>
-<dataset></p>
+<pre><code>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;dataset&gt;
+    &lt;user username="ford"
+        password="ford"
+        first_name="Henry"
+        last_name="Ford" /&gt;
 
-<pre><code>&lt;user username="ford"
-    password="ford"
-    first_name="Henry"
-    last_name="Ford" /&gt;
-
-&lt;user username="twain"
-    password="twain"
-    first_name="Mark"
-    last_name="twain" /&gt;
+    &lt;user username="twain"
+        password="twain"
+        first_name="Mark"
+        last_name="twain" /&gt;
+&lt;/dataset&gt;
 </code></pre>
-
-<p></dataset>
-```</p>
 
 <p>缺省情况下，DbUnit在单元测试开始之前执行CLEAN_INSERT操作，删除Seed File中所有表的数据，并导入Seed File的测试数据。我们可以通过覆盖getSetUpOperation()和getTearDownOperation()方法来控制单元测试前和测试后的数据库状态。一种高效的实施方案就是让getSetUpOperation()方法执行REFRESH操作，通过执行这个操作，我们可以用Seed File中的数据去更新目标数据库里的数据。接下来，就是getTearDownOperation()，让他执行一个NONE操作，也就是什么也不执行。</p>
 
-<p>```
-protected DatabaseOperation getSetUpOperation() throws Exception {</p>
+<pre><code>protected DatabaseOperation getSetUpOperation() throws Exception {
+    return DatabaseOperation.REFRESH;
+}
 
-<pre><code>return DatabaseOperation.REFRESH;
+protected DatabaseOperation getTearDownOperation() throws Exception {
+    return DatabaseOperation.NONE;
+}
 </code></pre>
-
-<p>}</p>
-
-<p>protected DatabaseOperation getTearDownOperation() throws Exception {</p>
-
-<pre><code>return DatabaseOperation.NONE;
-</code></pre>
-
-<p>}
-```</p>
 
 <p>为了方便测试，我们为SqlMap的单元测试编写一个抽象的测试基类，代码如下：</p>
 
-<p>```
-public abstract class SqlMapTestCase extends DatabaseTestCase {</p>
+<pre><code>public abstract class SqlMapTestCase extends DatabaseTestCase {
+    protected SqlMapClient sqlMapClient = null;
+    protected Properties props = new Properties();
 
-<pre><code>protected SqlMapClient sqlMapClient = null;
-protected Properties props = new Properties();
+    protected IDatabaseConnection getConnection() throws Exception {
+        props.load(Resources.getResourceAsStream("properties/database.properties"));
 
-protected IDatabaseConnection getConnection() throws Exception {
-    props.load(Resources.getResourceAsStream("properties/database.properties"));
-
-    Class.forName(props.getProperty("driver"));
-    Connection conn = DriverManager.getConnection(props.getProperty("url"),
-            props.getProperty("username"), props.getProperty("password"));
-    return new DatabaseConnection(conn);
-}
-
-protected IDataSet getDataSet() throws Exception {
-    String resource = "com/example/netlink/dao/impl/dataset.xml";
-    return new FlatXmlDataSet(Resources.getResourceAsStream(resource));
-}
-
-protected void setUp() throws Exception {
-    super.setUp();
-
-    // Build the SqlMapClient
-    Reader reader = Resources.getResourceAsReader("sql-map-config.xml");
-    sqlMapClient = SqlMapClientBuilder.buildSqlMapClient(reader);
-
-    // Tell the SqlMapClient to use the given DataSource
-    DataSource dataSource = getDataSource();
-    TransactionConfig transactionConfig = getTransactionConfig(dataSource);
-    // Apply the given TransactionConfig to the SqlMapClient
-    applyTransactionConfig(sqlMapClient, transactionConfig);
-}
-
-protected void tearDown() throws Exception {
-    super.tearDown();
-
-    if (sqlMapClient != null) {
-        DataSource ds = sqlMapClient.getDataSource();
-        Connection conn = ds.getConnection();
-        conn.close();
+        Class.forName(props.getProperty("driver"));
+        Connection conn = DriverManager.getConnection(props.getProperty("url"),
+                props.getProperty("username"), props.getProperty("password"));
+        return new DatabaseConnection(conn);
     }
-}
 
-private DataSource getDataSource() throws Exception {
-    DriverManagerDataSource dataSource = new DriverManagerDataSource();
-    dataSource.setDriverClassName(props.getProperty("driver"));
-    dataSource.setUrl(props.getProperty("url"));
-    dataSource.setUsername(props.getProperty("username"));
-    dataSource.setPassword(props.getProperty("password"));
-    return dataSource;
-}
-
-private TransactionConfig getTransactionConfig(DataSource dataSource) throws Exception {
-    Properties transactionConfigProperties = new Properties();
-    transactionConfigProperties.setProperty("SetAutoCommitAllowed", "false");
-
-    TransactionConfig transactionConfig = (TransactionConfig)ExternalTransactionConfig.class.newInstance();
-    transactionConfig.setDataSource(dataSource);
-    transactionConfig.initialize(transactionConfigProperties);
-    return transactionConfig;
-}
-
-private void applyTransactionConfig(SqlMapClient sqlMapClient, TransactionConfig transactionConfig) {
-    if (!(sqlMapClient instanceof ExtendedSqlMapClient)) {
-        throw new IllegalArgumentException("Cannot set TransactionConfig with DataSource"
-                + "for SqlMapClient if not of type ExtendedSqlMapClient: " + sqlMapClient);
+    protected IDataSet getDataSet() throws Exception {
+        String resource = "com/example/netlink/dao/impl/dataset.xml";
+        return new FlatXmlDataSet(Resources.getResourceAsStream(resource));
     }
-    ExtendedSqlMapClient extendedClient = (ExtendedSqlMapClient)sqlMapClient;
-    transactionConfig.setMaximumConcurrentTransactions(extendedClient.getDelegate().getMaxTransactions());
-    extendedClient.getDelegate().setTxManager(new TransactionManager(transactionConfig));
+
+    protected void setUp() throws Exception {
+        super.setUp();
+
+        // Build the SqlMapClient
+        Reader reader = Resources.getResourceAsReader("sql-map-config.xml");
+        sqlMapClient = SqlMapClientBuilder.buildSqlMapClient(reader);
+
+        // Tell the SqlMapClient to use the given DataSource
+        DataSource dataSource = getDataSource();
+        TransactionConfig transactionConfig = getTransactionConfig(dataSource);
+        // Apply the given TransactionConfig to the SqlMapClient
+        applyTransactionConfig(sqlMapClient, transactionConfig);
+    }
+
+    protected void tearDown() throws Exception {
+        super.tearDown();
+
+        if (sqlMapClient != null) {
+            DataSource ds = sqlMapClient.getDataSource();
+            Connection conn = ds.getConnection();
+            conn.close();
+        }
+    }
+
+    private DataSource getDataSource() throws Exception {
+        DriverManagerDataSource dataSource = new DriverManagerDataSource();
+        dataSource.setDriverClassName(props.getProperty("driver"));
+        dataSource.setUrl(props.getProperty("url"));
+        dataSource.setUsername(props.getProperty("username"));
+        dataSource.setPassword(props.getProperty("password"));
+        return dataSource;
+    }
+
+    private TransactionConfig getTransactionConfig(DataSource dataSource) throws Exception {
+        Properties transactionConfigProperties = new Properties();
+        transactionConfigProperties.setProperty("SetAutoCommitAllowed", "false");
+
+        TransactionConfig transactionConfig = (TransactionConfig)ExternalTransactionConfig.class.newInstance();
+        transactionConfig.setDataSource(dataSource);
+        transactionConfig.initialize(transactionConfigProperties);
+        return transactionConfig;
+    }
+
+    private void applyTransactionConfig(SqlMapClient sqlMapClient, TransactionConfig transactionConfig) {
+        if (!(sqlMapClient instanceof ExtendedSqlMapClient)) {
+            throw new IllegalArgumentException("Cannot set TransactionConfig with DataSource"
+                    + "for SqlMapClient if not of type ExtendedSqlMapClient: " + sqlMapClient);
+        }
+        ExtendedSqlMapClient extendedClient = (ExtendedSqlMapClient)sqlMapClient;
+        transactionConfig.setMaximumConcurrentTransactions(extendedClient.getDelegate().getMaxTransactions());
+        extendedClient.getDelegate().setTxManager(new TransactionManager(transactionConfig));
+    }
 }
 </code></pre>
-
-<p>}
-```</p>
 
 <p>然后为每个SqlMap映射文件编写一个测试类，继承上面的抽象类：</p>
 
-<p>```
-public class UserSqlMapTest extends SqlMapTestCase {</p>
+<pre><code>public class UserSqlMapTest extends SqlMapTestCase {
 
-<pre><code>public void testGetUser() throws Exception {
-    User user = (User)sqlMapClient.queryForObject("getUser", "ford");
-    assertNotNull(user);
-    assertEquals("ford", user.getName());
+    public void testGetUser() throws Exception {
+        User user = (User)sqlMapClient.queryForObject("getUser", "ford");
+        assertNotNull(user);
+        assertEquals("ford", user.getName());
+    }
 }
 </code></pre>
-
-<p>}
-```</p>
 
 <p>如此就可以进行单元测试了。</p>
 ]]></content>

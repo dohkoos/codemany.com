@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Qianbao | 乐者为王]]></title>
   <link href="http://codemany.com/tags/qianbao/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-11-01T15:23:01+08:00</updated>
+  <updated>2014-11-02T04:09:41+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -22,32 +22,26 @@
 
 <p>修改Gemfile，将SQLite换成PostgreSQL：</p>
 
-<p>```</p>
-
-<h1>gem 'sqlite3'</h1>
-
-<p>gem 'pg'
-```</p>
+<pre><code># gem 'sqlite3'
+gem 'pg'
+</code></pre>
 
 <p>在config/application.rb中添加：</p>
 
-<p><code>
-config.assets.initialize_on_precompile = false
-</code></p>
+<pre><code>config.assets.initialize_on_precompile = false
+</code></pre>
 
 <p>股票功能需要导入交割单文件。因为导入后的文本文件不再使用，可以把上传路径由public/uploads改为tmp。这样就避免了不能Heroku不能写文件的问题。</p>
 
 <p>应用上传后运行时出现异常，使用heroku logs -t查看日志发现有如下错误：</p>
 
-<p><code>
-Error: column "stocks.share_name" must appear in the GROUP BY clause or be used in an aggregate function
-</code></p>
+<pre><code>Error: column "stocks.share_name" must appear in the GROUP BY clause or be used in an aggregate function
+</code></pre>
 
 <p>这是因为在controller中有这么一行代码：</p>
 
-<p><code>
-current_user.stocks.select("share_code, share_name, sum(actual_amount) as amount").group("share_code")
-</code></p>
+<pre><code>current_user.stocks.select("share_code, share_name, sum(actual_amount) as amount").group("share_code")
+</code></pre>
 
 <p>在PostgreSQL中这会有问题。比如下面的数据表：</p>
 
@@ -55,27 +49,23 @@ current_user.stocks.select("share_code, share_name, sum(actual_amount) as amount
 
 <p>执行上面的SQL语句后，share_name的值到底是取Ruby呢还是ST Ruby？解决这个问题的方法是使用aggregate函数。</p>
 
-<p><code>
-current_user.stocks.select("share_code, max(share_name) as share_name, sum(actual_amount) as amount").group("share_code")
-</code></p>
+<pre><code>current_user.stocks.select("share_code, max(share_name) as share_name, sum(actual_amount) as amount").group("share_code")
+</code></pre>
 
 <p>使用PostgreSQL还有个问题，就是decimal类型的字段，取出来的值是字符串类型。例如：</p>
 
-<p><code>
-if stock.amount &lt; 0
-</code></p>
+<pre><code>if stock.amount &lt; 0
+</code></pre>
 
 <p>它会报错误：</p>
 
-<p><code>
-ArgumentError (comparison of String with 0 failed)
-</code></p>
+<pre><code>ArgumentError (comparison of String with 0 failed)
+</code></pre>
 
 <p>这个可以使用to_f函数解决：</p>
 
-<p><code>
-if stock.amount.to_f &lt; 0
-</code></p>
+<pre><code>if stock.amount.to_f &lt; 0
+</code></pre>
 ]]></content>
   </entry>
   
@@ -88,247 +78,199 @@ if stock.amount.to_f &lt; 0
 
 <p>首先是创建项目：</p>
 
-<p><code>
-rails new qianbao
+<pre><code>rails new qianbao
 cd qianbao
 rails g scaffold entry amount:decimal tags:string effective_date:date
 rails g controller home index
-</code></p>
+</code></pre>
 
 <p>删除public/index.html，在config/routes.rb中添加根路由：</p>
 
-<p><code>
-root :to =&gt; 'home#index'
-</code></p>
+<pre><code>root :to =&gt; 'home#index'
+</code></pre>
 
 <p>现在要给应用加上一个认证系统（注册、激活、登录、登出），这次使用<a href="https://github.com/plataformatec/devise">devise</a>插件实现。</p>
 
 <p>在Gemfile中添加：</p>
 
-<p><code>
-gem 'devise'
-</code></p>
+<pre><code>gem 'devise'
+</code></pre>
 
 <p>然后执行下列命令：</p>
 
-<p><code>
-bundle install
+<pre><code>bundle install
 rails g devise:install
 rails g devise user
 rails g devise:views
-</code></p>
+</code></pre>
 
 <p>创建一个迁移任务，把User和Entry模型关联起来：</p>
 
-<p>```
-class AddUserIdToEntries &lt; ActiveRecord::Migration
-  def change</p>
+<pre><code>class AddUserIdToEntries &lt; ActiveRecord::Migration
+  def change
+    add_column :entries, :user_id, :integer
 
-<pre><code>add_column :entries, :user_id, :integer
-
-add_index :entries, :user_id
-</code></pre>
-
-<p>  end
+    add_index :entries, :user_id
+  end
 end
-```</p>
+</code></pre>
 
 <p>修改Entry和User模型：</p>
 
-<p>```
-class Entry &lt; ActiveRecord::Base
-  validates :effective_date, :presence => true
-  validates :amount,         :presence => true,</p>
+<pre><code>class Entry &lt; ActiveRecord::Base
+  validates :effective_date, :presence =&gt; true
+  validates :amount,         :presence =&gt; true,
+                             :numericality =&gt; {:greater_than =&gt; 0.0},
+                             :format =&gt; {:with =&gt; /^\d+??(?:\.\d{0,2})?$/}
+  validates :tags,           :presence =&gt; true,
+                             :length =&gt; { :within =&gt; 1..255 }
 
-<pre><code>                         :numericality =&gt; {:greater_than =&gt; 0.0},
-                         :format =&gt; {:with =&gt; /^\d+??(?:\.\d{0,2})?$/}
+  belongs_to :user
 </code></pre>
 
-<p>  validates :tags,           :presence => true,</p>
-
-<pre><code>                         :length =&gt; { :within =&gt; 1..255 }
-</code></pre>
-
-<p>  belongs_to :user
-```</p>
-
-<p><code>
-class User &lt; ActiveRecord::Base
+<pre><code>class User &lt; ActiveRecord::Base
   has_many :users
-</code></p>
+</code></pre>
 
 <p>修改app/views/home/index.html.erb为如下内容：</p>
 
-<p>```</p>
+<p>&#8220;`</p>
 
 <h1>Welcom to Qianbao!</h1>
 
 
 <p>&lt;% if user_signed_in? %>
-  <p></p>
-
-<pre><code>&lt;strong&gt;&lt;%=link_to current_user.email, edit_user_registration_path %&gt;&lt;/strong&gt;
-&lt;%= link_to 'Logout', destroy_user_session_path, :method =&gt; :delete %&gt;
-</code></pre>
-
-<p>  </p>
-  &lt;%= link_to "All Entries", entries_path %>
+  <p>
+    <strong>&lt;%=link_to current_user.email, edit_user_registration_path %></strong>
+    &lt;%= link_to &lsquo;Logout&rsquo;, destroy_user_session_path, :method => :delete %>
+  </p>
+  &lt;%= link_to &ldquo;All Entries&rdquo;, entries_path %>
 &lt;% else %>
-  <p></p>
-
-<pre><code>&lt;strong&gt;You are currently not logged in.&lt;/strong&gt;
-&lt;%= link_to 'Login', new_user_session_path %&gt; or
-&lt;%= link_to 'Sign up', new_user_registration_path %&gt;
-</code></pre>
-
-<p>  </p>
+  <p>
+    <strong>You are currently not logged in.</strong>
+    &lt;%= link_to &lsquo;Login&rsquo;, new_user_session_path %> or
+    &lt;%= link_to &lsquo;Sign up&rsquo;, new_user_registration_path %>
+  </p>
 &lt;% end %>
-```</p>
+&#8220;`</p>
 
 <p>修改app/controller/entries_controller.rb：</p>
 
-<p>```
-class EntriesController &lt; ApplicationController
-  before_filter :authenticate_user!</p>
+<pre><code>class EntriesController &lt; ApplicationController
+  before_filter :authenticate_user!
 
-<p>  # GET /entries
+  # GET /entries
   # GET /entries.json
-  def index</p>
+  def index
+    @entries = current_user.entries
 
-<pre><code>@entries = current_user.entries
+    respond_to do |format|
+      format.html # index.html.erb
+      format.json { render json: @entries }
+    end
+  end
 
-respond_to do |format|
-  format.html # index.html.erb
-  format.json { render json: @entries }
-end
-</code></pre>
-
-<p>  end</p>
-
-<p>  # GET /entries/1
+  # GET /entries/1
   # GET /entries/1.json
-  def show</p>
+  def show
+    @entry = current_user.entries.find(params[:id])
 
-<pre><code>@entry = current_user.entries.find(params[:id])
+    respond_to do |format|
+      format.html # show.html.erb
+      format.json { render json: @entry }
+    end
+  end
 
-respond_to do |format|
-  format.html # show.html.erb
-  format.json { render json: @entry }
-end
-</code></pre>
-
-<p>  end</p>
-
-<p>  # GET /entries/new
+  # GET /entries/new
   # GET /entries/new.json
-  def new</p>
+  def new
+    @entry = current_user.entries.new
 
-<pre><code>@entry = current_user.entries.new
+    respond_to do |format|
+      format.html # new.html.erb
+      format.json { render json: @entry }
+    end
+  end
 
-respond_to do |format|
-  format.html # new.html.erb
-  format.json { render json: @entry }
-end
-</code></pre>
+  # GET /entries/1/edit
+  def edit
+    @entry = current_user.entries.find(params[:id])
+  end
 
-<p>  end</p>
-
-<p>  # GET /entries/1/edit
-  def edit</p>
-
-<pre><code>@entry = current_user.entries.find(params[:id])
-</code></pre>
-
-<p>  end</p>
-
-<p>  # POST /entries
+  # POST /entries
   # POST /entries.json
-  def create</p>
+  def create
+    @entry = current_user.entries.new(params[:entry])
+    @entry.user = current_user
 
-<pre><code>@entry = current_user.entries.new(params[:entry])
-@entry.user = current_user
-
-respond_to do |format|
-  if @entry.save
-    format.html { redirect_to @entry, notice: 'Entry was successfully created.' }
-    format.json { render json: @entry, status: :created, location: @entry }
-  else
-    format.html { render action: "new" }
-    format.json { render json: @entry.errors, status: :unprocessable_entity }
+    respond_to do |format|
+      if @entry.save
+        format.html { redirect_to @entry, notice: 'Entry was successfully created.' }
+        format.json { render json: @entry, status: :created, location: @entry }
+      else
+        format.html { render action: "new" }
+        format.json { render json: @entry.errors, status: :unprocessable_entity }
+      end
+    end
   end
-end
-</code></pre>
 
-<p>  end</p>
-
-<p>  # PUT /entries/1
+  # PUT /entries/1
   # PUT /entries/1.json
-  def update</p>
+  def update
+    @entry = current_user.entries.find(params[:id])
 
-<pre><code>@entry = current_user.entries.find(params[:id])
+    respond_to do |format|
+      if @entry.update_attributes(params[:entry])
+        format.html { redirect_to @entry, notice: 'Entry was successfully updated.' }
+        format.json { head :no_content }
+      else
+        format.html { render action: "edit" }
+        format.json { render json: @entry.errors, status: :unprocessable_entity }
+      end
+    end
+  end
 
-respond_to do |format|
-  if @entry.update_attributes(params[:entry])
-    format.html { redirect_to @entry, notice: 'Entry was successfully updated.' }
-    format.json { head :no_content }
-  else
-    format.html { render action: "edit" }
-    format.json { render json: @entry.errors, status: :unprocessable_entity }
+  # DELETE /entries/1
+  # DELETE /entries/1.json
+  def destroy
+    @entry = current_user.entries.find(params[:id])
+    @entry.destroy
+
+    respond_to do |format|
+      format.html { redirect_to entries_url }
+      format.json { head :no_content }
+    end
   end
 end
 </code></pre>
-
-<p>  end</p>
-
-<p>  # DELETE /entries/1
-  # DELETE /entries/1.json
-  def destroy</p>
-
-<pre><code>@entry = current_user.entries.find(params[:id])
-@entry.destroy
-
-respond_to do |format|
-  format.html { redirect_to entries_url }
-  format.json { head :no_content }
-end
-</code></pre>
-
-<p>  end
-end
-```</p>
 
 <p>执行以下命令启动应用：</p>
 
-<p><code>
-rake db:migrate
+<pre><code>rake db:migrate
 rails s
-</code></p>
+</code></pre>
 
 <p>以前的版本用的CSS框架是<a href="http://blueprintcss.org/">Blueprint</a>，这次使用比它更方便快捷的<a href="https://github.com/twitter/bootstrap">Bootstrap</a>。Bootstrap建立在Less上，有个<a href="https://github.com/metaskills/less-rails-bootstrap">less-rails-bootstrap</a>，不过在安装libv8时竟然要提示缺少Python，拜托！我用的是Ruby，要我装Python，啥意思啊！还是找个Sass版的Bootstrap吧。</p>
 
 <p>下载<a href="https://github.com/jlong/sass-twitter-bootstrap">sass-twitter-bootstrap</a>：</p>
 
-<p><code>
-git clone https://github.com/jlong/sass-twitter-bootstrap.git
-</code></p>
+<pre><code>git clone https://github.com/jlong/sass-twitter-bootstrap.git
+</code></pre>
 
 <p>将sass-twitter-bootstrap/lib中的文件拷贝到app/assets/stylesheets/twitter目录下。然后将app/assets/stylesheets/application.css中的</p>
 
-<p><code>
-*= require_tree .
-</code></p>
+<pre><code>*= require_tree .
+</code></pre>
 
 <p>修改为</p>
 
-<p><code>
-*= require twitter/bootstrap
-</code></p>
+<pre><code>*= require twitter/bootstrap
+</code></pre>
 
 <p>再在文件末尾添加：</p>
 
-<p><code>
-body { padding-top: 60px; }
-</code></p>
+<pre><code>body { padding-top: 60px; }
+</code></pre>
 
 <p>现在就可以使用Bootstrap来布局美化应用了。</p>
 
@@ -345,69 +287,50 @@ body { padding-top: 60px; }
 
 <p>安装插件</p>
 
-<p><code>
-script/plugin install git://github.com/jviney/acts_as_taggable_on_steroids.git
+<pre><code>script/plugin install git://github.com/jviney/acts_as_taggable_on_steroids.git
 script/generate acts_as_taggable_migration
 rake db:migrate
-</code></p>
+</code></pre>
 
 <p>在Entry模型中添加一句代码：</p>
 
-<p><code>
-class Entry &lt; ActiveRecord::Base
+<pre><code>class Entry &lt; ActiveRecord::Base
   acts_as_taggable
-</code></p>
+</code></pre>
 
 <p>还要将所有视图中原来的tags字段替换成tag_list字段。</p>
 
-<p>```</p>
+<pre><code># index.html.erb
+&lt;%=h entry.tag_list %&gt;
+</code></pre>
 
-<h1>index.html.erb</h1>
+<pre><code># edit.html.erb
+&lt;%= f.text_field :tag_list %&gt;
+</code></pre>
 
-<p>&lt;%=h entry.tag_list %>
-```</p>
-
-<p>```</p>
-
-<h1>edit.html.erb</h1>
-
-<p>&lt;%= f.text_field :tag_list %>
-```</p>
-
-<p>```</p>
-
-<h1>new.html.erb</h1>
-
-<p>&lt;%= f.text_field :tag_list %>
-```</p>
+<pre><code># new.html.erb
+&lt;%= f.text_field :tag_list %&gt;
+</code></pre>
 
 <p>还要将Entry模型中的验证字段tags改成tag_list。做完这些插件也就安装完成了。</p>
 
 <p>既然用了插件，那么原来的tags字段就不需要了，写个迁移任务把它处理掉吧！</p>
 
-<p><code>
-script/generate migration remove_tags_from_entries
-</code></p>
+<pre><code>script/generate migration remove_tags_from_entries
+</code></pre>
 
 <p>迁移代码如下：</p>
 
-<p>```
-class RemoveTagsFromEntries &lt; ActiveRecord::Migration
-  def self.up</p>
+<pre><code>class RemoveTagsFromEntries &lt; ActiveRecord::Migration
+  def self.up
+    remove_column :entries, :tags
+  end
 
-<pre><code>remove_column :entries, :tags
-</code></pre>
-
-<p>  end</p>
-
-<p>  def self.down</p>
-
-<pre><code>add_column :entries, :tags, :string
-</code></pre>
-
-<p>  end
+  def self.down
+    add_column :entries, :tags, :string
+  end
 end
-```</p>
+</code></pre>
 
 <p>代码下载：<a href="https://github.com/dohkoos/qianbao">https://github.com/dohkoos/qianbao</a></p>
 ]]></content>
@@ -424,38 +347,31 @@ end
 
 <p>使用很简单，安装插件后配置一下邮件接受者就可以了。</p>
 
-<p><code>
-script/plugin install git://github.com/rails/exception_notification.git
-</code></p>
+<pre><code>script/plugin install git://github.com/rails/exception_notification.git
+</code></pre>
 
 <p>在config/environment.rb中的最后添加邮件接收者的地址：</p>
 
-<p><code>
-ExceptionNotifier.exception_recipients = %w(yourname@example.com)
-</code></p>
+<pre><code>ExceptionNotifier.exception_recipients = %w(yourname@example.com)
+</code></pre>
 
 <p>然后告诉exception_notification哪些controller出错才发送日志，当然是全部啦：</p>
 
-<p><code>
-class ApplicationController &lt; ActionController::Base
+<pre><code>class ApplicationController &lt; ActionController::Base
   include ExceptionNotifiable
-</code></p>
+</code></pre>
 
 <p>exception_notification采用ActionMailer发送邮件，所以使用的前提是确保ActionMailer可以正常发送邮件。还有就是exception_notification默认只在production环境下才会生效，如果想要在development下也生效，需要将config/environments/development.rb文件中的：</p>
 
-<p><code>
-config.action_mailer.raise_delivery_errors = false
-</code></p>
+<pre><code>config.action_mailer.raise_delivery_errors = false
+</code></pre>
 
 <p>修改为</p>
 
-<p>```
-config.action_mailer.raise_delivery_errors = true</p>
-
-<h1>Let exception_notification generate email notifications</h1>
-
-<p>config.action_controller.consider_all_requests_local = false
-```</p>
+<pre><code>config.action_mailer.raise_delivery_errors = true
+# Let exception_notification generate email notifications
+config.action_controller.consider_all_requests_local = false
+</code></pre>
 
 <p>代码下载：<a href="https://github.com/dohkoos/qianbao">https://github.com/dohkoos/qianbao</a></p>
 ]]></content>
@@ -474,97 +390,75 @@ config.action_mailer.raise_delivery_errors = true</p>
 
 <p>首先在header区添加以下代码：</p>
 
-<p><code>
-&lt;%= link_to 'Chinese', :locale =&gt; 'zh' %&gt;
+<pre><code>&lt;%= link_to 'Chinese', :locale =&gt; 'zh' %&gt;
 &lt;%= link_to 'English', :locale =&gt; 'en' %&gt;
-</code></p>
+</code></pre>
 
 <p>点击其中某个链接后，浏览器就会传递对应的参数zh或en到后台。</p>
 
 <p>然后在app/controllers/application_controller.rb中添加以下代码：</p>
 
-<p>```
-before_filter :set_locale</p>
+<pre><code>before_filter :set_locale
 
-<p>protected
-  def set_locale</p>
-
-<pre><code>I18n.locale = params[:locale]
+protected
+  def set_locale
+    I18n.locale = params[:locale]
+  end
 </code></pre>
-
-<p>  end
-```</p>
 
 <p>不过这里有个问题就是url中必须得带着参数，不然的话用户的选择就会失效。要想使选择达到持续的效果，可以考虑把这些信息保存在session中，改进后的代码如下：</p>
 
-<p><code>
-def set_locale
+<pre><code>def set_locale
   I18n.locale = params[:locale] || session[:locale]
   session[:locale] = I18n.locale
 end
-</code></p>
+</code></pre>
 
 <p>现在这样就基本上差不多了。剩下的就是处理第一次访问时的语言，这个可以从request的ACCEPT_LANGUAGE参数中获取。最终实现的代码：</p>
 
-<p><code>
-def set_locale
+<pre><code>def set_locale
   accept_lang = request.env['HTTP_ACCEPT_LANGUAGE'].scan(/^[a-z]{2}/).first
   I18n.locale = params[:locale] || session[:locale] || accept_lang || 'zh'
   session[:locale] = I18n.locale
 end
-</code></p>
+</code></pre>
 
 <p>不过当用户选择中文后，在新建记录时会报以下错误：</p>
 
-<p>```
-can't convert Symbol into String</p>
+<pre><code>can't convert Symbol into String
 
-<p>Extracted source (around line #8):</p>
+Extracted source (around line #8):
 
-<pre><code>6:   &lt;p&gt;
-7:     &lt;%= t(:effective_date) %&gt;&lt;br /&gt;
-8:     &lt;%= f.date_select :effective_date %&gt;
+    6:   &lt;p&gt;
+    7:     &lt;%= t(:effective_date) %&gt;&lt;br /&gt;
+    8:     &lt;%= f.date_select :effective_date %&gt;
 </code></pre>
-
-<p>```</p>
 
 <p>查找资料后发现可以通过在date_select中加入order来解决，不过日期下拉列表中的月份还有问题，出现的是一些随机数，不是正常月份。这个也可以通过添加month_names参数解决。</p>
 
-<p>```</p>
+<p>&#8220;`</p>
 
 <p><p>
   &lt;%= t(:effective_date) %><br />
   &lt;%= f.date_select :effective_date, :order => [:year, :month, :day] %>
 </p>
-```</p>
+&#8220;`</p>
 
 <p>更好的办法是把它们放到对应的Locale文件里：</p>
 
-<p>```</p>
-
-<h1>en.yml</h1>
-
-<p>en:
-  date:</p>
-
-<pre><code>month_names: [~, January, February, ..., November, December]
-order: [:year, :month, :day]
+<pre><code># en.yml
+en:
+  date:
+    month_names: [~, January, February, ..., November, December]
+    order: [:year, :month, :day]
 </code></pre>
 
-<p>```</p>
-
-<p>```</p>
-
-<h1>zh.yml</h1>
-
-<p>zh:
-  date:</p>
-
-<pre><code>month_names: [~, 一月, 二月, ..., 十一月, 十二月]
-order: [:year, :month, :day]
+<pre><code># zh.yml
+zh:
+  date:
+    month_names: [~, 一月, 二月, ..., 十一月, 十二月]
+    order: [:year, :month, :day]
 </code></pre>
-
-<p>```</p>
 
 <p>代码下载：<a href="https://github.com/dohkoos/qianbao">https://github.com/dohkoos/qianbao</a></p>
 ]]></content>

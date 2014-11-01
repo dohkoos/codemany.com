@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: EMMA | 乐者为王]]></title>
   <link href="http://codemany.com/tags/emma/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-11-01T15:23:01+08:00</updated>
+  <updated>2014-11-02T04:09:41+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -22,17 +22,15 @@
 
 <p>到sourceforge下载了2.0版本的EMMA下来，由于将EMMA的生成文件做了重定向，因此遇到了些问题，比如出现以下错误：</p>
 
-<p><code>
-nothing to do: no runtime coverage data found in any of the data files
-</code></p>
+<pre><code>nothing to do: no runtime coverage data found in any of the data files
+</code></pre>
 
 <p>查找EMMA的FAQ 3.7节，只是告诉你可能少了metadata和runtime coverate date（对Ant用户来说一般是少了runtime coveraget date，它的后缀名默认是ec）。</p>
 
 <p>由FAQ 3.15节可以知道runtime coverage data文件默认是生成在user.dir目录下的（即build.xml中的basedir目录下），而由instr指令生成的metadata文件（后缀名默认为em）则已经被重定向到另外的目录（用来生成coverage report的地方），所以必须重新设置coverage.out.file的值，用来重定向生成的runtime coverage data。因为runtime coverage data是在junit任务执行时产生的，所以我们可以在junit任务中添加一行代码：</p>
 
-<p><code>
-&lt;sysproperty key="emma.coverage.out.file" value="${coverage.dir}/coverage.emma" /&gt;
-</code></p>
+<pre><code>&lt;sysproperty key="emma.coverage.out.file" value="${coverage.dir}/coverage.emma" /&gt;
+</code></pre>
 
 <p>注意：</p>
 
@@ -45,73 +43,57 @@ nothing to do: no runtime coverage data found in any of the data files
 
 <p>其实EMMA附带的examples目录下的build-offline.xml里已经说明的很详细了，只不过下载后没有仔细看，才遇到了一些问题。下面是build.xml的部分代码：</p>
 
-<p>```
-<path id="classpath">
-  <pathelement location="${instrumentedclasses}" />
-  <pathelement location="${classes}" />
-  <pathelement location="${testclasses}" />
-  <fileset dir="${lib}" includes="**/*.jar" />
-</path></p>
+<pre><code>&lt;path id="classpath"&gt;
+  &lt;pathelement location="${instrumentedclasses}" /&gt;
+  &lt;pathelement location="${classes}" /&gt;
+  &lt;pathelement location="${testclasses}" /&gt;
+  &lt;fileset dir="${lib}" includes="**/*.jar" /&gt;
+&lt;/path&gt;
 
-<p><target name="compile" depends="prepare">
-  <javac srcdir="${src}" destdir="${classes}" debug="on"></p>
+&lt;target name="compile" depends="prepare"&gt;
+  &lt;javac srcdir="${src}" destdir="${classes}" debug="on"&gt;
+    &lt;classpath refid="classpath" /&gt;
+  &lt;/javac&gt;
+  &lt;javac srcdir="${test}" destdir="${testclasses}" debug="on"&gt;
+    &lt;classpath refid="classpath" /&gt;
+  &lt;/javac&gt;
+&lt;/target&gt;
 
-<pre><code>&lt;classpath refid="classpath" /&gt;
+&lt;target name="coverage.instrument" depends="compile"&gt;
+  &lt;emma enabled="yes"&gt;
+    &lt;instr instrpath="${classes}" destdir="${instrumentedclasses}"
+        metadatafile="{coveragereports}/metadata.emma" merge="true"&gt;
+    &lt;/instr&gt;
+  &lt;/emma&gt;
+&lt;/target&gt;
+
+&lt;target name="junit" depends="coverage.instrument"&gt;
+  &lt;junit printsummary="yes" haltonfailure="no" fork="true"&gt;
+    &lt;sysproperty key="emma.coverage.out.file" value="${coveragereports}/coverage.emma" /&gt;
+    &lt;classpath refid="classpath" /&gt;
+
+    &lt;formatter type="xml" /&gt;
+
+    &lt;batchtest fork="yes" todir="${junitreports}"&gt;
+      &lt;fileset dir="${test}"&gt;
+        &lt;include name="**/*Test*.java" /&gt;
+      &lt;/fileset&gt;
+    &lt;/batchtest&gt;
+  &lt;/junit&gt;
+&lt;/target&gt;
+
+&lt;target name="coverage.report" depends="test"&gt;
+  &lt;emma enabled="yes"&gt;
+    &lt;report sourcepath="${src}"&gt;
+      &lt;fileset dir="${coveragereports}"&gt;
+        &lt;include name="*.emma" /&gt;
+      &lt;/fileset&gt;
+
+      &lt;html outfile="${coveragereports}/coverage.html" depth="method" /&gt;
+    &lt;/report&gt;
+  &lt;/emma&gt;
+&lt;/target&gt;
 </code></pre>
-
-<p>  </javac>
-  <javac srcdir="${test}" destdir="${testclasses}" debug="on"></p>
-
-<pre><code>&lt;classpath refid="classpath" /&gt;
-</code></pre>
-
-<p>  </javac>
-</target></p>
-
-<p><target name="coverage.instrument" depends="compile">
-  <emma enabled="yes"></p>
-
-<pre><code>&lt;instr instrpath="${classes}" destdir="${instrumentedclasses}"
-    metadatafile="{coveragereports}/metadata.emma" merge="true"&gt;
-&lt;/instr&gt;
-</code></pre>
-
-<p>  </emma>
-</target></p>
-
-<p><target name="junit" depends="coverage.instrument">
-  <junit printsummary="yes" haltonfailure="no" fork="true"></p>
-
-<pre><code>&lt;sysproperty key="emma.coverage.out.file" value="${coveragereports}/coverage.emma" /&gt;
-&lt;classpath refid="classpath" /&gt;
-
-&lt;formatter type="xml" /&gt;
-
-&lt;batchtest fork="yes" todir="${junitreports}"&gt;
-  &lt;fileset dir="${test}"&gt;
-    &lt;include name="**/*Test*.java" /&gt;
-  &lt;/fileset&gt;
-&lt;/batchtest&gt;
-</code></pre>
-
-<p>  </junit>
-</target></p>
-
-<p><target name="coverage.report" depends="test">
-  <emma enabled="yes"></p>
-
-<pre><code>&lt;report sourcepath="${src}"&gt;
-  &lt;fileset dir="${coveragereports}"&gt;
-    &lt;include name="*.emma" /&gt;
-  &lt;/fileset&gt;
-
-  &lt;html outfile="${coveragereports}/coverage.html" depth="method" /&gt;
-&lt;/report&gt;
-</code></pre>
-
-<p>  </emma>
-</target>
-```</p>
 ]]></content>
   </entry>
   

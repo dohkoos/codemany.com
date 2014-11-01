@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Validation | 乐者为王]]></title>
   <link href="http://codemany.com/tags/validation/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-11-01T15:23:01+08:00</updated>
+  <updated>2014-11-02T04:09:41+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -20,440 +20,375 @@
     <id>http://codemany.com/blog/implement-crud-for-books</id>
     <content type="html"><![CDATA[<p>图书的MySQL数据库创建脚本：</p>
 
-<p>```
-CREATE TABLE books (</p>
-
-<pre><code>id int NOT NULL AUTO_INCREMENT,
-title varchar(255) NOT NULL,
-description text,
-image_url varchar(255),
-price decimal(8, 2) NOT NULL,
-author varchar(255) NOT NULL,
-isbn varchar(255) NOT NULL,
-publisher varchar(255) NOT NULL,
-user_id int NOT NULL,
-PRIMARY KEY (id)
+<pre><code>CREATE TABLE books (
+    id int NOT NULL AUTO_INCREMENT,
+    title varchar(255) NOT NULL,
+    description text,
+    image_url varchar(255),
+    price decimal(8, 2) NOT NULL,
+    author varchar(255) NOT NULL,
+    isbn varchar(255) NOT NULL,
+    publisher varchar(255) NOT NULL,
+    user_id int NOT NULL,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf-8;
 </code></pre>
-
-<p>) ENGINE=InnoDB DEFAULT CHARSET=utf-8;
-```</p>
 
 <p>图书实体类文件Book.java主要代码：</p>
 
-<p>```
-public class Book {</p>
-
-<pre><code>private Long id;
-private String title;
-private String description;
-private String image_url;
-private double price;
-private String author;
-private String isbn;
-private String publisher;
-private User user;
+<pre><code>public class Book {
+    private Long id;
+    private String title;
+    private String description;
+    private String image_url;
+    private double price;
+    private String author;
+    private String isbn;
+    private String publisher;
+    private User user;
 </code></pre>
-
-<p>```</p>
 
 <p>在User类中添加集合变量books：</p>
 
-<p>```
-public class User {</p>
-
-<pre><code>private Set&lt;Book&gt; books = new HashSet&lt;Book&gt;();
+<pre><code>public class User {
+    private Set&lt;Book&gt; books = new HashSet&lt;Book&gt;();
 </code></pre>
-
-<p>```</p>
 
 <p>在User.hbm.xml中配置和图书的一对多关联：</p>
 
-<p>```</p>
+<p>&#8220;`</p>
 
 <!-- Bidirectional one-to-many association to Book -->
 
 
-<p><set name="books" inverse="true"></p>
-
-<pre><code>&lt;key column="user_id" not-null="true" /&gt;
-&lt;one-to-many class="com.codemany.book.model.Book" /&gt;
-</code></pre>
-
-<p></set>
-```</p>
+<p><set name="books" inverse="true">
+    <key column="user_id" not-null="true" />
+    <one-to-many class="com.codemany.book.model.Book" />
+</set>
+&#8220;`</p>
 
 <p>图书的表映射文件Book.hbm.xml代码：</p>
 
-<p>```
-&lt;hibernate-mapping></p>
+<pre><code>&lt;hibernate-mapping&gt;
+    &lt;class name="com.codemany.book.model.Book" table="books"&gt;
+        &lt;id name="id"&gt;
+            &lt;generator class="increment" /&gt;
+        &lt;/id&gt;
 
-<pre><code>&lt;class name="com.codemany.book.model.Book" table="books"&gt;
-    &lt;id name="id"&gt;
-        &lt;generator class="increment" /&gt;
-    &lt;/id&gt;
+        &lt;property name="title" not-null="true" /&gt;
+        &lt;property name="description" /&gt;
+        &lt;property name="image_url" /&gt;
+        &lt;property name="price" not-null="true" /&gt;
+        &lt;property name="author" not-null="true" /&gt;
+        &lt;property name="isbn" not-null="true" /&gt;
+        &lt;property name="publisher" not-null="true" /&gt;
 
-    &lt;property name="title" not-null="true" /&gt;
-    &lt;property name="description" /&gt;
-    &lt;property name="image_url" /&gt;
-    &lt;property name="price" not-null="true" /&gt;
-    &lt;property name="author" not-null="true" /&gt;
-    &lt;property name="isbn" not-null="true" /&gt;
-    &lt;property name="publisher" not-null="true" /&gt;
-
-    &lt;many-to-one name="user" column="user_id" not-null="true" /&gt;
-&lt;/class&gt;
+        &lt;many-to-one name="user" column="user_id" not-null="true" /&gt;
+    &lt;/class&gt;
+&lt;/hibernate-mapping&gt;
 </code></pre>
-
-<p>&lt;/hibernate-mapping>
-```</p>
 
 <p>BookService.java中的代码相对简单，因为没什么复杂的业务逻辑，只是负责把Action和Dao这两层连接起来。</p>
 
 <p>BookDao.java中的代码主要实现图书的读取，更新和删除：</p>
 
-<p>```
-package com.codemany.book.dao;</p>
+<pre><code>package com.codemany.book.dao;
 
-<p>import java.util.List;</p>
+import java.util.List;
 
-<p>import org.hibernate.Query;
+import org.hibernate.Query;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
-import org.hibernate.Transaction;</p>
+import org.hibernate.Transaction;
 
-<p>import com.codemany.book.model.Book;</p>
+import com.codemany.book.model.Book;
 
-<p>public class BookDao {</p>
+public class BookDao {
+    private SessionFactory sessionFactory;
 
-<pre><code>private SessionFactory sessionFactory;
-
-public void setSessionFactory(SessionFactory sessionFactory) {
-    this.sessionFactory = sessionFactory;
-}
-
-public List&lt;Book&gt; getBookList() {
-    Session session = sessionFactory.openSession();
-    try {
-        Query query = session.createQuery("from Book b");
-        List&lt;Book&gt; bookList = query.list();
-        return bookList;
-    } finally {
-        session.close();
+    public void setSessionFactory(SessionFactory sessionFactory) {
+        this.sessionFactory = sessionFactory;
     }
-}
 
-public Book getBook(Long bookId) {
-    Session session = sessionFactory.openSession();
-    try {
-        Query query = session.createQuery("from Book b where b.id = :id");
-        query.setLong("id", bookId);
-        query.setMaxResults(1);
-        return (Book)query.uniqueResult();
-    } finally {
-        session.close();
+    public List&lt;Book&gt; getBookList() {
+        Session session = sessionFactory.openSession();
+        try {
+            Query query = session.createQuery("from Book b");
+            List&lt;Book&gt; bookList = query.list();
+            return bookList;
+        } finally {
+            session.close();
+        }
     }
-}
 
-public void saveOrUpdateBook(Book book) {
-    Session session = sessionFactory.openSession();
-    Transaction ts = null;
-    try {
-        ts = session.beginTransaction();
-        session.saveOrUpdate(book);
-        ts.commit();
-    } finally {
-        session.close();
+    public Book getBook(Long bookId) {
+        Session session = sessionFactory.openSession();
+        try {
+            Query query = session.createQuery("from Book b where b.id = :id");
+            query.setLong("id", bookId);
+            query.setMaxResults(1);
+            return (Book)query.uniqueResult();
+        } finally {
+            session.close();
+        }
     }
-}
 
-public void deleteBook(Long bookId) {
-    Session session = sessionFactory.openSession();
-    Transaction ts = null;
-    try {
-        ts = session.beginTransaction();
-        Book book = (Book)session.get(Book.class, bookId);
-        session.delete(book);
-        ts.commit();
-    } finally {
-        session.close();
+    public void saveOrUpdateBook(Book book) {
+        Session session = sessionFactory.openSession();
+        Transaction ts = null;
+        try {
+            ts = session.beginTransaction();
+            session.saveOrUpdate(book);
+            ts.commit();
+        } finally {
+            session.close();
+        }
+    }
+
+    public void deleteBook(Long bookId) {
+        Session session = sessionFactory.openSession();
+        Transaction ts = null;
+        try {
+            ts = session.beginTransaction();
+            Book book = (Book)session.get(Book.class, bookId);
+            session.delete(book);
+            ts.commit();
+        } finally {
+            session.close();
+        }
     }
 }
 </code></pre>
-
-<p>}
-```</p>
 
 <p>BookAction.java负责协调图书应用程序间的运转。接收访问请求，与模型进行交互，将合适的视图展示给用户：</p>
 
-<p>```
-package com.codemany.book.action;</p>
+<pre><code>package com.codemany.book.action;
 
-<p>import java.util.List;</p>
+import java.util.List;
 
-<p>import com.codemany.account.model.User;
+import com.codemany.account.model.User;
 import com.codemany.book.model.Book;
-import com.codemany.book.service.BookService;</p>
+import com.codemany.book.service.BookService;
 
-<p>import com.opensymphony.xwork2.ActionContext;
-import com.opensymphony.xwork2.ActionSupport;</p>
+import com.opensymphony.xwork2.ActionContext;
+import com.opensymphony.xwork2.ActionSupport;
 
-<p>public class BookAction extends ActionSupport {</p>
+public class BookAction extends ActionSupport {
+    private static final long serialVersionUID = 2538923417705852774L;
 
-<pre><code>private static final long serialVersionUID = 2538923417705852774L;
+    private Long bookId;
+    private Book book;
+    private List&lt;Book&gt; bookList;
+    private BookService bookService;
 
-private Long bookId;
-private Book book;
-private List&lt;Book&gt; bookList;
-private BookService bookService;
-
-public String list() throws Exception {
-    bookList = bookService.getBookList();
-    return "list";
-}
-
-public String show() throws Exception {
-    book = bookService.getBook(bookId);
-    return "show";
-}
-
-public String input() throws Exception {
-    if (bookId != null) {
-        book = bookService.getBook(bookId);
+    public String list() throws Exception {
+        bookList = bookService.getBookList();
+        return "list";
     }
-    return INPUT;
-}
 
-public String saveOrUpdate() throws Exception {
-    User user = (User)ActionContext.getContext().getSession().get("user");
-    book.setUser(user);
-    bookService.saveOrUpdateBook(book);
-    return SUCCESS;
-}
+    public String show() throws Exception {
+        book = bookService.getBook(bookId);
+        return "show";
+    }
 
-public String delete() throws Exception {
-    bookService.deleteBook(bookId);
-    return SUCCESS;
-}
+    public String input() throws Exception {
+        if (bookId != null) {
+            book = bookService.getBook(bookId);
+        }
+        return INPUT;
+    }
+
+    public String saveOrUpdate() throws Exception {
+        User user = (User)ActionContext.getContext().getSession().get("user");
+        book.setUser(user);
+        bookService.saveOrUpdateBook(book);
+        return SUCCESS;
+    }
+
+    public String delete() throws Exception {
+        bookService.deleteBook(bookId);
+        return SUCCESS;
+    }
 </code></pre>
-
-<p>```</p>
 
 <p>在applicationContext.xml中添加Book的相关配置，如下面代码所示：</p>
 
-<p>```
-<bean id="sessionFactory" class="org.springframework.orm.hibernate4.LocalSessionFactoryBean"></p>
-
-<pre><code>&lt;property name="mappingResources"&gt;
-    &lt;list&gt;
-        &lt;value&gt;com/codemany/book/model/Book.hbm.xml&lt;/value&gt;
-    &lt;/list&gt;
-&lt;/property&gt;
-</code></pre>
-
-<p></bean></p>
+<p>&#8220;`
+<bean id="sessionFactory" class="org.springframework.orm.hibernate4.LocalSessionFactoryBean">
+    <property name="mappingResources">
+        <list>
+            <value>com/codemany/book/model/Book.hbm.xml</value>
+        </list>
+    </property>
+</bean></p>
 
 <!-- book -->
 
 
-<p><bean id="bookDao" class="com.codemany.book.dao.BookDao"></p>
+<p><bean id="bookDao" class="com.codemany.book.dao.BookDao">
+    <property name="sessionFactory" ref="sessionFactory" />
+</bean></p>
 
-<pre><code>&lt;property name="sessionFactory" ref="sessionFactory" /&gt;
-</code></pre>
+<p><bean id="bookService" class="com.codemany.book.service.BookService">
+    <property name="bookDao" ref="bookDao" />
+</bean></p>
 
-<p></bean></p>
-
-<p><bean id="bookService" class="com.codemany.book.service.BookService"></p>
-
-<pre><code>&lt;property name="bookDao" ref="bookDao" /&gt;
-</code></pre>
-
-<p></bean></p>
-
-<p><bean id="bookAction" class="com.codemany.book.action.BookAction" scope="prototype"></p>
-
-<pre><code>&lt;property name="bookService" ref="bookService" /&gt;
-</code></pre>
-
-<p></bean>
-```</p>
+<p><bean id="bookAction" class="com.codemany.book.action.BookAction" scope="prototype">
+    <property name="bookService" ref="bookService" />
+</bean>
+&#8220;`</p>
 
 <p>在Struts 2配置文件struts.xml中include文件book.xml。以下是book.xml文件的内容：</p>
 
-<p>```
-&lt;?xml version="1.0" encoding="utf-8"?>
-&lt;!DOCTYPE struts PUBLIC</p>
+<pre><code>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;!DOCTYPE struts PUBLIC
+    "-//Apache Software Foundation//DTD Struts Configuration 2.0//EN"
+    "http://struts.apache.org/dtds/struts-2.0.dtd"&gt;
 
-<pre><code>"-//Apache Software Foundation//DTD Struts Configuration 2.0//EN"
-"http://struts.apache.org/dtds/struts-2.0.dtd"&gt;
+&lt;struts&gt;
+    &lt;package name="book" extends="struts-default"&gt;
+        &lt;action name="*Book" method="{1}" class="bookAction"&gt;
+            &lt;result name="list"&gt;/books/list.jsp&lt;/result&gt;
+            &lt;result name="show"&gt;/books/show.jsp&lt;/result&gt;
+            &lt;result name="input"&gt;/books/form.jsp&lt;/result&gt;
+            &lt;result type="redirectAction"&gt;listBook&lt;/result&gt;
+        &lt;/action&gt;
+    &lt;/package&gt;
+&lt;/struts&gt;
 </code></pre>
-
-<p><struts></p>
-
-<pre><code>&lt;package name="book" extends="struts-default"&gt;
-    &lt;action name="*Book" method="{1}" class="bookAction"&gt;
-        &lt;result name="list"&gt;/books/list.jsp&lt;/result&gt;
-        &lt;result name="show"&gt;/books/show.jsp&lt;/result&gt;
-        &lt;result name="input"&gt;/books/form.jsp&lt;/result&gt;
-        &lt;result type="redirectAction"&gt;listBook&lt;/result&gt;
-    &lt;/action&gt;
-&lt;/package&gt;
-</code></pre>
-
-<p></struts>
-```</p>
 
 <p>视图文件show.jsp作为显示单本图书的信息，代码很简单，就不放出来了，只把list.jsp和form.jsp的代码列出来。</p>
 
 <p>list.jsp用来显示所有的图书：</p>
 
-<p>```
-<body></p>
+<pre><code>&lt;body&gt;
+    &lt;h1&gt;Listing books&lt;/h1&gt;
 
-<pre><code>&lt;h1&gt;Listing books&lt;/h1&gt;
+    &lt;table&gt;
+        &lt;tr&gt;
+            &lt;th&gt;Title&lt;/th&gt;
+            &lt;th&gt;Description&lt;/th&gt;
+            &lt;th&gt;Image url&lt;/th&gt;
+            &lt;th&gt;Price&lt;/th&gt;
+            &lt;th&gt;Author&lt;/th&gt;
+            &lt;th&gt;ISBN&lt;/th&gt;
+            &lt;th&gt;Publisher&lt;/th&gt;
+            &lt;th&gt;Action&lt;/th&gt;
+        &lt;/tr&gt;
 
-&lt;table&gt;
-    &lt;tr&gt;
-        &lt;th&gt;Title&lt;/th&gt;
-        &lt;th&gt;Description&lt;/th&gt;
-        &lt;th&gt;Image url&lt;/th&gt;
-        &lt;th&gt;Price&lt;/th&gt;
-        &lt;th&gt;Author&lt;/th&gt;
-        &lt;th&gt;ISBN&lt;/th&gt;
-        &lt;th&gt;Publisher&lt;/th&gt;
-        &lt;th&gt;Action&lt;/th&gt;
-    &lt;/tr&gt;
+        &lt;s:iterator value="bookList"&gt;
+        &lt;tr&gt;
+            &lt;td&gt;&lt;s:property value="title" /&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;s:property value="description" /&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;s:property value="image_url" /&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;s:property value="price" /&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;s:property value="author" /&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;s:property value="isbn" /&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;s:property value="publisher" /&gt;&lt;/td&gt;
+            &lt;td&gt;
+                &lt;s:a href="showBook.action?bookId=%{id}"&gt;Show&lt;/s:a&gt;
+                &lt;s:a href="inputBook.action?bookId=%{id}"&gt;Edit&lt;/s:a&gt;
+                &lt;s:a href="deleteBook.action?bookId=%{id}" method="delete"&gt;Destroy&lt;/s:a&gt;
+            &lt;/td&gt;
+        &lt;/tr&gt;
+        &lt;/s:iterator&gt;
+    &lt;/table&gt;
 
-    &lt;s:iterator value="bookList"&gt;
-    &lt;tr&gt;
-        &lt;td&gt;&lt;s:property value="title" /&gt;&lt;/td&gt;
-        &lt;td&gt;&lt;s:property value="description" /&gt;&lt;/td&gt;
-        &lt;td&gt;&lt;s:property value="image_url" /&gt;&lt;/td&gt;
-        &lt;td&gt;&lt;s:property value="price" /&gt;&lt;/td&gt;
-        &lt;td&gt;&lt;s:property value="author" /&gt;&lt;/td&gt;
-        &lt;td&gt;&lt;s:property value="isbn" /&gt;&lt;/td&gt;
-        &lt;td&gt;&lt;s:property value="publisher" /&gt;&lt;/td&gt;
-        &lt;td&gt;
-            &lt;s:a href="showBook.action?bookId=%{id}"&gt;Show&lt;/s:a&gt;
-            &lt;s:a href="inputBook.action?bookId=%{id}"&gt;Edit&lt;/s:a&gt;
-            &lt;s:a href="deleteBook.action?bookId=%{id}" method="delete"&gt;Destroy&lt;/s:a&gt;
-        &lt;/td&gt;
-    &lt;/tr&gt;
-    &lt;/s:iterator&gt;
-&lt;/table&gt;
-
-&lt;s:a action="inputBook"&gt;Add&lt;/s:a&gt;
+    &lt;s:a action="inputBook"&gt;Add&lt;/s:a&gt;
+&lt;/body&gt;
 </code></pre>
-
-<p></body>
-```</p>
 
 <p>当用户新建或者更新图书时，视图form.jsp就上场了。因为被两个逻辑使用，显示的标题等信息也不相同，所以需要判断图书的id是否存在，如果不存在的话即是新建业务，否则就是更新操作。</p>
 
-<p>```
-<body></p>
+<pre><code>&lt;body&gt;
+    &lt;s:if test="book.id != null"&gt;
+        &lt;h1&gt;Editing book&lt;/h1&gt;
+    &lt;/s:if&gt;
+    &lt;s:else&gt;
+        &lt;h1&gt;Add book&lt;/h1&gt;
+    &lt;/s:else&gt;
 
-<pre><code>&lt;s:if test="book.id != null"&gt;
-    &lt;h1&gt;Editing book&lt;/h1&gt;
-&lt;/s:if&gt;
-&lt;s:else&gt;
-    &lt;h1&gt;Add book&lt;/h1&gt;
-&lt;/s:else&gt;
+    &lt;s:form action="saveOrUpdateBook" method="post"&gt;
+        &lt;div class="field"&gt;
+            &lt;s:hidden name="book.id" value="%{book.id}" /&gt;
+        &lt;/div&gt;
+        &lt;div class="field"&gt;
+            &lt;s:textfield name="book.title" label="Title" /&gt;
+        &lt;/div&gt;
+        &lt;div class="field"&gt;
+            &lt;s:textarea name="book.description" label="Description" rows="5" cols="25" /&gt;
+        &lt;/div&gt;
+        &lt;div class="field"&gt;
+            &lt;s:textfield name="book.image_url" label="Image URL" /&gt;
+        &lt;/div&gt;
+        &lt;div class="field"&gt;
+            &lt;s:textfield name="book.price" label="Price" /&gt;
+        &lt;/div&gt;
+        &lt;div class="field"&gt;
+            &lt;s:textfield name="book.author" label="Author" /&gt;
+        &lt;/div&gt;
+        &lt;div class="field"&gt;
+            &lt;s:textfield name="book.isbn" label="ISBN" /&gt;
+        &lt;/div&gt;
+        &lt;div class="field"&gt;
+            &lt;s:textfield name="book.publisher" label="Publisher" /&gt;
+        &lt;/div&gt;
+        &lt;div class="actions"&gt;
+            &lt;s:if test="book.id != null"&gt;
+            &lt;s:submit value="Update" /&gt;
+            &lt;/s:if&gt;
+            &lt;s:else&gt;
+            &lt;s:submit value="Save" /&gt;
+            &lt;/s:else&gt;
+      &lt;/div&gt;
+    &lt;/s:form&gt;
 
-&lt;s:form action="saveOrUpdateBook" method="post"&gt;
-    &lt;div class="field"&gt;
-        &lt;s:hidden name="book.id" value="%{book.id}" /&gt;
-    &lt;/div&gt;
-    &lt;div class="field"&gt;
-        &lt;s:textfield name="book.title" label="Title" /&gt;
-    &lt;/div&gt;
-    &lt;div class="field"&gt;
-        &lt;s:textarea name="book.description" label="Description" rows="5" cols="25" /&gt;
-    &lt;/div&gt;
-    &lt;div class="field"&gt;
-        &lt;s:textfield name="book.image_url" label="Image URL" /&gt;
-    &lt;/div&gt;
-    &lt;div class="field"&gt;
-        &lt;s:textfield name="book.price" label="Price" /&gt;
-    &lt;/div&gt;
-    &lt;div class="field"&gt;
-        &lt;s:textfield name="book.author" label="Author" /&gt;
-    &lt;/div&gt;
-    &lt;div class="field"&gt;
-        &lt;s:textfield name="book.isbn" label="ISBN" /&gt;
-    &lt;/div&gt;
-    &lt;div class="field"&gt;
-        &lt;s:textfield name="book.publisher" label="Publisher" /&gt;
-    &lt;/div&gt;
-    &lt;div class="actions"&gt;
-        &lt;s:if test="book.id != null"&gt;
-        &lt;s:submit value="Update" /&gt;
-        &lt;/s:if&gt;
-        &lt;s:else&gt;
-        &lt;s:submit value="Save" /&gt;
-        &lt;/s:else&gt;
-  &lt;/div&gt;
-&lt;/s:form&gt;
-
-&lt;s:if test="book.id != null"&gt;
-    &lt;s:a href="showBook.action?bookId=%{book.id}"&gt;Show&lt;/s:a&gt; |
-&lt;/s:if&gt;
-&lt;s:a action="listBook"&gt;Back&lt;/s:a&gt;
+    &lt;s:if test="book.id != null"&gt;
+        &lt;s:a href="showBook.action?bookId=%{book.id}"&gt;Show&lt;/s:a&gt; |
+    &lt;/s:if&gt;
+    &lt;s:a action="listBook"&gt;Back&lt;/s:a&gt;
+&lt;/body&gt;
 </code></pre>
-
-<p></body>
-```</p>
 
 <p>最后还要完成图书模型的服务端校验。Struts 2的校验文件有两种格式：ActionName-validation.xml和ActionName-alias-validation.xml。第一种会对该Action中的每个方法进行校验，不符合只对saveOrUpdate校验的要求。在BookAction.java同目录下创建BookAction-saveOrUpdateBook-validation.xml文件：</p>
 
-<p>```
-<validators></p>
-
-<pre><code>&lt;field name="book"&gt;
-    &lt;field-validator type="visitor"&gt;
-        &lt;param name="appendPrefix"&gt;true&lt;/param&gt;
-        &lt;message /&gt;
-    &lt;/field-validator&gt;
-&lt;/field&gt;
+<pre><code>&lt;validators&gt;
+    &lt;field name="book"&gt;
+        &lt;field-validator type="visitor"&gt;
+            &lt;param name="appendPrefix"&gt;true&lt;/param&gt;
+            &lt;message /&gt;
+        &lt;/field-validator&gt;
+    &lt;/field&gt;
+&lt;/validators&gt;
 </code></pre>
-
-<p></validators>
-```</p>
 
 <p>当然，还要在Book.java所在的位置创建Book-validation.xml文件：</p>
 
-<p>```
-<validators></p>
+<pre><code>&lt;validators&gt;
+    &lt;field name="title"&gt;
+        &lt;field-validator type="required"&gt;
+            &lt;message&gt;Price is required&lt;/message&gt;
+        &lt;/field-validator&gt;
+    &lt;/field&gt;
 
-<pre><code>&lt;field name="title"&gt;
-    &lt;field-validator type="required"&gt;
-        &lt;message&gt;Price is required&lt;/message&gt;
-    &lt;/field-validator&gt;
-&lt;/field&gt;
-
-&lt;field name="price"&gt;
-    &lt;field-validator type="required"&gt;
-        &lt;message&gt;Price is required&lt;/message&gt;
-    &lt;/field-validator&gt;
-    &lt;field-validator type="double"&gt;
-        &lt;param name="minInclusive"&gt;0.01&lt;/param&gt;
-        &lt;message&gt;Price should be at least 0.01&lt;/message&gt;
-    &lt;/field-validator&gt;
-&lt;/field&gt;
+    &lt;field name="price"&gt;
+        &lt;field-validator type="required"&gt;
+            &lt;message&gt;Price is required&lt;/message&gt;
+        &lt;/field-validator&gt;
+        &lt;field-validator type="double"&gt;
+            &lt;param name="minInclusive"&gt;0.01&lt;/param&gt;
+            &lt;message&gt;Price should be at least 0.01&lt;/message&gt;
+        &lt;/field-validator&gt;
+    &lt;/field&gt;
 </code></pre>
-
-<p>```</p>
 
 <p>看着BookAction-saveOrUpdateBook-validation.xml这么长的文件名是不是有点无语:)没关系，BookAction-validation.xml配置文件还是可以用的，只要在BookAction.java中那些不需要进行校验的方法上添加@SkipValidation；也可以在action配置中启用validation.excludeMethods参数：</p>
 
-<p>```
-<action name="*Book" method="{1}" class="bookAction"></p>
-
-<pre><code>&lt;interceptor-ref name="defaultStack"&gt;
-    &lt;param name="validation.excludeMethods"&gt;list,show,input,delete&lt;/param&gt;
-&lt;/interceptor-ref&gt;
+<pre><code>&lt;action name="*Book" method="{1}" class="bookAction"&gt;
+    &lt;interceptor-ref name="defaultStack"&gt;
+        &lt;param name="validation.excludeMethods"&gt;list,show,input,delete&lt;/param&gt;
+    &lt;/interceptor-ref&gt;
 </code></pre>
-
-<p>```</p>
 
 <p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
 ]]></content>
@@ -475,74 +410,56 @@ public String delete() throws Exception {
 
 <p>使用XML配置时validation.xml的命名规则和放置路径：</p>
 
-<p><code>
-&lt;ActionClassName&gt;-validation.xml
-</code></p>
+<pre><code>&lt;ActionClassName&gt;-validation.xml
+</code></pre>
 
 <p><code>&lt;ActionClassName&gt;</code>就是要验证的Action类的名字，将此文件放在与Action类文件相同的目录下即可。如果该Action类在struts.xml配置中有多个action实例，那么对应某个action实例的校验文件命名规则如下：</p>
 
-<p><code>
-&lt;ActionClassName&gt;-&lt;aliasName&gt;-validation.xml
-</code></p>
+<pre><code>&lt;ActionClassName&gt;-&lt;aliasName&gt;-validation.xml
+</code></pre>
 
 <p>例如：UserAction-login-validation.xml。注意，这里的<code>&lt;aliasName&gt;</code>并不是方法名，而是struts.xml中配置的action实例的名字。</p>
 
 <p>既然用框架来校验了，那么在LoginAction.java中判断用户名和密码是否为空的代码就可以删除了。还要记得加上username和passowrd的getter方法，不然校验器（validator）会因为取不到field而报错。</p>
 
-<p>```
-public String execute() throws Exception {</p>
+<pre><code>public String execute() throws Exception {
+    User u = userService.getUser(username);
+    if (u == null || !password.equals(u.getPassword())) {
+        return INPUT;
+    }
 
-<pre><code>User u = userService.getUser(username);
-if (u == null || !password.equals(u.getPassword())) {
-    return INPUT;
+    ActionContext.getContext().getSession().put("logined", true);
+    return SUCCESS;
 }
 
-ActionContext.getContext().getSession().put("logined", true);
-return SUCCESS;
+public String getUsername() {
+    return username;
+}
+
+public String getPassword() {
+    return password;
+}
 </code></pre>
-
-<p>}</p>
-
-<p>public String getUsername() {</p>
-
-<pre><code>return username;
-</code></pre>
-
-<p>}</p>
-
-<p>public String getPassword() {</p>
-
-<pre><code>return password;
-</code></pre>
-
-<p>}
-```</p>
 
 <p>同时在LoginAction.java相同目录下创建LoginAction-validation.xml，内容如下：</p>
 
-<p>```
-&lt;!DOCTYPE validators PUBLIC</p>
+<pre><code>&lt;!DOCTYPE validators PUBLIC
+    "-//OpenSymphony Group//XWork Validator 1.0.2//EN"
+    "http://www.opensymphony.com/xwork/xwork-validator-1.0.2.dtd"&gt;
 
-<pre><code>"-//OpenSymphony Group//XWork Validator 1.0.2//EN"
-"http://www.opensymphony.com/xwork/xwork-validator-1.0.2.dtd"&gt;
+&lt;validators&gt;
+    &lt;field name="username"&gt;
+        &lt;field-validator type="requiredstring"&gt;
+            &lt;message&gt;Username is required&lt;/message&gt;
+        &lt;/field-validator&gt;
+    &lt;/field&gt;
+    &lt;field name="password"&gt;
+        &lt;field-validator type="requiredstring"&gt;
+            &lt;message&gt;Password is required&lt;/message&gt;
+        &lt;/field-validator&gt;
+    &lt;/field&gt;
+&lt;/validators&gt;
 </code></pre>
-
-<p><validators></p>
-
-<pre><code>&lt;field name="username"&gt;
-    &lt;field-validator type="requiredstring"&gt;
-        &lt;message&gt;Username is required&lt;/message&gt;
-    &lt;/field-validator&gt;
-&lt;/field&gt;
-&lt;field name="password"&gt;
-    &lt;field-validator type="requiredstring"&gt;
-        &lt;message&gt;Password is required&lt;/message&gt;
-    &lt;/field-validator&gt;
-&lt;/field&gt;
-</code></pre>
-
-<p></validators>
-```</p>
 
 <p>message提供了校验出错的信息，消息中可以使用${}来引用被校验的对象。如果未出现异常，则转入用户请求的处理方法；出现异常则转入input所指定的视图。所以，对于校验的action实例，必须要在配置文件中为其指定input视图。</p>
 

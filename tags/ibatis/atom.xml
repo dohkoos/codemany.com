@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: iBatis | 乐者为王]]></title>
   <link href="http://codemany.com/tags/ibatis/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-11-01T15:23:01+08:00</updated>
+  <updated>2014-11-02T04:09:41+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -24,107 +24,86 @@
 
 <p>首先定义数据表：</p>
 
-<p>```
-CREATE TABLE users (</p>
-
-<pre><code>username varchar(40),
-password varchar(255),
-enabled char(1),
-PRIMARY KEY (username)
+<pre><code>CREATE TABLE users (
+    username varchar(40),
+    password varchar(255),
+    enabled char(1),
+    PRIMARY KEY (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf-8;
 </code></pre>
-
-<p>) ENGINE=InnoDB DEFAULT CHARSET=utf-8;
-```</p>
 
 <p>YesNoTypeHandlerCallback实现代码：</p>
 
-<p>```
-public class YesNoTypeHandlerCallback implements TypeHandlerCallback {</p>
+<pre><code>public class YesNoTypeHandlerCallback implements TypeHandlerCallback {
 
-<pre><code>public void setParameter(ParameterSetter setter, Object parameter) throws SQLException {
-    if (parameter == null) {
-        setter.setString("");
-    } else {
-        Boolean b = (Boolean)parameter;
-        if (b.booleanValue()) {
-            setter.setString("Y");
+    public void setParameter(ParameterSetter setter, Object parameter) throws SQLException {
+        if (parameter == null) {
+            setter.setString("");
         } else {
-            setter.setString("N");
+            Boolean b = (Boolean)parameter;
+            if (b.booleanValue()) {
+                setter.setString("Y");
+            } else {
+                setter.setString("N");
+            }
         }
     }
-}
 
-public Object getResult(ResultGetter getter) throws SQLException {
-    String string = getter.getString();
-    if (string == null) {
-        return null;
-    } else if ("Y".equalsIgnoreCase(string)) {
-        return new Boolean(true);
-    } else {
-        return new Boolean(false);
+    public Object getResult(ResultGetter getter) throws SQLException {
+        String string = getter.getString();
+        if (string == null) {
+            return null;
+        } else if ("Y".equalsIgnoreCase(string)) {
+            return new Boolean(true);
+        } else {
+            return new Boolean(false);
+        }
+    }
+
+    public Object valueOf(String s) {
+        return s;
     }
 }
-
-public Object valueOf(String s) {
-    return s;
-}
 </code></pre>
-
-<p>}
-```</p>
 
 <p>配置文件sql-map-config.xml中的内容如下：</p>
 
-<p>```
-<sqlMapConfig></p>
+<pre><code>&lt;sqlMapConfig&gt;
+    &lt;typeHandler jdbcType="CHAR" javaType="boolean"
+                 callback="com.example.netlink.dao.support.YesNoTypeHandlerCallback" /&gt;
 
-<pre><code>&lt;typeHandler jdbcType="CHAR" javaType="boolean"
-             callback="com.example.netlink.dao.support.YesNoTypeHandlerCallback" /&gt;
-
-&lt;sqlMap resource="com/example/netlink/dao/impl/User.xml" /&gt;
+    &lt;sqlMap resource="com/example/netlink/dao/impl/User.xml" /&gt;
+&lt;/sqlMapConfig&gt;
 </code></pre>
 
-<p></sqlMapConfig>
-```</p>
-
-<p>jdbcType="CHAR" javaType="boolean"必须有，否则YesNoTypeHandlerCallback.setParameter()不会被调用。</p>
+<p>jdbcType=&ldquo;CHAR&rdquo; javaType=&ldquo;boolean&#8221;必须有，否则YesNoTypeHandlerCallback.setParameter()不会被调用。</p>
 
 <p>SqlMap映射文件User.xml部分代码：</p>
 
-<p>```
-<typeAlias alias="user" type="com.example.netlink.model.User" /></p>
+<pre><code>&lt;typeAlias alias="user" type="com.example.netlink.model.User" /&gt;
 
-<p><resultMap id="userResult" class="user"></p>
+&lt;resultMap id="userResult" class="user"&gt;
+    &lt;result property="username" column="username" /&gt;
+    &lt;result property="password" column="password" /&gt;
+    &lt;result property="enabled" column="enabled" jdbcType="CHAR" javaType="boolean" /&gt;
+&lt;/resultMap&gt;
 
-<pre><code>&lt;result property="username" column="username" /&gt;
-&lt;result property="password" column="password" /&gt;
-&lt;result property="enabled" column="enabled" jdbcType="CHAR" javaType="boolean" /&gt;
+&lt;select id="getUser" parameterClass="string" resultMap="userResult"&gt;
+&lt;![CDATA[
+    SELECT username, password, enabled
+    FROM user WHERE username = #username#
+]]&gt;
+&lt;/select&gt;
+
+&lt;insert id="addUser" parameterClass="user"&gt;
+&lt;![CDATA[
+    INSERT INTO user (username, password, enabled)
+    VALUES (#username#, #password#, #enabled,jdbcType=CHAR,javaType=boolean#)
+]]&gt;
+&lt;/insert&gt;
 </code></pre>
 
-<p></resultMap></p>
-
-<p><select id="getUser" parameterClass="string" resultMap="userResult">
-&lt;![CDATA[</p>
-
-<pre><code>SELECT username, password, enabled
-FROM user WHERE username = #username#
-</code></pre>
-
-<p>]]&gt;
-</select></p>
-
-<p><insert id="addUser" parameterClass="user">
-&lt;![CDATA[</p>
-
-<pre><code>INSERT INTO user (username, password, enabled)
-VALUES (#username#, #password#, #enabled,jdbcType=CHAR,javaType=boolean#)
-</code></pre>
-
-<p>]]&gt;
-</insert>
-```</p>
-
-<p>jdbcType="CHAR" javaType="boolean"必须有，否则YesNoTypeHandlerCallback.getResult()不会被调用；#enabled,jdbcType=CHAR,javaType=boolean#也必须这样写，否则YesNoTypeHandlerCallback.setParameter()也不会被调用，写成#enabled:CHAR#或#enabled#都不起作用。</p>
+<p>jdbcType=&ldquo;CHAR&rdquo; javaType=&ldquo;boolean&#8221;必须有，否则YesNoTypeHandlerCallback.getResult()不会被调用；#enabled,jdbcType=CHAR,javaType=boolean#也必须这样写，否则YesNoTypeHandlerCallback.setParameter()也不会被调用，写成#enabled:CHAR#或#enabled#都不起作用。</p>
 ]]></content>
   </entry>
   

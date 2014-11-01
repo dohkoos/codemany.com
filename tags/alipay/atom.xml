@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Alipay | 乐者为王]]></title>
   <link href="http://codemany.com/tags/alipay/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-11-01T15:23:01+08:00</updated>
+  <updated>2014-11-02T04:09:41+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -22,86 +22,73 @@
 
 <p>支付处理代码：</p>
 
-<p>```
-class OrdersController &lt; ApplicationController
-  before_filter :login_required</p>
+<pre><code>class OrdersController &lt; ApplicationController
+  before_filter :login_required
 
-<p>  # place order
-  def place_order</p>
+  # place order
+  def place_order
+    parameters = {
+      'service' =&gt; 'create_direct_pay_by_user',
+      'partner' =&gt; ALIPAY_ACCOUNT,
+      'seller_email' =&gt; ALIPAY_EMAIL,
+      'out_trade_no' =&gt; @order.out_trade_no,
+      'subject' =&gt; 'payment subject',
+      'body' =&gt; 'payment body',
+      'price' =&gt; @order.price.to_s,
+      'quantity' =&gt; @order.quantity.to_s,
+      'payment_type' =&gt; '1',
+      '_input_charset' =&gt; 'utf-8',
+      'notify_url' =&gt; url_for(:only_path =&gt; false, :action =&gt; 'notify'),
+      'return_url' =&gt; url_for(:only_path =&gt; false, :action =&gt; 'done')
+    }
 
-<pre><code>parameters = {
-  'service' =&gt; 'create_direct_pay_by_user',
-  'partner' =&gt; ALIPAY_ACCOUNT,
-  'seller_email' =&gt; ALIPAY_EMAIL,
-  'out_trade_no' =&gt; @order.out_trade_no,
-  'subject' =&gt; 'payment subject',
-  'body' =&gt; 'payment body',
-  'price' =&gt; @order.price.to_s,
-  'quantity' =&gt; @order.quantity.to_s,
-  'payment_type' =&gt; '1',
-  '_input_charset' =&gt; 'utf-8',
-  'notify_url' =&gt; url_for(:only_path =&gt; false, :action =&gt; 'notify'),
-  'return_url' =&gt; url_for(:only_path =&gt; false, :action =&gt; 'done')
-}
+    # 即时到帐中交易状态为“等待买家付款”的状态默认是不会发送通知的，自己手动设置一下
+    @order.status = 'WAIT_BUYER_PAY'
+    @order.user = current_user
+    @order.save
 
-# 即时到帐中交易状态为“等待买家付款”的状态默认是不会发送通知的，自己手动设置一下
-@order.status = 'WAIT_BUYER_PAY'
-@order.user = current_user
-@order.save
+    values = {}
+    # 支付宝要求传递的参数必须要按照首字母的顺序传递，所以这里要sort
+    parameters.keys.sort.each do |k|
+      values[k] = parameters[k];
+    end
 
-values = {}
-# 支付宝要求传递的参数必须要按照首字母的顺序传递，所以这里要sort
-parameters.keys.sort.each do |k|
-  values[k] = parameters[k];
+    # 一定要先unescape后再生成sign，否则支付宝会报ILLEGAL SIGN 
+    sign = Digest::MD5.hexdigest(CGI.unescape(values.to_query) + ALIPAY_KEY)
+    gateway = 'https://www.alipay.com/cooperate/gateway.do?'
+    redirect_to gateway + values.to_query + '&amp;sign=' + sign + '&amp;sign_type=MD5'
+  end
+
+  # 返回success或fail。如果返回fail，支付宝会每隔一段时间就自动调用notify_url通信接口 
+  def notify
+    render :text =&gt; 'success'
+  end
+
+  def done
+    if verify_sign
+      order = Order.find_by_out_trade_no(params[:out_trade_no])
+      # 支付宝即时到帐接口只有一种交易状态，就是“交易成功”，更新一下
+      order.update_attributes(params[:trade_status])
+      render :text =&gt; 'Payment successful'
+    else
+      render :text =&gt; 'Alipay Error: ILLEGAL_SIGN'
+    end
+  end
+
+protected
+  def verify_sign
+    params.delete("sign_type")
+    sign = params.delete("sign")
+
+    values = {}
+    params.keys.sort.each do |k|
+      values[k] = params[k];
+    end
+
+    sign.downcase == Digest::MD5.hexdigest(CGI.unescape(values.to_query) + ALIPAY_KEY)
+  end
 end
-
-# 一定要先unescape后再生成sign，否则支付宝会报ILLEGAL SIGN 
-sign = Digest::MD5.hexdigest(CGI.unescape(values.to_query) + ALIPAY_KEY)
-gateway = 'https://www.alipay.com/cooperate/gateway.do?'
-redirect_to gateway + values.to_query + '&amp;sign=' + sign + '&amp;sign_type=MD5'
 </code></pre>
-
-<p>  end</p>
-
-<p>  # 返回success或fail。如果返回fail，支付宝会每隔一段时间就自动调用notify_url通信接口
-  def notify</p>
-
-<pre><code>render :text =&gt; 'success'
-</code></pre>
-
-<p>  end</p>
-
-<p>  def done</p>
-
-<pre><code>if verify_sign
-  order = Order.find_by_out_trade_no(params[:out_trade_no])
-  # 支付宝即时到帐接口只有一种交易状态，就是“交易成功”，更新一下
-  order.update_attributes(params[:trade_status])
-  render :text =&gt; 'Payment successful'
-else
-  render :text =&gt; 'Alipay Error: ILLEGAL_SIGN'
-end
-</code></pre>
-
-<p>  end</p>
-
-<p>protected
-  def verify_sign</p>
-
-<pre><code>params.delete("sign_type")
-sign = params.delete("sign")
-
-values = {}
-params.keys.sort.each do |k|
-  values[k] = params[k];
-end
-
-sign.downcase == Digest::MD5.hexdigest(CGI.unescape(values.to_query) + ALIPAY_KEY)
-</code></pre>
-
-<p>  end
-end
-```</p>
 ]]></content>
   </entry>
   

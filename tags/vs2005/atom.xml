@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: VS2005 | 乐者为王]]></title>
   <link href="http://codemany.com/tags/vs2005/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-11-01T15:23:01+08:00</updated>
+  <updated>2014-11-02T04:09:41+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -20,46 +20,39 @@
     <id>http://codemany.com/blog/fix-bug-wxwidgets-wizard-for-visual-studio-2005-and-2008</id>
     <content type="html"><![CDATA[<p>前面发布的wxWidgets Wizard for Visual Studio 2005/2008存在一个bug，安装在VS2008中后不能创建新的wxWidgets项目。原因是没有将wxAppWiz.vsz文件中VsWizardEngine的版本号改为9.0。现在做了一些修改，修改后的代码如下：</p>
 
-<p>```
-procedure CurStepChanged(CurStep: TSetupStep);
-var</p>
-
-<pre><code>i: Integer;
-Signature: String;
-ConfigLine: String;
-ConfigFile: String;
-ConfigFileLines: TArrayOfString;
-</code></pre>
-
-<p>begin</p>
-
-<pre><code>if CurStep = ssPostInstall then begin
-    if (Pos('Visual Studio 9.0', ExpandConstant('{app}')) &gt; 0) then begin
-        Signature := 'Wizard=VsWizard.VsWizardEngine';
-        ConfigFile := ExpandConstant('{app}\VCProjects\wxAppWiz.vsz');
-        LoadStringsFromFile(ConfigFile, ConfigFileLines);
-        for i := 0 to GetArrayLength(ConfigFileLines) - 1 do begin
-            if (Pos(Signature, ConfigFileLines[i]) &gt; 0) then begin
-                ConfigFileLines[i] := 'Wizard=VsWizard.VsWizardEngine.9.0'
-                SaveStringsToFile(ConfigFile, ConfigFileLines, False);
-                break;
+<pre><code>procedure CurStepChanged(CurStep: TSetupStep);
+var
+    i: Integer;
+    Signature: String;
+    ConfigLine: String;
+    ConfigFile: String;
+    ConfigFileLines: TArrayOfString;
+begin
+    if CurStep = ssPostInstall then begin
+        if (Pos('Visual Studio 9.0', ExpandConstant('{app}')) &gt; 0) then begin
+            Signature := 'Wizard=VsWizard.VsWizardEngine';
+            ConfigFile := ExpandConstant('{app}\VCProjects\wxAppWiz.vsz');
+            LoadStringsFromFile(ConfigFile, ConfigFileLines);
+            for i := 0 to GetArrayLength(ConfigFileLines) - 1 do begin
+                if (Pos(Signature, ConfigFileLines[i]) &gt; 0) then begin
+                    ConfigFileLines[i] := 'Wizard=VsWizard.VsWizardEngine.9.0'
+                    SaveStringsToFile(ConfigFile, ConfigFileLines, False);
+                    break;
+                end;
             end;
         end;
-    end;
 
-    Signature := 'wxWidgets';
-    ConfigLine := 'wxWidgets|{1B027A40-8F43-11D0-8D11-00A0C91BC942}|#1043|70' + #13#10;
-    ConfigFile := ExpandConstant('{app}\VCProjects\vc.vsdir');
-    LoadStringsFromFile(ConfigFile, ConfigFileLines);
-    for i := 0 to GetArrayLength(ConfigFileLines) - 1 do begin
-        if (Pos(Signature, ConfigFileLines[i]) &gt; 0) then abort;
+        Signature := 'wxWidgets';
+        ConfigLine := 'wxWidgets|{1B027A40-8F43-11D0-8D11-00A0C91BC942}|#1043|70' + #13#10;
+        ConfigFile := ExpandConstant('{app}\VCProjects\vc.vsdir');
+        LoadStringsFromFile(ConfigFile, ConfigFileLines);
+        for i := 0 to GetArrayLength(ConfigFileLines) - 1 do begin
+            if (Pos(Signature, ConfigFileLines[i]) &gt; 0) then abort;
+        end;
+        SaveStringToFile(ConfigFile, ConfigLine, True);
     end;
-    SaveStringToFile(ConfigFile, ConfigLine, True);
 end;
 </code></pre>
-
-<p>end;
-```</p>
 
 <p>代码下载：<a href="https://github.com/dohkoos/wxwizard">https://github.com/dohkoos/wxwizard</a></p>
 ]]></content>
@@ -72,25 +65,16 @@ end;
     <id>http://codemany.com/blog/complete-wxwidgets-wizard-for-visual-studio-2005-and-2008-install-program</id>
     <content type="html"><![CDATA[<p>两个晚上的时间，一边查资料一边学习，同时编写和测试安装脚本，最终完成了wxWidgets Wizard for Visual Studio 2005/2008的安装程序。现在不用配置就可以使用wxWidgets Wizard的代码框架生成功能了。安装制作程序采用的是Inno Setup，完整的安装脚本如下：</p>
 
-<p>```</p>
+<pre><code>#define SrcImgsDir '..\VCWizards\images'
+#define SrcHtmlDir '..\VCWizards\html\1033'
+#define SrcScptDir '..\VCWizards\scripts\1033'
+#define SrcTempDir '..\VCWizards\templates\1033'
+#define TgtImgsDir 'VCWizards\AppWiz\wxWidgets\Application\images'
+#define TgtHtmlDir 'VCWizards\AppWiz\wxWidgets\Application\html\1033'
+#define TgtScptDir 'VCWizards\AppWiz\wxWidgets\Application\scripts\1033'
+#define TgtTempDir 'VCWizards\AppWiz\wxWidgets\Application\templates\1033'
 
-<h1>define SrcImgsDir '..\VCWizards\images'</h1>
-
-<h1>define SrcHtmlDir '..\VCWizards\html\1033'</h1>
-
-<h1>define SrcScptDir '..\VCWizards\scripts\1033'</h1>
-
-<h1>define SrcTempDir '..\VCWizards\templates\1033'</h1>
-
-<h1>define TgtImgsDir 'VCWizards\AppWiz\wxWidgets\Application\images'</h1>
-
-<h1>define TgtHtmlDir 'VCWizards\AppWiz\wxWidgets\Application\html\1033'</h1>
-
-<h1>define TgtScptDir 'VCWizards\AppWiz\wxWidgets\Application\scripts\1033'</h1>
-
-<h1>define TgtTempDir 'VCWizards\AppWiz\wxWidgets\Application\templates\1033'</h1>
-
-<p>[Setup]
+[Setup]
 AppName=wxWidgets Application Wizard
 AppVerName=wxWidgets Wizard 1.0.0
 AppPublisher=dohkoos
@@ -100,81 +84,69 @@ DirExistsWarning=no
 UninstallFilesDir={app}\VCWizards\AppWiz\wxWidgets
 UninstallDisplayIcon={app}\VCProjects\wxAppWiz.ico
 Compression=lzma
-SolidCompression=yes</p>
+SolidCompression=yes
 
-<p>[Files]
+[Files]
 Source: ..\VCProjects\wxAppWiz.ico; DestDir: {app}\VCProjects
 Source: ..\VCProjects\wxAppWiz.vsz; DestDir: {app}\VCProjects
 Source: ..\VCProjects\wxWidgets\wxWidgets.vsdir; DestDir: {app}\VCProjects\wxWidgets
-Source: {#SrcImgsDir}*.gif; DestDir: {app}{#TgtImgsDir}
-Source: {#SrcHtmlDir}*.htm; DestDir: {app}{#TgtHtmlDir}
-Source: {#SrcHtmlDir}*.css; DestDir: {app}{#TgtHtmlDir}
-Source: {#SrcScptDir}*.js; DestDir: {app}{#TgtScptDir}
-Source: {#SrcTempDir}*.h; DestDir: {app}{#TgtTempDir}
-Source: {#SrcTempDir}*.cpp; DestDir: {app}{#TgtTempDir}
-Source: {#SrcTempDir}\readme.txt; DestDir: {app}{#TgtTempDir}
-Source: {#SrcTempDir}\root.manifest; DestDir: {app}{#TgtTempDir}
-Source: {#SrcTempDir}\Templates.inf; DestDir: {app}{#TgtTempDir}</p>
+Source: {#SrcImgsDir}\*.gif; DestDir: {app}\{#TgtImgsDir}
+Source: {#SrcHtmlDir}\*.htm; DestDir: {app}\{#TgtHtmlDir}
+Source: {#SrcHtmlDir}\*.css; DestDir: {app}\{#TgtHtmlDir}
+Source: {#SrcScptDir}\*.js; DestDir: {app}\{#TgtScptDir}
+Source: {#SrcTempDir}\*.h; DestDir: {app}\{#TgtTempDir}
+Source: {#SrcTempDir}\*.cpp; DestDir: {app}\{#TgtTempDir}
+Source: {#SrcTempDir}\readme.txt; DestDir: {app}\{#TgtTempDir}
+Source: {#SrcTempDir}\root.manifest; DestDir: {app}\{#TgtTempDir}
+Source: {#SrcTempDir}\Templates.inf; DestDir: {app}\{#TgtTempDir}
 
-<p>[Code]
+[Code]
 procedure CurStepChanged(CurStep: TSetupStep);
-var</p>
-
-<pre><code>i: Integer;
-Signature: String;
-ConfigLine: String;
-ConfigFile: String;
-ConfigFileLines: TArrayOfString;
-</code></pre>
-
-<p>begin</p>
-
-<pre><code>if CurStep = ssPostInstall then begin
-    Signature := 'wxWidgets';
-    ConfigLine := 'wxWidgets|{1B027A40-8F43-11D0-8D11-00A0C91BC942}|#1043|70' + #13#10;
-    ConfigFile := ExpandConstant('{app}\VCProjects\vc.vsdir');
-    LoadStringsFromFile(ConfigFile, ConfigFileLines);
-    for i := 0 to GetArrayLength(ConfigFileLines) - 1 do begin
-        if (Pos(Signature, ConfigFileLines[i]) &gt; 0) then abort;
-    end;
-    SaveStringToFile(ConfigFile, ConfigLine, True);
-end;
-</code></pre>
-
-<p>end;</p>
-
-<p>procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
-var</p>
-
-<pre><code>i: Integer;
-j: Integer;
-Signature: String;
-ConfigFile: String;
-ConfigFileLines, NewConfigFileLines: TArrayOfString;
-</code></pre>
-
-<p>begin</p>
-
-<pre><code>if CurUninstallStep = usUninstall then begin
-    Signature := 'wxWidgets';
-    ConfigFile := ExpandConstant('{app}\VCProjects\vc.vsdir');
-    LoadStringsFromFile(ConfigFile, ConfigFileLines);
-    SetArrayLength(NewConfigFileLines, GetArrayLength(ConfigFileLines) - 1);
-    j := 0;
-    for i := 0 to GetArrayLength(ConfigFileLines) - 1 do begin
-        if (Pos(Signature, ConfigFileLines[i]) &gt; 0) then begin
-            continue;
-        end else begin
-            NewConfigFileLines[j] := ConfigFileLines[i];
-            j := j + 1;
+var
+    i: Integer;
+    Signature: String;
+    ConfigLine: String;
+    ConfigFile: String;
+    ConfigFileLines: TArrayOfString;
+begin
+    if CurStep = ssPostInstall then begin
+        Signature := 'wxWidgets';
+        ConfigLine := 'wxWidgets|{1B027A40-8F43-11D0-8D11-00A0C91BC942}|#1043|70' + #13#10;
+        ConfigFile := ExpandConstant('{app}\VCProjects\vc.vsdir');
+        LoadStringsFromFile(ConfigFile, ConfigFileLines);
+        for i := 0 to GetArrayLength(ConfigFileLines) - 1 do begin
+            if (Pos(Signature, ConfigFileLines[i]) &gt; 0) then abort;
         end;
+        SaveStringToFile(ConfigFile, ConfigLine, True);
     end;
-    SaveStringsToFile(ConfigFile, NewConfigFileLines, False);
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+    i: Integer;
+    j: Integer;
+    Signature: String;
+    ConfigFile: String;
+    ConfigFileLines, NewConfigFileLines: TArrayOfString;
+begin
+    if CurUninstallStep = usUninstall then begin
+        Signature := 'wxWidgets';
+        ConfigFile := ExpandConstant('{app}\VCProjects\vc.vsdir');
+        LoadStringsFromFile(ConfigFile, ConfigFileLines);
+        SetArrayLength(NewConfigFileLines, GetArrayLength(ConfigFileLines) - 1);
+        j := 0;
+        for i := 0 to GetArrayLength(ConfigFileLines) - 1 do begin
+            if (Pos(Signature, ConfigFileLines[i]) &gt; 0) then begin
+                continue;
+            end else begin
+                NewConfigFileLines[j] := ConfigFileLines[i];
+                j := j + 1;
+            end;
+        end;
+        SaveStringsToFile(ConfigFile, NewConfigFileLines, False);
+    end;
 end;
 </code></pre>
-
-<p>end;
-```</p>
 
 <p>代码下载：<a href="https://github.com/dohkoos/wxwizard">https://github.com/dohkoos/wxwizard</a></p>
 ]]></content>
@@ -220,9 +192,8 @@ end;
 
 <p>在移植的过程中遇到了些问题，先是编译时出现如下错误：</p>
 
-<p><code>
-error C2011: 'fd_set' : 'struct' type redefinition
-</code></p>
+<pre><code>error C2011: 'fd_set' : 'struct' type redefinition
+</code></pre>
 
 <p>问题的具体分析可以看<a href="http://blog.csdn.net/freefalcon/archive/2006/11/09/1374733.aspx">使用winsock2.h可能出现的两种编译错误</a>。解决方法有三种：</p>
 
@@ -235,9 +206,8 @@ error C2011: 'fd_set' : 'struct' type redefinition
 
 <p>接着又碰到以下错误：</p>
 
-<p><code>
-error C2208: 'bool' : no members defined using this type
-</code></p>
+<pre><code>error C2208: 'bool' : no members defined using this type
+</code></pre>
 
 <p>在<code>#include &lt;windows.h&gt;</code>的后面添加<code>#include &lt;wx/msw/winundef.h&gt;</code>即可。</p>
 
@@ -261,7 +231,7 @@ error C2208: 'bool' : no members defined using this type
 
 <p><img src="/uploads/wxwidgets-compile.png" title="wxwidgets-compile" ></p>
 
-<p>编译好后的wxWidgets会在$(WXWIN)/lib/vc_lib目录下生成一系列的lib文件，这些lib文件的名字遵循下面的命名规则：不依赖于GUI组件的库会以wxbase开头，紧跟着的是版本号，然后的字母表明这个库是否是编译为Unicode('u')或是否是编译为Debug('d')，名字中的最后部分是wxWidgets组件的名字。</p>
+<p>编译好后的wxWidgets会在$(WXWIN)/lib/vc_lib目录下生成一系列的lib文件，这些lib文件的名字遵循下面的命名规则：不依赖于GUI组件的库会以wxbase开头，紧跟着的是版本号，然后的字母表明这个库是否是编译为Unicode(&lsquo;u&rsquo;)或是否是编译为Debug(&rsquo;d&#8217;)，名字中的最后部分是wxWidgets组件的名字。</p>
 
 <p>注意：wxWidgets编译完后在$(WXWIN)/build/msw目录下会生成许多预编译头文件，占了很大的空间，如果确定以后不再编译wxWidgets库的话，可以考虑删掉。</p>
 
@@ -279,37 +249,36 @@ error C2208: 'bool' : no members defined using this type
 
 <p>新建一个General -> Empty Project或Win32 -> Win32 Project项目，然后设置项目的一些属性，可以选择下面的其中一个来设置。譬如你如果打算使用Unicode，那么选择Unicode Debug或Unicode Release，如果你仅仅想调试程序而非发布，则只需要选择Debug设置。</p>
 
-<p>```
-Debug：
-Project Properties -> General -> Character Set: No Set
-Project Properties -> C/C++ -> Code Generation -> Runtime Library: Multi-threaded Debug (/MTd)
-Project Properties -> Linker -> Input -> Additional Dependencies: wxbase28d.lib wxmsw28d_core.lib winmm.lib comctl32.lib rpcrt4.lib wsock32.lib oleacc.lib</p>
+<pre><code>Debug：
+Project Properties -&gt; General -&gt; Character Set: No Set
+Project Properties -&gt; C/C++ -&gt; Code Generation -&gt; Runtime Library: Multi-threaded Debug (/MTd)
+Project Properties -&gt; Linker -&gt; Input -&gt; Additional Dependencies: wxbase28d.lib wxmsw28d_core.lib winmm.lib comctl32.lib rpcrt4.lib wsock32.lib oleacc.lib
 
-<p>Release：
-Project Properties -> General -> Character Set: No Set
-Project Properties -> C/C++ -> Code Generation -> Runtime Library: Multi-threaded (/MT)
-Project Properties -> Linker -> Input -> Additional Dependencies: wxbase28.lib wxmsw28_core.lib winmm.lib comctl32.lib rpcrt4.lib wsock32.lib oleacc.lib</p>
+Release：
+Project Properties -&gt; General -&gt; Character Set: No Set
+Project Properties -&gt; C/C++ -&gt; Code Generation -&gt; Runtime Library: Multi-threaded (/MT)
+Project Properties -&gt; Linker -&gt; Input -&gt; Additional Dependencies: wxbase28.lib wxmsw28_core.lib winmm.lib comctl32.lib rpcrt4.lib wsock32.lib oleacc.lib
 
-<p>Unicode Debug：
-Project Properties -> General -> Character Set: Use Unicode Character Set
-Project Properties -> C/C++ -> Code Generation -> Runtime Library: Multi-threaded Debug (/MTd)
-Project Properties -> Linker -> Input -> Additional Dependencies: wxbase28ud.lib wxmsw28ud_core.lib winmm.lib comctl32.lib rpcrt4.lib wsock32.lib oleacc.lib</p>
+Unicode Debug：
+Project Properties -&gt; General -&gt; Character Set: Use Unicode Character Set
+Project Properties -&gt; C/C++ -&gt; Code Generation -&gt; Runtime Library: Multi-threaded Debug (/MTd)
+Project Properties -&gt; Linker -&gt; Input -&gt; Additional Dependencies: wxbase28ud.lib wxmsw28ud_core.lib winmm.lib comctl32.lib rpcrt4.lib wsock32.lib oleacc.lib
 
-<p>Unicode Release：
-Project Properties -> General -> Character Set: Use Unicode Character Set
-Project Properties -> C/C++ -> Code Generation -> Runtime Library: Multi-threaded (/MT)
-Project Properties -> Linker -> Input -> Additional Dependencies: wxbase28u.lib wxmsw28u_core.lib winmm.lib comctl32.lib rpcrt4.lib wsock32.lib oleacc.lib
-```</p>
+Unicode Release：
+Project Properties -&gt; General -&gt; Character Set: Use Unicode Character Set
+Project Properties -&gt; C/C++ -&gt; Code Generation -&gt; Runtime Library: Multi-threaded (/MT)
+Project Properties -&gt; Linker -&gt; Input -&gt; Additional Dependencies: wxbase28u.lib wxmsw28u_core.lib winmm.lib comctl32.lib rpcrt4.lib wsock32.lib oleacc.lib
+</code></pre>
 
 <p>问题：</p>
 
-<p>1、编译时出现Cannot open include file: '../mswu/wx/setup.h': No such file or directory错误</p>
+<p>1、编译时出现Cannot open include file: &lsquo;../mswu/wx/setup.h&rsquo;: No such file or directory错误</p>
 
 <p>这是因为项目属性的Character Set设置不正确，必须与使用的wxWidgets库的Character Set一致。</p>
 
 <p>2、编译时出现MSVCRT.lib(MSVCRT.dll) : error LNK2005: _free already defined in LIBC.lib(free.obj)错误</p>
 
-<p>这是因为没有连接正确的wxWidgets库，譬如Unicode Debug版本的项目就需要连接Unicode+Debug版本的wxWidgets库（库名后缀为'ud'的lib文件），或者是wxWidgets库和程序使用的Runtime Library不同。</p>
+<p>这是因为没有连接正确的wxWidgets库，譬如Unicode Debug版本的项目就需要连接Unicode+Debug版本的wxWidgets库（库名后缀为&#8217;ud&#8217;的lib文件），或者是wxWidgets库和程序使用的Runtime Library不同。</p>
 
 <p>3、运行是出现No Debugging Information对话框</p>
 

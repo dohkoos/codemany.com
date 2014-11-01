@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: DLL | 乐者为王]]></title>
   <link href="http://codemany.com/tags/dll/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-11-01T15:23:01+08:00</updated>
+  <updated>2014-11-02T04:09:41+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -58,37 +58,26 @@
 
 <p>使用DLL的客户程序必须include头文件（此头文件包含每个DLL中的导出函数或C++类），并且链接到此DLL的创建者所提供的导入库。</p>
 
-<p>```
-// Cacl.cpp
+<pre><code>// Cacl.cpp
 DLLAPI int Sum(int a, int b)
-{</p>
-
-<pre><code>return a + b;
+{
+    return a + b;
+}
 </code></pre>
 
-<p>}
-```</p>
+<pre><code>// Cacl.h
+#ifdef CACL_EXPORTS
+#define DLLAPI __declspec(dllexport)
+#else
+#define DLLAPI __declspec(dllimport)
+#endif
 
-<p>```
-// Cacl.h</p>
-
-<h1>ifdef CACL_EXPORTS</h1>
-
-<h1>define DLLAPI __declspec(dllexport)</h1>
-
-<h1>else</h1>
-
-<h1>define DLLAPI __declspec(dllimport)</h1>
-
-<h1>endif</h1>
-
-<p>DLLAPI int Sum(int a, int b);
-```</p>
-
-<p><code>
-// Client.cpp
 DLLAPI int Sum(int a, int b);
-</code></p>
+</code></pre>
+
+<pre><code>// Client.cpp
+DLLAPI int Sum(int a, int b);
+</code></pre>
 
 <p>为了显式链接到DLL，客户程序必须在运行时通过函数调显式加载DLL：</p>
 
@@ -99,23 +88,19 @@ DLLAPI int Sum(int a, int b);
 </ol>
 
 
-<p>```
-// Client.cpp
+<pre><code>// Client.cpp
 HINSTANCE hDLL = LoadLibrary("demo");
 if (hDLL != NULL)
-{</p>
-
-<pre><code>LPFNDLLFUNC1 lpfnDllFunc1 = GetProcAddress(hDLL, "Sum");
-if (lpfnDllFunc1 == NULL)
 {
-    FreeLibrary(hDLL);
-    return SOME_ERROR_CODE;
+    LPFNDLLFUNC1 lpfnDllFunc1 = GetProcAddress(hDLL, "Sum");
+    if (lpfnDllFunc1 == NULL)
+    {
+        FreeLibrary(hDLL);
+        return SOME_ERROR_CODE;
+    }
+    return lpfnDllFunc1(dwParam, uParam);
 }
-return lpfnDllFunc1(dwParam, uParam);
 </code></pre>
-
-<p>}
-```</p>
 
 <p>五、客户程序如何找到DLL</p>
 
@@ -136,84 +121,62 @@ return lpfnDllFunc1(dwParam, uParam);
 
 <p>方法1：在定义中使用__declspec(dllexport)关键字。</p>
 
-<p>```
-// 导出函数
-<strong>declspec(dllexport) void </strong>cdecl Function();</p>
+<pre><code>// 导出函数
+__declspec(dllexport) void __cdecl Function();
 
-<p>// 导出类中的所有公共数据成员和成员函数
+// 导出类中的所有公共数据成员和成员函数
 class __declspec(dllexport) CExampleExport : public CObject
 {
 }
-```</p>
+</code></pre>
 
 <p>方法2：在生成DLL时，创建一个后缀名为def的模块定义文件（如果希望按序号而不是按名称从DLL导出函数，则使用此方法）。</p>
 
 <p>实例DLL和客户程序代码：</p>
 
-<p>```
-// Cacl.h</p>
+<pre><code>// Cacl.h
+#ifdef CACL_EXPORTS
+#define DLLAPI __declspec(dllexport)
+#else
+#define DLLAPI __declspec(dllimport)
+#endif
 
-<h1>ifdef CACL_EXPORTS</h1>
+DLLAPI int Sum(int a, int b);
+</code></pre>
 
-<h1>define DLLAPI __declspec(dllexport)</h1>
+<pre><code>// Cacl.cpp
+#include &lt;windows.h&gt;
+#include "Cacl.h"
 
-<h1>else</h1>
-
-<h1>define DLLAPI __declspec(dllimport)</h1>
-
-<h1>endif</h1>
-
-<p>DLLAPI int Sum(int a, int b);
-```</p>
-
-<p>```
-// Cacl.cpp</p>
-
-<h1>include &lt;windows.h></h1>
-
-<h1>include "Cacl.h"</h1>
-
-<p>BOOL APIENTRY DllMain(HANDLE hModule, DWORD reason, LPVOID lpReserved)
-{</p>
-
-<pre><code>switch (reason)
+BOOL APIENTRY DllMain(HANDLE hModule, DWORD reason, LPVOID lpReserved)
 {
-    case DLL_PROCESS_ATTACH:
-    case DLL_THREAD_ATTACH:
-    case DLL_THREAD_DETACH:
-    case DLL_PROCESS_DETACH:
-        break;
+    switch (reason)
+    {
+        case DLL_PROCESS_ATTACH:
+        case DLL_THREAD_ATTACH:
+        case DLL_THREAD_DETACH:
+        case DLL_PROCESS_DETACH:
+            break;
+    }
+    return TRUE;
 }
-return TRUE;
+
+DLLAPI int Sum(int a, int b)
+{
+    return a + b;
+}
 </code></pre>
 
-<p>}</p>
+<pre><code>// Client.cpp
+#include &lt;stdio.h&gt;
+#include "Cacl.h"
 
-<p>DLLAPI int Sum(int a, int b)
-{</p>
-
-<pre><code>return a + b;
+int main(int argc, char* argv[])
+{
+    printf("Sum = %d\n", Sum(5, 3));
+    return 0;
+}
 </code></pre>
-
-<p>}
-```</p>
-
-<p>```
-// Client.cpp</p>
-
-<h1>include &lt;stdio.h></h1>
-
-<h1>include "Cacl.h"</h1>
-
-<p>int main(int argc, char* argv[])
-{</p>
-
-<pre><code>printf("Sum = %d\n", Sum(5, 3));
-return 0;
-</code></pre>
-
-<p>}
-```</p>
 
 <p>七、如何调试DLL</p>
 

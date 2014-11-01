@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Interceptor | 乐者为王]]></title>
   <link href="http://codemany.com/tags/interceptor/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-11-01T15:23:01+08:00</updated>
+  <updated>2014-11-02T04:09:41+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -40,214 +40,195 @@
 
 <p>创建AuthorizationInterceptor类，继承类AbstractInterceptor。为什么继承它呢？而不是直接实现接口Interceptor。这是因为AbstractInterceptor已经实现了Interceptor接口，并且实现了接口中的init和destroy方法。而在这个拦截器中，我们并不需要使用这两个方法。下面上代码：</p>
 
-<p>```
-package com.codemany.account.interceptor;</p>
+<pre><code>package com.codemany.account.interceptor;
 
-<p>import java.util.Collections;
-import java.util.Set;</p>
+import java.util.Collections;
+import java.util.Set;
 
-<p>import com.codemany.account.model.User;</p>
+import com.codemany.account.model.User;
 
-<p>import com.opensymphony.xwork2.Action;
+import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionInvocation;
 import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
-import com.opensymphony.xwork2.util.TextParseUtil;</p>
+import com.opensymphony.xwork2.util.TextParseUtil;
 
-<p>public class AuthorizationInterceptor extends AbstractInterceptor {</p>
+public class AuthorizationInterceptor extends AbstractInterceptor {
+    private static final long serialVersionUID = -5140884040684756043L;
 
-<pre><code>private static final long serialVersionUID = -5140884040684756043L;
+    protected Set&lt;String&gt; skipActions = Collections.emptySet();
 
-protected Set&lt;String&gt; skipActions = Collections.emptySet();
+    public void setSkipActions(String skipActions) {
+        this.skipActions = TextParseUtil.commaDelimitedStringToSet(skipActions);
+    }
 
-public void setSkipActions(String skipActions) {
-    this.skipActions = TextParseUtil.commaDelimitedStringToSet(skipActions);
-}
+    @Override
+    public String intercept(ActionInvocation invocation) throws Exception {
+        User user = (User)invocation.getInvocationContext()
+                .getSession().get(User.SESSION_KEY);
 
-@Override
-public String intercept(ActionInvocation invocation) throws Exception {
-    User user = (User)invocation.getInvocationContext()
-            .getSession().get(User.SESSION_KEY);
-
-    boolean isLogined = user != null;
-    String action = invocation.getProxy().getActionName();
-    // 如果用户未登录，并且访问的是需要登录权限的Action，就跳转到全局转向配置login上
-    if (isLogined || skipActions.contains(action)) {
-        return invocation.invoke();
-    } else {
-        return Action.LOGIN;
+        boolean isLogined = user != null;
+        String action = invocation.getProxy().getActionName();
+        // 如果用户未登录，并且访问的是需要登录权限的Action，就跳转到全局转向配置login上
+        if (isLogined || skipActions.contains(action)) {
+            return invocation.invoke();
+        } else {
+            return Action.LOGIN;
+        }
     }
 }
 </code></pre>
-
-<p>}
-```</p>
 
 <p>这里的skipActions目的是为了跳过一些不需要拦截的Action。因为默认情况下，拦截器会拦截Action中的所有的方法。像login，register这类Action是任何用户在任何状态下都可以访问的，所以不需要拦截，这里就可以将这些Action放到skipActions中来跳过拦截。</p>
 
 <p>实现了拦截类后还要在struts.xml进行配置使它起作用，以下是struts.xml的完整代码：</p>
 
-<p>```
-&lt;?xml version="1.0" encoding="utf-8"?>
-&lt;!DOCTYPE struts PUBLIC</p>
+<pre><code>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;!DOCTYPE struts PUBLIC
+    "-//Apache Software Foundation//DTD Struts Configuration 2.3//EN"
+    "http://struts.apache.org/dtds/struts-2.3.dtd"&gt;
 
-<pre><code>"-//Apache Software Foundation//DTD Struts Configuration 2.3//EN"
-"http://struts.apache.org/dtds/struts-2.3.dtd"&gt;
+&lt;struts&gt;
+    &lt;constant name="struts.enable.DynamicMethodInvocation" value="true" /&gt;
+    &lt;constant name="struts.devMode" value="true" /&gt;
+
+    &lt;package name="default" extends="struts-default"&gt;
+        &lt;interceptors&gt;
+            &lt;interceptor name="authorization"
+                class="com.codemany.account.interceptor.AuthorizationInterceptor" /&gt;
+
+            &lt;interceptor-stack name="authorizationStack"&gt;
+                &lt;interceptor-ref name="authorization"&gt;
+                    &lt;param name="skipActions"&gt;login, logout, register&lt;/param&gt;
+                &lt;/interceptor-ref&gt;
+                &lt;interceptor-ref name="defaultStack" /&gt;
+            &lt;/interceptor-stack&gt;
+        &lt;/interceptors&gt;
+
+        &lt;default-interceptor-ref name="authorizationStack" /&gt;
+
+        &lt;!-- 全局转向配置 --&gt;
+        &lt;!-- 还记得拦截器里面的return Action.LOGIN这句吧，当程序执行完这一行后，--&gt;
+        &lt;!-- 就会到struts.xml文件的global-results中找name为login的全局转向配置。--&gt;
+        &lt;global-results&gt;
+            &lt;result name="login" type="redirectAction"&gt;login!input&lt;/result&gt;
+        &lt;/global-results&gt;
+    &lt;/package&gt;
+
+    &lt;include file="account.xml" /&gt;
+    &lt;include file="book.xml" /&gt;
+&lt;/struts&gt;
 </code></pre>
-
-<p><struts></p>
-
-<pre><code>&lt;constant name="struts.enable.DynamicMethodInvocation" value="true" /&gt;
-&lt;constant name="struts.devMode" value="true" /&gt;
-
-&lt;package name="default" extends="struts-default"&gt;
-    &lt;interceptors&gt;
-        &lt;interceptor name="authorization"
-            class="com.codemany.account.interceptor.AuthorizationInterceptor" /&gt;
-
-        &lt;interceptor-stack name="authorizationStack"&gt;
-            &lt;interceptor-ref name="authorization"&gt;
-                &lt;param name="skipActions"&gt;login, logout, register&lt;/param&gt;
-            &lt;/interceptor-ref&gt;
-            &lt;interceptor-ref name="defaultStack" /&gt;
-        &lt;/interceptor-stack&gt;
-    &lt;/interceptors&gt;
-
-    &lt;default-interceptor-ref name="authorizationStack" /&gt;
-
-    &lt;!-- 全局转向配置 --&gt;
-    &lt;!-- 还记得拦截器里面的return Action.LOGIN这句吧，当程序执行完这一行后，--&gt;
-    &lt;!-- 就会到struts.xml文件的global-results中找name为login的全局转向配置。--&gt;
-    &lt;global-results&gt;
-        &lt;result name="login" type="redirectAction"&gt;login!input&lt;/result&gt;
-    &lt;/global-results&gt;
-&lt;/package&gt;
-
-&lt;include file="account.xml" /&gt;
-&lt;include file="book.xml" /&gt;
-</code></pre>
-
-<p></struts>
-```</p>
 
 <p>然后将account.xml和book.xml中package继承的父包改成struts.xml配置中的default包：</p>
 
-<p>```
-<package name="account" extends="default"></p>
+<pre><code>&lt;package name="account" extends="default"&gt;
 
-<p><package name="book" extends="default">
-```</p>
+&lt;package name="book" extends="default"&gt;
+</code></pre>
 
 <p>第二个问题的解决就是重写BookAction.java的代码，不再从数据库中读取Book数据，而是从当前登录用户的books属性中查找Book信息。</p>
 
-<p>```
-package com.codemany.book.action;</p>
+<pre><code>package com.codemany.book.action;
 
-<p>import java.util.ArrayList;
-import java.util.List;</p>
+import java.util.ArrayList;
+import java.util.List;
 
-<p>import com.codemany.account.model.User;
+import com.codemany.account.model.User;
 import com.codemany.book.model.Book;
-import com.codemany.book.service.BookService;</p>
+import com.codemany.book.service.BookService;
 
-<p>import com.opensymphony.xwork2.ActionContext;
-import com.opensymphony.xwork2.ActionSupport;</p>
+import com.opensymphony.xwork2.ActionContext;
+import com.opensymphony.xwork2.ActionSupport;
 
-<p>public class BookAction extends ActionSupport {</p>
+public class BookAction extends ActionSupport {
+    private static final long serialVersionUID = 2538923417705852774L;
 
-<pre><code>private static final long serialVersionUID = 2538923417705852774L;
+    private Long bookId;
+    private Book book;
+    private List&lt;Book&gt; bookList;
 
-private Long bookId;
-private Book book;
-private List&lt;Book&gt; bookList;
+    private BookService bookService;
 
-private BookService bookService;
-
-public String list() throws Exception {
-    if (bookList == null) {
-        bookList = new ArrayList&lt;Book&gt;();
+    public String list() throws Exception {
+        if (bookList == null) {
+            bookList = new ArrayList&lt;Book&gt;();
+        }
+        bookList.addAll(getCurrentUser().getBooks());
+        return "list";
     }
-    bookList.addAll(getCurrentUser().getBooks());
-    return "list";
-}
 
-public String show() throws Exception {
-    book = getCurrentUser().getBook(bookId);
-    return "show";
-}
-
-public String input() throws Exception {
-    if (bookId != null) {
+    public String show() throws Exception {
         book = getCurrentUser().getBook(bookId);
+        return "show";
     }
-    return INPUT;
-}
 
-public String saveOrUpdate() throws Exception {
-    book.setUser(getCurrentUser());
-    bookService.saveOrUpdateBook(book);
-    return SUCCESS;
-}
-
-public String delete() throws Exception {
-    Book book = getCurrentUser().getBook(bookId);
-    if (book != null) {
-        bookService.deleteBook(bookId);
-        getCurrentUser().getBooks().remove(book);
+    public String input() throws Exception {
+        if (bookId != null) {
+            book = getCurrentUser().getBook(bookId);
+        }
+        return INPUT;
     }
-    return SUCCESS;
-}
 
-public List&lt;Book&gt; getBookList() {
-    return bookList;
-}
+    public String saveOrUpdate() throws Exception {
+        book.setUser(getCurrentUser());
+        bookService.saveOrUpdateBook(book);
+        return SUCCESS;
+    }
 
-public Book getBook() {
-    return book;
-}
+    public String delete() throws Exception {
+        Book book = getCurrentUser().getBook(bookId);
+        if (book != null) {
+            bookService.deleteBook(bookId);
+            getCurrentUser().getBooks().remove(book);
+        }
+        return SUCCESS;
+    }
 
-public void setBook(Book book) {
-    this.book = book;
-}
+    public List&lt;Book&gt; getBookList() {
+        return bookList;
+    }
 
-public void setBookId(Long bookId) {
-    this.bookId = bookId;
-}
+    public Book getBook() {
+        return book;
+    }
 
-public void setBookService(BookService bookService) {
-    this.bookService = bookService;
-}
+    public void setBook(Book book) {
+        this.book = book;
+    }
 
-private User getCurrentUser() {
-    return (User)ActionContext.getContext()
-            .getSession().get(User.SESSION_KEY);
+    public void setBookId(Long bookId) {
+        this.bookId = bookId;
+    }
+
+    public void setBookService(BookService bookService) {
+        this.bookService = bookService;
+    }
+
+    private User getCurrentUser() {
+        return (User)ActionContext.getContext()
+                .getSession().get(User.SESSION_KEY);
+    }
 }
 </code></pre>
-
-<p>}
-```</p>
 
 <p>上面的代码会产生异常，提示取出的Book数据为空，所以要在User.hbm.xml中set标签后添加属性lazy=“false”，这样Hibernate从数据库中读取User数据时会连带取出对应的Book数据：</p>
 
-<p><code>
-&lt;set name="books" inverse="true" lazy="false"&gt;
-</code></p>
+<pre><code>&lt;set name="books" inverse="true" lazy="false"&gt;
+</code></pre>
 
 <p>下面是BookAction类中用到的User.getBook(bookId)代码：</p>
 
-<p>```
-public class User {</p>
+<pre><code>public class User {
 
-<pre><code>public Book getBook(Long bookId) {
-    for (Book book : books) {
-        if (bookId != null &amp;&amp; bookId.equals(book.getId())) {
-            return book;
+    public Book getBook(Long bookId) {
+        for (Book book : books) {
+            if (bookId != null &amp;&amp; bookId.equals(book.getId())) {
+                return book;
+            }
         }
+        return null;
     }
-    return null;
-}
 </code></pre>
-
-<p>```</p>
 
 <p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
 ]]></content>
