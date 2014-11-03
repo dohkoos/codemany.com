@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Tag: devise | 乐者为王]]></title>
+  <link href="http://codemany.com/tags/devise/atom.xml" rel="self"/>
+  <link href="http://codemany.com/"/>
+  <updated>2014-11-04T04:27:44+08:00</updated>
+  <id>http://codemany.com/</id>
+  <author>
+    <name><![CDATA[dohkoos]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[用Rails 3.2打造简单记账应用]]></title>
+    <link href="http://codemany.com/blog/using-rails-32-to-create-a-simple-accounting-application/"/>
+    <updated>2012-04-18T07:49:27+08:00</updated>
+    <id>http://codemany.com/blog/using-rails-32-to-create-a-simple-accounting-application</id>
+    <content type="html"><![CDATA[<p>Rails已经到3.2版本了，和以前的2.3版本有了很大的不同，决定把原来老版本的记账应用重新写一遍，更新部分插件。</p>
+
+<p>首先是创建项目：</p>
+
+<pre><code>rails new qianbao
+cd qianbao
+rails g scaffold entry amount:decimal tags:string effective_date:date
+rails g controller home index
+</code></pre>
+
+<p>删除public/index.html，在config/routes.rb中添加根路由：</p>
+
+<pre><code>root :to =&gt; 'home#index'
+</code></pre>
+
+<p>现在要给应用加上一个认证系统（注册、激活、登录、登出），这次使用<a href="https://github.com/plataformatec/devise">devise</a>插件实现。</p>
+
+<p>在Gemfile中添加：</p>
+
+<pre><code>gem 'devise'
+</code></pre>
+
+<p>然后执行下列命令：</p>
+
+<pre><code>bundle install
+rails g devise:install
+rails g devise user
+rails g devise:views
+</code></pre>
+
+<p>创建一个迁移任务，把User和Entry模型关联起来：</p>
+
+<pre><code>class AddUserIdToEntries &lt; ActiveRecord::Migration
+  def change
+    add_column :entries, :user_id, :integer
+
+    add_index :entries, :user_id
+  end
+end
+</code></pre>
+
+<p>修改Entry和User模型：</p>
+
+<pre><code>class Entry &lt; ActiveRecord::Base
+  validates :effective_date, :presence =&gt; true
+  validates :amount,         :presence =&gt; true,
+                             :numericality =&gt; {:greater_than =&gt; 0.0},
+                             :format =&gt; {:with =&gt; /^\d+??(?:\.\d{0,2})?$/}
+  validates :tags,           :presence =&gt; true,
+                             :length =&gt; { :within =&gt; 1..255 }
+
+  belongs_to :user
+</code></pre>
+
+<pre><code>class User &lt; ActiveRecord::Base
+  has_many :users
+</code></pre>
+
+<p>修改app/views/home/index.html.erb为如下内容：</p>
+
+<p>&#8220;`</p>
+
+<h1>Welcom to Qianbao!</h1>
+
+
+<p>&lt;% if user_signed_in? %>
+  <p>
+    <strong>&lt;%=link_to current_user.email, edit_user_registration_path %></strong>
+    &lt;%= link_to &lsquo;Logout&rsquo;, destroy_user_session_path, :method => :delete %>
+  </p>
+  &lt;%= link_to &ldquo;All Entries&rdquo;, entries_path %>
+&lt;% else %>
+  <p>
+    <strong>You are currently not logged in.</strong>
+    &lt;%= link_to &lsquo;Login&rsquo;, new_user_session_path %> or
+    &lt;%= link_to &lsquo;Sign up&rsquo;, new_user_registration_path %>
+  </p>
+&lt;% end %>
+&#8220;`</p>
+
+<p>修改app/controller/entries_controller.rb：</p>
+
+<pre><code>class EntriesController &lt; ApplicationController
+  before_filter :authenticate_user!
+
+  # GET /entries
+  # GET /entries.json
+  def index
+    @entries = current_user.entries
+
+    respond_to do |format|
+      format.html # index.html.erb
+      format.json { render json: @entries }
+    end
+  end
+
+  # GET /entries/1
+  # GET /entries/1.json
+  def show
+    @entry = current_user.entries.find(params[:id])
+
+    respond_to do |format|
+      format.html # show.html.erb
+      format.json { render json: @entry }
+    end
+  end
+
+  # GET /entries/new
+  # GET /entries/new.json
+  def new
+    @entry = current_user.entries.new
+
+    respond_to do |format|
+      format.html # new.html.erb
+      format.json { render json: @entry }
+    end
+  end
+
+  # GET /entries/1/edit
+  def edit
+    @entry = current_user.entries.find(params[:id])
+  end
+
+  # POST /entries
+  # POST /entries.json
+  def create
+    @entry = current_user.entries.new(params[:entry])
+    @entry.user = current_user
+
+    respond_to do |format|
+      if @entry.save
+        format.html { redirect_to @entry, notice: 'Entry was successfully created.' }
+        format.json { render json: @entry, status: :created, location: @entry }
+      else
+        format.html { render action: "new" }
+        format.json { render json: @entry.errors, status: :unprocessable_entity }
+      end
+    end
+  end
+
+  # PUT /entries/1
+  # PUT /entries/1.json
+  def update
+    @entry = current_user.entries.find(params[:id])
+
+    respond_to do |format|
+      if @entry.update_attributes(params[:entry])
+        format.html { redirect_to @entry, notice: 'Entry was successfully updated.' }
+        format.json { head :no_content }
+      else
+        format.html { render action: "edit" }
+        format.json { render json: @entry.errors, status: :unprocessable_entity }
+      end
+    end
+  end
+
+  # DELETE /entries/1
+  # DELETE /entries/1.json
+  def destroy
+    @entry = current_user.entries.find(params[:id])
+    @entry.destroy
+
+    respond_to do |format|
+      format.html { redirect_to entries_url }
+      format.json { head :no_content }
+    end
+  end
+end
+</code></pre>
+
+<p>执行以下命令启动应用：</p>
+
+<pre><code>rake db:migrate
+rails s
+</code></pre>
+
+<p>以前的版本用的CSS框架是<a href="http://blueprintcss.org/">Blueprint</a>，这次使用比它更方便快捷的<a href="https://github.com/twitter/bootstrap">Bootstrap</a>。Bootstrap建立在Less上，有个<a href="https://github.com/metaskills/less-rails-bootstrap">less-rails-bootstrap</a>，不过在安装libv8时竟然要提示缺少Python，拜托！我用的是Ruby，要我装Python，啥意思啊！还是找个Sass版的Bootstrap吧。</p>
+
+<p>下载<a href="https://github.com/jlong/sass-twitter-bootstrap">sass-twitter-bootstrap</a>：</p>
+
+<pre><code>git clone https://github.com/jlong/sass-twitter-bootstrap.git
+</code></pre>
+
+<p>将sass-twitter-bootstrap/lib中的文件拷贝到app/assets/stylesheets/twitter目录下。然后将app/assets/stylesheets/application.css中的</p>
+
+<pre><code>*= require_tree .
+</code></pre>
+
+<p>修改为</p>
+
+<pre><code>*= require twitter/bootstrap
+</code></pre>
+
+<p>再在文件末尾添加：</p>
+
+<pre><code>body { padding-top: 60px; }
+</code></pre>
+
+<p>现在就可以使用Bootstrap来布局美化应用了。</p>
+
+<p>代码下载：<a href="https://github.com/dohkoos/qianbao">https://github.com/dohkoos/qianbao</a></p>
+]]></content>
+  </entry>
+  
+</feed>

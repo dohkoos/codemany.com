@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Tag: Barcode | 乐者为王]]></title>
+  <link href="http://codemany.com/tags/barcode/atom.xml" rel="self"/>
+  <link href="http://codemany.com/"/>
+  <updated>2014-11-04T04:27:44+08:00</updated>
+  <id>http://codemany.com/</id>
+  <author>
+    <name><![CDATA[dohkoos]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[扫描ISBN条码实现藏书管理]]></title>
+    <link href="http://codemany.com/blog/manage-books-by-scanning-isbn-barcode/"/>
+    <updated>2013-04-25T12:17:14+08:00</updated>
+    <id>http://codemany.com/blog/manage-books-by-scanning-isbn-barcode</id>
+    <content type="html"><![CDATA[<p>每个程序猿家里都有一堆技术书籍，偶也不例外，因此想写个Android应用来管理自己的藏书以及想买的书籍。在网上找到marshal的<a href="http://marshal.easymorse.com/archives/2745">识别图书ISBN号并输出查询结果的示例</a>和<a href="http://marshal.easymorse.com/archives/2756">完善图书查询原型，增加收藏夹功能</a>两篇文章，写的非常不错，还提供源代码。下载代码研究后发现已基本具备了想要的功能，决定在它的基础上做些修改供自己使用。</p>
+
+<p>把原来uses-sdk的minSdkVersion改成了9，增加android:targetSdkVersion=&ldquo;17&#8221;。然后使用手机测试程序时发现，在连接网络时后台会抛出了android.os.NetworkOnMainThreadException异常，并且应用崩溃打不开。通过查阅相关资料了解到，自从Android 2.3之后，系统增加了一个类StrictMode。这个类对网络的访问方式进行了一定的改变。官方文档给出了这个类设置的目的：</p>
+
+<blockquote><p>StrictMode is a developer tool which detects things you might be doing by accident and brings them to your attention so you can fix them.</p>
+
+<p>StrictMode is most commonly used to catch accidental disk or network access on the application&rsquo;s main thread, where UI operations are received and animations take place. Keeping disk and network operations off the main thread makes for much smoother, more responsive applications. By keeping your application&rsquo;s main thread responsive, you also prevent ANR dialogs from being shown to users.</p>
+
+<p>Note that even though an Android device&rsquo;s disk is often on flash memory, many devices run a filesystem on top of that memory with very limited concurrency. It&rsquo;s often the case that almost all disk accesses are fast, but may in individual cases be dramatically slower when certain I/O is happening in the background from other processes. If possible, it&rsquo;s best to assume that such things are not fast.</p></blockquote>
+
+<p>因为marshal把访问网络的代码直接放到UI线程中，造成和主线程的首要工作——UI交互——相矛盾。解决这类问题很容易，把访问网络的代码放到AsyncTask中就行了。官方有个<a href="http://developer.android.com/training/basics/network-ops/index.html">NetworkUsage</a>例子是个不错的参考。</p>
+
+<p>接着发现豆瓣API查询返回的是500错误，在浏览器上访问却又正常，后来给HttpClient加上Agent头就没问题了，不知道是不是期间豆瓣的API在实现上作了改变。</p>
+
+<pre><code>HttpClient client = new DefaultHttpClient();
+String agent = System.getProperty("http.agent");
+client.getParams().setParameter(CoreProtocolPNames.USER_AGENT, agent);
+</code></pre>
+
+<p>解析豆瓣XML查询结果的代码：</p>
+
+<pre><code>XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+factory.setNamespaceAware(true);
+XmlPullParser parser = factory.newPullParser();
+parser.setInput(inputStream, "utf-8");
+Book book = new Book();
+
+int eventType = parser.getEventType();
+while (eventType != XmlPullParser.END_DOCUMENT) {
+    switch (eventType) {
+    case XmlPullParser.START_TAG:
+        if ("link".equals(parser.getName())
+                &amp;&amp; "image".equals(parser.getAttributeValue(null, "rel"))) {
+            book.setImageUrl(parser.getAttributeValue(null, "href"));
+            eventType = parser.next();
+        } else if ("summary".equals(parser.getName())) {
+            book.setSummary(parser.nextText());
+        } else if ("attribute".equals(parser.getName())) {
+            String name = parser.getAttributeValue(null, "name");
+            if ("title".equals(name)) {
+                book.setTitle(parser.nextText());
+            } else if ("author".equals(name)) {
+                book.setAuthor(parser.nextText());
+            } else if ("isbn10".equals(name)) {
+                book.setIsbn10(parser.nextText());
+            } else if ("isbn13".equals(name)) {
+                book.setIsbn13(parser.nextText());
+            } else if ("publisher".equals(name)) {  
+                book.setPublisher(parser.getText());
+            }                   
+        }
+        break;
+    case XmlPullParser.END_TAG:
+        break;
+    }
+    eventType = parser.next();
+}
+</code></pre>
+
+<p>然后，然后就是结果页面不显示图书信息。想要找到原因，肿么办？看来要调试WebView了！<a href="http://developer.android.com/guide/webapps/debugging.html">http://developer.android.com/guide/webapps/debugging.html</a> 告诉了我们如何调试。</p>
+
+<p>首先在WebView上设置setWebChromeClient方法：</p>
+
+<pre><code>webView.setWebChromeClient(new WebChromeClient() {
+    public void onConsoleMessage(String message,
+            int lineNumber, String sourceID) {
+        Log.d(TAG, message + " -- From line "
+                + lineNumber + " of " + sourceID);
+    }
+});
+</code></pre>
+
+<p>然后在JavaScript脚本中使用以下方法就可以在logcat中看到调试信息了。</p>
+
+<pre><code>console.log(String)
+console.info(String)
+console.warn(String)
+console.error(String)
+</code></pre>
+
+<p>重新运行程序，果然在logcat中看到报如下错误：</p>
+
+<pre><code>Uncaught TypeError: Object [object Object] has no method...
+</code></pre>
+
+<p>搜索后在Stack Overflow找到了<a href="http://stackoverflow.com/questions/14031635/android-4-2-1-webview-and-javascript-interface-breaks">问题的答案</a>（Stack Overflow真的非常不错，问题的回答都非常详尽）。<a href="http://developer.android.com/guide/webapps/webview.html#BindingJavaScript">http://developer.android.com/guide/webapps/webview.html#BindingJavaScript</a> 是官方文档的解释。</p>
+
+<p>解决方法就是在要被JavaScript调用的方法上加@JavascriptInterface注解：</p>
+
+<pre><code>public class Book {
+
+    @JavascriptInterface
+    public String getAuthor() {
+        return author;
+    }
+
+    public void setAuthor(String author) {
+        if (this.author != null) {
+            this.author += ", " + author;
+        } else {
+            this.author = author;
+        }
+    }
+</code></pre>
+]]></content>
+  </entry>
+  
+</feed>
