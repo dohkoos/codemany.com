@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Qianbao | 乐者为王]]></title>
   <link href="http://codemany.com/tags/qianbao/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-11-04T04:27:44+08:00</updated>
+  <updated>2014-11-05T11:52:45+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,62 +12,6 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
-  
-  <entry>
-    <title type="html"><![CDATA[部署Qianbao到Heroku时的问题]]></title>
-    <link href="http://codemany.com/blog/problem-when-deploying-qianbao-to-heroku/"/>
-    <updated>2013-05-21T06:25:33+08:00</updated>
-    <id>http://codemany.com/blog/problem-when-deploying-qianbao-to-heroku</id>
-    <content type="html"><![CDATA[<p>Heroku现在已经是纯粹的只读PaaS了，也就是说以前还支持的SQlite现在也不能使用了。因此部署到Heroku上的Rails应用需要把使用的数据库改成PostgreSQL，并且要关闭assets的预编译功能。</p>
-
-<p>修改Gemfile，将SQLite换成PostgreSQL：</p>
-
-<pre><code># gem 'sqlite3'
-gem 'pg'
-</code></pre>
-
-<p>在config/application.rb中添加：</p>
-
-<pre><code>config.assets.initialize_on_precompile = false
-</code></pre>
-
-<p>股票功能需要导入交割单文件。因为导入后的文本文件不再使用，可以把上传路径由public/uploads改为tmp。这样就避免了不能Heroku不能写文件的问题。</p>
-
-<p>应用上传后运行时出现异常，使用heroku logs -t查看日志发现有如下错误：</p>
-
-<pre><code>Error: column "stocks.share_name" must appear in the GROUP BY clause or be used in an aggregate function
-</code></pre>
-
-<p>这是因为在controller中有这么一行代码：</p>
-
-<pre><code>current_user.stocks.select("share_code, share_name, sum(actual_amount) as amount").group("share_code")
-</code></pre>
-
-<p>在PostgreSQL中这会有问题。比如下面的数据表：</p>
-
-<p><img src="/uploads/qianbao-stocks-table.png" title="qianbao-stocks-table" ></p>
-
-<p>执行上面的SQL语句后，share_name的值到底是取Ruby呢还是ST Ruby？解决这个问题的方法是使用aggregate函数。</p>
-
-<pre><code>current_user.stocks.select("share_code, max(share_name) as share_name, sum(actual_amount) as amount").group("share_code")
-</code></pre>
-
-<p>使用PostgreSQL还有个问题，就是decimal类型的字段，取出来的值是字符串类型。例如：</p>
-
-<pre><code>if stock.amount &lt; 0
-</code></pre>
-
-<p>它会报错误：</p>
-
-<pre><code>ArgumentError (comparison of String with 0 failed)
-</code></pre>
-
-<p>这个可以使用to_f函数解决：</p>
-
-<pre><code>if stock.amount.to_f &lt; 0
-</code></pre>
-]]></content>
-  </entry>
   
   <entry>
     <title type="html"><![CDATA[用Rails 3.2打造简单记账应用]]></title>
@@ -458,6 +402,159 @@ zh:
   date:
     month_names: [~, 一月, 二月, ..., 十一月, 十二月]
     order: [:year, :month, :day]
+</code></pre>
+
+<p>代码下载：<a href="https://github.com/dohkoos/qianbao">https://github.com/dohkoos/qianbao</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[用Rails 2.3打造简单记账软件（9）]]></title>
+    <link href="http://codemany.com/blog/using-rails-23-to-create-a-simple-accounting-app-part9/"/>
+    <updated>2009-12-20T20:45:19+08:00</updated>
+    <id>http://codemany.com/blog/using-rails-23-to-create-a-simple-accounting-app-part9</id>
+    <content type="html"><![CDATA[<p>没啥多说的，继续开始干活。</p>
+
+<p>修改app/views/entries/index.html.erb为：</p>
+
+<p>&#8220;`</p>
+
+<h1>Listing entries</h1>
+
+
+
+
+<table>
+  <thead>
+    <tr>
+      <th class="center">Date</th>
+      <th class="center">Amount</th>
+      <th class="center">Tags</th>
+      <th class="center">Comment</th>
+      <th class="center">Action</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    <% @entries.each do |entry| %>
+    <tr class="<%= cycle('odd', 'even') %>&#8221;>
+      <td class="center"><%=h entry.effective_date %></td>
+      <td class="right"><%=h number_to_currency(entry.amount) %></td>
+      <td><%=h entry.tags %></td>
+      <td><%=h entry.comment %></td>
+      <td class="center">
+        <%= link_to 'Edit', edit_entry_path(entry) %>
+        <%= link_to 'Destroy', entry, :confirm => &#8216;Are you sure?&#8217;, :method => :delete %>
+      </td>
+    </tr>
+    <% end %>
+  </tbody>
+</table>
+
+
+<p>&lt;%= link_to &lsquo;New entry&rsquo;, new_entry_path %>
+&#8220;`</p>
+
+<p>修改app/views/layouts/application.html.erb文件的内容为：</p>
+
+<pre><code>&lt;!DOCTYPE html PUBLIC
+  "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"&gt;
+
+&lt;html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"&gt;
+&lt;head&gt;
+  &lt;meta http-equiv="content-type" content="text/html; charset=utf-8" /&gt;
+  &lt;title&gt;Qianbao: &lt;%= controller.action_name %&gt;&lt;/title&gt;
+  &lt;%= stylesheet_link_tag 'scaffold' %&gt;
+  &lt;%= stylesheet_link_tag 'qianbao' %&gt;
+  &lt;%= stylesheet_link_tag 'table' %&gt;
+&lt;/head&gt;
+
+&lt;body&gt;
+  &lt;div id="container"&gt;
+    &lt;%= render :partial =&gt; 'layouts/header' %&gt;
+
+    &lt;div id="content"&gt;
+      &lt;p style="color: green"&gt;&lt;%= flash[:notice] %&gt;&lt;/p&gt;
+
+      &lt;%= yield %&gt;
+    &lt;/div&gt;
+
+    &lt;%= render :partial =&gt; 'layouts/footer' %&gt;
+  &lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+
+<p>新建app/views/layouts/_header.html.erb文件：</p>
+
+<p>&#8220;`</p>
+
+<div id="header">
+  <%= link_to 'Home', root_path %>
+  <% if logged_in? %>
+    <%= link_to 'All entries', entries_path %>
+    <strong>You are logged in as <%= current_user.login %></strong>
+    <%= link_to 'Logout', logout_path %>
+  <% else %>
+    <%= link_to 'Login', login_path %>
+    <%= link_to 'Sign Up', signup_path %>
+  <% end %>
+</div>
+
+
+<pre><code>
+新建app/views/layouts/_footer.html.erb文件：
+</code></pre>
+
+<div id="footer">&copy 2009</div>
+
+
+<pre><code>
+在public/stylesheets/qianbao.css的末尾添加：
+</code></pre>
+
+<p>.center {
+  text-align: center;
+}</p>
+
+<p>.right {
+  text-align: right;
+}
+&#8220;`</p>
+
+<p>新建public/stylesheets/table.css，内容为：</p>
+
+<pre><code>table {
+  border-collapse: collapse;
+  text-align: left;
+  width: 90%;
+}
+
+thead {
+  height: 30px;
+}
+
+thead th {
+  padding: 5px;
+  background: #efefef;
+}
+
+tbody td {
+  padding: 5px;
+}
+
+th, td {
+  border: 1px solid #e6e6e6;
+}
+
+tr.odd {
+  background: #fff;
+}
+
+tr.even {
+  background: #f9f9f9;
+}
 </code></pre>
 
 <p>代码下载：<a href="https://github.com/dohkoos/qianbao">https://github.com/dohkoos/qianbao</a></p>
