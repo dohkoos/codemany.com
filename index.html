@@ -120,6 +120,82 @@
       
   <header>
     
+      <h1 class="entry-title"><a href="/blog/git-notes-rebase-onto/">Git笔记之rebase &#8211;onto</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-10-26T13:41:19+08:00" pubdate data-updated="true">Oct 26<sup>th</sup>, 2014</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>有的时候，可能需要修改某个已提交commit。如果是修改最近提交的commit，可以使用<code>git commit --amend</code>命令；如果是修改更早提交的commit，可以使用<code>git rebase -i HEAD~n</code>。不过这个命令有个缺陷，就是不能修改最早提交的那个commit。假设有如下提交历史：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>A - B - C - D</span></code></pre></td></tr></table></div></figure>
+
+
+<p>要修改D可以使用<code>git commit --amend</code>；要修改B、C或D可以使用<code>git rebase -i HEAD~n</code>；但是如果要修改A呢？这就需要<code>rebase --onto</code>出场了。下面就来实例讲解如何使用<code>rebase --onto</code>命令。</p>
+
+<p>因为要修改A这个commit，所以先在它之上创建临时分支v1：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>git checkout -b v1 A</span></code></pre></td></tr></table></div></figure>
+
+
+<p>然后就可以在v1分支上做想要的修改了，改完之后用下面的命令提交更改的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>git commit -a --amend</span></code></pre></td></tr></table></div></figure>
+
+
+<p>这时查看v1分支的提交历史，可以发现SHA1值已经发生了变化（master分支的SHA1值仍然不变）：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>A'</span></code></pre></td></tr></table></div></figure>
+
+
+<p>接着可以把修改后的内容和master分支合并：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>git rebase --onto v1 A master</span></code></pre></td></tr></table></div></figure>
+
+
+<p>表示把master分支上从A之后的所有提交重新apply到v1分支最新的commit之后。</p>
+
+<p>这里有两点要注意：一个是A处的开闭问题，<code>rebase --onto</code>的机制是左开右闭，也就是说上述命令只会apply三个提交B、C、D；第二是<code>rebase --onto</code>之后v1分支的提交历史没有改变，还是只有一个提交A’，当前活动分支切换到了master，并且所有commit的SHA1值都发生了改变。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>A' - B' - C' - D'</span></code></pre></td></tr></table></div></figure>
+
+
+<p>最后就是正常的<code>rebase --continue</code>流程了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
       <h1 class="entry-title"><a href="/blog/read-binary-file-give-wrong-size-in-ruby/">Ruby中读二进制文件时大小错误</a></h1>
     
     
@@ -872,247 +948,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/using-raspberry-pi-to-monitor-home-humiture/">使用Raspberry Pi监控室内温湿度</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2014-06-24T14:19:44+08:00" pubdate data-updated="true">Jun 24<sup>th</sup>, 2014</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>机房没有温湿度监控系统，只有温湿度计，还不是数字的，只能得到个大概的读数，不是非常精确。怎么办？自己动手DIY个在线的温湿度监控系统吧！</p>
-
-<p>物品清单：</p>
-
-<ul>
-<li>金士顿16G的SDHC卡1张</li>
-<li>SDHC读卡器1个（可选）</li>
-<li>网线1条</li>
-<li>手机充电器（5V～1A）1个</li>
-<li>MicroUSB数据线1条</li>
-<li>电脑1台</li>
-<li>1P-1P双头母杜邦线3条</li>
-<li>10K电位器一个</li>
-<li>DHT11或DHT22温湿度传感器一个（可以购买已经焊好电阻的传感器模块）</li>
-</ul>
-
-
-<p>1、让树莓派（Raspberry Pi）工作起来</p>
-
-<p>从 <a href="http://www.raspberrypi.org/downloads">http://www.raspberrypi.org/downloads</a> 下载基于debian的wheezy镜像Raspbian。如果使用Windows系统，官方建议使用<a href="http://sourceforge.net/projects/win32diskimager/">Win32DiskImager</a>来复制image文件到SD卡（如果是Linux系统可以用工具dd）。写入系统后，把卡插到板子上，接上网线、电源，然后就启动了。等个20多秒，板上3个小灯都亮了，表明系统已经启动成功。</p>
-
-<p>登录路由器后台找到raspberrypi设备分配到的IP。然后使用SSH或VNC（前者是命令行界面，后者是图形界面）连接刚才从路由器找到的IP地址。登录的默认账号是pi，密码是raspberry。登录RPi之后输入ping qq.com测试上网是否正常。</p>
-
-<p>2、使用固定的IP访问RPi</p>
-
-<p>默认情况下RPi使用的是自动分配的IP地址，每次登录都需要在路由器中查找对应IP，实在太麻烦，可以把它设置成静态的。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sudo vi /etc/network/interfaces</span></code></pre></td></tr></table></div></figure>
-
-
-<p>打开配置文件，看到如下内容</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>auto lo
-</span><span class='line'>
-</span><span class='line'>iface lo inet loopback
-</span><span class='line'>iface eth0 inet dhcp
-</span><span class='line'>
-</span><span class='line'>allow-hotplug wlan0
-</span><span class='line'>iface wlan0 inet manual
-</span><span class='line'>wpa-roam /etc/wpa_supplicant/wpa_supplicant.conf
-</span><span class='line'>iface default inet dhcp</span></code></pre></td></tr></table></div></figure>
-
-
-<p>将之修改成</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>auto lo
-</span><span class='line'>
-</span><span class='line'>iface lo inet loopback
-</span><span class='line'>
-</span><span class='line'>iface eth0 inet static
-</span><span class='line'>  address 192.168.0.100
-</span><span class='line'>  netmask 255.255.255.0
-</span><span class='line'>  gateway 192.168.0.1
-</span><span class='line'>  dns-nameservers 8.8.8.8
-</span><span class='line'>
-</span><span class='line'>allow-hotplug wlan0
-</span><span class='line'>iface wlan0 inet manual
-</span><span class='line'>  wpa-roam /etc/wpa_supplicant/wpa_supplicant.conf
-</span><span class='line'>
-</span><span class='line'>iface default inet dhcp</span></code></pre></td></tr></table></div></figure>
-
-
-<p>然后存盘退出。以后就可以通过192.168.0.100来登录RPi了。</p>
-
-<p>3、把温湿度传感器接到RPi上</p>
-
-<p><img src="/uploads/rpi-dht22.png" title="rpi-dht22" ></p>
-
-<p>DHT11/DHT22共有4根引脚：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>1 -&gt; 3.3v 接左边第1个GPIO针脚
-</span><span class='line'>2 -&gt; GPIO 数据接口，可随意连接1个GPIO针脚（第7个针脚对应的是GPIO Pin #4）
-</span><span class='line'>3 -&gt; NC 不接
-</span><span class='line'>4 -&gt; GND 接地（第14个针脚）</span></code></pre></td></tr></table></div></figure>
-
-
-<p>注意：在1脚和2脚间还需要并联10K的电阻，以保持读数稳定。</p>
-
-<p>安装好的样子：</p>
-
-<p><img src="/uploads/rpi-actual.png" title="rpi-actual" ></p>
-
-<p>4、用C读取当前的温度和湿度值</p>
-
-<p>用的是树莓派2红色B型，它采用Broadcom BCM2835 (CPU, GPU, DSP, and SDRAM)芯片。所以读取GPIO口需要到 <a href="http://www.open.com.au/mikem/bcm2835/index.html">http://www.open.com.au/mikem/bcm2835/index.html</a> 获取最新的BCM2835 C语言库，然后下载，编译和安装。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>wget http://www.open.com.au/mikem/bcm2835/bcm2835-1.36.tar.gz
-</span><span class='line'>tar -zxvf bcm2835-1.36.tar.gz
-</span><span class='line'>cd bcm2835-1.36
-</span><span class='line'>./configure
-</span><span class='line'>make
-</span><span class='line'>sudo make install</span></code></pre></td></tr></table></div></figure>
-
-
-<p>从GitHub库中获取DHT11/DHT22温湿度程序，编译测试。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>cd /home/pi
-</span><span class='line'>git clone https://github.com/dohkoos/Raspberry-Pi-Code.git
-</span><span class='line'>cd Raspberry-Pi-Code/DHT22
-</span><span class='line'>make
-</span><span class='line'>sudo ./dht 22 4 # 数据接口接在第7针脚，所以这里是4</span></code></pre></td></tr></table></div></figure>
-
-
-<p>5、记录曲线图到云端</p>
-
-<p>这里使用<a href="http://www.yeelink.net/">Yeelink</a>的服务，Yeelink是国内比较知名的免费物联网数据平台。根据它的API规则，提交的数据必须为JSON格式：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>{"timestamp": "2012-03-15 16:13:14", "value": 294.34}</span></code></pre></td></tr></table></div></figure>
-
-
-<p>将温湿度值提交到Yeelink的Ruby代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># Capture temperature & humidity value from the console
-</span><span class='line'>output = `sudo ./dht 22 4`
-</span><span class='line'>mt = /Temp =\s+([0-9.]+)/.match(output)
-</span><span class='line'>temperature = mt[1]
-</span><span class='line'>
-</span><span class='line'>mt = /Hum =\s+([0-9.]+)/.match(output)
-</span><span class='line'>humidity = mt[1]
-</span><span class='line'>
-</span><span class='line'># Combined temperature & humidity value into json format
-</span><span class='line'>json_temperature = %Q[{\\"timestamp\\": \\"#{Time.now}\\", \\"value\\": #{temperature}}]
-</span><span class='line'>json_humidity = %Q[{\\"timestamp\\": \\"#{Time.now}\\", \\"value\\": #{humidity}}]
-</span><span class='line'>
-</span><span class='line'># Post json data to Yeelink
-</span><span class='line'>`curl -X POST -d "#{json_temperature}" -H "Content-Type: application/json" -H "U-ApiKey:XXXXXXXXXXXXXXXX" http://api.yeelink.net/v1.0/device/&lt;device_id&gt;/sensor/&lt;sensor_id&gt;/datapoints`
-</span><span class='line'>`curl -X POST -d "#{json_humidity}" -H "Content-Type: application/json" -H "U-ApiKey:XXXXXXXXXXXXXXXX" http://api.yeelink.net/v1.0/device/&lt;device_id&gt;/sensor/&lt;sensor_id&gt;/datapoints`</span></code></pre></td></tr></table></div></figure>
-
-
-<p>将U-ApiKey:XXXXXXXXXXXXXXXX替换为自已账户的API Key，后面的URL也需要替换为自己申请的传感器URL。</p>
-
-<p>6、添加到计划任务</p>
-
-<p>使用crontab命令将以下内容添加到计划任务中：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># m h dom mon dow command
-</span><span class='line'>*/10 * * * * cd /home/pi/Raspberry-Pi-Code/DHT22/ && ruby yeelink.rb</span></code></pre></td></tr></table></div></figure>
-
-
-<p>重启计划任务，然后每隔10分钟就会上传一次数据到云端。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sudo /etc/init.d/cron restart</span></code></pre></td></tr></table></div></figure>
-
-
-<p>下面是我的曲线图：</p>
-
-<p><img src="/uploads/rpi-yeelink.png" title="rpi-yeelink" ></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/2">&larr; Older</a>
@@ -1132,6 +967,10 @@
       </li>
     
       <li class="post">
+        <a href="/blog/git-notes-rebase-onto/">Git笔记之rebase &#8211;onto</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/read-binary-file-give-wrong-size-in-ruby/">Ruby中读二进制文件时大小错误</a>
       </li>
     
@@ -1141,10 +980,6 @@
     
       <li class="post">
         <a href="/blog/migrating-wordpress-to-octopress/">Wordpress迁移到Octopress</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/problem-with-nokogiri-when-url-containing-chinese-character/">Nokogiri抓取页面URL含有中文参数的问题</a>
       </li>
     
   </ul>
