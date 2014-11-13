@@ -9,13 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="机房没有温湿度监控系统，只有温湿度计，还不是数字的，只能得到个大概的读数，不是非常精确。怎么办？自己动手DIY个在线的温湿度监控系统吧！ 物品清单： 金士顿16G的SDHC卡1张
-SDHC读卡器1个（可选）
-网线1条
-手机充电器（5V～1A）1个
-MicroUSB数据线1条
-电脑1台
-1P- &hellip;">
+  <meta name="description" content="以前写过使用Ruby批量修改繁体文件名为简体，可惜脚本的性能很有问题，批量重命名时运行速度非常慢。这次准备优化下代码，提升脚本的执行效率。 profile.rb是为Ruby程序准备的profiler，它可以统计并输出各方法的运行时间，以便于找到程序执行的性能瓶颈。这次就用它来剖析脚本的运行时间。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +62,73 @@ MicroUSB数据线1条
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-i-made-ruby-script-156x-faster/">我是如何让Ruby脚本速度提升156倍的</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-06-28T13:04:08+08:00" pubdate data-updated="true">Jun 28<sup>th</sup>, 2014</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>以前写过<a href="/blog/using-ruby-to-batch-rename-filename-from-traditional-to-simplified/">使用Ruby批量修改繁体文件名为简体</a>，可惜脚本的性能很有问题，批量重命名时运行速度非常慢。这次准备优化下代码，提升脚本的执行效率。</p>
+
+<p>profile.rb是为Ruby程序准备的profiler，它可以统计并输出各方法的运行时间，以便于找到程序执行的性能瓶颈。这次就用它来剖析脚本的运行时间。使用方法很简单，加上命令行选项-r profile就可以：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ruby -r profile rename.rb</span></code></pre></td></tr></table></div></figure>
+
+
+<p>运行结束后，会把统计信息输出到标准错误输出中。如下图所示：</p>
+
+<p><img src="/uploads/profile-before-tuning.png" title="profile-before-tuning" ></p>
+
+<p>profile统计的是各方法的运行时间，分为两类。一类是计算的是从方法调用到方法返回之间的时间，称为整体时间；另一类则是从整体时间中扣除在该方法中调用其它方法所耗费时间之后得到的时间，称为实际时间。</p>
+
+<p>上图输出信息每行中各字段含义如下（从左到右）：</p>
+
+<ul>
+<li>该方法执行时间占整体时间的百分比，比例越高越说明这行代码可能需要优化</li>
+<li>整体时间的总和</li>
+<li>实际时间的总和</li>
+<li>被调用的次数</li>
+<li>每次调用的平均实际时间（毫秒）</li>
+<li>每次调用的平均整体时间（毫秒）</li>
+<li>方法名</li>
+</ul>
+
+
+<p>由上图可以看出，脚本执行的时间大部分耗在了循环上。解决方法有两个：消除循环或减少循环次数。前者很难实现，暂且还没有想到办法，也许根本就没有可能。脚本中mapping的大小为2685，所以每修改一个文件名需要执行2685次循环，且循环中的encode和gsub!都是耗时操作。通常文件名的长度不超过30个字符，通过遍历文件名中每个字符的方式重命名就可以把循环次数缩减到不超过30次。</p>
+
+<p>修改代码后重新执行分析命令，得到的结果是脚本运行时间从379395秒变成2418秒，性能整整提升了156倍，达到2个数量级的效果。</p>
+
+<p><img src="/uploads/profile-after-tuning.png" title="profile-after-tuning" ></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1697,122 +1758,6 @@ MicroUSB数据线1条
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/draw-2d-bar-graph-using-ichartjs/">使用ichartjs画2D条形图</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2013-03-27T06:45:37+08:00" pubdate data-updated="true">Mar 27<sup>th</sup>, 2013</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p><a href="/blog/using-open-flash-chart-ii-in-rails/">在Rails中使用Open Flash Chart II</a>中使用了OFC2来画2D条形图。现在Flash快要不行了，因为有了更好的HTML5。好的程序猿也要紧随潮流，使用新的技术来改进和增强他们的代码。这次就尝试使用HTML5图形库来替换OFC2。比较已有的一些图形库，最后选定国产的<a href="http://www.ichartjs.com/">ichartjs</a>。</p>
-
-<p>实现2D条形图真的很简单：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;script type="text/javascript" src="ichart.1.1.min.js"&gt;&lt;/script&gt;
-</span><span class='line'>&lt;script type="text/javascript"&gt;
-</span><span class='line'>$(function() {
-</span><span class='line'>  var data = [
-</span><span class='line'>    {name: 'IE', value: 35.75, color: '#a5c2d5'},
-</span><span class='line'>    {name: 'Chrome', value: 29.84, color: '#cbab4f'},
-</span><span class='line'>    {name: 'Firefox', value: 24.88, color: '#76a871'},
-</span><span class='line'>    {name: 'Safari',value: 6.77, color: '#9f7961'},
-</span><span class='line'>    {name: 'Opera',value：2.02, color: '#a56f8f'},
-</span><span class='line'>    {name: 'Other',value: 0.73, color: '#6f83a5'}
-</span><span class='line'>  ];
-</span><span class='line'>
-</span><span class='line'>  new iChart.Bar2D({
-</span><span class='line'>    render: 'canvasDiv',
-</span><span class='line'>    data: data,
-</span><span class='line'>    title: 'Top 5 Browsers from 1 to 29 Feb 2012',
-</span><span class='line'>    showpercent: true,
-</span><span class='line'>    decimalsnum: 2,
-</span><span class='line'>    width: 800,
-</span><span class='line'>    height: 400,
-</span><span class='line'>    coordinate: {
-</span><span class='line'>      scale: [{
-</span><span class='line'>        position: 'bottom',
-</span><span class='line'>        start_scale: 0,
-</span><span class='line'>        end_scale: 40,
-</span><span class='line'>        scale_space: 8,
-</span><span class='line'>        listeners: {
-</span><span class='line'>          parseText: function(t, x, y) {
-</span><span class='line'>            return {text: t + "%"}
-</span><span class='line'>          }
-</span><span class='line'>        }
-</span><span class='line'>      }]
-</span><span class='line'>    }
-</span><span class='line'>  }).draw();
-</span><span class='line'>}); 
-</span><span class='line'>&lt;/script&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;div id="canvasDiv"&gt;&lt;/div&gt;</span></code></pre></td></tr></table></div></figure>
-
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/3">&larr; Older</a>
@@ -1830,6 +1775,10 @@ MicroUSB数据线1条
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/multipart-misspelling-cause-bug/">打错单词引发的血案</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/how-to-disable-virtualbox-time-sync-between-host-and-guest/">如何禁止VirtualBox虚拟机和物理机之间的时间同步</a>
       </li>
     
@@ -1843,10 +1792,6 @@ MicroUSB数据线1条
     
       <li class="post">
         <a href="/blog/tricks-and-tips-for-octopress/">Octopress 2.0使用技巧</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/migrating-wordpress-to-octopress/">Wordpress迁移到Octopress</a>
       </li>
     
   </ul>

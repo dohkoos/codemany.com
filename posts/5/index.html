@@ -9,7 +9,10 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="连接（join）可以在SELECT语句的FROM子句或WHERE子句中建立，在FROM子句中指出连接时有助于将连接操作与WHERE子句中的搜索条件区分开来。连接可以对同一个表操作，也可以对多个表操作，对同一个表操作的连接称为自连接（self join）。 连接类型（join type）分为三种： &hellip;">
+  <meta name="description" content="破解前的系统情况： 硬件版本号 V3.0
+软件版本号 F460_IMS_V2.30.10P1T6_JS1111
+BOOT版本号 V1.1.0P1T1
+版本日期 2012-02-29 16:29:07 中兴ZXA10-F460光猫（E8-C）在第一次安装的时候， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -62,6 +65,171 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-crack-zte-zxa10-f460-v30-for-superuser-password/">如何破解中兴ZXA10-F460 v3.0获取超级管理员密码</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-07-20T14:12:59+08:00" pubdate data-updated="true">Jul 20<sup>th</sup>, 2012</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>破解前的系统情况：</p>
+
+<ul>
+<li>硬件版本号 V3.0</li>
+<li>软件版本号 F460_IMS_V2.30.10P1T6_JS1111</li>
+<li>BOOT版本号 V1.1.0P1T1</li>
+<li>版本日期 2012-02-29 16:29:07</li>
+</ul>
+
+
+<p>中兴ZXA10-F460光猫（E8-C）在第一次安装的时候，超级管理员帐号是telecomadmin，密码为nE7jA%5m，这个是默认的，由安装人员设置好相关设置后，会自动下载配置，这时候这个超级管理员密码会被修改为telecomadminXXXXXXXX（8个X是8位数字，每个用户是不同的）这种格式。因为很多设置需要在超级管理员下才能设置，所以破解这个超级管理员密码是非常必要的。</p>
+
+<p>其中V1.0和V2.0版本网上有破解方法，大家可以自己搜索。</p>
+
+<p>在命令行下输入telnet 192.168.1.1，帐号和密码都是root。连接成功后，会出现“F460 login:”这样的提示。</p>
+
+<p>注意：目前网上流传的查看/tmp目录下db_backup_cfg.xml文件内容的破解方法已经无效了。另外在/userconfig/cfg目录下有两个加密的配置文件db_backup_cfg.xml和db_user_cfg.xml，同目录下还有个db_default_cfg.xml是不加密的（该文件是出厂设置的配置文件），但是大家不要用这个文件去替换db_user_cfg.xml，否则会出现不可预知的后果。</p>
+
+<p>实际上只要修改一下/home/httpd/login.gch这个文件，就能看到密码了。patch文件内容如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>--- /home/httpd/login.gch 2012-07-03 14:05:16.000000000 +0800
+</span><span class='line'>+++ login.gch 2012-07-03 14:03:37.000000000 +0800
+</span><span class='line'>@@ -152,6 +152,17 @@
+</span><span class='line'>set_language("langcn.conf");
+</span><span class='line'>langclass = "login_title_centeren";
+</span><span class='line'>}
+</span><span class='line'>+var CK_HANDLE = create_paralist();
+</span><span class='line'>+var login_name = "telecomadmin";
+</span><span class='line'>+set_para(CK_HANDLE, "Username", login_name);
+</span><span class='line'>+qeury_list_bycond("OBJ_USERINFO_ID", "IGD", CK_HANDLE);
+</span><span class='line'>+destroy_paralist(CK_HANDLE);
+</span><span class='line'>+CK_HANDLE = create_paralist();
+</span><span class='line'>+var CK_IDENTITY = query_identity(0);
+</span><span class='line'>+get_inst(CK_HANDLE, "OBJ_USERINFO_ID", CK_IDENTITY);
+</span><span class='line'>+var now_pwd = get_para(CK_HANDLE, "Password");
+</span><span class='line'>+now_pwd = delMoreSlash(now_pwd);
+</span><span class='line'>+destroy_paralist(CK_HANDLE);
+</span><span class='line'>%&gt;
+</span><span class='line'>&lt;head&gt;
+</span><span class='line'>&lt;META HTTP-EQUIV="pragma" CONTENT="no-cache&gt;
+</span><span class='line'>@@ -239,4 +250,5 @@
+</span><span class='line'>&lt;/script&gt;
+</span><span class='line'>&lt;/head&gt;
+</span><span class='line'>&lt;body onload="onFocus();"&gt;
+</span><span class='line'>+&lt;div&gt;&lt;%=now_pwd;%&gt;&lt;/div&gt;
+</span><span class='line'>&lt;div id="container" class="content"&gt;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>效果是浏览器登录192.168.1.1的时候，超级管理员密码会显示在首页界面的左上角。</p>
+
+<p>到这儿有人想了，怎么把上面的patch更新到/home/httpd/login.gch中呢？总结了三种方法：</p>
+
+<p>第一种方法是telent到F460上后，执行下面的命令即可：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>sed -i '155 s/^/var CK_HANDLE = create_paralist();\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '156 s/^/var login_name = "telecomadmin";\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '157 s/^/set_para(CK_HANDLE, "Username", login_name);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '158 s/^/qeury_list_bycond("OBJ_USERINFO_ID", "IGD", CK_HANDLE);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '159 s/^/destroy_paralist(CK_HANDLE);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '160 s/^/CK_HANDLE = create_paralist();\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '161 s/^/var CK_IDENTITY = query_identity(0);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '162 s/^/get_inst(CK_HANDLE, "OBJ_USERINFO_ID", CK_IDENTITY);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '163 s/^/var now_pwd = get_para(CK_HANDLE, "Password");\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '164 s/^/now_pwd = delMoreSlash(now_pwd);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '165 s/^/destroy_paralist(CK_HANDLE);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '253 s/^/&lt;div&gt;&lt;%=now_pwd;%&gt;&lt;\/div&gt;\n/' /home/httpd/login.gch</span></code></pre></td></tr></table></div></figure>
+
+
+<p>第二种方法是telent到F460上后，执行cp /home/httpd/login.gch /home/httpd/login_gch.xml，通过浏览器把login_gch.xml保存到电脑上，然后再把patch更新进去。可以在电脑上架设ftp服务器，在F460上执行以下命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>cd /home/httpd/
+</span><span class='line'>wget ftp://&lt;YOUR_COMPUTER_IP&gt;/login.gch  # 把&lt;YOUR_COMPUTER_IP&gt;替换成你自己的</span></code></pre></td></tr></table></div></figure>
+
+
+<p>第三种方法是telent到F460上后，执行df命令，查看是否有usb1_1或usb2_1，如果有就可以进行下一步操作。输入cp /home/httpd/login.gch /mnt/usb1_1/login.gch把文件拷贝到优盘上，修改后使用cp /mnt/usb1_1/login.gch /home/httpd/login.gch把文件更新到猫上就可以。</p>
+
+<p>2013/6/16更新</p>
+
+<p>其实还有种更简便的方法，中兴的光猫有个sendcmd命令，下面是语法的简单说明：</p>
+
+<ol>
+<li>读取全部表名 sendcmd 1 DB all；</li>
+<li>读取指定表信息 sendcmd 1 DB p 表名。比如sendcmd 1 DB p UserInfo，查看路由器帐号和密码，超级管理员密码也在这里查看；</li>
+<li>查看当前系统运行的服务状态 sendcmd -pc show；</li>
+<li>修改某个表的某个字段的值 sendcmd 1 DB set 表名 行数 字段名 字段值。比如要修改超级管理员密码，可以使用sendcmd 1 DB set UserInfo 0 Password 123456；</li>
+<li>保存对配置文件的修改 sendcmd 1 DB save。</li>
+</ol>
+
+
+<p>其实还有其它的命令，但是就修改光猫配置来说，这几条命令足够了。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1189,74 +1357,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-to-crack-huawei-hg526-telecom-cat/">如何破解华为HG526电信猫</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-01-15T12:56:43+08:00" pubdate data-updated="true">Jan 15<sup>th</sup>, 2012</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>把家里的电信从旧的4M套餐改为新的4M套餐，每月费用省了40多块，还送了个华为的HG526电信猫和iTV。拿到HG526后发现它带有无线路由功能，想着是不是可以让它自动拨号，以替换原来的ADSL猫和无线路由器。网上搜索一下，发现有很多教程，参考着资料一番实践，终于把设备给换了下来。这里做个笔记，把实践中碰到的问题和疑惑记录下来，分享给大家。</p>
-
-<p>破解HG526的关键是获得超级用户telecomadmin的密码，通过以下步骤实现：</p>
-
-<ol>
-<li>准备U盘，在根目录下建立一个文件夹e8_Config_backup，插入华为HG526；</li>
-<li>使用HG526的默认帐号（用户名useradmin）登录路由器192.168.1.1；</li>
-<li>在浏览器地址栏里输入<code>http://192.168.1.1/html/ehomeclient/cfgUSBRestore.cgi?coverusbpath=usb1_1</code>回车（注意大小写），提示备份成功；</li>
-<li>把U盘插入电脑，e8_Config_backup文件夹下多了一个文件ctce8_HG526.cfg；</li>
-<li>用附件中的工具把配置文件解密，找到telecomadmin帐号的密码；</li>
-<li>用超级用户telecomadmin登录，把远程管理关闭（不然密码就会被电信更改的）。</li>
-</ol>
-
-
-<p>路由拨号配置</p>
-
-<p>登录后，进入“网络” -> “宽带设置”，在“连接名称”右边，选择“INTERNET_R_8_35”，按照下图配置，修改自己的上网账号和密码。</p>
-
-<p><img src="/uploads/hg526.png" title="hg526" ></p>
-
-<p>这里有个问题，某些地方的VPI/VCI值是不一样的，本人所在区域值是0/100，所以上面应该选“INTERNET_B_0_100”。其它地方如果刷了不能用建议咨询下电信维护人员。</p>
-
-<p>将破解的配置文件恢复到HG526中</p>
-
-<p>在U盘的e8_Config_backup文件夹里放入破解修改后的ctce8_HG526.cfg文件，插入HG526。用超级用户登录，在“管理” -> “设备管理”页面中，在“启用USB自动恢复配置文件”后面打上钩。然后点击“设备重启”。注意观察HG526以及U盘的指示灯，等HG526上所有的灯稳定了，配置也就刷进去了。</p>
-
-<p>删除TR069协议，修改远程管理网址和域名</p>
-
-<p>正常情况下“TR069_R_8_46”连接项在配置页面中无法删除，但我们可以使用Web Developer插件来做到。在安装了Web Developer插件的Firefox中访问路由器，用telecomadmin登录，进入“网络” -> “宽带设置”，在页面中点击右键，在Web Developer工具栏中选择“表单” -> “开启 被禁用的表单”。然后你就可以删除TR069协议了。远程管理的修改与之类似。</p>
-
-<p>关于TR069的解释：TR-069是由DSL论坛所开发的技术规范之一，其全称为“CPE广域网管理协议”。它提供了对下一代网络中家庭网络设备进行管理配置的通用框架和协议，用于从网络侧对家庭网络中的网关、路由器、机顶盒等设备进行远程集中管理。电信通过TR069协议修改我们的无线猫的配置，比如超级用户名密码，用户权限等，所以我们的配置文件里要关闭TR069，大家注意不要自己打开，否则一旦被改了超级用户名密码就惨了！</p>
-
-<p>HG526配置文件加/解密工具下载：<a href="https://github.com/dohkoos/hw-hg526">https://github.com/dohkoos/hw-hg526</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/6">&larr; Older</a>
@@ -1274,6 +1374,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/multipart-misspelling-cause-bug/">打错单词引发的血案</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/how-to-disable-virtualbox-time-sync-between-host-and-guest/">如何禁止VirtualBox虚拟机和物理机之间的时间同步</a>
       </li>
     
@@ -1287,10 +1391,6 @@
     
       <li class="post">
         <a href="/blog/tricks-and-tips-for-octopress/">Octopress 2.0使用技巧</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/migrating-wordpress-to-octopress/">Wordpress迁移到Octopress</a>
       </li>
     
   </ul>
