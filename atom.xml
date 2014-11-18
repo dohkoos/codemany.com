@@ -4,7 +4,7 @@
   <title><![CDATA[乐者为王]]></title>
   <link href="http://codemany.com/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2014-11-17T22:14:06+08:00</updated>
+  <updated>2014-11-18T19:50:27+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,147 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[重构Rails代码]]></title>
+    <link href="http://codemany.com/blog/refactoring-rails-code/"/>
+    <updated>2014-11-18T19:42:59+08:00</updated>
+    <id>http://codemany.com/blog/refactoring-rails-code</id>
+    <content type="html"><![CDATA[<p>在以前写的博文<a href="http://codemany.com/blog/problem-when-deploying-application-to-heroku/>部署应用到Heroku时的问题</a>里有这么一段话：</p>
+
+<blockquote><p>股票功能需要导入交割单文件，因为导入后的文本文件不再使用，可以把上传路径由public/uploads改为tmp，这样就避免了Heroku不能写文件的问题。</p></blockquote>
+
+<p>下面是那时候写的导入代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class StocksController &lt; ApplicationController
+</span><span class='line'>  UPLOADS_DIRECTORY = File.join("#{Rails.root}", "public/uploads")
+</span><span class='line'>
+</span><span class='line'>  def import
+</span><span class='line'>    filename = upload_file(params[:file])
+</span><span class='line'>    lines = File.readlines("#{UPLOADS_DIRECTORY}/#{filename}")
+</span><span class='line'>    lines.each do |line|
+</span><span class='line'>      # do something
+</span><span class='line'>    end
+</span><span class='line'>    redirect_to stocks_url
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  protected
+</span><span class='line'>    def upload_file(file)
+</span><span class='line'>      if !file.original_filename.empty?
+</span><span class='line'>        @filename = get_file_name(file.original_filename)
+</span><span class='line'>        FileUtils.mkdir("#{UPLOADS_DIRECTORY}") unless File.exist?("#{UPLOADS_DIRECTORY}")
+</span><span class='line'>        File.open("#{UPLOADS_DIRECTORY}/#{@filename}", "wb") do |f|
+</span><span class='line'>          f.write(file.read)
+</span><span class='line'>        end
+</span><span class='line'>        return @filename
+</span><span class='line'>      end
+</span><span class='line'>    end
+</span><span class='line'>
+</span><span class='line'>    def get_file_name(filename)
+</span><span class='line'>      if !filename.nil?
+</span><span class='line'>        # does not support chinese filename?
+</span><span class='line'>        #Time.now.strftime("%Y%m%d%H%M%S")# + '_' + filename
+</span><span class='line'>        Time.now.strftime("%Y%m%d%H%M%S") + '.txt'
+</span><span class='line'>      end
+</span><span class='line'>    end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>这里的实现方法是先将上传文件保存到服务器上的public/uploads目录中，然后再读取和处理。</p>
+
+<p>其实根本不需要写的这么复杂，因为导入的文本文件被读取一次后就不再使用了。所以在当时写代码的时候一直有这样的想法，如果能直接获得上传文件的数据，那么就不需要再另外去写保存和读取文件的代码了。</p>
+
+<p>事实也是如此。通过表单提交的file数据会首先在服务器上形成临时文件，这时可以通过临时文件的路径来读取上传文件的数据。</p>
+
+<p>根据该想法重构后的代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class StocksController &lt; ApplicationController
+</span><span class='line'>  def import
+</span><span class='line'>    lines = File.readlines(params[:file].tempfile.to_path.to_s)
+</span><span class='line'>    lines.each do |line|
+</span><span class='line'>      # do something
+</span><span class='line'>    end
+</span><span class='line'>    redirect_to stocks_url
+</span><span class='line'>  end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>重构后的代码果然清爽多了，不过还是有改进的空间。</p>
+
+<p>作为控制器，controller只是负责接收request，并返回response。而具体的业务逻辑，则应该交由model去完成。下面是依照该理念再次重构后的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class StocksController &lt; ApplicationController
+</span><span class='line'>  def import
+</span><span class='line'>    Stock.import(params[:file])
+</span><span class='line'>    redirect_to stocks_url
+</span><span class='line'>  end
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>class Stock &lt; ActiveRecord::Base
+</span><span class='line'>  def self.import(file)
+</span><span class='line'>    lines = File.readlines(file.tempfile.to_path.to_s)
+</span><span class='line'>    lines.each do |line|
+</span><span class='line'>      # do something
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[打错multipart引发的血案]]></title>
@@ -1986,97 +2127,6 @@
 
 
 <p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[PowerBuilder生成可执行文件的小技巧]]></title>
-    <link href="http://codemany.com/blog/tips-for-creating-executable-file-in-powerbuilder/"/>
-    <updated>2013-03-29T14:10:04+08:00</updated>
-    <id>http://codemany.com/blog/tips-for-creating-executable-file-in-powerbuilder</id>
-    <content type="html"><![CDATA[<p>1、使用资源文件（.pbr）引用资源</p>
-
-<p>在资源相同目录下建立.pbr文件，其中列出在应用中动态引用的资源文件，每行一个资源，格式如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>appico.ico
-</span><span class='line'>appbmp1.bmp
-</span><span class='line'>appbmp2.bmp
-</span><span class='line'>appbmp3.bmp
-</span><span class='line'>appbmp4.bmp</span></code></pre></td></tr></table></div></figure>
-
-
-<p>在.pbr文件中指定的文件名必须与在脚本中引用的资源匹配，若引用时包含路径，则在.pbr中也必须包含同一路径，否则因PowerBuilder在执行时只是简单地进行字符串比较而导致无法发现该资源。</p>
-
-<p>2、设置可执行文件图标</p>
-
-<p>应用 -> 属性 -> General -> Additional Properties按钮 -> Icon标签页 -> Icon Name</p>
-
-<p>3、可执行文件所需的环境DLL</p>
-
-<p>最简便的方式是使用自带的打包程序PowerBuilder Runtime Packager。这个应用会自动把脱离环境运行所需的DLL等文件筛选出来。运行后会生成一个MSI应用，执行下就可以解压出需要的DLL文件了。</p>
-
-<p>4、Deploy时出现“The current library list is different”信息</p>
-
-<p>在生成可执行文件时经常会碰到这样的异常情况。Debug没问题，Run没问题，Incremental Build或Full Build也没问题，但在Deploy时就出现：</p>
-
-<blockquote><p>The current library list is different than the library list contained within this project. The project library list has been updated. specify build options for the updated list and try again.</p></blockquote>
-
-<p>上面的信息告诉我们当前的库列表和项目配置中的库列表不一致，但明明先前在其它机器上可以Deploy成功的呀！几经周折，终于找到了原因。</p>
-
-<p>首先导出项目配置文件example.srj，可以看到Deploy失败时的配置内容为：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>CMP:0,0,0,2,0,0
-</span><span class='line'>COM:
-</span><span class='line'>DES:
-</span><span class='line'>CPY:
-</span><span class='line'>PRD:
-</span><span class='line'>PVS:1,0,0,x
-</span><span class='line'>PVN:1,0,0,x
-</span><span class='line'>FVS:1,0,0,x
-</span><span class='line'>FVN:1,0,0,x
-</span><span class='line'>PBD:C:\example\example.pbl,,0</span></code></pre></td></tr></table></div></figure>
-
-
-<p>最后一行表明库文件在C盘？可当前的项目文件都是在D盘啊！修改路径后导入配置，点击Deploy按钮，执行成功。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>CMP:0,0,0,2,0,0
-</span><span class='line'>COM:
-</span><span class='line'>DES:
-</span><span class='line'>CPY:
-</span><span class='line'>PRD:
-</span><span class='line'>PVS:1,0,0,x
-</span><span class='line'>PVN:1,0,0,x
-</span><span class='line'>FVS:1,0,0,x
-</span><span class='line'>FVN:1,0,0,x
-</span><span class='line'>PBD:D:\example\example.pbl,,0</span></code></pre></td></tr></table></div></figure>
-
-
-<p>总结了下原因，出现这种失败通常是实际库文件路径和项目配置中的库文件路径不一致导致。修改项目配置或删除重建项目配置就没问题了。</p>
 ]]></content>
   </entry>
   
