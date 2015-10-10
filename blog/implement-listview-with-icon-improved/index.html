@@ -18,15 +18,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   
-  <link rel="canonical" href="http://codemany.com/blog/implement-listview-with-icon-improved">
+  <link rel="canonical" href="http://codemany.com/blog/implement-listview-with-icon-improved/">
   <link href="/favicon.png" rel="icon">
   <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
   <link href="/atom.xml" rel="alternate" title="乐者为王" type="application/atom+xml">
   <script src="/javascripts/modernizr-2.0.js"></script>
-  <script>!window.jQuery && document.write(unescape('%3Cscript src="./javascripts/libs/jquery.min.js"%3E%3C/script%3E'))</script>
+  <script>!window.jQuery && document.write(unescape('%3Cscript src="/javascripts/libs/jquery.min.js"%3E%3C/script%3E'))</script>
   <script src="/javascripts/octopress.js" type="text/javascript"></script>
-  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
-
+  
   
   <script type="text/javascript">
     var _gaq = _gaq || [];
@@ -59,7 +58,7 @@
   
 <form action="https://www.google.com/search" method="get">
   <fieldset role="search">
-    <input type="hidden" name="q" value="site:codemany.com" />
+    <input type="hidden" name="sitesearch" value="codemany.com">
     <input class="search" type="text" name="q" results="0" placeholder="Search"/>
   </fieldset>
 </form>
@@ -86,7 +85,7 @@
 
 
 
-<time class='entry-date' datetime='2011-06-02T18:47:58+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2011</span></span> <span class='time'>6:47 pm</span></time>
+<time class='entry-date' datetime='2011-06-02T10:47:58+00:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2011</span></span> <span class='time'>10:47 am</span></time>
         
       </p>
     
@@ -120,8 +119,8 @@
 </span><span class='line'>        new int[] {R.id.app_icon, R.id.app_title, R.id.app_package});
 </span><span class='line'>lv.setAdapter(adapter);
 </span><span class='line'>
-</span><span class='line'>pd.dismiss();</span></code></pre></td></tr></table></div></figure>
-
+</span><span class='line'>pd.dismiss();
+</span></code></pre></td></tr></table></div></figure>
 
 <p>但结果ProgressDialog没有显示出来，因为加载数据的代码也执行在UI线程中，所以对话框的显示被阻塞了。怎么办呢？可以试着创建一个新线程，然后把加载数据这个耗时的操作放到这个非UI线程中去执行，这样不就可以了么：</p>
 
@@ -156,18 +155,20 @@
 </span><span class='line'>    }
 </span><span class='line'>}.start();
 </span><span class='line'>
-</span><span class='line'>pd.dismiss();</span></code></pre></td></tr></table></div></figure>
-
+</span><span class='line'>pd.dismiss();
+</span></code></pre></td></tr></table></div></figure>
 
 <p>这下更惨了，直接报Runtime异常，连界面都打不开了。</p>
 
 <p>深入研究一下Android的线程模型，看看Android到底是怎么处理UI线程和其它线程的交互的，为什么上面的代码会报异常?</p>
 
-<blockquote><p>When an application is launched, the system creates a thread called &ldquo;main&rdquo; for the application. The main thread, also called the UI thread, is very important because it is in charge of dispatching the events to the appropriate widgets, including drawing events. It is also the thread where your application interacts with running components of the Android UI toolkit.</p>
+<blockquote>
+<p>When an application is launched, the system creates a thread called &quot;main&quot; for the application. The main thread, also called the UI thread, is very important because it is in charge of dispatching the events to the appropriate widgets, including drawing events. It is also the thread where your application interacts with running components of the Android UI toolkit.</p>
 
 <p>For instance, if you touch the a button on screen, the UI thread dispatches the touch event to the widget, which in turn sets its pressed state and posts an invalidate request to the event queue. The UI thread dequeues the request and notifies the widget to redraw itself.</p>
 
-<p>This single-thread model can yield poor performance unless your application is implemented properly. Specifically, if everything is happening in a single thread, performing long operations such as network access or database queries on the UI thread will block the whole user interface. No event can be dispatched, including drawing events, while the long operation is underway. From the user&rsquo;s perspective, the application appears hung. Even worse, if the UI thread is blocked for more than a few seconds (about 5 seconds currently) the user is presented with the infamous &ldquo;application not responding&rdquo; (ANR) dialog.</p></blockquote>
+<p>This single-thread model can yield poor performance unless your application is implemented properly. Specifically, if everything is happening in a single thread, performing long operations such as network access or database queries on the UI thread will block the whole user interface. No event can be dispatched, including drawing events, while the long operation is underway. From the user&#39;s perspective, the application appears hung. Even worse, if the UI thread is blocked for more than a few seconds (about 5 seconds currently) the user is presented with the infamous &quot;application not responding&quot; (ANR) dialog.</p>
+</blockquote>
 
 <p>看了上面这段话可以知道为啥程序一打开就黑屏，像挂掉了一样。</p>
 
@@ -181,7 +182,6 @@
 <li><a href="http://developer.android.com/reference/android/view/View.html#postDelayed(java.lang.Runnable,%20long)">View.postDelayed(Runnable, long)</a></li>
 <li><a href="http://developer.android.com/reference/android/os/Handler.html">Hanlder</a></li>
 </ul>
-
 
 <p>上面的任何一个类或方法都可以修复我们前面代码中遇到的问题，很不幸的是这些类或方法同样会使你的代码变的很复杂很难理解。而且当你需要实现一些很复杂的操作并需要频繁地更新UI时会变得更糟糕。为了解决这个问题，Android 1.5提供了一个工具类AsyncTask，它使创建需要与用户界面交互的长时间运行的任务变得更简单。在Android 1.0和1.1中具有与AsyncTask相同功能的类UserTask，它提供了完全一样的API，你需要做的只是把它的代码拷贝的你的程序中。</p>
 
@@ -306,8 +306,8 @@
 </span><span class='line'>
 </span><span class='line'>            pd.dismiss();
 </span><span class='line'>        }
-</span><span class='line'>    };</span></code></pre></td></tr></table></div></figure>
-
+</span><span class='line'>    };
+</span></code></pre></td></tr></table></div></figure>
 </div>
 
 
@@ -323,7 +323,7 @@
 
 
 
-<time class='entry-date' datetime='2011-06-02T18:47:58+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2011</span></span> <span class='time'>6:47 pm</span></time>
+<time class='entry-date' datetime='2011-06-02T10:47:58+00:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2011</span></span> <span class='time'>10:47 am</span></time>
       
 
 
@@ -379,7 +379,7 @@
     
     <p class="meta">
       
-        <a class="basic-alignment left" href="/blog/no-such-file-to-load-xxx-missingsourcefile-on-heroku/" title="Previous Post: no such file to load -- xxx (MissingSourceFile) on Heroku">&laquo; no such file to load &#8211; xxx (MissingSourceFile) on Heroku</a>
+        <a class="basic-alignment left" href="/blog/no-such-file-to-load-xxx-missingsourcefile-on-heroku/" title="Previous Post: no such file to load -- xxx (MissingSourceFile) on Heroku">&laquo; no such file to load -- xxx (MissingSourceFile) on Heroku</a>
       
       
         <a class="basic-alignment right" href="/blog/adding-checkbox-to-the-listview/" title="Next Post: 向ListView中添加CheckBox">向ListView中添加CheckBox &raquo;</a>
@@ -446,6 +446,7 @@
 <a style="font-size: 98%" href="/tags/listview/">ListView</a>
 <a style="font-size: 93%" href="/tags/misc/">Misc</a>
 <a style="font-size: 108%" href="/tags/mysql/">MySQL</a>
+<a style="font-size: 87%" href="/tags/osdev/">OSDev</a>
 <a style="font-size: 98%" href="/tags/paperclip/">Paperclip</a>
 <a style="font-size: 116%" href="/tags/powerbuilder/">PowerBuilder</a>
 <a style="font-size: 93%" href="/tags/powerscript/">PowerScript</a>
@@ -457,7 +458,6 @@
 <a style="font-size: 102%" href="/tags/translation/">Translation</a>
 <a style="font-size: 98%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 93%" href="/tags/vs2005/">VS2005</a>
-<a style="font-size: 87%" href="/tags/w32dasm/">W32Dasm</a>
 <a style="font-size: 108%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 111%" href="/tags/wxwidgets/">wxWidgets</a>
 
@@ -478,7 +478,7 @@
 <section>
   <h1>GitHub Repos</h1>
   <ul id="gh_repos">
-    <li class="loading">Status updating&#8230;</li>
+    <li class="loading">Status updating...</li>
   </ul>
   
   <a href="https://github.com/dohkoos">@dohkoos</a> on GitHub

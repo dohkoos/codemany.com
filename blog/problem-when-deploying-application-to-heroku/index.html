@@ -20,15 +20,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   
-  <link rel="canonical" href="http://codemany.com/blog/problem-when-deploying-application-to-heroku">
+  <link rel="canonical" href="http://codemany.com/blog/problem-when-deploying-application-to-heroku/">
   <link href="/favicon.png" rel="icon">
   <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
   <link href="/atom.xml" rel="alternate" title="乐者为王" type="application/atom+xml">
   <script src="/javascripts/modernizr-2.0.js"></script>
-  <script>!window.jQuery && document.write(unescape('%3Cscript src="./javascripts/libs/jquery.min.js"%3E%3C/script%3E'))</script>
+  <script>!window.jQuery && document.write(unescape('%3Cscript src="/javascripts/libs/jquery.min.js"%3E%3C/script%3E'))</script>
   <script src="/javascripts/octopress.js" type="text/javascript"></script>
-  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
-
+  
   
   <script type="text/javascript">
     var _gaq = _gaq || [];
@@ -61,7 +60,7 @@
   
 <form action="https://www.google.com/search" method="get">
   <fieldset role="search">
-    <input type="hidden" name="q" value="site:codemany.com" />
+    <input type="hidden" name="sitesearch" value="codemany.com">
     <input class="search" type="text" name="q" results="0" placeholder="Search"/>
   </fieldset>
 </form>
@@ -88,7 +87,7 @@
 
 
 
-<time class='entry-date' datetime='2013-05-21T06:25:33+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>21</span><span class='date-suffix'>st</span>, <span class='date-year'>2013</span></span> <span class='time'>6:25 am</span></time>
+<time class='entry-date' datetime='2013-05-20T22:25:33+00:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>20</span><span class='date-suffix'>th</span>, <span class='date-year'>2013</span></span> <span class='time'>10:25 pm</span></time>
         
       </p>
     
@@ -102,28 +101,28 @@
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'># gem 'sqlite3'
-</span><span class='line'>gem 'pg'</span></code></pre></td></tr></table></div></figure>
-
+</span><span class='line'>gem 'pg'
+</span></code></pre></td></tr></table></div></figure>
 
 <p>在config/application.rb中添加：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>config.assets.initialize_on_precompile = false</span></code></pre></td></tr></table></div></figure>
-
+</pre></td><td class='code'><pre><code class=''><span class='line'>config.assets.initialize_on_precompile = false
+</span></code></pre></td></tr></table></div></figure>
 
 <p>股票功能需要导入交割单文件，因为导入后的文本文件不再使用，可以把上传路径由public/uploads改为tmp，这样就避免了Heroku不能写文件的问题。</p>
 
 <p>应用上传后运行时出现异常，使用heroku logs -t查看日志发现有如下错误：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Error: column "stocks.share_name" must appear in the GROUP BY clause or be used in an aggregate function</span></code></pre></td></tr></table></div></figure>
-
+</pre></td><td class='code'><pre><code class=''><span class='line'>Error: column "stocks.share_name" must appear in the GROUP BY clause or be used in an aggregate function
+</span></code></pre></td></tr></table></div></figure>
 
 <p>这是因为在controller中有这么一行代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>current_user.stocks.select("share_code, share_name, sum(actual_amount) as amount").group("share_code")</span></code></pre></td></tr></table></div></figure>
-
+</pre></td><td class='code'><pre><code class=''><span class='line'>current_user.stocks.select("share_code, share_name, sum(actual_amount) as amount").group("share_code")
+</span></code></pre></td></tr></table></div></figure>
 
 <p>在PostgreSQL中这会有问题。比如下面的数据表：</p>
 
@@ -132,26 +131,26 @@
 <p>执行上面的SQL语句后，share_name的值到底是取Ruby呢还是ST Ruby？解决这个问题的方法是使用aggregate函数。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>current_user.stocks.select("share_code, max(share_name) as share_name, sum(actual_amount) as amount").group("share_code")</span></code></pre></td></tr></table></div></figure>
-
+</pre></td><td class='code'><pre><code class=''><span class='line'>current_user.stocks.select("share_code, max(share_name) as share_name, sum(actual_amount) as amount").group("share_code")
+</span></code></pre></td></tr></table></div></figure>
 
 <p>使用PostgreSQL还有个问题，就是decimal类型的字段，取出来的值是字符串类型。例如：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if stock.amount &lt; 0</span></code></pre></td></tr></table></div></figure>
-
+</pre></td><td class='code'><pre><code class=''><span class='line'>if stock.amount &lt; 0
+</span></code></pre></td></tr></table></div></figure>
 
 <p>它会报错误：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ArgumentError (comparison of String with 0 failed)</span></code></pre></td></tr></table></div></figure>
-
+</pre></td><td class='code'><pre><code class=''><span class='line'>ArgumentError (comparison of String with 0 failed)
+</span></code></pre></td></tr></table></div></figure>
 
 <p>这个可以使用to_f函数解决：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if stock.amount.to_f &lt; 0</span></code></pre></td></tr></table></div></figure>
-
+</pre></td><td class='code'><pre><code class=''><span class='line'>if stock.amount.to_f &lt; 0
+</span></code></pre></td></tr></table></div></figure>
 </div>
 
 
@@ -167,7 +166,7 @@
 
 
 
-<time class='entry-date' datetime='2013-05-21T06:25:33+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>21</span><span class='date-suffix'>st</span>, <span class='date-year'>2013</span></span> <span class='time'>6:25 am</span></time>
+<time class='entry-date' datetime='2013-05-20T22:25:33+00:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>20</span><span class='date-suffix'>th</span>, <span class='date-year'>2013</span></span> <span class='time'>10:25 pm</span></time>
       
 
 
@@ -186,7 +185,7 @@
   <ul class="posts">
   
     <li class="related">
-      <a href="/blog/no-such-file-to-load-xxx-missingsourcefile-on-heroku/">no such file to load &#8211; xxx (MissingSourceFile) on Heroku</a>
+      <a href="/blog/no-such-file-to-load-xxx-missingsourcefile-on-heroku/">no such file to load -- xxx (MissingSourceFile) on Heroku</a>
     </li>
   
     <li class="related">
@@ -290,6 +289,7 @@
 <a style="font-size: 98%" href="/tags/listview/">ListView</a>
 <a style="font-size: 93%" href="/tags/misc/">Misc</a>
 <a style="font-size: 108%" href="/tags/mysql/">MySQL</a>
+<a style="font-size: 87%" href="/tags/osdev/">OSDev</a>
 <a style="font-size: 98%" href="/tags/paperclip/">Paperclip</a>
 <a style="font-size: 116%" href="/tags/powerbuilder/">PowerBuilder</a>
 <a style="font-size: 93%" href="/tags/powerscript/">PowerScript</a>
@@ -301,7 +301,6 @@
 <a style="font-size: 102%" href="/tags/translation/">Translation</a>
 <a style="font-size: 98%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 93%" href="/tags/vs2005/">VS2005</a>
-<a style="font-size: 87%" href="/tags/w32dasm/">W32Dasm</a>
 <a style="font-size: 108%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 111%" href="/tags/wxwidgets/">wxWidgets</a>
 
@@ -322,7 +321,7 @@
 <section>
   <h1>GitHub Repos</h1>
   <ul id="gh_repos">
-    <li class="loading">Status updating&#8230;</li>
+    <li class="loading">Status updating...</li>
   </ul>
   
   <a href="https://github.com/dohkoos">@dohkoos</a> on GitHub

@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Heroku | 乐者为王]]></title>
   <link href="http://codemany.com/tags/heroku/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2015-03-22T21:22:24+08:00</updated>
+  <updated>2015-10-10T13:05:20+00:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -16,73 +16,57 @@
   <entry>
     <title type="html"><![CDATA[部署应用到Heroku时的问题]]></title>
     <link href="http://codemany.com/blog/problem-when-deploying-application-to-heroku/"/>
-    <updated>2013-05-21T06:25:33+08:00</updated>
+    <updated>2013-05-20T22:25:33+00:00</updated>
     <id>http://codemany.com/blog/problem-when-deploying-application-to-heroku</id>
     <content type="html"><![CDATA[<p>Heroku现在已经是纯粹的只读PaaS了，也就是说以前还支持的SQlite现在也不能使用了。因此部署到Heroku上的Rails应用需要把使用的数据库改成PostgreSQL，并且要关闭assets的预编译功能。</p>
 
 <p>修改Gemfile，将SQLite换成PostgreSQL：</p>
-
-<pre><code># gem 'sqlite3'
-gem 'pg'
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text"># gem &#39;sqlite3&#39;
+gem &#39;pg&#39;
+</code></pre></div>
 <p>在config/application.rb中添加：</p>
-
-<pre><code>config.assets.initialize_on_precompile = false
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">config.assets.initialize_on_precompile = false
+</code></pre></div>
 <p>股票功能需要导入交割单文件，因为导入后的文本文件不再使用，可以把上传路径由public/uploads改为tmp，这样就避免了Heroku不能写文件的问题。</p>
 
 <p>应用上传后运行时出现异常，使用heroku logs -t查看日志发现有如下错误：</p>
-
-<pre><code>Error: column "stocks.share_name" must appear in the GROUP BY clause or be used in an aggregate function
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">Error: column &quot;stocks.share_name&quot; must appear in the GROUP BY clause or be used in an aggregate function
+</code></pre></div>
 <p>这是因为在controller中有这么一行代码：</p>
-
-<pre><code>current_user.stocks.select("share_code, share_name, sum(actual_amount) as amount").group("share_code")
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">current_user.stocks.select(&quot;share_code, share_name, sum(actual_amount) as amount&quot;).group(&quot;share_code&quot;)
+</code></pre></div>
 <p>在PostgreSQL中这会有问题。比如下面的数据表：</p>
 
-<p>{% img /uploads/qianbao-stocks-table.png qianbao-stocks-table %}</p>
+<p><img src="/uploads/qianbao-stocks-table.png" title="qianbao-stocks-table" ></p>
 
 <p>执行上面的SQL语句后，share_name的值到底是取Ruby呢还是ST Ruby？解决这个问题的方法是使用aggregate函数。</p>
-
-<pre><code>current_user.stocks.select("share_code, max(share_name) as share_name, sum(actual_amount) as amount").group("share_code")
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">current_user.stocks.select(&quot;share_code, max(share_name) as share_name, sum(actual_amount) as amount&quot;).group(&quot;share_code&quot;)
+</code></pre></div>
 <p>使用PostgreSQL还有个问题，就是decimal类型的字段，取出来的值是字符串类型。例如：</p>
-
-<pre><code>if stock.amount &lt; 0
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">if stock.amount &lt; 0
+</code></pre></div>
 <p>它会报错误：</p>
-
-<pre><code>ArgumentError (comparison of String with 0 failed)
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">ArgumentError (comparison of String with 0 failed)
+</code></pre></div>
 <p>这个可以使用to_f函数解决：</p>
-
-<pre><code>if stock.amount.to_f &lt; 0
-</code></pre>
-]]></content>
+<div class="highlight"><pre><code class="language-text" data-lang="text">if stock.amount.to_f &lt; 0
+</code></pre></div>]]></content>
   </entry>
   
   <entry>
     <title type="html"><![CDATA[no such file to load -- xxx (MissingSourceFile) on Heroku]]></title>
     <link href="http://codemany.com/blog/no-such-file-to-load-xxx-missingsourcefile-on-heroku/"/>
-    <updated>2011-05-28T23:08:16+08:00</updated>
+    <updated>2011-05-28T15:08:16+00:00</updated>
     <id>http://codemany.com/blog/no-such-file-to-load-xxx-missingsourcefile-on-heroku</id>
     <content type="html"><![CDATA[<p>终于解决掉了困扰我多日的一个问题。</p>
 
-<p>部署在Heroku上的项目，在controller中require某个文件时总是出现no such file to load &ndash; calc (MissingSourceFile)。</p>
+<p>部署在Heroku上的项目，在controller中require某个文件时总是出现no such file to load -- calc (MissingSourceFile)。</p>
 
 <p>本地机器上运行的好好的，在Heroku上就出现Application error，百思不得其解，网上也没有找到类似问题的解决方法。</p>
 
 <p>咨询Heroku的技术支持，几封邮件交流下来对方也没有办法（感觉Heroku的技术支持不咋的）。</p>
 
-<p>今天把问题解决掉后再回过头来看，发现这其实是个非常简单的问题，就是Linux和Windows对待文件名大小写的差异。因为在Windows上是不区分大小写的，所以在controller中用require &lsquo;calc&#8217;来引入Calc.rb时是成功的，但是在Linux下就不可以。将文件名Calc.rb改成calc.rb再push到Heroku就把问题解决了。</p>
+<p>今天把问题解决掉后再回过头来看，发现这其实是个非常简单的问题，就是Linux和Windows对待文件名大小写的差异。因为在Windows上是不区分大小写的，所以在controller中用require &#39;calc&#39;来引入Calc.rb时是成功的，但是在Linux下就不可以。将文件名Calc.rb改成calc.rb再push到Heroku就把问题解决了。</p>
 
 <p>就这么个问题竟然让我思考了几天，还真是郁闷啊！</p>
 ]]></content>
@@ -91,82 +75,60 @@ gem 'pg'
   <entry>
     <title type="html"><![CDATA[如何导入/导出Heroku中应用的数据]]></title>
     <link href="http://codemany.com/blog/how-to-import-or-export-data-from-the-application-in-heroku/"/>
-    <updated>2009-12-27T20:43:03+08:00</updated>
+    <updated>2009-12-27T12:43:03+00:00</updated>
     <id>http://codemany.com/blog/how-to-import-or-export-data-from-the-application-in-heroku</id>
     <content type="html"><![CDATA[<p>导入/导出Heroku上应用的数据需要安装Taps包：</p>
-
-<pre><code>gem install taps
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">gem install taps
+</code></pre></div>
 <p>导入数据到Heroku里：</p>
-
-<pre><code>heroku db:push
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">heroku db:push
+</code></pre></div>
 <p>导出数据到本地：</p>
-
-<pre><code>heroku db:pull
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">heroku db:pull
+</code></pre></div>
 <p>其中导入/导出数据由config/database.yml配置设定。</p>
 
-<p>Heroku还支持主机到主机的数据库传输，具体细节可以查看 <a href="http://docs.heroku.com/taps">http://docs.heroku.com/taps</a> 。</p>
+<p>Heroku还支持主机到主机的数据库传输，具体细节可以查看 <a href="http://docs.heroku.com/taps">http://docs.heroku.com/taps</a> 文档。</p>
 ]]></content>
   </entry>
   
   <entry>
     <title type="html"><![CDATA[如何在Heroku上部署Rails应用]]></title>
     <link href="http://codemany.com/blog/how-to-deploy-rails-application-on-heroku/"/>
-    <updated>2009-12-18T14:27:21+08:00</updated>
+    <updated>2009-12-18T06:27:21+00:00</updated>
     <id>http://codemany.com/blog/how-to-deploy-rails-application-on-heroku</id>
     <content type="html"><![CDATA[<p>要使用Heroku，必须先在其官网注册一个账号。</p>
 
 <p>1、在本机上安装Heroku的gem包：</p>
-
-<pre><code>gem install heroku
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">gem install heroku
+</code></pre></div>
 <p>2、提交代码到Heroku需要ssh，可以使用ssh-keygen先产生一个公钥：</p>
-
-<pre><code>ssh-keygen -t rsa
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">ssh-keygen -t rsa
+</code></pre></div>
 <p>3、然后通过下面的命令把公钥加入到Heroku：</p>
-
-<pre><code>heroku keys:add
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">heroku keys:add
+</code></pre></div>
 <p>4、创建Rails项目并加入Git版本控制：</p>
-
-<pre><code>rails appname  # 不要使用MySQL数据库，因为Heroku暂时还不支持它
+<div class="highlight"><pre><code class="language-text" data-lang="text">rails appname  # 不要使用MySQL数据库，因为Heroku暂时还不支持它
 cd appname
 git init
 git add .
-git commit -m "Initial project"
-</code></pre>
-
+git commit -m &quot;Initial project&quot;
+</code></pre></div>
 <p>5、在Heroku上创建这个项目：</p>
-
-<pre><code>heroku create [appname]
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">heroku create [appname]
+</code></pre></div>
 <p>注意：在创建项目时会要求输入Email和密码（即注册Heroku时输入的Email和密码），以便创建~/.heroku/credentials文件，这个文件记录了你输入的用户名和密码。</p>
 
 <p>如果已经在Heroku上创建了这个项目，那么可以使用下列命令来增加一个远程服务器端，以后提交代码的时候只需要使用heroku别名即可：</p>
-
-<pre><code>git remote add heroku git@heroku.com:appname.git
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">git remote add heroku git@heroku.com:appname.git
+</code></pre></div>
 <p>6、将本地的代码部署到Heroku上：</p>
-
-<pre><code>git push heroku master
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">git push heroku master
+</code></pre></div>
 <p>7、最后做一个数据库迁移：</p>
-
-<pre><code>heroku rake db:migrate
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">heroku rake db:migrate
+</code></pre></div>
 <p>现在就可以在浏览器里输入<code>http://appname.herokuapp.com</code>来访问你的应用了。</p>
 ]]></content>
   </entry>

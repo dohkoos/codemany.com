@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Rails | 乐者为王]]></title>
   <link href="http://codemany.com/tags/rails/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2015-03-22T21:22:24+08:00</updated>
+  <updated>2015-10-10T13:05:20+00:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -16,20 +16,21 @@
   <entry>
     <title type="html"><![CDATA[重构Rails代码]]></title>
     <link href="http://codemany.com/blog/refactoring-rails-code/"/>
-    <updated>2014-11-18T19:42:59+08:00</updated>
+    <updated>2014-11-18T11:42:59+00:00</updated>
     <id>http://codemany.com/blog/refactoring-rails-code</id>
     <content type="html"><![CDATA[<p>在以前写的博文<a href="http://codemany.com/blog/problem-when-deploying-application-to-heroku/">部署应用到Heroku时的问题</a>里有这么一段话：</p>
 
-<blockquote><p>股票功能需要导入交割单文件，因为导入后的文本文件不再使用，可以把上传路径由public/uploads改为tmp，这样就避免了Heroku不能写文件的问题。</p></blockquote>
+<blockquote>
+<p>股票功能需要导入交割单文件，因为导入后的文本文件不再使用，可以把上传路径由public/uploads改为tmp，这样就避免了Heroku不能写文件的问题。</p>
+</blockquote>
 
 <p>下面是那时候写的导入代码：</p>
-
-<pre><code>class StocksController &lt; ApplicationController
-  UPLOADS_DIRECTORY = File.join("#{Rails.root}", "public/uploads")
+<div class="highlight"><pre><code class="language-text" data-lang="text">class StocksController &lt; ApplicationController
+  UPLOADS_DIRECTORY = File.join(&quot;#{Rails.root}&quot;, &quot;public/uploads&quot;)
 
   def import
     filename = upload_file(params[:file])
-    lines = File.readlines("#{UPLOADS_DIRECTORY}/#{filename}")
+    lines = File.readlines(&quot;#{UPLOADS_DIRECTORY}/#{filename}&quot;)
     lines.each do |line|
       # do something
     end
@@ -40,8 +41,8 @@
     def upload_file(file)
       if !file.original_filename.empty?
         @filename = get_file_name(file.original_filename)
-        Dir.mkdir("#{UPLOADS_DIRECTORY}") unless Dir.exist?("#{UPLOADS_DIRECTORY}")
-        File.open("#{UPLOADS_DIRECTORY}/#{@filename}", "wb") do |f|
+        Dir.mkdir(&quot;#{UPLOADS_DIRECTORY}&quot;) unless Dir.exist?(&quot;#{UPLOADS_DIRECTORY}&quot;)
+        File.open(&quot;#{UPLOADS_DIRECTORY}/#{@filename}&quot;, &quot;wb&quot;) do |f|
           f.write(file.read)
         end
         return @filename
@@ -51,12 +52,11 @@
     def get_file_name(filename)
       if !filename.nil?
         # does not support chinese filename?
-        Time.now.strftime("%Y%m%d%H%M%S") + '.txt'
+        Time.now.strftime(&quot;%Y%m%d%H%M%S&quot;) + &#39;.txt&#39;
       end
     end
 end
-</code></pre>
-
+</code></pre></div>
 <p>这里的实现方法是先将上传文件保存到服务器上应用的public/uploads目录中，然后再读取和处理。</p>
 
 <p>其实根本不需要写的这么复杂，因为导入的文件被读取一次后就不再使用了。所以在当时写代码的时候一直有这样的想法，如果能直接获得上传文件的数据，那么就不需要再另外去写保存和读取文件的代码了。</p>
@@ -64,8 +64,7 @@ end
 <p>事实也是如此。通过表单提交的file数据会首先在服务器上形成临时文件，这时其实可以通过临时文件的路径来读取上传文件的数据。</p>
 
 <p>根据该想法重构后的代码如下：</p>
-
-<pre><code>class StocksController &lt; ApplicationController
+<div class="highlight"><pre><code class="language-text" data-lang="text">class StocksController &lt; ApplicationController
   def import
     lines = File.readlines(params[:file].tempfile.to_path.to_s)
     lines.each do |line|
@@ -73,13 +72,11 @@ end
     end
     redirect_to stocks_url
   end
-</code></pre>
-
+</code></pre></div>
 <p>重构后的代码果然清爽多了，不过还是有改进的空间。</p>
 
 <p>作为控制器，controller只是负责接收request，并返回response。而具体的业务逻辑，则应该交由model去完成。下面是依照该理念再次重构后的代码：</p>
-
-<pre><code>class StocksController &lt; ApplicationController
+<div class="highlight"><pre><code class="language-text" data-lang="text">class StocksController &lt; ApplicationController
   def import
     Stock.import(params[:file])
     redirect_to stocks_url
@@ -94,179 +91,132 @@ class Stock &lt; ActiveRecord::Base
     end
   end
 end
-</code></pre>
-]]></content>
+</code></pre></div>]]></content>
   </entry>
   
   <entry>
     <title type="html"><![CDATA[使用Pry调试Rails应用]]></title>
     <link href="http://codemany.com/blog/debugging-rails-application-with-pry/"/>
-    <updated>2014-07-07T23:26:08+08:00</updated>
+    <updated>2014-07-07T15:26:08+00:00</updated>
     <id>http://codemany.com/blog/debugging-rails-application-with-pry</id>
-    <content type="html"><![CDATA[<p>调试Rails程序的工具有ruby-debug、irb、rails-console等，不过现在这些工具都可以歇着了，因为有了Pry。</p>
+    <content type="html"><![CDATA[<p>调试Rails程序有更新更好的工具了，这就是Pry，它是一套全新的IRB取代方案。</p>
 
 <p>首先，在Gemfile中申明gem包：</p>
-
-<pre><code>gem 'pry', group: :development
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">gem &#39;pry&#39;, group: :development
+</code></pre></div>
 <p>然后执行</p>
-
-<pre><code>bundle install
-</code></pre>
-
-<p>用Pry代替irb，直接运行：</p>
-
-<pre><code>pry
-</code></pre>
-
-<p>用Pry代替rails console，运行：</p>
-
-<pre><code>pry -r ./config/environment.rb
-</code></pre>
-
-<p>调试Rails项目时，在需要调试的地方添加binding.pry，当rails server运行到这行代码时会自动调出一个pry窗口，可以在这里进行交互，退出调试用exit-all。例如：</p>
-
-<pre><code>def index
+<div class="highlight"><pre><code class="language-text" data-lang="text">bundle install
+</code></pre></div>
+<p>想用Pry代替IRB，可以直接运行：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">pry
+</code></pre></div>
+<p>调试Rails项目时，在需要调试的地方添加binding.pry，当程序运行到这行代码时会打开一个Pry窗口，可以在这里操作当前代码的上下文变量。退出调试用exit-all。例如：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">def index
   @articles = Article.all
   binding.pry
 end
-</code></pre>
-
+</code></pre></div>
 <p>可以使用exit-program命令无条件地退出循环。</p>
-
-<pre><code>(1..100).each do |i|
+<div class="highlight"><pre><code class="language-text" data-lang="text">(1..100).each do |i|
   binding.pry
   puts i
 end
-</code></pre>
-
-<p>Pry默认没有调试中经常用到的上一步，下一步等命令，可以安装pry-nav，然后就可以使用step, next, continue跳来跳去了。</p>
+</code></pre></div>
+<p>Pry默认是没有调试中经常用到的上一步，下一步等命令的，可以安装pry-nav，然后就可以使用step, next, continue跳来跳去了。</p>
 ]]></content>
   </entry>
   
   <entry>
     <title type="html"><![CDATA[部署应用到Heroku时的问题]]></title>
     <link href="http://codemany.com/blog/problem-when-deploying-application-to-heroku/"/>
-    <updated>2013-05-21T06:25:33+08:00</updated>
+    <updated>2013-05-20T22:25:33+00:00</updated>
     <id>http://codemany.com/blog/problem-when-deploying-application-to-heroku</id>
     <content type="html"><![CDATA[<p>Heroku现在已经是纯粹的只读PaaS了，也就是说以前还支持的SQlite现在也不能使用了。因此部署到Heroku上的Rails应用需要把使用的数据库改成PostgreSQL，并且要关闭assets的预编译功能。</p>
 
 <p>修改Gemfile，将SQLite换成PostgreSQL：</p>
-
-<pre><code># gem 'sqlite3'
-gem 'pg'
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text"># gem &#39;sqlite3&#39;
+gem &#39;pg&#39;
+</code></pre></div>
 <p>在config/application.rb中添加：</p>
-
-<pre><code>config.assets.initialize_on_precompile = false
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">config.assets.initialize_on_precompile = false
+</code></pre></div>
 <p>股票功能需要导入交割单文件，因为导入后的文本文件不再使用，可以把上传路径由public/uploads改为tmp，这样就避免了Heroku不能写文件的问题。</p>
 
 <p>应用上传后运行时出现异常，使用heroku logs -t查看日志发现有如下错误：</p>
-
-<pre><code>Error: column "stocks.share_name" must appear in the GROUP BY clause or be used in an aggregate function
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">Error: column &quot;stocks.share_name&quot; must appear in the GROUP BY clause or be used in an aggregate function
+</code></pre></div>
 <p>这是因为在controller中有这么一行代码：</p>
-
-<pre><code>current_user.stocks.select("share_code, share_name, sum(actual_amount) as amount").group("share_code")
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">current_user.stocks.select(&quot;share_code, share_name, sum(actual_amount) as amount&quot;).group(&quot;share_code&quot;)
+</code></pre></div>
 <p>在PostgreSQL中这会有问题。比如下面的数据表：</p>
 
-<p>{% img /uploads/qianbao-stocks-table.png qianbao-stocks-table %}</p>
+<p><img src="/uploads/qianbao-stocks-table.png" title="qianbao-stocks-table" ></p>
 
 <p>执行上面的SQL语句后，share_name的值到底是取Ruby呢还是ST Ruby？解决这个问题的方法是使用aggregate函数。</p>
-
-<pre><code>current_user.stocks.select("share_code, max(share_name) as share_name, sum(actual_amount) as amount").group("share_code")
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">current_user.stocks.select(&quot;share_code, max(share_name) as share_name, sum(actual_amount) as amount&quot;).group(&quot;share_code&quot;)
+</code></pre></div>
 <p>使用PostgreSQL还有个问题，就是decimal类型的字段，取出来的值是字符串类型。例如：</p>
-
-<pre><code>if stock.amount &lt; 0
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">if stock.amount &lt; 0
+</code></pre></div>
 <p>它会报错误：</p>
-
-<pre><code>ArgumentError (comparison of String with 0 failed)
-</code></pre>
-
+<div class="highlight"><pre><code class="language-text" data-lang="text">ArgumentError (comparison of String with 0 failed)
+</code></pre></div>
 <p>这个可以使用to_f函数解决：</p>
-
-<pre><code>if stock.amount.to_f &lt; 0
-</code></pre>
-]]></content>
+<div class="highlight"><pre><code class="language-text" data-lang="text">if stock.amount.to_f &lt; 0
+</code></pre></div>]]></content>
   </entry>
   
   <entry>
     <title type="html"><![CDATA[Rails中通过Checkbox实现批量删除]]></title>
     <link href="http://codemany.com/blog/deleting-multiple-records-using-checkboxes-in-rails/"/>
-    <updated>2012-12-14T18:20:20+08:00</updated>
+    <updated>2012-12-14T10:20:20+00:00</updated>
     <id>http://codemany.com/blog/deleting-multiple-records-using-checkboxes-in-rails</id>
     <content type="html"><![CDATA[<p>在Rails生成的控制器模版中，包含的destroy方法只能处理单个对象，而批量删除要求能够同时处理多个对象，这需要自定义一个批量操作action。批量删除的效果图如下：</p>
 
-<p>{% img /uploads/table-with-checkboxes.png table-with-checkboxes %}</p>
+<p><img src="/uploads/table-with-checkboxes.png" title="table-with-checkboxes" ></p>
 
 <p>每一行记录的第一列设置成Checkbox，用于标记此行是否被选中。表下方放置一个全选Checkbox，表示全部选中或全部反选。全选和反选的JavaScript代码如下：</p>
-
-<p>&#8220;`</p>
-
-<script>
+<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;script&gt;
 function toggle_checkall(field_name, state) {
-  var checkboxes = document.getElementsByTagName('input');
+  var checkboxes = document.getElementsByTagName(&#39;input&#39;);
   var count = checkboxes.length;
-  for (var i = 0; i < count; i++) {
-    if (checkboxes[i].type == "checkbox"
-        && checkboxes[i].name == field_name + "_ids[]") {
+  for (var i = 0; i &lt; count; i++) {
+    if (checkboxes[i].type == &quot;checkbox&quot;
+        &amp;&amp; checkboxes[i].name == field_name + &quot;_ids[]&quot;) {
       checkboxes[i].checked = state;
     }
   }
 }
-</script>
-
-
-<pre><code>
-在routes.rb中配置批量删除action的映射：
-</code></pre>
-
-<p>resources :departs do
-  delete &lsquo;destroy_multiple&rsquo;, :on => collection
+&lt;/script&gt;
+</code></pre></div>
+<p>在routes.rb中配置批量删除action的映射：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">resources :departs do
+  delete &#39;destroy_multiple&#39;, :on =&gt; collection
 end
-&#8220;`</p>
-
+</code></pre></div>
 <p>在index.html.erb中添加代码：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;%= form_tag destroy_multiple_departs_path, method: :delete do %&gt;
+&lt;%= submit_tag &quot;删除选中&quot; %&gt;
+&lt;table&gt;
+  &lt;thead&gt;
+    &lt;tr&gt;
+      &lt;th&gt;&lt;input type=&quot;checkbox&quot; onclick=&quot;toggle_checkall(&#39;depart&#39;, this.checked);&quot; /&gt;&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
 
-<p>&#8220;`
-&lt;%= form_tag destroy_multiple_departs_path, method: :delete do %>
-&lt;%= submit_tag &ldquo;删除选中&rdquo; %></p>
-
-<table>
-  <thead>
-    <tr>
-      <th><input type="checkbox" onclick="toggle_checkall('depart', this.checked);" /></th>
-    </tr>
-  </thead>
-
-  <tbody>
-    <tr>
-      <td><%= check_box_tag "depart_ids[]", depart.id %></td>
-    </tr>
-    <tr>
-      <td><%= check_box_tag "depart_ids[]", depart.id %></td>
-    </tr>
-  </tbody>
-</table>
-
-
-<p>&lt;% end %>
-&#8220;`</p>
-
+  &lt;tbody&gt;
+    &lt;tr&gt;
+      &lt;td&gt;&lt;%= check_box_tag &quot;depart_ids[]&quot;, depart.id %&gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;&lt;%= check_box_tag &quot;depart_ids[]&quot;, depart.id %&gt;&lt;/td&gt;
+    &lt;/tr&gt;
+  &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;% end %&gt;
+</code></pre></div>
 <p>在controller中添加批量删除实现代码：</p>
-
-<pre><code>def destroy_multiple
+<div class="highlight"><pre><code class="language-text" data-lang="text">def destroy_multiple
   Depart.destroy(params[:depart_ids]) unless params[:depart_ids].blank?
 
   respond_to do |format|
@@ -274,40 +224,33 @@ end
     format.json { head :no_content }
   end
 end
-</code></pre>
-]]></content>
+</code></pre></div>]]></content>
   </entry>
   
   <entry>
     <title type="html"><![CDATA[改写Rails 2.x generator到Rails 3.x时的一些记录]]></title>
     <link href="http://codemany.com/blog/notes-rewrite-generator-from-rails-2x-to-rails-3x/"/>
-    <updated>2012-05-03T07:13:58+08:00</updated>
+    <updated>2012-05-02T23:13:58+00:00</updated>
     <id>http://codemany.com/blog/notes-rewrite-generator-from-rails-2x-to-rails-3x</id>
     <content type="html"><![CDATA[<p>因为有个基于Rails 2.x的项目用到了<a href="https://github.com/jsboulanger/feedback">feedback</a>插件，在把项目迁移到Rails 3.x版本后，需要让feedback也支持Rails 3.x。但是原作者早已不再更新该插件，所以只能自己动手。花了两天时间查找资料，修改代码，终于完成。</p>
 
 <p>Rails 3.x中生成generator可用下面的命令：</p>
-
-<pre><code>rails g generator feedback_form
+<div class="highlight"><pre><code class="language-text" data-lang="text">rails g generator feedback_form
       create  lib/generators/feedback_form
       create  lib/generators/feedback_form/feedback_form_generator.rb
       create  lib/generators/feedback_form/USAGE
       create  lib/generators/feedback_form/templates
-</code></pre>
-
-<pre><code>class InitializerGenerator &lt; Rails::Generators::NamedBase
-  source_root File.expand_path("../templates", __FILE__)
+</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">class InitializerGenerator &lt; Rails::Generators::NamedBase
+  source_root File.expand_path(&quot;../templates&quot;, __FILE__)
 end
-</code></pre>
-
+</code></pre></div>
 <p>生成基类也从Rails::Generators::Base变成了Rails::Generators::NamedBase。它们的区别是Rails::Generators::NamedBase期望至少一个参数。</p>
 
 <p>USAGE文件里的内容是输入-h参数时显示的文档：</p>
-
-<pre><code>rails generate feedback_form --help
+<div class="highlight"><pre><code class="language-text" data-lang="text">rails generate feedback_form --help
 Usage:
   rails generate feedback_form NAME [options]
-</code></pre>
-
+</code></pre></div>
 <p>Rails 2.x中的manifest可以删除了，因为在3.x的generator中每个public方法在生成过程中会被自动调用。</p>
 ]]></content>
   </entry>

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
 
-  <title><![CDATA[Tag: Refactor | 乐者为王]]></title>
-  <link href="http://codemany.com/tags/refactor/atom.xml" rel="self"/>
+  <title><![CDATA[Tag: Refactoring | 乐者为王]]></title>
+  <link href="http://codemany.com/tags/refactoring/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2015-03-22T21:22:24+08:00</updated>
+  <updated>2015-10-10T13:05:20+00:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -16,20 +16,21 @@
   <entry>
     <title type="html"><![CDATA[重构Rails代码]]></title>
     <link href="http://codemany.com/blog/refactoring-rails-code/"/>
-    <updated>2014-11-18T19:42:59+08:00</updated>
+    <updated>2014-11-18T11:42:59+00:00</updated>
     <id>http://codemany.com/blog/refactoring-rails-code</id>
     <content type="html"><![CDATA[<p>在以前写的博文<a href="http://codemany.com/blog/problem-when-deploying-application-to-heroku/">部署应用到Heroku时的问题</a>里有这么一段话：</p>
 
-<blockquote><p>股票功能需要导入交割单文件，因为导入后的文本文件不再使用，可以把上传路径由public/uploads改为tmp，这样就避免了Heroku不能写文件的问题。</p></blockquote>
+<blockquote>
+<p>股票功能需要导入交割单文件，因为导入后的文本文件不再使用，可以把上传路径由public/uploads改为tmp，这样就避免了Heroku不能写文件的问题。</p>
+</blockquote>
 
 <p>下面是那时候写的导入代码：</p>
-
-<pre><code>class StocksController &lt; ApplicationController
-  UPLOADS_DIRECTORY = File.join("#{Rails.root}", "public/uploads")
+<div class="highlight"><pre><code class="language-text" data-lang="text">class StocksController &lt; ApplicationController
+  UPLOADS_DIRECTORY = File.join(&quot;#{Rails.root}&quot;, &quot;public/uploads&quot;)
 
   def import
     filename = upload_file(params[:file])
-    lines = File.readlines("#{UPLOADS_DIRECTORY}/#{filename}")
+    lines = File.readlines(&quot;#{UPLOADS_DIRECTORY}/#{filename}&quot;)
     lines.each do |line|
       # do something
     end
@@ -40,8 +41,8 @@
     def upload_file(file)
       if !file.original_filename.empty?
         @filename = get_file_name(file.original_filename)
-        Dir.mkdir("#{UPLOADS_DIRECTORY}") unless Dir.exist?("#{UPLOADS_DIRECTORY}")
-        File.open("#{UPLOADS_DIRECTORY}/#{@filename}", "wb") do |f|
+        Dir.mkdir(&quot;#{UPLOADS_DIRECTORY}&quot;) unless Dir.exist?(&quot;#{UPLOADS_DIRECTORY}&quot;)
+        File.open(&quot;#{UPLOADS_DIRECTORY}/#{@filename}&quot;, &quot;wb&quot;) do |f|
           f.write(file.read)
         end
         return @filename
@@ -51,12 +52,11 @@
     def get_file_name(filename)
       if !filename.nil?
         # does not support chinese filename?
-        Time.now.strftime("%Y%m%d%H%M%S") + '.txt'
+        Time.now.strftime(&quot;%Y%m%d%H%M%S&quot;) + &#39;.txt&#39;
       end
     end
 end
-</code></pre>
-
+</code></pre></div>
 <p>这里的实现方法是先将上传文件保存到服务器上应用的public/uploads目录中，然后再读取和处理。</p>
 
 <p>其实根本不需要写的这么复杂，因为导入的文件被读取一次后就不再使用了。所以在当时写代码的时候一直有这样的想法，如果能直接获得上传文件的数据，那么就不需要再另外去写保存和读取文件的代码了。</p>
@@ -64,8 +64,7 @@ end
 <p>事实也是如此。通过表单提交的file数据会首先在服务器上形成临时文件，这时其实可以通过临时文件的路径来读取上传文件的数据。</p>
 
 <p>根据该想法重构后的代码如下：</p>
-
-<pre><code>class StocksController &lt; ApplicationController
+<div class="highlight"><pre><code class="language-text" data-lang="text">class StocksController &lt; ApplicationController
   def import
     lines = File.readlines(params[:file].tempfile.to_path.to_s)
     lines.each do |line|
@@ -73,13 +72,11 @@ end
     end
     redirect_to stocks_url
   end
-</code></pre>
-
+</code></pre></div>
 <p>重构后的代码果然清爽多了，不过还是有改进的空间。</p>
 
 <p>作为控制器，controller只是负责接收request，并返回response。而具体的业务逻辑，则应该交由model去完成。下面是依照该理念再次重构后的代码：</p>
-
-<pre><code>class StocksController &lt; ApplicationController
+<div class="highlight"><pre><code class="language-text" data-lang="text">class StocksController &lt; ApplicationController
   def import
     Stock.import(params[:file])
     redirect_to stocks_url
@@ -94,8 +91,7 @@ class Stock &lt; ActiveRecord::Base
     end
   end
 end
-</code></pre>
-]]></content>
+</code></pre></div>]]></content>
   </entry>
   
 </feed>
