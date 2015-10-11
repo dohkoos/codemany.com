@@ -9,7 +9,8 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="首先我们先要了解一下ServletResponse.setContentLength(int len)的含义。setContentLength是设置返回内容体长度的方法，len是内容体的长度。由于网络上传输内容是以字节（byte）为单位的，所以len就是指内容体有多少个字节。 &hellip;">
+  <meta name="description" content="首先用jar cvf executable.jar *.class命令生成jar文件，然后编辑jar文件中META-INF目录下的MAINFEST文件。在其尾部加上main-class: main-class-name就可以让它变成可执行的了。
+">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,206 +74,6 @@
     <div id="content">
       <div class="blog-index">
   
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-to-solve-sitemesh-truncate-the-page-containing-chinese-character/">如何解决含有中文的页面末尾内容会被SiteMesh截掉的问题</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-07-22T06:33:59+00:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2005</span></span> <span class='time'>6:33 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>首先我们先要了解一下ServletResponse.setContentLength(int len)的含义。setContentLength是设置返回内容体长度的方法，len是内容体的长度。由于网络上传输内容是以字节（byte）为单位的，所以len就是指内容体有多少个字节。假设现在有长度为100个字节的数据，在输出数据到客户端前我们用setContentLength(90)设置内容体的长度为90个字节。那么在客户端接收到的数据长度就是90个字节而不是100。下面我们来做个试验：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class PageTruncateFilter implements Filter {
-</span><span class='line'>
-</span><span class='line'>    public void init(FilterConfig config) throws ServletException {
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
-</span><span class='line'>                        throws IOException, ServletException {
-</span><span class='line'>        HttpServletRequest request = (HttpServletRequest)req;
-</span><span class='line'>        HttpServletResponse response = (HttpServletResponse)res;
-</span><span class='line'>
-</span><span class='line'>        String content = "&lt;html&gt;&lt;head&gt;&lt;title&gt;Truncated Page&lt;/title&gt;&lt;/head&gt;";
-</span><span class='line'>               content += "&lt;body&gt;这个页面的内容will be truncated.&lt;/body&gt;&lt;/html&gt;";
-</span><span class='line'>        response.setCharacterEncoding("gbk");
-</span><span class='line'>        response.setContentLength(content.length());
-</span><span class='line'>        PrintWriter out = response.getWriter();
-</span><span class='line'>        out.println(content);
-</span><span class='line'>        out.close();
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void destroy() {
-</span><span class='line'>    }
-</span><span class='line'>}
-</span></code></pre></td></tr></table></div></figure>
-
-<p>由于content字符串含有两个中文字符，每一个中文字符又是由两个字节组成，所以content.length()的值比content的字节数要少2。在客户端显示的内容也会因此少2个字节，即缺少“l&gt;”这两个字符。</p>
-
-<p>现在我们来浏览SiteMesh的源码找出问题的原因。首先从PageFilter.java的doFilter方法开始。由于页面没有在decorators.xml中注册修饰，所以writeOriginal方法会被调用。下面是writeOriginal方法的源代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>/** Write the original page data to the response. */
-</span><span class='line'>private void writeOriginal(HttpServletRequest request, HttpServletResponse response,
-</span><span class='line'>                          Page page) throws IOException {
-</span><span class='line'>    response.setContentLength(page.getContentLength());
-</span><span class='line'>
-</span><span class='line'>    if (request.getAttribute(USING_STREAM).equals(Boolean.TRUE)) {
-</span><span class='line'>        PrintWriter writer = new PrintWriter(response.getOutputStream());
-</span><span class='line'>        page.writePage(writer);
-</span><span class='line'>        // flush writer to underlying outputStream
-</span><span class='line'>        writer.flush();
-</span><span class='line'>        response.getOutputStream().flush();
-</span><span class='line'>    } else {
-</span><span class='line'>        page.writePage(response.getWriter());
-</span><span class='line'>        response.getWriter().flush();
-</span><span class='line'>    }
-</span><span class='line'>}
-</span></code></pre></td></tr></table></div></figure>
-
-<p>首行代码就是设置内容体长度的，让我们追到page.getContentLength()里面去看看（Page接口的getContentLength方法是由AbstractPage.java实现的）：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public int getContentLength() {
-</span><span class='line'>    return pageData.length;
-</span><span class='line'>}
-</span></code></pre></td></tr></table></div></figure>
-
-<p>它返回pageData数组的长度。但是pageData数组是char类型的，假如pageData中有中文内容时，设置的内容体长度就会小于pageData的字节数。这时就会出现输出到客户端的数据截掉的问题。所以只要修改getContentLength方法返回的值就可以了，下面是修改后的getContentLength方法：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public int getContentLength() {
-</span><span class='line'>    String content = new String(pageData);
-</span><span class='line'>    return content.getBytes().length;
-</span><span class='line'>}
-</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/using-ssh2-to-access-gro-clinux-org-cvs-server-in-eclipse3/">在Eclipse 3中使用SSH2访问gro.clinux.org的CVS服务器</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-07-07T11:48:08+00:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>7</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>11:48 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在Eclipse中生成公钥和私钥</p>
-
-<p>打开Eclipse，进入Window -&gt; Preferences -&gt; Team -&gt; CVS -&gt; SSH2 Connection Method -&gt; Key Management，点击“Generate RSA Key...”，然后填写Passphrase和Confirm Passphrase，接着点击“Save Private Key...”保存公钥和私钥（公钥和私钥文件保存在~/.ssh/目录下，id_rsa是私钥文件，id_rsa.pub 是公钥文件）。</p>
-
-<p>将公钥上传至gro.clinux.org服务器</p>
-
-<p>登陆gro服务器，进入[帐号维护]，在页面底部你可以看到如下信息：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Shell帐号信息
-</span><span class='line'>
-</span><span class='line'>Shell box：
-</span><span class='line'>CVS/SSH 共享认证Key：0 [编辑Keys]
-</span></code></pre></td></tr></table></div></figure>
-
-<p>点击[编辑Keys]，然后把刚才生成的文件id_rsa.pub中的内容粘贴到文本框中（看看是不是符合它上面的要求，千万要仔细看看），如果没有问题的话，就更新吧。大约6个小时后Cron会自动更新，在服务器上你的目录下会自动添加文件夹/.ssh/，里面包含了名为authorized_keys2的文件，你的公钥就保存在这里。</p>
-
-<p>在Eclipse中建立CVS连接</p>
-
-<p>打开CVS Repository Exploring Perspective，进入New -&gt; Repository Location，填入以下内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Host：cvs.unixname.gro.clinux.org
-</span><span class='line'>Repository Path：/cvsroot/unixname
-</span><span class='line'>User：你在gro.clinux.org上注册的帐户
-</span><span class='line'>Password：先前保存公钥和私钥时输入的Passphrase
-</span><span class='line'>Connection Type：extssh
-</span></code></pre></td></tr></table></div></figure>
-
-<p>点击Finish。如果你是第一次登录的话，将会弹出一个对话框，不用看那么仔细，直接点击OK就好了。</p>
-</div>
-  
-  
-
-
-    </article>
   
   
     <article>
@@ -1096,6 +897,143 @@
 
     </article>
   
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/ascii-code-table/">ASCII码表</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2005-02-25T05:18:47+00:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>25</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>5:18 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>完整的ASCII编码表如下（源自微软MSDN站点）：</p>
+
+<p><img src="/uploads/asciitable.png" title="asciitable" ></p>
+
+<p>仿照 <a href="http://ascii-table.com/">http://ascii-table.com/</a> 做的Flex版本：</p>
+
+<p><object width="640" height="490" data="/uploads/asciitable.swf" type="application/x-shockwave-flash">
+<param name="quality" value="high" />
+<param name="src" value="/uploads/asciitable.swf" />
+</object></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/problem-running-junit-tests-with-ant-in-eclipse-part2/">Eclipse中Ant执行JUnit测试的问题（2）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2005-02-22T14:02:00+00:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2005</span></span> <span class='time'>2:02 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Eclipse 3.0.3 + Ant 1.6.2 + JUnit 3.8.1</p>
+
+<p>构建配置文件build.xml：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;target name="junit"&gt;
+</span><span class='line'>    &lt;junit&gt;
+</span><span class='line'>        &lt;formatter type="xml" /&gt;
+</span><span class='line'>        &lt;batchtest todir="${report.dir}"&gt;
+</span><span class='line'>            &lt;fileset dir="${classes.dir}" includes="**/*Test.class" /&gt;
+</span><span class='line'>        &lt;/batchtest&gt;
+</span><span class='line'>    &lt;/junit&gt;
+</span><span class='line'>&lt;/target&gt;
+</span></code></pre></td></tr></table></div></figure>
+
+<p>执行任务的时候出现了异常：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>java.lang.ClassNotFoundException: com.example.lesson.HelloTest
+</span><span class='line'>    at java.net.URLClassLoader$1.run(Unknown Source)
+</span><span class='line'>    at java.security.AccessController.doPrivileged(Native Method)
+</span><span class='line'>    at java.net.URLClassLoader.findClass(Unknown Source)
+</span><span class='line'>    at java.lang.ClassLoader.loadClass(Unknown Source)
+</span><span class='line'>    at sun.misc.Launcher$AppClassLoader.loadClass(Unknown Source)
+</span><span class='line'>    at java.lang.ClassLoader.loadClass(Unknown Source)
+</span><span class='line'>    at java.lang.ClassLoader.loadClassInternal(Unknown Source)
+</span><span class='line'>    at java.lang.Class.forName0(Native Method)
+</span><span class='line'>    at java.lang.Class.forName(Unknown Source)
+</span></code></pre></td></tr></table></div></figure>
+
+<p>网上搜索没有找到答案，到Ant官网上发现 <a href="http://ant.apache.org/faq.html#delegating-classloader">http://ant.apache.org/faq.html#delegating-classloader</a> 这篇文章讲了该问题。只要在junit任务里加入classpath指出要加载类的路径就可以了。修改后的build.xml文件如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;target name="junit"&gt;
+</span><span class='line'>    &lt;junit&gt;
+</span><span class='line'>        &lt;classpath&gt;
+</span><span class='line'>            &lt;pathelement location="${classes.dir}" /&gt;
+</span><span class='line'>        &lt;/classpath&gt;
+</span><span class='line'>        &lt;formatter type="xml" /&gt;
+</span><span class='line'>        &lt;batchtest todir="${report.dir}"&gt;
+</span><span class='line'>            &lt;fileset dir="${classes.dir}" includes="**/*Test.class" /&gt;
+</span><span class='line'>        &lt;/batchtest&gt;
+</span><span class='line'>    &lt;/junit&gt;
+</span><span class='line'>&lt;/target&gt;
+</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
   <div class="pagination">
     
       <a class="prev" href="/posts/23">&larr; Older</a>
@@ -1148,14 +1086,14 @@
 <a style="font-size: 134%" href="/tags/android/">Android</a>
 <a style="font-size: 93%" href="/tags/ant/">Ant</a>
 <a style="font-size: 111%" href="/tags/crack/">Crack</a>
-<a style="font-size: 111%" href="/tags/database/">Database</a>
+<a style="font-size: 108%" href="/tags/database/">Database</a>
 <a style="font-size: 98%" href="/tags/eclipse/">Eclipse</a>
 <a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
 <a style="font-size: 141%" href="/tags/java/">Java</a>
 <a style="font-size: 93%" href="/tags/javascript/">JavaScript</a>
 <a style="font-size: 98%" href="/tags/listview/">ListView</a>
 <a style="font-size: 93%" href="/tags/misc/">Misc</a>
-<a style="font-size: 108%" href="/tags/mysql/">MySQL</a>
+<a style="font-size: 105%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 87%" href="/tags/osdev/">OSDev</a>
 <a style="font-size: 98%" href="/tags/paperclip/">Paperclip</a>
 <a style="font-size: 116%" href="/tags/powerbuilder/">PowerBuilder</a>
@@ -1167,9 +1105,9 @@
 <a style="font-size: 102%" href="/tags/struts/">Struts</a>
 <a style="font-size: 105%" href="/tags/translation/">Translation</a>
 <a style="font-size: 98%" href="/tags/ubuntu/">Ubuntu</a>
-<a style="font-size: 93%" href="/tags/vs2005/">VS2005</a>
+<a style="font-size: 87%" href="/tags/w32dasm/">W32Dasm</a>
 <a style="font-size: 108%" href="/tags/windows-server-2008/">Windows Server 2008</a>
-<a style="font-size: 111%" href="/tags/wxwidgets/">wxWidgets</a>
+<a style="font-size: 108%" href="/tags/wxwidgets/">wxWidgets</a>
 
   </ul>
 </section>
