@@ -4,7 +4,7 @@
   <title><![CDATA[乐者为王]]></title>
   <link href="http://codemany.com/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2015-10-12T05:46:25+00:00</updated>
+  <updated>2015-10-14T02:01:46+00:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,122 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[如何使用VisualVM检测Java内存泄漏]]></title>
+    <link href="http://codemany.com/blog/how-to-detect-java-memory-leak-using-visualvm/"/>
+    <updated>2015-10-12T05:08:19+00:00</updated>
+    <id>http://codemany.com/blog/how-to-detect-java-memory-leak-using-visualvm</id>
+    <content type="html"><![CDATA[<p>Java的一个重要优点是通过垃圾收集器（Garbage Collection）自动管理内存的回收，程序员不需要关注它。程序员真的不需要关注内存管理吗？只要你碰到过OutOfMemoryError你就知道它不是真的。</p>
+
+<p>这里我会展示如何使用VisualVM快速定位内存泄漏。先看下面这段代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>import java.util.List;
+</span><span class='line'>import java.util.ArrayList;
+</span><span class='line'>
+</span><span class='line'>public class MemoryLeakDemo {
+</span><span class='line'>    public static void main(String[] args) {
+</span><span class='line'>        new Thread(new MemoryLeak(), "MemoryLeak").start();
+</span><span class='line'>    }
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>class MemoryLeak implements Runnable {
+</span><span class='line'>    public static List&lt;Integer&gt; leakList = new ArrayList&lt;Integer&gt;();
+</span><span class='line'>
+</span><span class='line'>    public void run() {
+</span><span class='line'>        int count = 0;
+</span><span class='line'>        while (true) {
+</span><span class='line'>            try {
+</span><span class='line'>                Thread.sleep(3);
+</span><span class='line'>            } catch (InterruptedException e) {
+</span><span class='line'>            }
+</span><span class='line'>            count++;
+</span><span class='line'>            Integer i = new Integer(count);
+</span><span class='line'>            leakList.add(i);
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>执行下列命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>java -verbose:gc -XX:+PrintGCDetails -Xmx20m MemoryLeakDemo</span></code></pre></td></tr></table></div></figure>
+
+<p>等待一段时间后，你会看到：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Exception in thread "MemoryLeak" java.lang.OutOfMemoryError: Java heap space
+</span><span class='line'>        at java.util.Arrays.copyOf(Arrays.java:3181)
+</span><span class='line'>        at java.util.ArrayList.grow(ArrayList.java:261)
+</span><span class='line'>        at java.util.ArrayList.ensureExplicitCapacity(ArrayList.java:235)
+</span><span class='line'>        at java.util.ArrayList.ensureCapacityInternal(ArrayList.java:227)
+</span><span class='line'>        at java.util.ArrayList.add(ArrayList.java:458)
+</span><span class='line'>        at MemoryLeak.run(MemoryLeakDemo.java:22)
+</span><span class='line'>        at java.lang.Thread.run(Thread.java:745)
+</span><span class='line'>Heap
+</span><span class='line'> PSYoungGen      total 3584K, used 298K [0x00000000ff980000, 0x00000000ffe80000, 0x0000000100000000)
+</span><span class='line'>  eden space 3072K, 9% used [0x00000000ff980000,0x00000000ff9ca908,0x00000000ffc80000)
+</span><span class='line'>  from space 512K, 0% used [0x00000000ffc80000,0x00000000ffc80000,0x00000000ffd00000)
+</span><span class='line'>  to   space 512K, 0% used [0x00000000ffe00000,0x00000000ffe00000,0x00000000ffe80000)
+</span><span class='line'> ParOldGen       total 13824K, used 12156K [0x00000000fec00000, 0x00000000ff980000, 0x00000000ff980000)
+</span><span class='line'>  object space 13824K, 87% used [0x00000000fec00000,0x00000000ff7df3e8,0x00000000ff980000)
+</span><span class='line'> Metaspace       used 7993K, capacity 8164K, committed 8448K, reserved 1056768K
+</span><span class='line'>  class space    used 912K, capacity 954K, committed 1024K, reserved 1048576K</span></code></pre></td></tr></table></div></figure>
+
+<p>打开VisualVM开始监测MemoryLeakDemo，在Monitor标签页我们可以看到实时的程序内存堆的使用情况：</p>
+
+<p><img src="http://codemany.com/uploads/visualvm-heap.png" title="visualvm-heap" ></p>
+
+<p>波峰到波谷处是执行了GC的，明显可以看到执行GC后内存曲线仍旧呈上扬趋势，也就是说，内存占用是只升不降。到底是什么原因导致的呢？</p>
+
+<p>打开Sampler标签页，点击Memory按钮启动一个内存分析会话，VisualVM会定期获取所有执行线程的转储，分析栈跟踪信息，实时显示成堆直方图。通过堆直方图，我们就可以知道哪个对象占用了较多的内存，以便做进一步的优化。</p>
+
+<p><img src="http://codemany.com/uploads/visualvm-sampler.png" title="visualvm-sampler" ></p>
+
+<p>如上图所示，第1行的Integer对象占用内存最大，已经有41万多实例了，并且还在持续增加中。很显然，罪魁祸首就是它了！</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[对抗完美]]></title>
@@ -1490,125 +1606,6 @@ TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类
 <p>下面是我的曲线图：</p>
 
 <p><img src="http://codemany.com/uploads/rpi-yeelink.png" title="rpi-yeelink" ></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[使用响应式设计改造电子书网站]]></title>
-    <link href="http://codemany.com/blog/rebuild-ebook-website-with-responsive-design/"/>
-    <updated>2014-06-19T03:55:16+00:00</updated>
-    <id>http://codemany.com/blog/rebuild-ebook-website-with-responsive-design</id>
-    <content type="html"><![CDATA[<p>因为要在其它设备上测试响应式设计的效果，需要先对开发环境做些简单的配置。</p>
-
-<p>启动服务器时需加上本机的IP地址和访问端口（通常是80）：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>rails s -b 192.168.0.100 -p 80
-</span></code></pre></td></tr></table></div></figure>
-
-<p>配置Windows系统的内置防火墙，开启80端口以供其它设备访问：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>netsh advfirewall firewall add rule name="Open Port 80" dir=in action=allow protocol=TCP localport=80
-</span></code></pre></td></tr></table></div></figure>
-
-<p>查看和删除防火墙规则的命令：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>netsh advfirewall firewall delete rule name="Open Port 80" protocol=TCP localport=80
-</span><span class='line'>netsh advfirewall firewall show rule name="Open Port 80"
-</span></code></pre></td></tr></table></div></figure>
-
-<p>响应式设计的优缺点就不多说了，已经有太多的文章讲过这些。这里主要讲如何使用响应式设计改造现有的电子书网站。</p>
-
-<p>首先，需要使用viewport标签设置屏幕宽度为设备宽度，使网站内容可以适应响应式变化。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;meta name="viewport" content="width=device-width, initial-scale=1" /&gt;
-</span></code></pre></td></tr></table></div></figure>
-
-<p>因为这是一个非常简陋，并且以内容为主的网站。在上述设置后几乎不用再修改就能适应不同屏幕分辨率下的信息呈现，除了导航栏因为导航选项较多，在手机等设备上打开会出现后面部分选项被挤下去。抽屉样式的导航是解决这个问题的好方法。在网上找到一个横向导航栏切换成抽屉式导航栏的库<a href="http://srobbin.github.io/jquery-pageslide/">jQuery PageSlide</a>，它使用图片实现三明治图标，所以对它做了些修改，用标签来实现：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;ul class="burger"&gt;
-</span><span class='line'>  &lt;li&gt;&lt;/li&gt;&lt;li&gt;&lt;/li&gt;&lt;li&gt;&lt;/li&gt;
-</span><span class='line'>&lt;/ul&gt;
-</span></code></pre></td></tr></table></div></figure>
-
-<p>对应的CSS代码如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>.burger {
-</span><span class='line'>  li {
-</span><span class='line'>    height: 4px;
-</span><span class='line'>    width: 30px;
-</span><span class='line'>    background: #000;
-</span><span class='line'>    border-radius: 3px;
-</span><span class='line'>    margin: 5px 0;
-</span><span class='line'>  }
-</span><span class='line'>}
-</span></code></pre></td></tr></table></div></figure>
-
-<p>要实现响应式的话，只要让它在正常情况下隐藏，屏幕变小时显现即可：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>.burger {
-</span><span class='line'>  display: none;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>@media screen and (max-width: 480px) {
-</span><span class='line'>  .burger {
-</span><span class='line'>    display: block;
-</span><span class='line'>  }
-</span><span class='line'>}
-</span></code></pre></td></tr></table></div></figure>
-
-<p>还需要在application.html.erb的底部开启点击三明治图标时的响应事件：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= javascript_include_tag "jquery.pageslide", "data-turbolinks-track" =&gt; true %&gt;
-</span><span class='line'>&lt;script&gt;
-</span><span class='line'>  $(".burger").pageslide();
-</span><span class='line'>&lt;/script&gt;
-</span></code></pre></td></tr></table></div></figure>
-
-<p>导航条的CSS也需要做些修改，使之能在屏幕变小时转换成抽屉式导航条：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>@media screen and (max-width: 480px) {
-</span><span class='line'>  nav ul {
-</span><span class='line'>    display: none;
-</span><span class='line'>  }
-</span><span class='line'>}
-</span></code></pre></td></tr></table></div></figure>
-
-<p>至此，网站的响应式改造就基本完成了。如果您觉得对你有所帮助，请将此文发送给你的朋友，如果你还有更好的建议也可以在下面的评论中分享你的经验。</p>
 ]]></content>
   </entry>
   

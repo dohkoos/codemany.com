@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Java | 乐者为王]]></title>
   <link href="http://codemany.com/tags/java/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2015-10-12T05:46:25+00:00</updated>
+  <updated>2015-10-14T02:01:46+00:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,76 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[如何使用VisualVM检测Java内存泄漏]]></title>
+    <link href="http://codemany.com/blog/how-to-detect-java-memory-leak-using-visualvm/"/>
+    <updated>2015-10-12T05:08:19+00:00</updated>
+    <id>http://codemany.com/blog/how-to-detect-java-memory-leak-using-visualvm</id>
+    <content type="html"><![CDATA[<p>Java的一个重要优点是通过垃圾收集器（Garbage Collection）自动管理内存的回收，程序员不需要关注它。程序员真的不需要关注内存管理吗？只要你碰到过OutOfMemoryError你就知道它不是真的。</p>
+
+<p>这里我会展示如何使用VisualVM快速定位内存泄漏。先看下面这段代码：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">import java.util.List;
+import java.util.ArrayList;
+
+public class MemoryLeakDemo {
+    public static void main(String[] args) {
+        new Thread(new MemoryLeak(), &quot;MemoryLeak&quot;).start();
+    }
+}
+
+class MemoryLeak implements Runnable {
+    public static List&lt;Integer&gt; leakList = new ArrayList&lt;Integer&gt;();
+
+    public void run() {
+        int count = 0;
+        while (true) {
+            try {
+                Thread.sleep(3);
+            } catch (InterruptedException e) {
+            }
+            count++;
+            Integer i = new Integer(count);
+            leakList.add(i);
+        }
+    }
+}
+</code></pre></div>
+<p>执行下列命令：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">java -verbose:gc -XX:+PrintGCDetails -Xmx20m MemoryLeakDemo
+</code></pre></div>
+<p>等待一段时间后，你会看到：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">Exception in thread &quot;MemoryLeak&quot; java.lang.OutOfMemoryError: Java heap space
+        at java.util.Arrays.copyOf(Arrays.java:3181)
+        at java.util.ArrayList.grow(ArrayList.java:261)
+        at java.util.ArrayList.ensureExplicitCapacity(ArrayList.java:235)
+        at java.util.ArrayList.ensureCapacityInternal(ArrayList.java:227)
+        at java.util.ArrayList.add(ArrayList.java:458)
+        at MemoryLeak.run(MemoryLeakDemo.java:22)
+        at java.lang.Thread.run(Thread.java:745)
+Heap
+ PSYoungGen      total 3584K, used 298K [0x00000000ff980000, 0x00000000ffe80000, 0x0000000100000000)
+  eden space 3072K, 9% used [0x00000000ff980000,0x00000000ff9ca908,0x00000000ffc80000)
+  from space 512K, 0% used [0x00000000ffc80000,0x00000000ffc80000,0x00000000ffd00000)
+  to   space 512K, 0% used [0x00000000ffe00000,0x00000000ffe00000,0x00000000ffe80000)
+ ParOldGen       total 13824K, used 12156K [0x00000000fec00000, 0x00000000ff980000, 0x00000000ff980000)
+  object space 13824K, 87% used [0x00000000fec00000,0x00000000ff7df3e8,0x00000000ff980000)
+ Metaspace       used 7993K, capacity 8164K, committed 8448K, reserved 1056768K
+  class space    used 912K, capacity 954K, committed 1024K, reserved 1048576K
+</code></pre></div>
+<p>打开VisualVM开始监测MemoryLeakDemo，在Monitor标签页我们可以看到实时的程序内存堆的使用情况：</p>
+
+<p><img src="/uploads/visualvm-heap.png" title="visualvm-heap" ></p>
+
+<p>波峰到波谷处是执行了GC的，明显可以看到执行GC后内存曲线仍旧呈上扬趋势，也就是说，内存占用是只升不降。到底是什么原因导致的呢？</p>
+
+<p>打开Sampler标签页，点击Memory按钮启动一个内存分析会话，VisualVM会定期获取所有执行线程的转储，分析栈跟踪信息，实时显示成堆直方图。通过堆直方图，我们就可以知道哪个对象占用了较多的内存，以便做进一步的优化。</p>
+
+<p><img src="/uploads/visualvm-sampler.png" title="visualvm-sampler" ></p>
+
+<p>如上图所示，第1行的Integer对象占用内存最大，已经有41万多实例了，并且还在持续增加中。很显然，罪魁祸首就是它了！</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[使用SiteMesh做网页布局]]></title>
@@ -697,233 +767,6 @@ for (int i = 0, n = numbers.length; i &lt; selected.length; i++) {
             // 取得，确保了产生的数组selected中的数为不重复的。
 }
 </code></pre></div>]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[实现用户注册功能]]></title>
-    <link href="http://codemany.com/blog/implement-user-registration/"/>
-    <updated>2012-09-22T03:11:25+00:00</updated>
-    <id>http://codemany.com/blog/implement-user-registration</id>
-    <content type="html"><![CDATA[<p>已经两个星期没有更新代码了，这次来给加上用户注册的功能。</p>
-
-<p>先在User.java中添加confirmPassword字段。然后在UserDao.java中添加保存用户的代码：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public void addUser(User user) {
-    Session session = sessionFactory.openSession();
-    Transaction ts = null;
-    try {
-        ts = session.beginTransaction();
-        session.save(user);
-        ts.commit();
-    } finally {
-        session.close();
-    }
-}
-</code></pre></div>
-<p>在UserService.java中添加以下代码：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public void addUser(User user) throws UserAlreadyExistsException {
-    User u = getUser(user.getUsername());
-    if (u != null) {
-        throw new UserAlreadyExistsException();
-    }
-    userDao.addUser(user);
-}
-</code></pre></div>
-<p>其中UserAlreadyExistsException.java代码如下：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">package com.codemany.account.service;
-
-public class UserAlreadyExistsException extends Exception {
-    private static final long serialVersionUID = -7518737598462419360L;
-
-    public UserAlreadyExistsException() {
-        super();
-    }
-
-    public UserAlreadyExistsException(String message) {
-        super(message);
-    }
-
-    public UserAlreadyExistsException(String message, Throwable cause) {
-        super(message, cause);
-    }
-
-    public UserAlreadyExistsException(Throwable cause) {
-        super(cause);
-    }
-}
-</code></pre></div>
-<p>在applicationContext.xml中加上一个bean：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;bean id=&quot;registerAction&quot; class=&quot;com.codemany.account.action.RegisterAction&quot; scope=&quot;prototype&quot;&gt;
-    &lt;property name=&quot;userService&quot; ref=&quot;userService&quot; /&gt;
-&lt;/bean&gt;
-</code></pre></div>
-<p>然后在account.xml中添加register动作，并修改login动作相应的页面：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;action name=&quot;login&quot; class=&quot;loginAction&quot;&gt;
-    &lt;result name=&quot;success&quot;&gt;/index.jsp&lt;/result&gt;
-    &lt;result name=&quot;input&quot;&gt;/login.jsp&lt;/result&gt;
-&lt;/action&gt;
-
-&lt;action name=&quot;register&quot; class=&quot;registerAction&quot;&gt;
-    &lt;result name=&quot;success&quot;&gt;/index.jsp&lt;/result&gt;
-    &lt;result name=&quot;input&quot;&gt;/register.jsp&lt;/result&gt;
-&lt;/action&gt;
-</code></pre></div>
-<p>建立RegisterAction.java类：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">package com.codemany.account.action;
-
-import com.codemany.account.model.User;
-import com.codemany.account.service.UserAlreadyExistsException;
-import com.codemany.account.service.UserService;
-
-import com.opensymphony.xwork2.ActionSupport;
-
-public class RegisterAction extends ActionSupport {
-    private static final long serialVersionUID = 7021982816578678150L;
-
-    private User user;
-
-    private UserService userService;
-
-    public String execute() throws Exception {
-        try {
-            userService.addUser(user);
-        } catch (UserAlreadyExistsException e) {
-            return INPUT;
-        }
-        return SUCCESS;
-    }
-
-    public User getUser() {
-        return user;
-    }
-
-    public void setUser(User user) {
-        this.user = user;
-    }
-
-    public void setUserService(UserService userService) {
-        this.userService = userService;
-    }
-}
-</code></pre></div>
-<p>新建校验配置文件。先是对应RegisterAction类的RegisterAction-validation.xml配置：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;!DOCTYPE validators PUBLIC
-    &quot;-//OpenSymphony Group//XWork Validator 1.0.2//EN&quot;
-    &quot;http://www.opensymphony.com/xwork/xwork-validator-1.0.2.dtd&quot;&gt;
-
-&lt;validators&gt;
-    &lt;field name=&quot;user&quot;&gt;
-        &lt;field-validator type=&quot;visitor&quot;&gt;
-            &lt;param name=&quot;appendPrefix&quot;&gt;true&lt;/param&gt;
-            &lt;message /&gt;
-        &lt;/field-validator&gt;
-    &lt;/field&gt;
-&lt;/validators&gt;
-</code></pre></div>
-<p>这里的校验使用了visitor类型，它是用于检测action里的复合属性的。这里的复合属性是User对象，所以要在User.java同一个目录下建立校验配置文件User-validation.xml，内容如下：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;!DOCTYPE validators PUBLIC
-    &quot;-//OpenSymphony Group//XWork Validator 1.0.2//EN&quot;
-    &quot;http://www.opensymphony.com/xwork/xwork-validator-1.0.2.dtd&quot;&gt;
-
-&lt;validators&gt;
-    &lt;field name=&quot;username&quot;&gt;
-        &lt;field-validator type=&quot;requiredstring&quot;&gt;
-            &lt;message&gt;Username is required&lt;/message&gt;
-        &lt;/field-validator&gt;
-        &lt;field-validator type=&quot;stringlength&quot;&gt;
-            &lt;param name=&quot;minLength&quot;&gt;2&lt;/param&gt;
-            &lt;param name=&quot;maxLength&quot;&gt;20&lt;/param&gt;
-            &lt;message&gt;Username must be between ${minLength} and ${maxLength} characters&lt;/message&gt;
-        &lt;/field-validator&gt;
-    &lt;/field&gt;
-
-    &lt;field name=&quot;password&quot;&gt;
-        &lt;field-validator type=&quot;requiredstring&quot;&gt;
-            &lt;message&gt;Password is required&lt;/message&gt;
-        &lt;/field-validator&gt;
-        &lt;field-validator type=&quot;stringlength&quot;&gt;
-            &lt;param name=&quot;minLength&quot;&gt;6&lt;/param&gt;
-            &lt;param name=&quot;maxLength&quot;&gt;50&lt;/param&gt;
-            &lt;message&gt;Password must be between ${minLength} and ${maxLength} characters&lt;/message&gt;
-        &lt;/field-validator&gt;
-    &lt;/field&gt;
-
-    &lt;field name=&quot;confirmPassword&quot;&gt;
-        &lt;field-validator type=&quot;fieldexpression&quot;&gt;
-            &lt;param name=&quot;expression&quot;&gt;confirmPassword.equals(password)&lt;/param&gt;
-            &lt;message&gt;Password does not match the confirm password&lt;/message&gt;
-        &lt;/field-validator&gt;
-    &lt;/field&gt;
-&lt;/validators&gt;
-</code></pre></div>
-<p>修改index.jsp，将登录表单移到单独的login.jsp页面中:</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;%@ page contentType=&quot;text/html; charset=utf-8&quot; pageEncoding=&quot;utf-8&quot; %&gt;
-
-&lt;%@ taglib uri=&quot;/struts-tags&quot; prefix=&quot;s&quot; %&gt;
-
-&lt;!DOCTYPE html&gt;
-&lt;html&gt;
-&lt;head&gt;
-    &lt;meta charset=&quot;utf-8&quot;&gt;
-    &lt;title&gt;JBookShelf&lt;/title&gt;
-&lt;/head&gt;
-
-&lt;body&gt;
-    &lt;s:if test=&quot;#session.logined&quot;&gt;
-        Welcome, you have logined. &lt;a href=&quot;&lt;%= request.getContextPath() %&gt;/logout.action&quot;&gt;Logout&lt;/a&gt;
-    &lt;/s:if&gt;
-    &lt;s:else&gt;
-        &lt;a href=&quot;&lt;%= request.getContextPath() %&gt;/login!input.action&quot;&gt;Login&lt;/a&gt; |
-        &lt;a href=&quot;&lt;%= request.getContextPath() %&gt;/register!input.action&quot;&gt;Register&lt;/a&gt;
-    &lt;/s:else&gt;
-&lt;/body&gt;
-&lt;/html&gt;
-</code></pre></div>
-<p>这里是登录页面login.jsp，首页index.jsp中的登录表单就是被移到这个文件中：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;%@ page contentType=&quot;text/html; charset=utf-8&quot; pageEncoding=&quot;utf-8&quot; %&gt;
-
-&lt;%@ taglib uri=&quot;/struts-tags&quot; prefix=&quot;s&quot; %&gt;
-
-&lt;!DOCTYPE html&gt;
-&lt;html&gt;
-&lt;head&gt;
-    &lt;meta charset=&quot;utf-8&quot;&gt;
-    &lt;title&gt;Login&lt;/title&gt;
-&lt;/head&gt;
-
-&lt;body&gt;
-    &lt;p&gt;User: test/test&lt;/p&gt;
-    &lt;s:form action=&quot;login&quot;&gt;
-        &lt;s:textfield key=&quot;username&quot; label=&quot;Username&quot; /&gt;
-        &lt;s:password key=&quot;password&quot; label=&quot;Password&quot; /&gt;
-        &lt;s:submit value=&quot;Login&quot; /&gt;
-    &lt;/s:form&gt;
-&lt;/body&gt;
-&lt;/html&gt;
-</code></pre></div>
-<p>注册页面register.jsp，负责生成注册时的表单：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;%@ page contentType=&quot;text/html; charset=utf-8&quot; pageEncoding=&quot;utf-8&quot; %&gt;
-
-&lt;%@ taglib uri=&quot;/struts-tags&quot; prefix=&quot;s&quot; %&gt;
-
-&lt;!DOCTYPE html&gt;
-&lt;html&gt;
-&lt;head&gt;
-&lt;meta charset=&quot;utf-8&quot;&gt;
-&lt;title&gt;Registration&lt;/title&gt;
-&lt;/head&gt;
-
-&lt;body&gt;
-    &lt;s:form action=&quot;register&quot;&gt;
-        &lt;s:textfield key=&quot;user.username&quot; label=&quot;Username&quot; /&gt;
-        &lt;s:password key=&quot;user.password&quot; label=&quot;Password&quot; /&gt;
-        &lt;s:password key=&quot;user.confirmPassword&quot; label=&quot;Password Confirmation&quot; /&gt;
-        &lt;s:submit value=&quot;Register&quot; /&gt;
-    &lt;/s:form&gt;
-&lt;/body&gt;
-&lt;/html&gt;
-</code></pre></div>
-<p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
-]]></content>
   </entry>
   
 </feed>
