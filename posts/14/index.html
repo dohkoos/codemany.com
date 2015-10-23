@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="域名信息的查询原理非常简单，主要是基于RFC 954（RFC 812已被废弃）提供的WHOIS协议。WHOIS服务器是一个基于“查询/响应”的TCP事务服务器，用户程序通过访问WHOIS服务器，从WHOIS数据库中查询得到我们所需要的内容。其主要过程有以下三步： &hellip;">
+  <meta name="description" content="在PowerBuilder中，DataWindow是用来存储和操纵数据的对象。在每个DataWindow对象中都有4个二维表作为数据缓冲区来存储数据。用户在DataWindow中对数据的操作实际上都是将数据在这几个缓冲区中进行修改和移动，最后在用户提交数据库时， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,108 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/datawindows-data-buffer/">DataWindow的数据缓冲区</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2009-10-15T09:03:29+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>15</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>9:03 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在PowerBuilder中，DataWindow是用来存储和操纵数据的对象。在每个DataWindow对象中都有4个二维表作为数据缓冲区来存储数据。用户在DataWindow中对数据的操作实际上都是将数据在这几个缓冲区中进行修改和移动，最后在用户提交数据库时，系统根据这四个缓冲区中的信息形成SQL的INSERT、UPDATE、DELETE等语句。这四个缓冲区是：</p>
+
+<p>Primary Buffer</p>
+
+<p>这个缓冲区是存放填充窗口中DataWindow控件的数据的，调用DataWindow控件的Retrieve()函数和InsertRow()函数可以将数据填入这个缓冲区中。当使用有关DataWindow删除和过滤函数时，相应记录将从这一缓冲区中删除。而在执行DataWindow的Update()函数时，PowerBuilder将查看这一缓冲区中的记录以形成INSERT和UPDATE语句。</p>
+
+<p>Delete Buffer</p>
+
+<p>这个缓冲区保存的是用DeleteRow()函数从Primary Buffer中删除的记录，执行Update()函数时，系统根据这一缓冲区的记录形成DELETE语句。</p>
+
+<p>Filter Buffer</p>
+
+<p>这个缓冲区存储的是从Original Buffer使用Filter()函数过滤到Primary Buffer中后剩余的记录。</p>
+
+<p>Original Buffer</p>
+
+<p>这一缓冲区存储的是DataWindow最初执行Retrieve()函数时得到的全部记录。当提交数据库时，根据Primary Buffer生成的UPDATE语句和根据Delete Buffer生成的DELETE语句都要依据这一缓冲区来构造这些SQL语句中的WHERE子句。</p>
+
+<p>Original Buffer由PowerBuilder内部维护，PowerBuilder所提供的任何函数都无法改变它的值，不过通过PowerBuilder所提供的GetItem系列函数可以读出DataWindow最初从数据库中查到的原始值。通过这些函数我们可以编程实现所谓的Undo功能，并且得到在使用乐观锁时形成提交数据库的WHERE子句。如果你当前使用的DataWindow没有设置修改的权力，你将不能对Delete Buffer和Original Buffer进行操作，而且当调用Update()时也将引起系统错误。</p>
+
+<p>Primary Buffer和Delete Buffer都有行级和列级的状态值，这个状态值是一个枚举类型。在提交时由该行的状态值来决定是否要产生SQL语句，其中Primary Buffer产生的是INSERT和UPDATE语句，而Delete Buffer产生的是DELETE语句。我们用GetItemStatus()函数和SetItemStatus()函数可以对这一状态值进行操纵。这一枚举状态有以下四种：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>NotModified! —— 指定单元的数据和原始数据相同，没有发生改变。
+</span><span class='line'>DataModified! —— 指定单元的数据和原始数据不同，发生了改变。
+</span><span class='line'>New! —— 该数据行是新增加的，但数据没有发生改变（数据为空或缺省值）。
+</span><span class='line'>NewModified! —— 该数据行是新增加的，且数据已发生改变（用户键盘输入或调用SetItem()函数）。</span></code></pre></td></tr></table></div></figure>
+
+<p>在上面的这四个值中，NotModifed!和DataModified!可以表示行和列的状态，而New!和NewModified!只可以表示行的状态。</p>
+
+<p>让我们来看一个实例。有这样一张表，表中有3个字段，其中item是主键。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>item CHAR(5)
+</span><span class='line'>name CHAR(20)
+</span><span class='line'>quantity INT</span></code></pre></td></tr></table></div></figure>
+
+<p>在代码中我们查询这张表的记录，得到以下的这些信息，它们被存储在Primary Buffer和Origianal Buffer中。</p>
+
+<p><img src="/uploads/dwbuffer-1.png" title="dwbuffer-1" ></p>
+
+<p>在窗口中，我们过滤掉数量为0的行，并且加上一个空行：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>dw_1.SetFilter("quantity=0")
+</span><span class='line'>dw_1.Filter()
+</span><span class='line'>dw_1.InsertRow()</span></code></pre></td></tr></table></div></figure>
+
+<p>这时Primary Buffer的状态为：</p>
+
+<p><img src="/uploads/dwbuffer-2.png" title="dwbuffer-2" ></p>
+
+<p>在Filter Buffer中的记录为：</p>
+
+<p><img src="/uploads/dwbuffer-3.png" title="dwbuffer-3" ></p>
+
+<p>用户在新插入行中输入数据，删除了第3行数据，并修改了第2行数据。当他离开这个DataWindow时，Primary Buffer和Delete Buffer的状态如下：</p>
+
+<p><img src="/uploads/dwbuffer-4.png" title="dwbuffer-4" ></p>
+
+<p><img src="/uploads/dwbuffer-5.png" title="dwbuffer-5" ></p>
+
+<p>这时执行dw_1.Update()函数，系统将基于这两个缓冲区生成SQL语句。</p>
+
+<p><img src="/uploads/dwbuffer-6.png" title="dwbuffer-6" ></p>
+
+<p>在Primary Buffer中，状态为NotModified!和New!的行将被忽略而不产生SQL语句。状态为DataModified!的行将产生UPDATE语句，状态为NewModified!的行将产生INSERT语句，在Delete Buffer中的行将产生DELETE语句。使用DataWindow的Reset()函数和Retrieve()函数以及改变DataObject属性时，系统将重置这几个缓冲区。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -477,7 +579,7 @@
 
 <p>其中“flamingo”是之前创建的共享文件夹的名字。现在Ubuntu和主机可以分享文件了。</p>
 
-<p>假如您不想每一次都手动挂载，可以在/etc/fstab中添加一项：</p>
+<p>假如你不想每一次都手动挂载，可以在/etc/fstab中添加一项：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'>flamingo /mnt/shared vboxsf rw,gid=100,uid=1000,auto 0 0</span></code></pre></td></tr></table></div></figure>
@@ -801,45 +903,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-to-setup-background-color-of-cell-on-datawindow/">如何设置数据窗口中某行某列的背景颜色</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2008-10-18T20:25:59+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>8:25 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>假设数据窗口有多行数据，在修改某个Cell的数据后希望能将该Cell的背景色变成红色，代码该如何写呢？</p>
-
-<p>要对某行某列的属性进行更改，可以使用modify函数。在对某行某列的属性进行改变时，你需要先判断当前行是否是被修改数据的那行，如果知道行号的话（例如在itemchanged事件中），你可以使用下面的代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>dw_main.modify(ls_colname + "background.color = '0~tIf(getrow() = " + string(row) + ", 255, 16777215)'")</span></code></pre></td></tr></table></div></figure>
-
-<p>当然，你也可以这么写：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>dw_main.modify(ls_colname + "background.color = '0~tIf(getrow() = currentrow(), 255, 16777215)'")</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/15">&larr; Older</a>
@@ -857,6 +920,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/writing-great-oo-code-day-one/">一开始就编写优质的OO代码</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/ruby-debugger-overview/">Ruby调试工具概览</a>
       </li>
     
@@ -870,10 +937,6 @@
     
       <li class="post">
         <a href="/blog/elasticsearch-restful-api/">Elasticsearch的RESTful API</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/elasticsearch-installation/">Elasticsearch安装</a>
       </li>
     
   </ul>
@@ -891,16 +954,16 @@
 <a style="font-size: 97%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 134%" href="/tags/android/">Android</a>
 <a style="font-size: 93%" href="/tags/ant/">Ant</a>
-<a style="font-size: 87%" href="/tags/css/">CSS</a>
 <a style="font-size: 111%" href="/tags/crack/">Crack</a>
 <a style="font-size: 108%" href="/tags/database/">Database</a>
 <a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
+<a style="font-size: 87%" href="/tags/git/">Git</a>
 <a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
 <a style="font-size: 142%" href="/tags/java/">Java</a>
 <a style="font-size: 93%" href="/tags/javascript/">JavaScript</a>
 <a style="font-size: 97%" href="/tags/listview/">ListView</a>
+<a style="font-size: 87%" href="/tags/maven/">Maven</a>
 <a style="font-size: 105%" href="/tags/mysql/">MySQL</a>
-<a style="font-size: 87%" href="/tags/osdev/">OSDev</a>
 <a style="font-size: 93%" href="/tags/other/">Other</a>
 <a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
 <a style="font-size: 116%" href="/tags/powerbuilder/">PowerBuilder</a>
@@ -910,7 +973,7 @@
 <a style="font-size: 111%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 93%" href="/tags/spring/">Spring</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 105%" href="/tags/translation/">Translation</a>
+<a style="font-size: 108%" href="/tags/translation/">Translation</a>
 <a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 108%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 108%" href="/tags/wxwidgets/">wxWidgets</a>
