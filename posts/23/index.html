@@ -9,8 +9,17 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="在配置JPetStore 4.0.5时出了一点问题，写此文章记录下解决方法，以便日后查找。 按照教程配置好后运行Tomcat，在点击“Enter the Store”时出现了HTTP 500错误。从日志中的异常记录来看是没有找到MySQL的驱动程序。 1
-SimpleDataSource: &hellip;">
+  <meta name="description" content="web.xml配置文件： 1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+&lt;web-app&gt; &lt;servlet&gt; &lt;servlet-name&gt;hello&lt;/servlet-name&gt; &lt;servlet-class&gt;com.example. &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -74,6 +83,147 @@ SimpleDataSource: &hellip;">
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/log4j-does-not-output-log-in-servlet-init-method/">Servlet.init()中Log4j不能输出日志</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2005-03-13T08:10:05+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>13</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>8:10 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>web.xml配置文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;web-app&gt;
+</span><span class='line'>    &lt;servlet&gt;
+</span><span class='line'>        &lt;servlet-name&gt;hello&lt;/servlet-name&gt;
+</span><span class='line'>        &lt;servlet-class&gt;com.example.lesson.HelloServlet&lt;/servlet-class&gt;
+</span><span class='line'>        &lt;init-param&gt;
+</span><span class='line'>            &lt;param-name&gt;log4jConfig&lt;/param-name&gt;
+</span><span class='line'>            &lt;param-value&gt;/WEB-INF/log4j.properties&lt;/param-value&gt;
+</span><span class='line'>        &lt;/init-param&gt;
+</span><span class='line'>    &lt;/servlet&gt;
+</span><span class='line'>&lt;/web-app&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>log4j.properties配置文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>log4j.rootLogger=ALL, Console
+</span><span class='line'>log4j.appender.Console=org.apache.log4j.ConsoleAppender
+</span><span class='line'>log4j.appender.Console.layout=org.apache.log4j.PatternLayout
+</span><span class='line'>log4j.appender.Console.layout.ConversionPattern=[%t] %37c %3x - %m%n</span></code></pre></td></tr></table></div></figure>
+
+<p>HelloServlet.java代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>import javax.servlet.ServletConfig;
+</span><span class='line'>import javax.servlet.ServletContext;
+</span><span class='line'>import javax.servlet.ServletException;
+</span><span class='line'>import javax.servlet.http.HttpServlet;
+</span><span class='line'>
+</span><span class='line'>import org.apache.log4j.BasicConfigurator;
+</span><span class='line'>import org.apache.log4j.Logger;
+</span><span class='line'>import org.apache.log4j.PropertyConfigurator;
+</span><span class='line'>
+</span><span class='line'>public class HelloServlet extends HttpServlet {
+</span><span class='line'>    private Logger logger = Logger.getLogger(HelloServlet.class);
+</span><span class='line'>
+</span><span class='line'>    public void init() throws ServletException {
+</span><span class='line'>        super.init();
+</span><span class='line'>
+</span><span class='line'>        ServletConfig config = getServletConfig();
+</span><span class='line'>        ServletContext sc = getServletContext();
+</span><span class='line'>
+</span><span class='line'>        String log4jConfig = config.getInitParameter("log4jConfig");
+</span><span class='line'>        System.out.println(log4jConfig);
+</span><span class='line'>
+</span><span class='line'>        if (log4jConfig == null) {
+</span><span class='line'>            BasicConfigurator.configure();
+</span><span class='line'>        } else {
+</span><span class='line'>            PropertyConfigurator.configure(sc.getRealPath(log4jConfig));
+</span><span class='line'>        }
+</span><span class='line'>
+</span><span class='line'>        logger.info("This is an info message!");
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public void destroy() {
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>程序运行没有问题，可就是不能在Console视图中输出日志信息，而且使用System.out.println()也不能输出，不过在把private Logger logger行注释掉后System.out.println()就可以输出了。查看TOMCAT_HOME/logs中的日志文件，发现有如下异常：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>----- Root Cause -----
+</span><span class='line'>java.lang.NoClassDefFoundError: org/apache/log4j/Logger
+</span><span class='line'>  at com.example.lesson.HelloServlet.&lt;init&gt;(HelloServlet.java:15)</span></code></pre></td></tr></table></div></figure>
+
+<p>找不到Logger类？是不是WEB-INF/lib目录下没有log4j.jar呢？转到WEB-INF/lib目录，果然没有发现log4j.jar文件。把log4j.jar拷过去再试一下，真的OK了。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -974,42 +1124,6 @@ SimpleDataSource: &hellip;">
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/source-not-found-for-in-eclipse-when-debugging-servlet/">在Eclipse下调试Servlet时出现Source not found for</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2004-11-03T11:03:19+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2004</span></span> <span class='time'>11:03 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在Eclipse下调试Servlet出现了Source not found for HelloServlet.doGet()的问题，猜想是没有将Servlet代码加入到debug路径下以致在调试的时候找不到source，虽然知道原因，却不知道怎么解决。就在Eclipse里乱逛，东点西击，最后终于找到了解决问题所在。</p>
-
-<p>进入Window -&gt; Preferences -&gt; Tomcat -&gt; Source Path，在Source Path标签下有行文字：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Add java projects to source path (Eclipse debugger will search for source files in these projects).</span></code></pre></td></tr></table></div></figure>
-
-<p>将要调试的project选中然后再调试，果然不再出现警告了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/24">&larr; Older</a>
@@ -1027,6 +1141,10 @@ SimpleDataSource: &hellip;">
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/trap-for-storing-data-in-the-application-object/">在Application对象里存储数据的陷阱</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/writing-great-oo-code-day-one/">一开始就编写优质的OO代码</a>
       </li>
     
@@ -1042,10 +1160,6 @@ SimpleDataSource: &hellip;">
         <a href="/blog/fighting-perfection/">对抗完美</a>
       </li>
     
-      <li class="post">
-        <a href="/blog/elasticsearch-restful-api/">Elasticsearch的RESTful API</a>
-      </li>
-    
   </ul>
 </section>
 <section>
@@ -1059,7 +1173,7 @@ SimpleDataSource: &hellip;">
   <ul class="tag-cloud">
     <a style="font-size: 93%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 97%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 134%" href="/tags/android/">Android</a>
+<a style="font-size: 135%" href="/tags/android/">Android</a>
 <a style="font-size: 93%" href="/tags/ant/">Ant</a>
 <a style="font-size: 111%" href="/tags/crack/">Crack</a>
 <a style="font-size: 108%" href="/tags/database/">Database</a>

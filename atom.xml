@@ -4,7 +4,7 @@
   <title><![CDATA[乐者为王]]></title>
   <link href="http://codemany.com/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2015-10-23T22:41:20+08:00</updated>
+  <updated>2015-10-27T21:56:13+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,42 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[在Application对象里存储数据的陷阱]]></title>
+    <link href="http://codemany.com/blog/trap-for-storing-data-in-the-application-object/"/>
+    <updated>2015-10-27T20:57:41+08:00</updated>
+    <id>http://codemany.com/blog/trap-for-storing-data-in-the-application-object</id>
+    <content type="html"><![CDATA[<p>看到<a href="http://www.developerphil.com/dont-store-data-in-the-application-object/">Don&#39;t Store Data in the Application Object</a>讲，在Application对象中存储共享数据会引起NullPointerException。顿时心里就咯噔了一下，用了四分之三秒，想起自己有个业余项目就干了这样的事。赶紧地测试看看。</p>
+
+<p>打开应用，从MainActivity进入TxtViewerActivity界面（这里MainActivity主要是读取目录数据，然后保存在继承自Application的MainApp中，供TxtViewerActivity调用）。按手机Home键退出应用，这时你按菜单键可以看到该应用的缩图。然后在Eclipse中打开Window -&gt; Show View -&gt; Other -&gt; Android -&gt; Devices视图，双击窗口内的设备，然后点击设备下对应的进程，点击右上方红色的“Stop Process”图标。</p>
+
+<p><img src="http://codemany.com/uploads/android-devices.png" title="android-devices" ></p>
+
+<p>重新按菜单键打开应用，然后……然后果然在LogCat中看到了有NullPointerException的大段红色警告文字。</p>
+
+<h3 id="为什么会crash的？">为什么会Crash的？</h3>
+
+<p>根本原因在于：当应用被kill掉后，通过菜单键重新打开时，应用不会开始重新启动。Android系统会新建一个Application对象，然后启动上次离开时的TxtViewerActivity以造成这个应用从来没有被kill掉的假象。因为没有经过MainActivity的数据读取，所以在TxtViewerActivity中读取数据当然要抛出异常了。</p>
+
+<h3 id="有没有替代方法呢？">有没有替代方法呢？</h3>
+
+<ul>
+<li>直接将数据通过Intent传递给TxtViewerActivity？当然也会碰到上述同样的问题。</li>
+<li>使用SharedPreferences？可惜只能存储boolean、int、long、float和String五种数据类型，不支持List的存储；</li>
+<li>使用持久化存储？也不支持List的存储，而且太笨重了；</li>
+<li>使用Singleton对象保存共享数据，然后通过Intent传递呢？这个想法不错，还可以将读取assets资源等操作移到该对象中，做到单一职责原则，改善设计。不过这样一来Singleton对象会对MainActivity的context有长期引用，容易造成内存泄露。如果不把读取操作放进去……那根本就不可能，你能让一个追求完美的程序猿忍受糟糕的代码设计吗！</li>
+</ul>
+
+<p>幸好早就有人总结出来经验了：使用Application的context代替Activity的context。</p>
+
+<p>创建Singleton对象，在Application对该对象保持引用，把原来存储在Application中共享的数据全部移到Singleton对象中，将Activity中读取assets资源等操作也放入该对象，Activity中原来对Application对象的访问改成通过Application对象对Singleton对象的访问。</p>
+
+<p>这样修改后，不光解决了应用的崩溃，还预防了内存泄漏，更改进代码的设计。</p>
+
+<p>代码下载：<a href="https://github.com/dohkoos/txtReader">https://github.com/dohkoos/txtReader</a></p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[一开始就编写优质的OO代码]]></title>
@@ -1455,89 +1491,6 @@ TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类
 </span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
 
 <p>Pry默认是没有调试中经常用到的上一步，下一步等命令的，可以安装<a href="https://github.com/nixme/pry-nav">pry-nav</a>，然后就可以使用step, next, continue跳来跳去了。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[在Raspberry Pi上使用无线网卡]]></title>
-    <link href="http://codemany.com/blog/using-wifi-on-raspberry-pi/"/>
-    <updated>2014-07-06T20:25:08+08:00</updated>
-    <id>http://codemany.com/blog/using-wifi-on-raspberry-pi</id>
-    <content type="html"><![CDATA[<p>使用的是EDUP EP-N1556这款无线网卡，体积小巧，支持300M速率，买回来插在RPi上直接就能识别了。</p>
-
-<p>输入lsusb命令，可以见到设备列表中有RTL8192CU 802.11n WLAN Adapter字样，说明网卡已经被系统识别，芯片是RTL8192。</p>
-
-<p>下面就给无线网卡设置静态IP地址：</p>
-
-<p>修改/etc/wpa_supplicant/wpa_supplicant.conf</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
-</span><span class='line'>update_config=1
-</span><span class='line'>
-</span><span class='line'>network={
-</span><span class='line'>  ssid="NETGEAR"
-</span><span class='line'>  psk="12345678"
-</span><span class='line'>  proto=RSN  # 也可以写成WPA2
-</span><span class='line'>  key_mgmt=WPA-PSK  # 一定不要写成WPA2-PSK
-</span><span class='line'>  id_str="edup1556"
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>修改/etc/network/interfaces</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>auto lo
-</span><span class='line'>
-</span><span class='line'>iface lo inet loopback
-</span><span class='line'>
-</span><span class='line'>iface eth0 inet static
-</span><span class='line'>  address 192.168.0.100
-</span><span class='line'>  netmask 255.255.255.0
-</span><span class='line'>  gateway 192.168.0.1
-</span><span class='line'>  dns-nameservers 8.8.8.8
-</span><span class='line'>
-</span><span class='line'>allow-hotplug wlan0
-</span><span class='line'>iface wlan0 inet manual
-</span><span class='line'>  wpa-roam /etc/wpa_supplicant/wpa_supplicant.conf
-</span><span class='line'>iface edup1556 inet static
-</span><span class='line'>  address 192.168.0.200
-</span><span class='line'>  netmask 255.255.255.0
-</span><span class='line'>  gateway 192.168.0.1
-</span><span class='line'>  dns-nameservers 8.8.8.8
-</span><span class='line'>
-</span><span class='line'>iface default inet dhcp</span></code></pre></td></tr></table></div></figure>
-
-<p>然后用ifconfig命令列出所有的网络设备，可以看到wlan0的IP是192.168.0.200了。</p>
-
-<p>你的树莓派自由了，不再需要网线拖着了。</p>
 ]]></content>
   </entry>
   

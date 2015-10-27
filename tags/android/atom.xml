@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Android | 乐者为王]]></title>
   <link href="http://codemany.com/tags/android/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2015-10-23T22:41:20+08:00</updated>
+  <updated>2015-10-27T21:56:13+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,42 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[在Application对象里存储数据的陷阱]]></title>
+    <link href="http://codemany.com/blog/trap-for-storing-data-in-the-application-object/"/>
+    <updated>2015-10-27T20:57:41+08:00</updated>
+    <id>http://codemany.com/blog/trap-for-storing-data-in-the-application-object</id>
+    <content type="html"><![CDATA[<p>看到<a href="http://www.developerphil.com/dont-store-data-in-the-application-object/">Don&#39;t Store Data in the Application Object</a>讲，在Application对象中存储共享数据会引起NullPointerException。顿时心里就咯噔了一下，用了四分之三秒，想起自己有个业余项目就干了这样的事。赶紧地测试看看。</p>
+
+<p>打开应用，从MainActivity进入TxtViewerActivity界面（这里MainActivity主要是读取目录数据，然后保存在继承自Application的MainApp中，供TxtViewerActivity调用）。按手机Home键退出应用，这时你按菜单键可以看到该应用的缩图。然后在Eclipse中打开Window -&gt; Show View -&gt; Other -&gt; Android -&gt; Devices视图，双击窗口内的设备，然后点击设备下对应的进程，点击右上方红色的“Stop Process”图标。</p>
+
+<p><img src="/uploads/android-devices.png" title="android-devices" ></p>
+
+<p>重新按菜单键打开应用，然后……然后果然在LogCat中看到了有NullPointerException的大段红色警告文字。</p>
+
+<h3 id="为什么会crash的？">为什么会Crash的？</h3>
+
+<p>根本原因在于：当应用被kill掉后，通过菜单键重新打开时，应用不会开始重新启动。Android系统会新建一个Application对象，然后启动上次离开时的TxtViewerActivity以造成这个应用从来没有被kill掉的假象。因为没有经过MainActivity的数据读取，所以在TxtViewerActivity中读取数据当然要抛出异常了。</p>
+
+<h3 id="有没有替代方法呢？">有没有替代方法呢？</h3>
+
+<ul>
+<li>直接将数据通过Intent传递给TxtViewerActivity？当然也会碰到上述同样的问题。</li>
+<li>使用SharedPreferences？可惜只能存储boolean、int、long、float和String五种数据类型，不支持List的存储；</li>
+<li>使用持久化存储？也不支持List的存储，而且太笨重了；</li>
+<li>使用Singleton对象保存共享数据，然后通过Intent传递呢？这个想法不错，还可以将读取assets资源等操作移到该对象中，做到单一职责原则，改善设计。不过这样一来Singleton对象会对MainActivity的context有长期引用，容易造成内存泄露。如果不把读取操作放进去……那根本就不可能，你能让一个追求完美的程序猿忍受糟糕的代码设计吗！</li>
+</ul>
+
+<p>幸好早就有人总结出来经验了：使用Application的context代替Activity的context。</p>
+
+<p>创建Singleton对象，在Application对该对象保持引用，把原来存储在Application中共享的数据全部移到Singleton对象中，将Activity中读取assets资源等操作也放入该对象，Activity中原来对Application对象的访问改成通过Application对象对Singleton对象的访问。</p>
+
+<p>这样修改后，不光解决了应用的崩溃，还预防了内存泄漏，更改进代码的设计。</p>
+
+<p>代码下载：<a href="https://github.com/dohkoos/txtReader">https://github.com/dohkoos/txtReader</a></p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[TabActivity is deprecated]]></title>
@@ -331,77 +367,6 @@ public class DialogActivity extends Activity {
 
 <p>注意：如果你决定在onCreateDialog()方法之外创建一个对话框，它将不会被附着到活动上。不过，你可以通过setOwnerActivity()把它附着到一个Activity上。</p>
 ]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[实现Android底部工具栏]]></title>
-    <link href="http://codemany.com/blog/implement-bottom-toolbar-in-android/"/>
-    <updated>2011-11-16T17:08:52+08:00</updated>
-    <id>http://codemany.com/blog/implement-bottom-toolbar-in-android</id>
-    <content type="html"><![CDATA[<p>在网上大部分教程中，底部工具栏通常由TabHost和RadioGroup结合完成，每个工具栏项对应一个独立的Activity。不过，我们要实现的是多个工具栏项在单独的一个Activity上起作用。</p>
-
-<p><a href="http://www.cnblogs.com/figoyu/archive/2010/11/20/1882691.html">http://www.cnblogs.com/figoyu/archive/2010/11/20/1882691.html</a> 就是这个。不过该教程对每个工具栏项设置了固定宽度80dip，导致工具栏项或屏幕大小不定时代码布局会有问题。</p>
-
-<p>这里对该教程做了些改进，使之能做到适应不定的工具栏项或屏幕大小。改进后的布局代码如下：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
-&lt;LinearLayout xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;
-    android:orientation=&quot;vertical&quot;
-    android:layout_width=&quot;fill_parent&quot;
-    android:layout_height=&quot;fill_parent&quot;&gt;
-    &lt;LinearLayout
-        android:layout_width=&quot;fill_parent&quot;
-        android:layout_height=&quot;0dip&quot;
-        android:layout_weight=&quot;1.0&quot;&gt;
-        &lt;ScrollView
-            android:layout_width=&quot;fill_parent&quot;
-            android:layout_height=&quot;fill_parent&quot;
-            android:scrollbars=&quot;vertical&quot;
-            android:fadingEdge=&quot;vertical&quot;&gt;
-            &lt;TextView
-                android:id=&quot;@+id/content&quot;
-                android:layout_width=&quot;fill_parent&quot;
-                android:layout_height=&quot;wrap_content&quot;
-                android:textSize=&quot;17dip&quot; /&gt;
-        &lt;/ScrollView&gt;
-    &lt;/LinearLayout&gt;
-
-    &lt;include layout=&quot;@layout/toolbar&quot; /&gt;
-&lt;/LinearLayout&gt;
-</code></pre></div>
-<p>以下是工具栏toolbar.xml的布局代码：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
-&lt;LinearLayout xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;
-    android:orientation=&quot;horizontal&quot;
-    android:layout_width=&quot;fill_parent&quot;
-    android:layout_height=&quot;wrap_content&quot;
-    android:background=&quot;@drawable/toolbar_bg&quot;&gt;
-    &lt;ImageButton
-        android:id=&quot;@+id/btn_index&quot;
-        android:src=&quot;@drawable/index&quot;
-        android:text=&quot;@string/index&quot;
-        style=&quot;@style/toolbar&quot; /&gt;
-    &lt;ImageButton
-        android:id=&quot;@+id/btn_prev&quot;
-        android:src=&quot;@drawable/btn_prev_bg&quot;
-        android:text=&quot;@string/prev&quot;
-        style=&quot;@style/toolbar&quot; /&gt;
-    &lt;ImageButton
-        android:id=&quot;@+id/btn_next&quot;
-        android:src=&quot;@drawable/btn_next_bg&quot;
-        android:text=&quot;@string/next&quot;
-        style=&quot;@style/toolbar&quot; /&gt;
-    &lt;ImageButton
-        android:id=&quot;@+id/btn_zoomin&quot;
-        android:src=&quot;@drawable/zoomin&quot;
-        android:text=&quot;@string/zoomin&quot;
-        style=&quot;@style/toolbar&quot; /&gt;
-    &lt;ImageButton
-        android:id=&quot;@+id/btn_zoomout&quot;
-        android:src=&quot;@drawable/zoomout&quot;
-        android:text=&quot;@string/zoomout&quot;
-        style=&quot;@style/toolbar&quot; /&gt;
-&lt;/LinearLayout&gt;
-</code></pre></div>]]></content>
   </entry>
   
 </feed>
