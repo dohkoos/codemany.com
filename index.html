@@ -9,12 +9,10 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="abcde五人打渔，打完睡觉，a先醒来，扔掉1条鱼，把剩下的分成5份，拿1份走了；b再醒来，也扔掉1条，把剩下的分成5份，拿1份走了；然后cde都按上面的方法取鱼。问他们最少打了多少条鱼？ 渔民
-醒来时鱼的总数
-取走的鱼数 a
-x
-(x - 1) / 5 b
-y = 4 * (x - 1) / 5 &hellip;">
+  <meta name="description" content="设计抽奖活动时，我们总是要控制抽奖物品出现的概率，让好的东西很难被抽到；
+设计游戏打怪时，我们要控制打怪时的命中概率，要控制宝物掉出的概率；
+网站的置顶广告，我们也要根据广告主的广告费用控制广告的出现时间；
+设计负载均衡算法时，我们要根据服务器的性能控制服务器被选中的可能。 深入思考这些需求， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -84,6 +82,127 @@ y = 4 * (x - 1) / 5 &hellip;">
       
   <header>
     
+      <h1 class="entry-title"><a href="/blog/random-with-weight-function/">带权随机函数</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2015-11-18T18:51:05+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>6:51 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><ul>
+<li>设计抽奖活动时，我们总是要控制抽奖物品出现的概率，让好的东西很难被抽到；</li>
+<li>设计游戏打怪时，我们要控制打怪时的命中概率，要控制宝物掉出的概率；</li>
+<li>网站的置顶广告，我们也要根据广告主的广告费用控制广告的出现时间；</li>
+<li>设计负载均衡算法时，我们要根据服务器的性能控制服务器被选中的可能。</li>
+</ul>
+
+<p>深入思考这些需求，你会发现它们都有相通的概念：每次从多个候选项中随机选取其中一项，要求每个候选项的出现都有一定的概率。</p>
+
+<p>假设有这样的候选项和对应概率：a:20%，b:25%，c:40%，d:15%。现在，把每个候选项的概率用一个称之为权重的正整数表示（最简单的方法是把百分符号去掉）。那么，</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>实际概率 = 候选项权重 / 权重总和 * 100%</span></code></pre></td></tr></table></div></figure>
+
+<p>事实上，权重的总和不一定要等于100，可以是任意大小。</p>
+
+<h3 id="算法描述">算法描述</h3>
+
+<p>依次将各候选项的权重从原点开始放在x轴坐标上首尾相连。这样，每个候选项对应一个取值区间，在总区间范围内随机选取一个值，该值所在区间就对应了选中的项。</p>
+
+<p><img src="/uploads/random-with-weight.png" title="random-with-weight" ></p>
+
+<h3 id="ruby代码实现">Ruby代码实现</h3>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def random(weight)
+</span><span class='line'>  # 获取所有候选项的权重总和
+</span><span class='line'>  total_weight = weight.inject { |r, e| r + e }
+</span><span class='line'>
+</span><span class='line'>  # 随机选取一个介于0到权重总和之间的整数
+</span><span class='line'>  rand_value = rand(total_weight)  # [0, total_weight)
+</span><span class='line'>
+</span><span class='line'>  # 扫描所有候选项，并且保留候选项权重的累积数。
+</span><span class='line'>  # 每当随机数小于累积数时，就停止并选出当前项。
+</span><span class='line'>  weight_barrier = 0
+</span><span class='line'>  weight.each_index do |i|
+</span><span class='line'>    weight_barrier += weight[i]
+</span><span class='line'>
+</span><span class='line'>    break i if rand_value &lt; weight_barrier
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>该实现不能保证每个候选项都恰好按正确的比例被选中，但当次数足够多时，应该会十分接近预先设定的比例。</p>
+
+<h3 id="实际案例">实际案例</h3>
+
+<p>要求写int[] get_weight(int[] weight)函数，返回的是权重的索引。其中weight是权重的数字数组，最终的结果是要大概保证按照给定的比例。</p>
+
+<ul>
+<li>比如weight为[1, 2, 2]，那么权重比例为1:2:2，执行10次后，大概的输出是0 1 1 0 1 1 2 2 2 2；</li>
+<li>比如weight为[100, 0]，那么权重比例为100:0，执行10次后，大概的输出是0 0 0 0 0 0 0 0 0 0；</li>
+<li>比如weight为[1, 1]，那么权重比例为1:1，执行10次后，大概的输出是0 1 0 1 0 0 1 1 0 1。</li>
+</ul>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def get_weight(weight)
+</span><span class='line'>  10.times.map { random(weight) }
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>weight = [1, 2, 2]
+</span><span class='line'>puts get_weight(weight).join(' ')
+</span><span class='line'>
+</span><span class='line'>weight = [100, 0]
+</span><span class='line'>puts get_weight(weight).join(' ')
+</span><span class='line'>
+</span><span class='line'>weight = [1, 1]
+</span><span class='line'>puts get_weight(weight).join(' ')</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
       <h1 class="entry-title"><a href="/blog/logic-problems-how-many-fish/">逻辑题-共打了多少鱼</a></h1>
     
     
@@ -111,28 +230,28 @@ y = 4 * (x - 1) / 5 &hellip;">
 </thead><tbody>
 <tr>
 <td>a</td>
-<td>x</td>
-<td>(x - 1) / 5</td>
+<td>x1 = x</td>
+<td>(x1 - 1) / 5</td>
 </tr>
 <tr>
 <td>b</td>
-<td>y = 4 * (x - 1) / 5</td>
-<td>(y - 1) / 5</td>
+<td>x2 = 4 * (x1 - 1) / 5</td>
+<td>(x2 - 1) / 5</td>
 </tr>
 <tr>
 <td>c</td>
-<td>z = 4 * (y - 1) / 5</td>
-<td>(z - 1) / 5</td>
+<td>x3 = 4 * (x2 - 1) / 5</td>
+<td>(x3 - 1) / 5</td>
 </tr>
 <tr>
 <td>d</td>
-<td>m = 4 * (z - 1) / 5</td>
-<td>(m - 1) / 5</td>
+<td>x4 = 4 * (x3 - 1) / 5</td>
+<td>(x4 - 1) / 5</td>
 </tr>
 <tr>
 <td>e</td>
-<td>n = 4 * (m - 1) / 5</td>
-<td>(n - 1) / 5</td>
+<td>x5 = 4 * (x4 - 1) / 5</td>
+<td>(x5 - 1) / 5</td>
 </tr>
 </tbody></table>
 
@@ -171,9 +290,9 @@ y = 4 * (x - 1) / 5 &hellip;">
 </span><span class='line'>
 </span><span class='line'>puts total  # 结果是3121条鱼</span></code></pre></td></tr></table></div></figure>
 
-<p>上面的代码总过做了3121 * 5 = 15605次循环，下面来做进一步的优化。</p>
+<p>上面的代码总过做了3901次循环，下面来做进一步的优化。</p>
 
-<p>从表格可以看出，因为(n - 1) % 5 == 0，推导出n &gt;= 6；又x % 5 == 1，因此x的个位数必须是1或者6。所以，枚举的最小值可以从11开始，每次步进为5。优化后的代码如下：</p>
+<p>从表格可以看出，因为(x5 - 1) % 5 == 0，推导出x5 &gt;= 6；又x1 % 5 == 1，因此x1的个位数必须是1或者6。所以，枚举的最小值可以从11开始，每次步进为5。优化后的代码如下：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -206,7 +325,7 @@ y = 4 * (x - 1) / 5 &hellip;">
 </span><span class='line'>
 </span><span class='line'>puts total</span></code></pre></td></tr></table></div></figure>
 
-<p>总的循环次数减少到(3121 - 11) / 5 + 1 = 623次，减少了整整96%的循环。</p>
+<p>总的循环次数减少到1401次，减少了整整64%的循环。</p>
 
 <p>推而广之：n个渔民打渔，每个渔民依次扔掉1条鱼后，把鱼分成n份，然后拿走其中一份，求最少打了多少条鱼？</p>
 
@@ -1114,77 +1233,6 @@ y = 4 * (x - 1) / 5 &hellip;">
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/why-we-cant-estimate-software-project-the-same-way-we-estimate-houses/">为什么我们不能用估算房屋同样的方法估算软件项目</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2015-01-10T09:33:48+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>10</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>9:33 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="http://www.summa-tech.com/blog/2009/01/28/why-we-cant-estimate-software-project-the-same-way-we-estimate-houses">http://www.summa-tech.com/blog/2009/01/28/why-we-cant-estimate-software-project-the-same-way-we-estimate-houses</a></p>
-
-<p>把构造软件类比成建造房屋是非常有用的，但也有缺陷。</p>
-
-<p>尽管软件建设和住宅建设都是工程实践，但比起软件，我们在估算建造房屋的成本和精力方面更成功。</p>
-
-<h3 id="词汇障碍">词汇障碍</h3>
-
-<p>因为我们大多数人一生都住在房子里，我们开发了一套定义良好的、可以理解的、几乎通用的词汇来描述和讨论关于我们称之为家的地方。当被问及我们的房子是什么样子的，我们可以很容易地回答。当计划一所新房子时，我们可以极其肯定地讨论我们想要什么，并确信建筑师和工程师会明白我们谈论的，反之亦然。我们可能不明白水管设施和电气细节，但我们知道电源插座要放在哪里，知道房间的大小，知道要有多少车库门。</p>
-
-<p>当我们谈论软件时，就不是那么有效了。有太多来自业务和技术方面的新术语，我们需要依赖于现实世界中的类比去解释他们。不仅发生在业务和技术人员之间，甚至还发生在业务人员和业务人员，技术人员和技术人员之间。我们不习惯于去描述软件需求因为所有软件的抽象，在估算时沟通经常受到噪音、误解、缺乏眼界的影响，增加了真正需要构建的不确定性。</p>
-
-<h3 id="物理">物理</h3>
-
-<p>现实世界有非常强大和稳定的规则，比如重力，这些规则会在盖房子的时候施加约束。我们知道我们必须在构建二楼前先完成地下室。我们不能在地基完成后增加层的数量。在水管设施铺设后更改浴室的位置将会是非常非常昂贵的。</p>
-
-<p>在软件项目中，我们生活在一个较少规则的世界里，就像《黑客帝国》。从技术上讲，我们可以在同一时间构造所有的应用层。它可以被设计成使用不同的数据库，运行在不同的服务器，或支持不同的语言。它可以通过浏览器、手机、或其它无线设备访问。选项几乎是无穷无尽的。</p>
-
-<p>正是这种自由和灵活性，在过去的40年里驱动了软件的巨大的进步，但在同时，它也是无数软件项目失败的原因。至关重要的是需求要面对现实，让它们遵守一些基本规则，即使它们不受宇宙物理规律的约束。</p>
-
-<h3 id="程序">程序</h3>
-
-<p>物理和几千年建设的结合已经带来了如何去建造一座房子的一套可靠的程序，虽然总是会有新的材料和改进的技术，核心概念都是相同的。油漆房子的过程几百年来几乎没有变化。</p>
-
-<p>我们仍然处于软件工程的早期阶段。大量的“直觉”仍在估算软件时使用，实际情况是直觉还没有被证明非常有效。</p>
-
-<h3 id="材料和标准">材料和标准</h3>
-
-<p>只有数量有限的材料能被实际地用在建造房屋上。从技术上来讲，可能有成千上百的选项去建造一堵墙：夹板、混凝土、钢铁、沙子、玻璃，但在家具建材零售店里这些选项是非常有限的。涂料的类型，门窗的模型很多但有限。当购买一个水槽时，它很容易兼容已有的水管设施的几率非常高。电器有着相同的电压，灯泡也是兼容的。计划建造一所房子的一切都是兼容的，材料更是普及的，把不确定性降低到了非常小的水平，提高了估算的准确性。</p>
-
-<p>软件行业确实有一些标准，但是它们处于层的最低水平，例如网络协议和文件系统。服务器和产品的集成仍处于布线阶段，XML和Web Service还有很长的路要走，在它们和建筑业达到相同级别的兼容性前，如果这是可能的。</p>
-
-<p>各种各样连接到数据库和构建软件的选项和方法增加了复杂性，提高了每个人参与软件构建工作的学习曲线。我不是说所有这些选项都是不好的，但它确实给估算阶段增加了不确定性，所以产生了复杂性。</p>
-
-<h3 id="角色">角色</h3>
-
-<p>每次我路过建筑工地，都会看到很多帽子，一些在积极工作，一些在等待时机采取行动。但最好的部分是我从来没有见过有人同时戴两顶帽子。角色界定的很明确，工人们专业从事于非常具体的领域。</p>
-
-<p>在大型软件项目中也有一些角色被定义，但还远远没有达到建筑业相同级别的专业化。通常团队成员需要戴上很多帽子，结果是，有时候他们会执行那些他们不是专家的任务，这就增加了他们提供的估算的不确定性。</p>
-
-<p>“很多帽子”现象的一个很好例子是“Webmaster”，该角色用于描述那个做网页设计、创建动画图片、编写HTML和Perl代码、配置数据库、管理网络和邮件服务器的家伙。幸运的是现在Webmaster是个很少使用的术语，因为所有这些活动现在都分配给了不同的角色，像网页设计师、DBA，程序员和系统管理员。我们确实在走向专业化，但还是有很长的路要走。</p>
-
-<p>我并不是建议我们停止使用“让我们像建造房屋那样构造软件”的类比，但我们必须意识到这个比喻的局限性。一旦我们知道局限性我们将能更好地定位讨论这一差异，以及提供建议如何解决它们。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/2">&larr; Older</a>
@@ -1198,6 +1246,10 @@ y = 4 * (x - 1) / 5 &hellip;">
     <section>
   <h1>Recent Posts</h1>
   <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/random-with-weight-function/">带权随机函数</a>
+      </li>
     
       <li class="post">
         <a href="/blog/logic-problems-how-many-fish/">逻辑题-共打了多少鱼</a>
@@ -1215,10 +1267,6 @@ y = 4 * (x - 1) / 5 &hellip;">
         <a href="/blog/writing-great-oo-code-day-one/">一开始就编写优质的OO代码</a>
       </li>
     
-      <li class="post">
-        <a href="/blog/ruby-debugger-overview/">Ruby调试工具概览</a>
-      </li>
-    
   </ul>
 </section>
 <section>
@@ -1231,11 +1279,11 @@ y = 4 * (x - 1) / 5 &hellip;">
   <h1>Tags</h1>
   <ul class="tag-cloud">
     <a style="font-size: 93%" href="/tags/antlr/">ANTLR</a>
-<a style="font-size: 101%" href="/tags/algorithm/">Algorithm</a>
+<a style="font-size: 105%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 135%" href="/tags/android/">Android</a>
 <a style="font-size: 93%" href="/tags/ant/">Ant</a>
 <a style="font-size: 111%" href="/tags/crack/">Crack</a>
-<a style="font-size: 108%" href="/tags/database/">Database</a>
+<a style="font-size: 105%" href="/tags/database/">Database</a>
 <a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
 <a style="font-size: 87%" href="/tags/git/">Git</a>
 <a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>

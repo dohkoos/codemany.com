@@ -5,11 +5,14 @@
 <!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  <title>数据库设计范式阅读笔记 - 乐者为王</title>
+  <title>带权随机函数 - 乐者为王</title>
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="下面三个范式是当前网上到处流传的关于数据库范式的定义。不知道是从哪里找来的，想来应该是从国内的数据库教科书上吧。光看定义的话很难明白，即使在例子的帮助下也难以理解1NF的内容，而且所说的与实践也有很大不同。上Wiki去查找相关内容，才发现完全是胡言乱语，不知所云，就是想把你搞糊涂，让你弄不懂。 &hellip;">
+  <meta name="description" content="设计抽奖活动时，我们总是要控制抽奖物品出现的概率，让好的东西很难被抽到；
+设计游戏打怪时，我们要控制打怪时的命中概率，要控制宝物掉出的概率；
+网站的置顶广告，我们也要根据广告主的广告费用控制广告的出现时间；
+设计负载均衡算法时，我们要根据服务器的性能控制服务器被选中的可能。 深入思考这些需求， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -18,7 +21,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   
-  <link rel="canonical" href="http://codemany.com/blog/reading-notes-database-design-normal-form/">
+  <link rel="canonical" href="http://codemany.com/blog/random-with-weight-function/">
   <link href="/favicon.png" rel="icon">
   <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
   <link href="/atom.xml" rel="alternate" title="乐者为王" type="application/atom+xml">
@@ -76,7 +79,7 @@
   
   <header>
     
-      <h1 class="entry-title">数据库设计范式阅读笔记</h1>
+      <h1 class="entry-title">带权随机函数</h1>
     
     
       <p class="meta">
@@ -85,68 +88,106 @@
 
 
 
-<time class='entry-date' datetime='2012-03-18T17:24:06+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>5:24 pm</span></time>
+<time class='entry-date' datetime='2015-11-18T18:51:05+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>6:51 pm</span></time>
         
       </p>
     
   </header>
 
 
-<div class="entry-content"><p>下面三个范式是当前网上到处流传的关于数据库范式的定义。不知道是从哪里找来的，想来应该是从国内的数据库教科书上吧。光看定义的话很难明白，即使在例子的帮助下也难以理解1NF的内容，而且所说的与实践也有很大不同。上Wiki去查找相关内容，才发现完全是胡言乱语，不知所云，就是想把你搞糊涂，让你弄不懂。下面针对每个范式说说我对它们的理解。</p>
+<div class="entry-content"><ul>
+<li>设计抽奖活动时，我们总是要控制抽奖物品出现的概率，让好的东西很难被抽到；</li>
+<li>设计游戏打怪时，我们要控制打怪时的命中概率，要控制宝物掉出的概率；</li>
+<li>网站的置顶广告，我们也要根据广告主的广告费用控制广告的出现时间；</li>
+<li>设计负载均衡算法时，我们要根据服务器的性能控制服务器被选中的可能。</li>
+</ul>
 
-<p>第一范式（1NF）：数据表的每一列都是不可分割的基本数据项，同一列中不能有多个值，即实体中的某个属性不能有多个值<del>或者不能有重复的属性。如果出现重复的属性，就可能需要定义一个新的实体，新的实体由重复的属性构成，新实体与原实体之间为一对多关系。</del>在1NF中表的每一行只包含一个实例的信息。</p>
+<p>深入思考这些需求，你会发现它们都有相通的概念：每次从多个候选项中随机选取其中一项，要求每个候选项的出现都有一定的概率。</p>
 
-<p>划线部分是纯粹的学院派做法，想要达到数据的零冗余。实际上是既没理解1NF的本质，也对实践过程中的性能问题缺乏认识。</p>
+<p>假设有这样的候选项和对应概率：a:20%，b:25%，c:40%，d:15%。现在，把每个候选项的概率用一个称之为权重的正整数表示（最简单的方法是把百分符号去掉）。那么，</p>
 
-<p>员工信息表：</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>实际概率 = 候选项权重 / 权重总和 * 100%</span></code></pre></td></tr></table></div></figure>
 
-<table><thead>
-<tr>
-<th>Employee </th>
-<th>Job Title </th>
-<th>Skill </th>
-<th>Salary</th>
-</tr>
-</thead><tbody>
-<tr>
-<td>Peter    </td>
-<td>Developer </td>
-<td>C#    </td>
-<td>2000</td>
-</tr>
-<tr>
-<td>Kevin    </td>
-<td>Developer </td>
-<td>Java  </td>
-<td>2000</td>
-</tr>
-<tr>
-<td>Sarah    </td>
-<td>Manager   </td>
-<td>PRIN2 </td>
-<td>3000</td>
-</tr>
-</tbody></table>
+<p>事实上，权重的总和不一定要等于100，可以是任意大小。</p>
 
-<p>“如果出现重复的属性，就可能需要定义一个新的实体”。上表中Job Title和Salary都出现了重复的属性，按照给出的说法，是不是要把Salary提出来变成一个单独的表呢？1NF要满足的基本条件：</p>
+<h3 id="算法描述">算法描述</h3>
 
-<ol>
-<li>没有重复行，就是每一行的记录都是不完全相同的；</li>
-<li>每个行列（row-and-column intersection）必须包含唯一的值，空或未定义也可以；</li>
-<li>所有列是基本的，不能有隐藏行ID，对象ID或时间戳等。</li>
-</ol>
+<p>依次将各候选项的权重从原点开始放在x轴坐标上首尾相连。这样，每个候选项对应一个取值区间，在总区间范围内随机选取一个值，该值所在区间就对应了选中的项。</p>
 
-<p>因此，我们只要给员工信息表加上个员工编码（emp_id）就符合1NF了，更本不需要去定义什么新的实体。</p>
+<p><img src="/uploads/random-with-weight.png" title="random-with-weight" ></p>
 
-<p>事实上，在当前所有的关系数据库管理系统中，都已经在建表的时候强制满足第一范式。通常就是加上个自增量id列作为主键。</p>
+<h3 id="ruby代码实现">Ruby代码实现</h3>
 
-<p>第二范式（2NF）：要满足2NF必须先满足1NF。<del>2NF要求数据表中的每个实例或行必须可以被惟一地区分。为实现区分通常需要为表加上一个列，以存储各个实例的惟一标识。</del>2NF要求实体的属性完全依赖于主关键字。所谓完全依赖是指不能存在仅依赖主关键字一部分的属性，如果存在，那么这个属性和主关键字的这一部分应该分离出来形成一个新的实体，新实体与原实体之间是一对多的关系。为实现区分通常需要为表加上一个列，以存储各个实例的惟一标识。简而言之，2NF就是非主属性非部分依赖于主关键字。</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def random(weight)
+</span><span class='line'>  # 获取所有候选项的权重总和
+</span><span class='line'>  total_weight = weight.inject { |r, e| r + e }
+</span><span class='line'>
+</span><span class='line'>  # 随机选取一个介于0到权重总和之间的整数
+</span><span class='line'>  rand_value = rand(total_weight)  # [0, total_weight)
+</span><span class='line'>
+</span><span class='line'>  # 扫描所有候选项，并且保留候选项权重的累积数。
+</span><span class='line'>  # 每当随机数小于累积数时，就停止并选出当前项。
+</span><span class='line'>  weight_barrier = 0
+</span><span class='line'>  weight.each_index do |i|
+</span><span class='line'>    weight_barrier += weight[i]
+</span><span class='line'>
+</span><span class='line'>    break i if rand_value &lt; weight_barrier
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
 
-<p>划线部分实际上是1NF的内容，所以2NF肯定要符合这个。还有就是，所有单关键字的数据表都符合2NF，因为不存在组合关键字。</p>
+<p>该实现不能保证每个候选项都恰好按正确的比例被选中，但当次数足够多时，应该会十分接近预先设定的比例。</p>
 
-<p>第三范式（3NF）：满足3NF必须先满足2NF。3NF要求一个数据表中不包含已在其它表中已包含的非主关键字信息。简而言之，第三范式就是属性不依赖于其它非主属性。</p>
+<h3 id="实际案例">实际案例</h3>
 
-<p>数据表只能包含其它表中包含的主关键字信息。</p>
+<p>要求写int[] get_weight(int[] weight)函数，返回的是权重的索引。其中weight是权重的数字数组，最终的结果是要大概保证按照给定的比例。</p>
+
+<ul>
+<li>比如weight为[1, 2, 2]，那么权重比例为1:2:2，执行10次后，大概的输出是0 1 1 0 1 1 2 2 2 2；</li>
+<li>比如weight为[100, 0]，那么权重比例为100:0，执行10次后，大概的输出是0 0 0 0 0 0 0 0 0 0；</li>
+<li>比如weight为[1, 1]，那么权重比例为1:1，执行10次后，大概的输出是0 1 0 1 0 0 1 1 0 1。</li>
+</ul>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def get_weight(weight)
+</span><span class='line'>  10.times.map { random(weight) }
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>weight = [1, 2, 2]
+</span><span class='line'>puts get_weight(weight).join(' ')
+</span><span class='line'>
+</span><span class='line'>weight = [100, 0]
+</span><span class='line'>puts get_weight(weight).join(' ')
+</span><span class='line'>
+</span><span class='line'>weight = [1, 1]
+</span><span class='line'>puts get_weight(weight).join(' ')</span></code></pre></td></tr></table></div></figure>
 </div>
 
 
@@ -162,7 +203,7 @@
 
 
 
-<time class='entry-date' datetime='2012-03-18T17:24:06+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>5:24 pm</span></time>
+<time class='entry-date' datetime='2015-11-18T18:51:05+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>6:51 pm</span></time>
       
 
 
@@ -170,7 +211,7 @@
 
 <span class="tags">
   
-    <a class='tag' href='/tags/database/'>Database</a>
+    <a class='tag' href='/tags/algorithm/'>Algorithm</a>
   
 </span>
 
@@ -181,23 +222,23 @@
   <ul class="posts">
   
     <li class="related">
-      <a href="/blog/summary-of-sql-join/">SQL连接总结</a>
+      <a href="/blog/logic-problems-how-many-fish/">逻辑题-共打了多少鱼</a>
     </li>
   
     <li class="related">
-      <a href="/blog/with-check-option-in-view/">创建视图时的with check option选项</a>
+      <a href="/blog/logic-problems-how-many-sick-dogs/">逻辑题-几条病狗</a>
     </li>
   
     <li class="related">
-      <a href="/blog/problem-using-sql-server-2000-personal-edition/">使用SQL Server 2000个人版出现的问题</a>
+      <a href="/blog/logic-problems-the-teachers-birthday/">逻辑题-老师的生日</a>
     </li>
   
     <li class="related">
-      <a href="/blog/allow-remote-client-to-connect-to-mysql-on-lunarpages/">允许客户端远程连接Lunarpages上的MySQL数据库</a>
+      <a href="/blog/logic-problems-100-lamps/">逻辑题-100盏电灯</a>
     </li>
   
     <li class="related">
-      <a href="/blog/comsybasejdbc2jdbcsybsqlexception-sql-anywhere-error-143-column-not-found/">com.sybase.jdbc2.jdbc.SybSQLException: SQL Anywhere Error -143: Column '@p3' not found</a>
+      <a href="/blog/how-to-extract-random-digit-without-replacement-from-array/">如何从数组中抽取随机不重复的数字</a>
     </li>
   
   </ul>
@@ -218,10 +259,8 @@
     
     <p class="meta">
       
-        <a class="basic-alignment left" href="/blog/how-currency-wars-confuse-reader-opnion/" title="Previous Post: 《货币战争》是如何混淆读者视听的">&laquo; 《货币战争》是如何混淆读者视听的</a>
+        <a class="basic-alignment left" href="/blog/logic-problems-how-many-fish/" title="Previous Post: 逻辑题-共打了多少鱼">&laquo; 逻辑题-共打了多少鱼</a>
       
-      
-        <a class="basic-alignment right" href="/blog/progressbar-does-not-work-when-reopen-progressdialog-using-showdialog/" title="Next Post: 使用showDialog()创建的ProgressDialog再次打开时进度条不变化">使用showDialog()创建的ProgressDialog再次打开时进度条不变化 &raquo;</a>
       
     </p>
   </footer>
@@ -242,6 +281,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/random-with-weight-function/">带权随机函数</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/logic-problems-how-many-fish/">逻辑题-共打了多少鱼</a>
       </li>
     
@@ -257,10 +300,6 @@
         <a href="/blog/writing-great-oo-code-day-one/">一开始就编写优质的OO代码</a>
       </li>
     
-      <li class="post">
-        <a href="/blog/ruby-debugger-overview/">Ruby调试工具概览</a>
-      </li>
-    
   </ul>
 </section>
 <section>
@@ -273,11 +312,11 @@
   <h1>Tags</h1>
   <ul class="tag-cloud">
     <a style="font-size: 93%" href="/tags/antlr/">ANTLR</a>
-<a style="font-size: 101%" href="/tags/algorithm/">Algorithm</a>
+<a style="font-size: 105%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 135%" href="/tags/android/">Android</a>
 <a style="font-size: 93%" href="/tags/ant/">Ant</a>
 <a style="font-size: 111%" href="/tags/crack/">Crack</a>
-<a style="font-size: 108%" href="/tags/database/">Database</a>
+<a style="font-size: 105%" href="/tags/database/">Database</a>
 <a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
 <a style="font-size: 87%" href="/tags/git/">Git</a>
 <a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
@@ -365,8 +404,8 @@
       
         
         // var disqus_developer = 1;
-        var disqus_identifier = 'http://codemany.com/blog/reading-notes-database-design-normal-form/';
-        var disqus_url = 'http://codemany.com/blog/reading-notes-database-design-normal-form/';
+        var disqus_identifier = 'http://codemany.com/blog/random-with-weight-function/';
+        var disqus_url = 'http://codemany.com/blog/random-with-weight-function/';
         var disqus_script = 'embed.js';
       
     (function () {

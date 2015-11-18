@@ -4,7 +4,7 @@
   <title><![CDATA[乐者为王]]></title>
   <link href="http://codemany.com/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2015-11-03T15:18:05+08:00</updated>
+  <updated>2015-11-18T20:11:51+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,107 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[带权随机函数]]></title>
+    <link href="http://codemany.com/blog/random-with-weight-function/"/>
+    <updated>2015-11-18T18:51:05+08:00</updated>
+    <id>http://codemany.com/blog/random-with-weight-function</id>
+    <content type="html"><![CDATA[<ul>
+<li>设计抽奖活动时，我们总是要控制抽奖物品出现的概率，让好的东西很难被抽到；</li>
+<li>设计游戏打怪时，我们要控制打怪时的命中概率，要控制宝物掉出的概率；</li>
+<li>网站的置顶广告，我们也要根据广告主的广告费用控制广告的出现时间；</li>
+<li>设计负载均衡算法时，我们要根据服务器的性能控制服务器被选中的可能。</li>
+</ul>
+
+<p>深入思考这些需求，你会发现它们都有相通的概念：每次从多个候选项中随机选取其中一项，要求每个候选项的出现都有一定的概率。</p>
+
+<p>假设有这样的候选项和对应概率：a:20%，b:25%，c:40%，d:15%。现在，把每个候选项的概率用一个称之为权重的正整数表示（最简单的方法是把百分符号去掉）。那么，</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>实际概率 = 候选项权重 / 权重总和 * 100%</span></code></pre></td></tr></table></div></figure>
+
+<p>事实上，权重的总和不一定要等于100，可以是任意大小。</p>
+
+<h3 id="算法描述">算法描述</h3>
+
+<p>依次将各候选项的权重从原点开始放在x轴坐标上首尾相连。这样，每个候选项对应一个取值区间，在总区间范围内随机选取一个值，该值所在区间就对应了选中的项。</p>
+
+<p><img src="http://codemany.com/uploads/random-with-weight.png" title="random-with-weight" ></p>
+
+<h3 id="ruby代码实现">Ruby代码实现</h3>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def random(weight)
+</span><span class='line'>  # 获取所有候选项的权重总和
+</span><span class='line'>  total_weight = weight.inject { |r, e| r + e }
+</span><span class='line'>
+</span><span class='line'>  # 随机选取一个介于0到权重总和之间的整数
+</span><span class='line'>  rand_value = rand(total_weight)  # [0, total_weight)
+</span><span class='line'>
+</span><span class='line'>  # 扫描所有候选项，并且保留候选项权重的累积数。
+</span><span class='line'>  # 每当随机数小于累积数时，就停止并选出当前项。
+</span><span class='line'>  weight_barrier = 0
+</span><span class='line'>  weight.each_index do |i|
+</span><span class='line'>    weight_barrier += weight[i]
+</span><span class='line'>
+</span><span class='line'>    break i if rand_value &lt; weight_barrier
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>该实现不能保证每个候选项都恰好按正确的比例被选中，但当次数足够多时，应该会十分接近预先设定的比例。</p>
+
+<h3 id="实际案例">实际案例</h3>
+
+<p>要求写int[] get_weight(int[] weight)函数，返回的是权重的索引。其中weight是权重的数字数组，最终的结果是要大概保证按照给定的比例。</p>
+
+<ul>
+<li>比如weight为[1, 2, 2]，那么权重比例为1:2:2，执行10次后，大概的输出是0 1 1 0 1 1 2 2 2 2；</li>
+<li>比如weight为[100, 0]，那么权重比例为100:0，执行10次后，大概的输出是0 0 0 0 0 0 0 0 0 0；</li>
+<li>比如weight为[1, 1]，那么权重比例为1:1，执行10次后，大概的输出是0 1 0 1 0 0 1 1 0 1。</li>
+</ul>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def get_weight(weight)
+</span><span class='line'>  10.times.map { random(weight) }
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>weight = [1, 2, 2]
+</span><span class='line'>puts get_weight(weight).join(' ')
+</span><span class='line'>
+</span><span class='line'>weight = [100, 0]
+</span><span class='line'>puts get_weight(weight).join(' ')
+</span><span class='line'>
+</span><span class='line'>weight = [1, 1]
+</span><span class='line'>puts get_weight(weight).join(' ')</span></code></pre></td></tr></table></div></figure>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[逻辑题-共打了多少鱼]]></title>
@@ -29,28 +130,28 @@
 </thead><tbody>
 <tr>
 <td>a</td>
-<td>x</td>
-<td>(x - 1) / 5</td>
+<td>x1 = x</td>
+<td>(x1 - 1) / 5</td>
 </tr>
 <tr>
 <td>b</td>
-<td>y = 4 * (x - 1) / 5</td>
-<td>(y - 1) / 5</td>
+<td>x2 = 4 * (x1 - 1) / 5</td>
+<td>(x2 - 1) / 5</td>
 </tr>
 <tr>
 <td>c</td>
-<td>z = 4 * (y - 1) / 5</td>
-<td>(z - 1) / 5</td>
+<td>x3 = 4 * (x2 - 1) / 5</td>
+<td>(x3 - 1) / 5</td>
 </tr>
 <tr>
 <td>d</td>
-<td>m = 4 * (z - 1) / 5</td>
-<td>(m - 1) / 5</td>
+<td>x4 = 4 * (x3 - 1) / 5</td>
+<td>(x4 - 1) / 5</td>
 </tr>
 <tr>
 <td>e</td>
-<td>n = 4 * (m - 1) / 5</td>
-<td>(n - 1) / 5</td>
+<td>x5 = 4 * (x4 - 1) / 5</td>
+<td>(x5 - 1) / 5</td>
 </tr>
 </tbody></table>
 
@@ -89,9 +190,9 @@
 </span><span class='line'>
 </span><span class='line'>puts total  # 结果是3121条鱼</span></code></pre></td></tr></table></div></figure>
 
-<p>上面的代码总过做了3121 * 5 = 15605次循环，下面来做进一步的优化。</p>
+<p>上面的代码总过做了3901次循环，下面来做进一步的优化。</p>
 
-<p>从表格可以看出，因为(n - 1) % 5 == 0，推导出n &gt;= 6；又x % 5 == 1，因此x的个位数必须是1或者6。所以，枚举的最小值可以从11开始，每次步进为5。优化后的代码如下：</p>
+<p>从表格可以看出，因为(x5 - 1) % 5 == 0，推导出x5 &gt;= 6；又x1 % 5 == 1，因此x1的个位数必须是1或者6。所以，枚举的最小值可以从11开始，每次步进为5。优化后的代码如下：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -124,7 +225,7 @@
 </span><span class='line'>
 </span><span class='line'>puts total</span></code></pre></td></tr></table></div></figure>
 
-<p>总的循环次数减少到(3121 - 11) / 5 + 1 = 623次，减少了整整96%的循环。</p>
+<p>总的循环次数减少到1401次，减少了整整64%的循环。</p>
 
 <p>推而广之：n个渔民打渔，每个渔民依次扔掉1条鱼后，把鱼分成n份，然后拿走其中一份，求最少打了多少条鱼？</p>
 
@@ -1601,47 +1702,6 @@ TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类
 <p>会把转换好的文章都放到source/_posts目录下，文件后缀名是html，直接改成markdown就是。</p>
 
 <p>最后就是苦力活：修改文中的站内链接、上传的图片路径以及代码高亮语法等。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Nokogiri抓取页面URL含有中文参数的问题]]></title>
-    <link href="http://codemany.com/blog/problem-with-nokogiri-when-url-containing-chinese-character/"/>
-    <updated>2014-07-17T22:48:00+08:00</updated>
-    <id>http://codemany.com/blog/problem-with-nokogiri-when-url-containing-chinese-character</id>
-    <content type="html"><![CDATA[<p>使用Nokogiri抓取某网站的长江现货数据，被抓取页面的URL中含有中文参数，使用以下的代码抓取数据失败：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>url = 'http://example.com/search.asp?type=长江有色&sort=asc'
-</span><span class='line'>doc = Nokogiri::HTML(open(url))</span></code></pre></td></tr></table></div></figure>
-
-<p>据 <a href="http://dingr.iteye.com/blog/647244">http://dingr.iteye.com/blog/647244</a> 讲是因为浏览器给服务器发送参数的时候是经过编码的，按照该文的意思试着也给URL里的中文编了下码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>url = 'http://example.com/search.asp?type=长江有色&sort=asc'
-</span><span class='line'>url = URI.escape(url)
-</span><span class='line'>doc = Nokogiri::HTML(open(url))</span></code></pre></td></tr></table></div></figure>
-
-<p>结果还是抓取失败。查看URL的编码信息：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>puts url.encoding  # 输出utf-8</span></code></pre></td></tr></table></div></figure>
-
-<p>网站页面采用的是GB2132编码，猜测网站后台处理数据时很有可能也是采用的GB2132。做个实验就清楚了，将URL转成GB2132后再编码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>url = 'http://example.com/search.asp?type=长江有色&sort=asc'
-</span><span class='line'>url = url.encode('gbk', 'utf-8')
-</span><span class='line'>url = URI.escape(url)
-</span><span class='line'>doc = Nokogiri::HTML(open(url))</span></code></pre></td></tr></table></div></figure>
-
-<p>发现果然OK了。</p>
 ]]></content>
   </entry>
   
