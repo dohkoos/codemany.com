@@ -9,7 +9,10 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="首先，让我们从最简单的做起，先实现一个能正确分析PowerScript注释的词法文件。PowerScript支持两种注释形式：单行注释（//）和多行注释（/*...*/）。 单行注释以双斜杠（//）起头，直到遇到行结束符为止，所以在这里要先明确一下行结束符用什么表示。在DOS系统中行结束符用“\r &hellip;">
+  <meta name="description" content="在上篇文中写的词法分析文件存在有两个小问题： 处理换行符和回车符的词法定义有重复，在WS和EndOfLine中都有出现；
+像/* comments /* nested comments */ */这种嵌套注释会被输出成： 1
+2
+bc&gt;/* comments /* nested &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +76,91 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/using-antlr-to-build-powerscript-grammar-parser-part2/">使用ANTLR构建PowerScript语法分析器（2）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-09-02T16:44:22+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2007</span></span> <span class='time'>4:44 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在<a href="/blog/using-antlr-to-build-powerscript-grammar-parser-part1/">上篇</a>文中写的词法分析文件存在有两个小问题：</p>
+
+<ol>
+<li>处理换行符和回车符的词法定义有重复，在WS和EndOfLine中都有出现；</li>
+<li>像<code>/* comments /* nested comments */ */</code>这种嵌套注释会被输出成：</li>
+</ol>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>bc&gt;/* comments /* nested comments */
+</span><span class='line'>bc&gt;/* comments /* nested comments */ */</span></code></pre></td></tr></table></div></figure>
+
+<p>第1个问题比较容易解决，只要将EndOfLine前的fragment去掉，再将WS改成下面这样就可以。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>WS
+</span><span class='line'>    : (' '|'\t'|'\u000C') {$channel=HIDDEN;}
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>第2个问题则可以通过计数器来处理。先初始化一个计数器变量depthOfComments来标记块注释的深度，当遇到<code>“/*”</code>时就加1，遇到“*/”时则减1。输出时只要判断depthOfComments是否等于0就行了。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>BLOCK_COMMENT
+</span><span class='line'>@init {
+</span><span class='line'>    int depthOfComments = 0;
+</span><span class='line'>}
+</span><span class='line'>    : '/*' {depthOfComments++;}
+</span><span class='line'>      ( options {greedy=false;}
+</span><span class='line'>      : ('/' '*')=&gt; BLOCK_COMMENT {depthOfComments++;}
+</span><span class='line'>      | '/' ~('*')
+</span><span class='line'>      | ~('/')
+</span><span class='line'>      )*
+</span><span class='line'>      '*/' {depthOfComments--;}
+</span><span class='line'>      {
+</span><span class='line'>          if (depthOfComments == 0) {
+</span><span class='line'>              System.out.println("bc&gt;" + getText());
+</span><span class='line'>          }
+</span><span class='line'>      }
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1023,48 +1111,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/css-box-model/">CSS盒模型</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2007-03-20T17:40:16+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>20</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>5:40 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>平面示意图</p>
-
-<p><img src="/uploads/box-model-01.gif" title="box-model-01" ></p>
-
-<p>3D示意图（原图出自：hicksdesign）</p>
-
-<p><img src="/uploads/box-model-02.gif" title="box-model-02" ></p>
-
-<p>Flash示意模型</p>
-
-<p><object width="640" height="380" data="/uploads/box-model.swf" type="application/x-shockwave-flash">
-<param name="quality" value="high" />
-<param name="src" value="/uploads/box-model.swf" />
-</object></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/20">&larr; Older</a>
@@ -1082,6 +1128,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/pbl-file-format-analysis/">PBL文件格式解析</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/random-with-weight-function/">带权随机函数</a>
       </li>
     
@@ -1095,10 +1145,6 @@
     
       <li class="post">
         <a href="/blog/trap-for-storing-data-in-the-application-object/">在Application对象里存储数据的陷阱</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/writing-great-oo-code-day-one/">一开始就编写优质的OO代码</a>
       </li>
     
   </ul>
@@ -1116,10 +1162,10 @@
 <a style="font-size: 105%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 135%" href="/tags/android/">Android</a>
 <a style="font-size: 93%" href="/tags/ant/">Ant</a>
+<a style="font-size: 87%" href="/tags/css/">CSS</a>
 <a style="font-size: 111%" href="/tags/crack/">Crack</a>
 <a style="font-size: 105%" href="/tags/database/">Database</a>
 <a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
-<a style="font-size: 87%" href="/tags/git/">Git</a>
 <a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
 <a style="font-size: 142%" href="/tags/java/">Java</a>
 <a style="font-size: 93%" href="/tags/javascript/">JavaScript</a>
@@ -1128,7 +1174,7 @@
 <a style="font-size: 105%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 93%" href="/tags/other/">Other</a>
 <a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
-<a style="font-size: 116%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 118%" href="/tags/powerbuilder/">PowerBuilder</a>
 <a style="font-size: 93%" href="/tags/powerscript/">PowerScript</a>
 <a style="font-size: 118%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
