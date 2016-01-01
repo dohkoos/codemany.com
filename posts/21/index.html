@@ -9,10 +9,9 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="WebWork是一个非常不错的MVC框架，有着众多的优点，也有着细微的缺陷。在实现一个用户注册验证的例子时，发现在资源文件中不能获取验证字段的值，只能每个字段一个message。 1
+  <meta name="description" content="使用DbUnit，开发人员可以控制测试数据库的状态。进行一个DAO单元测试之前，DbUnit为数据库准备好初始化数据；而在测试结束时，DbUnit会把数据库状态恢复到测试前的状态。下面的例子使用DbUnit为SqlMap编写单元测试。 SqlMap映射文件User.xml的内容如下： 1
 2
-3
-class User { private String username; private String &hellip;">
+3 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -76,6 +75,313 @@ class User { private String username; private String &hellip;">
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/sqlmap-unit-testing-with-spring-and-dbunit/">DbUnit结合Spring进行SqlMap的单元测试</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2006-04-11T20:39:04+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>11</span><span class='date-suffix'>th</span>, <span class='date-year'>2006</span></span> <span class='time'>8:39 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>使用DbUnit，开发人员可以控制测试数据库的状态。进行一个DAO单元测试之前，DbUnit为数据库准备好初始化数据；而在测试结束时，DbUnit会把数据库状态恢复到测试前的状态。下面的例子使用DbUnit为SqlMap编写单元测试。</p>
+
+<p>SqlMap映射文件User.xml的内容如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;select id="getUser" parameterClass="String" resultClass="User"&gt;
+</span><span class='line'>    SELECT username, password, first_name, last_name
+</span><span class='line'>    FROM user WHERE username = #username#
+</span><span class='line'>&lt;/select&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;delete id="removeUser" parameterClass="String"&gt;
+</span><span class='line'>    DELETE FROM user WHERE username = #username#
+</span><span class='line'>&lt;/delete&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;update id="updateUser" parameterClass="User"&gt;
+</span><span class='line'>    UPDATE user SET
+</span><span class='line'>        password = #password#,
+</span><span class='line'>        first_name = #firstName#,
+</span><span class='line'>        last_name = #lastName#
+</span><span class='line'>    WHERE username =#username#
+</span><span class='line'>&lt;/update&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;insert id="insertUser" parameterClass="User"&gt;
+</span><span class='line'>    INSERT INTO user (username, password, first_name, last_name)
+</span><span class='line'>    VALUES (#username#, #password#, #firstName#, #lastName#)
+</span><span class='line'>&lt;/insert&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>配置文件sql-map-config.xml中的内容如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;sqlMapConfig&gt;
+</span><span class='line'>    &lt;settings lazyLoadingEnabled="true"
+</span><span class='line'>              cacheModelsEnabled="true"
+</span><span class='line'>              enhancementEnabled="true"
+</span><span class='line'>              maxSessions="64"
+</span><span class='line'>              maxTransactions="8"
+</span><span class='line'>              maxRequests="128" /&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;sqlMap resource="com/codemany/netlink/dao/impl/User.xml" /&gt;
+</span><span class='line'>&lt;/sqlMapConfig&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>首先，要为单元测试准备测试数据。我们可以用DbUnit的Flat XML格式来准备测试数据集。下面的XML文件称为目标数据库的Seed File，它为测试准备了两条数据。其中元素名user对应数据库的表名，属性username，password，first_name和last_name是表user的列名，属性值就是记录值。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;dataset&gt;
+</span><span class='line'>    &lt;user username="ford"
+</span><span class='line'>        password="ford"
+</span><span class='line'>        first_name="Henry"
+</span><span class='line'>        last_name="Ford" /&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;user username="twain"
+</span><span class='line'>        password="twain"
+</span><span class='line'>        first_name="Mark"
+</span><span class='line'>        last_name="twain" /&gt;
+</span><span class='line'>&lt;/dataset&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>缺省情况下，DbUnit在单元测试开始之前执行CLEAN_INSERT操作，删除Seed File中所有表的数据，并导入Seed File的测试数据。我们可以通过覆盖getSetUpOperation()和getTearDownOperation()方法来控制单元测试前和测试后的数据库状态。一种高效的实施方案就是让getSetUpOperation()方法执行REFRESH操作，通过执行这个操作，我们可以用Seed File中的数据去更新目标数据库里的数据。接下来，就是getTearDownOperation()，让他执行一个NONE操作，也就是什么也不执行。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>protected DatabaseOperation getSetUpOperation() throws Exception {
+</span><span class='line'>    return DatabaseOperation.REFRESH;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>protected DatabaseOperation getTearDownOperation() throws Exception {
+</span><span class='line'>    return DatabaseOperation.NONE;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>为了方便测试，我们为SqlMap的单元测试编写一个抽象的测试基类，代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public abstract class SqlMapTestCase extends DatabaseTestCase {
+</span><span class='line'>    protected SqlMapClient sqlMapClient = null;
+</span><span class='line'>    protected Properties props = new Properties();
+</span><span class='line'>
+</span><span class='line'>    protected IDatabaseConnection getConnection() throws Exception {
+</span><span class='line'>        props.load(Resources.getResourceAsStream("properties/database.properties"));
+</span><span class='line'>
+</span><span class='line'>        Class.forName(props.getProperty("driver"));
+</span><span class='line'>        Connection conn = DriverManager.getConnection(props.getProperty("url"),
+</span><span class='line'>                props.getProperty("username"), props.getProperty("password"));
+</span><span class='line'>        return new DatabaseConnection(conn);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    protected IDataSet getDataSet() throws Exception {
+</span><span class='line'>        String resource = "com/codemany/netlink/dao/impl/dataset.xml";
+</span><span class='line'>        return new FlatXmlDataSet(Resources.getResourceAsStream(resource));
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    protected void setUp() throws Exception {
+</span><span class='line'>        super.setUp();
+</span><span class='line'>
+</span><span class='line'>        // Build the SqlMapClient
+</span><span class='line'>        Reader reader = Resources.getResourceAsReader("sql-map-config.xml");
+</span><span class='line'>        sqlMapClient = SqlMapClientBuilder.buildSqlMapClient(reader);
+</span><span class='line'>
+</span><span class='line'>        // Tell the SqlMapClient to use the given DataSource
+</span><span class='line'>        DataSource dataSource = getDataSource();
+</span><span class='line'>        TransactionConfig transactionConfig = getTransactionConfig(dataSource);
+</span><span class='line'>        // Apply the given TransactionConfig to the SqlMapClient
+</span><span class='line'>        applyTransactionConfig(sqlMapClient, transactionConfig);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    protected void tearDown() throws Exception {
+</span><span class='line'>        super.tearDown();
+</span><span class='line'>
+</span><span class='line'>        if (sqlMapClient != null) {
+</span><span class='line'>            DataSource ds = sqlMapClient.getDataSource();
+</span><span class='line'>            Connection conn = ds.getConnection();
+</span><span class='line'>            conn.close();
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    private DataSource getDataSource() throws Exception {
+</span><span class='line'>        DriverManagerDataSource dataSource = new DriverManagerDataSource();
+</span><span class='line'>        dataSource.setDriverClassName(props.getProperty("driver"));
+</span><span class='line'>        dataSource.setUrl(props.getProperty("url"));
+</span><span class='line'>        dataSource.setUsername(props.getProperty("username"));
+</span><span class='line'>        dataSource.setPassword(props.getProperty("password"));
+</span><span class='line'>        return dataSource;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    private TransactionConfig getTransactionConfig(DataSource dataSource) throws Exception {
+</span><span class='line'>        Properties transactionConfigProperties = new Properties();
+</span><span class='line'>        transactionConfigProperties.setProperty("SetAutoCommitAllowed", "false");
+</span><span class='line'>
+</span><span class='line'>        TransactionConfig transactionConfig = (TransactionConfig)ExternalTransactionConfig.class.newInstance();
+</span><span class='line'>        transactionConfig.setDataSource(dataSource);
+</span><span class='line'>        transactionConfig.initialize(transactionConfigProperties);
+</span><span class='line'>        return transactionConfig;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    private void applyTransactionConfig(SqlMapClient sqlMapClient, TransactionConfig transactionConfig) {
+</span><span class='line'>        if (!(sqlMapClient instanceof ExtendedSqlMapClient)) {
+</span><span class='line'>            throw new IllegalArgumentException("Cannot set TransactionConfig with DataSource"
+</span><span class='line'>                    + "for SqlMapClient if not of type ExtendedSqlMapClient: " + sqlMapClient);
+</span><span class='line'>        }
+</span><span class='line'>        ExtendedSqlMapClient extendedClient = (ExtendedSqlMapClient)sqlMapClient;
+</span><span class='line'>        transactionConfig.setMaximumConcurrentTransactions(extendedClient.getDelegate().getMaxTransactions());
+</span><span class='line'>        extendedClient.getDelegate().setTxManager(new TransactionManager(transactionConfig));
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>然后为每个SqlMap映射文件编写一个测试类，继承上面的抽象类：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class UserSqlMapTest extends SqlMapTestCase {
+</span><span class='line'>
+</span><span class='line'>    public void testGetUser() throws Exception {
+</span><span class='line'>        User user = (User)sqlMapClient.queryForObject("getUser", "ford");
+</span><span class='line'>        assertNotNull(user);
+</span><span class='line'>        assertEquals("ford", user.getName());
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>如此就可以进行单元测试了。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1376,96 +1682,6 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/remove-popup-ie-window-at-china-games-exit/">去除退出中国游戏中心时弹出的IE窗口</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-11-02T23:23:57+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2005</span></span> <span class='time'>11:23 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>这次破解的版本是0.8.011.4。</p>
-
-<p>中国游戏中心退出时弹出的IE窗口很烦人，决定做个补丁把它去除掉。</p>
-
-<p>省略无数次尝试……确定退出中国游戏中心后打开的网页地址是 <a href="http://www.chinagames.net/PlazaJump/open">http://www.chinagames.net/PlazaJump/open</a> 。用W32Dasm反汇编iGame.exe，通过String Data References找到网址字符串，双击该字符串，看到以下程序：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>:0043397A 90                nop
-</span><span class='line'>:0043397B 90                nop
-</span><span class='line'>:0043397C 90                nop
-</span><span class='line'>:0043397D 90                nop
-</span><span class='line'>:0043397E 90                nop
-</span><span class='line'>:0043397F 90                nop
-</span><span class='line'>:00433980 A1A2034800        mov eax, dword ptr [004803A2]
-</span><span class='line'>:00433985 56                push esi
-</span><span class='line'>:00433986 85C0              test eax, eax
-</span><span class='line'>:00433988 8BF1              mov esi, ecx
-</span><span class='line'>:0043398A 7411              je 0043399D               -&gt; 判断是否要打开IE窗口
-</span><span class='line'>:0043398C 6A00              push 00000000
-</span><span class='line'>
-</span><span class='line'>* Possible StringData Ref from Data Obj -&gt;"http://www.chinagames.net/PlazaJump/open/"
-</span><span class='line'>|
-</span><span class='line'>:0043398E 6860D84700        push 0047D860
-</span><span class='line'>:00433993 B9D0FC4700        mov ecx, 0047FCD0
-</span><span class='line'>:00433998 E8B3D2FFFF        call 00430C50             -&gt; 打开IE窗口
-</span><span class='line'>
-</span><span class='line'>* Referenced by a (U)nconditional or (C)onditional Jump at Address:
-</span><span class='line'>|:0043398A(C)
-</span><span class='line'>|
-</span><span class='line'>:0043399D 8BCE              mov ecx, esi</span></code></pre></td></tr></table></div></figure>
-
-<p>从上面可以知道，只要将0043398A处的je指令改成jmp指令就可以避免退出时弹出的IE窗口了。</p>
-
-<p>现在使用CodeFusion来制作一个文件补丁。它有三种制作补丁的方案，这里使用Find&amp;Replace方法。将0043397A到00433998段的数据作为查找匹配数据，并将0043398A处的74（je指令）改成eb（jmp指令），然后按照步骤生成补丁文件就可以了。</p>
-
-<p>2008/3/19更新</p>
-
-<p>应ls的要求制作了一个针对最新版本（0.8.011.10）的补丁，和原来的补丁放在一起提供下载。</p>
-
-<p><a href="/uploads/chinagames-patch.zip" title="chinagames-patch.zip">补丁文件</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/22">&larr; Older</a>
@@ -1483,6 +1699,10 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part2/">ANTLR 4权威参考读书笔记（2）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part1/">ANTLR 4权威参考读书笔记（1）</a>
       </li>
     
@@ -1498,10 +1718,6 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
         <a href="/blog/logic-problems-how-many-fish/">逻辑题-共打了多少鱼</a>
       </li>
     
-      <li class="post">
-        <a href="/blog/10-tips-for-writing-consistently-popular-programming-articles/">写出受欢迎的编程文章的10个技巧</a>
-      </li>
-    
   </ul>
 </section>
 <section>
@@ -1513,7 +1729,7 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 97%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 101%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 105%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 135%" href="/tags/android/">Android</a>
 <a style="font-size: 93%" href="/tags/ant/">Ant</a>
@@ -1593,7 +1809,7 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
     </div>
   </div>
   <footer role="contentinfo"><p>
-  Copyright &copy; 2015 - dohkoos -
+  Copyright &copy; 2016 - dohkoos -
   <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
 </p>
 

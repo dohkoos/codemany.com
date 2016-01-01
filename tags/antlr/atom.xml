@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: ANTLR | 乐者为王]]></title>
   <link href="http://codemany.com/tags/antlr/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2015-12-30T22:15:26+08:00</updated>
+  <updated>2016-01-02T00:29:57+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,107 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（2）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part2/"/>
+    <updated>2016-01-01T16:35:41+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part2</id>
+    <content type="html"><![CDATA[<ul>
+<li>token 记号</li>
+<li>phrase 短语</li>
+<li>ambiguity 二义性</li>
+</ul>
+
+<h3 id="安装antlr">安装ANTLR</h3>
+
+<p>ANTLR是由Java写成的，所以在安装ANTLR前必须保证已经安装有Java 1.6或以上版本。你可以到 <a href="http://www.antlr.org/download.html">http://www.antlr.org/download.html</a> 下载ANTLR的最新版本，或者也可使用命令行工具。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">curl -O http://www.antlr.org/download/antlr-4.0-complete.jar
+</code></pre></div>
+<p>antlr-4.0-complete.jar包含运行ANTLR工具的所有必要依赖，以及编译和执行由ANTLR生成的识别器所需的运行库。ANTLR工具将由语法文件描述的语法转换成识别程序，识别程序利用ANTLR运行库中的某些支持类识别输入的句子。该jar包还包含两个支持库：<a href="https://github.com/abego/treelayout">TreeLayout（一个复杂的树布局库）</a>和<a href="http://www.stringtemplate.org/">StringTemplate（一个用于生成代码和其它结构化文本的模板引擎）</a>。</p>
+
+<p>现在来测试下ANTLR工具是否工作正常：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">java -jar antlr-4.0-complete.jar  # 启动org.antlr.v4.Tool
+</code></pre></div>
+<p>如果正常会看到以下帮助信息：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">ANTLR Parser Generator  Version 4.0
+ -o ___              specify output directory where all output is generated
+ -lib ___            specify location of grammars, tokens files
+ ...
+</code></pre></div>
+<p>每次运行ANTLR工具都要输入这么长的命令是否有些痛苦？写个脚本来解放我们的手指吧！</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">#!/bin/sh
+java -cp .:./antlr-4.0-complete.jar:$CLASSPATH org.antlr.v4.Tool $*
+</code></pre></div>
+<p>把它保存为antlr.sh，以后就可以使用下列命令来运行ANTLR工具了：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">antlr
+</code></pre></div>
+<h3 id="执行antlr和测试识别器">执行ANTLR和测试识别器</h3>
+
+<p>先看下面这段用于识别像hello world那样短语的简单语法：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">grammar Hello;               // 定义语法的名字
+
+s  : &#39;hello&#39; ID ;            // 匹配关键字hello，后面跟着一个标志符
+ID : [a-z]+ ;                // 匹配小写字母标志符
+WS : [ \t\r\n]+ -&gt; skip ;    // 跳过空格、制表符、回车符和换行符
+</code></pre></div>
+<p>把以上语法保存为Hello.g，然后执行以下命令来生成识别器：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">antlr Hello.g
+</code></pre></div>
+<p>该命令会在相同目录下生成后缀名为tokens和java的六个文件：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">Hello.tokens        HelloLexer.java         HelloParser.java
+HelloLexer.tokens   HelloBaseListener.java  HelloListener.java
+</code></pre></div>
+<p>编译下由ANTLR生成的Java代码：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">javac -cp .:./antlr-4.0-complete.jar:$CLASSPATH *.java
+</code></pre></div>
+<p>到此，我们已经有了一个可以被HelloParser和HelloLexer利用的可执行的识别器，只缺一个主程序去触发语言识别了。</p>
+
+<p>ANTLR运行库有提供称之为TestRig的测试工具，可以让你不创建主程序就能测试语法。TestRig使用Java反射调用编译后的识别器，它能显示关于识别器如何匹配输入的大量信息。</p>
+
+<p>同样地，创建一个脚本grun.sh来简化以后的打字数：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">#!/bin/sh
+java -cp .:./antlr-4.0-complete.jar:$CLASSPATH org.antlr.v4.runtime.misc.TestRig $*
+</code></pre></div>
+<p>现在，让我们来打印出识别期间创建的那些记号（记号是指像关键字hello和标识符world那样的词汇符号）：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">grun Hello s -tokens
+</code></pre></div>
+<p>敲入上述命令并按回车，接着输入以下内容：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">hello world  # 输入并按回车
+EOF          # Unix系统输入Ctrl+D或Windows系统输入Ctrl+Z并按回车
+</code></pre></div>
+<p>TestRig会打印出记号列表，每一行输出表示一个记号以及它的有关信息：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">[@0,0:4=&#39;hello&#39;,&lt;1&gt;,1:0]
+[@1,6:10=&#39;world&#39;,&lt;2&gt;,1:6]
+[@2,13:12=&#39;&lt;EOF&gt;&#39;,&lt;-1&gt;,2:0]
+</code></pre></div>
+<p>这里详细讲解下<code>[@1,6:10=&#39;world&#39;,&lt;2&gt;,1:6]</code>的意义。@1表示记号索引（从0开始），6:10表示记号开始与结束的位置（从0开始），<2>表示记号类型，最后的1:6表示记号在第一行（从1开始），从第6个字符开始。</p>
+
+<p>除此之外，还可以以LISP风格的文本形式查看记号：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">grun Hello s -tree
+</code></pre></div>
+<p>它会输出如下形式的记号：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">(s hello world)  # (root children)
+</code></pre></div>
+<p>你也可以以可视化的方式查看分析树：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">grun Hello s -gui
+</code></pre></div>
+<p><img src="/uploads/parser-tree-hello.png" title="parser-tree-hello" ></p>
+
+<p>以下是TestRig可用的所有参数：</p>
+
+<ul>
+<li>-tokens 打印出记号流。</li>
+<li>-tree 以LISP风格的文本形式打印出分析树。</li>
+<li>-gui 在对话框中可视化地显示分析树。</li>
+<li>-ps file.ps 在PostScript中生成一个可视化的分析树表示，并把它存储在file.ps文件中。</li>
+<li>-encoding encodingname 指定输入文件的编码。</li>
+<li>-trace 在进入/退出规则前打印规则名字和当前的记号。</li>
+<li>-diagnostics 分析期间打开诊断消息。此生成消息仅用于异常情况，如二义性输入短语。</li>
+<li>-SLL 使用更快但稍弱的分析策略。</li>
+</ul>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（1）]]></title>
@@ -25,13 +126,14 @@
 <li>parser 分析器</li>
 <li>parse tree 分析树，表示语法如何匹配输入的数据结构。</li>
 <li>tree walker 树遍历器</li>
+<li>top-down 自顶向下</li>
 </ul>
 
 <p>ANTLR v4是一款强大的分析器生成器，可以用来阅读，处理，执行和转换结构化文本或二进制文件。通过语法文件，ANTLR可以自动生成分析器、分析树和树遍历器。</p>
 
 <p>ANTLR分析器使用一种新的分析技术称之为<code>Adaptive LL(*)</code>或<code>ALL(*)</code>，<code>ALL(*)</code>是v3版本<code>LL(*)</code>的扩展，它可以在生成的分析器执行前在运行时动态地执行语法分析而不是静态地。</p>
 
-<p>ANTLR v4极大地简化了用来匹配像算术表达式句法结构的语法规则。对于传统的自上而下的分析器生成器像ANTLR v3，识别表达式的最自然的语法是无效的，v4则不然。ANTLR v4会自动地重写左递归规则为非左递归等价物，唯一的约束是左递归必须是直接的——规则立刻引用它自身。</p>
+<p>ANTLR v4极大地简化了用来匹配像算术表达式句法结构的语法规则。对于传统的自顶向下的分析器生成器像ANTLR v3，识别表达式的最自然的语法是无效的，v4则不然。ANTLR v4会自动地重写左递归规则为非左递归等价物，唯一的约束是左递归必须是直接的——规则立刻引用它自身。</p>
 
 <p>此前，ANTLR v3用户必须用树构造操作增强语法。现在，ANTLR v4会自动构建分析树，也会以Listener和Visitor模式实现的形式自动生成树遍历器。所以，你不再需要构建树语法，可以用Visitor模式代替。降低在语法中嵌入动作的重要性使得甚至可以在不重新编译生成的分析器的情况下在不同的应用中重用相同的语法。</p>
 
@@ -284,46 +386,6 @@ Letter
 
 <p>经过实际测试V9.0 Build 5507、V9.0.1 Build 7171和V8.0.3 Build 9704都不支持变量名的续行。</p>
 ]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[使用ANTLR构建PowerScript语法分析器（2）]]></title>
-    <link href="http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part2/"/>
-    <updated>2007-09-02T16:44:22+08:00</updated>
-    <id>http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part2</id>
-    <content type="html"><![CDATA[<p>在<a href="http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part1/">上篇</a>文中写的词法分析文件存在有两个小问题：</p>
-
-<ol>
-<li>处理换行符和回车符的词法定义有重复，在WS和EndOfLine中都有出现；</li>
-<li>像<code>/* comments /* nested comments */ */</code>这种嵌套注释会被输出成：</li>
-</ol>
-<div class="highlight"><pre><code class="language-text" data-lang="text">bc&gt;/* comments /* nested comments */
-bc&gt;/* comments /* nested comments */ */
-</code></pre></div>
-<p>第1个问题比较容易解决，只要将EndOfLine前的fragment去掉，再将WS改成下面这样就可以。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">WS
-    : (&#39; &#39;|&#39;\t&#39;|&#39;\u000C&#39;) {$channel=HIDDEN;}
-    ;
-</code></pre></div>
-<p>第2个问题则可以通过计数器来处理。先初始化一个计数器变量depthOfComments来标记块注释的深度，当遇到<code>“/*”</code>时就加1，遇到“*/”时则减1。输出时只要判断depthOfComments是否等于0就行了。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">BLOCK_COMMENT
-@init {
-    int depthOfComments = 0;
-}
-    : &#39;/*&#39; {depthOfComments++;}
-      ( options {greedy=false;}
-      : (&#39;/&#39; &#39;*&#39;)=&gt; BLOCK_COMMENT {depthOfComments++;}
-      | &#39;/&#39; ~(&#39;*&#39;)
-      | ~(&#39;/&#39;)
-      )*
-      &#39;*/&#39; {depthOfComments--;}
-      {
-          if (depthOfComments == 0) {
-              System.out.println(&quot;bc&gt;&quot; + getText());
-          }
-      }
-    ;
-</code></pre></div>]]></content>
   </entry>
   
 </feed>
