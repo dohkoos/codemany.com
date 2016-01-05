@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: ANTLR | 乐者为王]]></title>
   <link href="http://codemany.com/tags/antlr/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2016-01-02T00:29:57+08:00</updated>
+  <updated>2016-01-05T23:58:33+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,212 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（3）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part3/"/>
+    <updated>2016-01-05T16:48:16+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part3</id>
+    <content type="html"><![CDATA[<ul>
+<li>lexical 词法</li>
+<li>lexer 词法器</li>
+<li>alternative 选项</li>
+<li>notation 表示法</li>
+<li>directive 指令</li>
+<li>label 标签</li>
+</ul>
+
+<p>了解ANTLR最好的方法就是实例。构建一个简单的计算器是个不错的主意。为了使它容易理解且保持简单，我们将只允许基本的算术运算符（加、减、乘、除）、括号表达式、整数和变量。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">grammar Calc;
+
+prog
+    : stat+
+    ;
+
+stat
+    : expr
+    | ID &#39;=&#39; expr
+    ;
+
+expr
+    : expr (&#39;*&#39;|&#39;/&#39;) expr
+    | expr (&#39;+&#39;|&#39;-&#39;) expr
+    | INT
+    | ID
+    | &#39;(&#39; expr &#39;)&#39;
+    ;
+
+ID  : [a-zA-Z]+ ;
+
+INT : [0-9]+ ;
+
+WS  : [ \r\t\u000C\n]+ -&gt; skip ;    // toss out whitespace
+</code></pre></div>
+<p>在上述的语法中，程序是由换行终止的语句序列，语句可以是表达式、赋值或者空行。那些以小写字母开头的像stat和expr是语法规则；由大写字母开头的诸如ID和INT为词法规则，识别标志符和整数这样的记号。我们用“|”运算符分隔规则的选项，我们也可以用“()”把符号分组成子规则。例如，子规则<code>(&#39;*&#39;|&#39;/&#39;)</code>匹配乘法符号或者除法符号。</p>
+
+<p>ANTLR v4最重要的新特性是它有能力处理（大多数类型的）左递归规则。例如，规则expr前两个选项就在左边缘递归地调用了expr自身。这种指定算术表达式表示法的方法比对于典型的自顶向下分析器策略我们所需要的更容易。当然，在这种策略下，我们需要定义多个规则，每个运算符优先级一个规则。</p>
+
+<p>记号定义的表示法对那些有正则表达式经验的应该很熟悉。唯一不寻常的是在WS规则上的<code>-&gt; skip</code>运算。它是一个指令，告诉词法器去匹配但扔掉空格。（每个可能的输入字符都必须被至少一个词法规则匹配。）我们通过使用形式化的ANTLR表示法避免捆绑语法到某个特定的目标语言，而不是在语法中插入任意代码片段来告诉词法器去忽略。</p>
+
+<p>这里是一些用来评估所有语法特性的测试序列：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">193
+a = 5
+b = 6
+a+b*2
+(1+2)*3
+</code></pre></div>
+<p>把它们放入文件calc.txt中，然后执行以下命令：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">antlr Calc.g
+compile *.java
+grun Calc prog -gui calc.txt
+</code></pre></div>
+<p>TestRig会弹出一个显示分析树的窗口：</p>
+
+<p><img src="/uploads/parse-tree-calc.png" title="parse-tree-calc" ></p>
+
+<h3 id="使用visitor模式计算结果">使用Visitor模式计算结果</h3>
+
+<p>为了让前面的算术表达式分析器计算出结果，我们还需要做些其它的事情。</p>
+
+<p>首先，我们需要用标签标明规则的选项，标签可以是和规则名没有冲突的任意标志符。如果选项上没有标签，ANTLR只会为每个规则生成一个visit方法。</p>
+
+<p>在本例中，我们希望为每个选项生成一个不同的visit方法，以便每种输入短语都能得到不同的事件。在新的语法中，标签出现在选项的右边缘，且以“#”符号开头：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">stat
+    : expr                   # printExpr
+    | ID &#39;=&#39; expr            # assign
+    ;
+
+expr
+    : expr op=(MUL|DIV) expr # MulDiv
+    | expr op=(ADD|SUB) expr # AddSub
+    | INT                    # int
+    | ID                     # id
+    | &#39;(&#39; expr &#39;)&#39;           # parens
+    ;
+</code></pre></div>
+<p>接下来，让我们为运算符字面量定义一些记号名字，以便以后可以在visit方法中引用作为Java常量的它们：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">MUL : &#39;*&#39; ;
+
+DIV : &#39;/&#39; ;
+
+ADD : &#39;+&#39; ;
+
+SUB : &#39;-&#39; ;
+</code></pre></div>
+<p>现在，我们有了一个增强型的语法。接下来要做的事情是实现一个EvalVisitor类，它通过遍历表达式分析树计算和返回值。</p>
+
+<p>执行下面的命令，让ANTLR生成Visitor接口和它的默认实现，其中-no-listener参数是告诉ANTLR不再生成Listener相关的代码：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">antlr -no-listener -visitor Calc.g
+</code></pre></div>
+<p>所有被标签标明的选项在生成的Visitor接口中都定义了一个visit方法：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public interface CalcVisitor&lt;T&gt; extends ParseTreeVisitor&lt;T&gt; {
+    T visitProg(CalcParser.ProgContext ctx);
+    T visitPrintExpr(CalcParser.PrintExprContext ctx);
+    T visitAssign(CalcParser.AssignContext ctx);
+    T visitParens(CalcParser.ParensContext ctx);
+    ...
+}
+</code></pre></div>
+<p>接口定义使用的是Java泛型，visit方法的返回值为参数化类型，这允许我们根据表达式计算返回值的类型去实现继承。因为表达式的计算结果是整型，所以我们的EvalVisitor应该继承CalcBaseVisitor<Integer>类。为计算分析树的每个节点，我们需要覆写与语句和表达式选项相关的方法。这里是全部的代码：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public class EvalVisitor extends CalcBaseVisitor&lt;Integer&gt; {
+    /** &quot;memory&quot; for our calculator; variable/value pairs go here */
+    Map&lt;String, Integer&gt; memory = new HashMap&lt;String, Integer&gt;();
+
+    /** ID &#39;=&#39; expr */
+    @Override
+    public Integer visitAssign(CalcParser.AssignContext ctx) {
+        String id = ctx.ID().getText();  // id is left-hand side of &#39;=&#39;
+        int value = visit(ctx.expr());   // compute value of expression on right
+        memory.put(id, value);           // store it in our memory
+        return value;
+    }
+
+    /** expr */
+    @Override
+    public Integer visitPrintExpr(CalcParser.PrintExprContext ctx) {
+        Integer value = visit(ctx.expr()); // evaluate the expr child
+        System.out.println(value);         // print the result
+        return 0;                          // return dummy value
+    }
+
+    /** INT */
+    @Override
+    public Integer visitInt(CalcParser.IntContext ctx) {
+        return Integer.valueOf(ctx.INT().getText());
+    }
+
+    /** ID */
+    @Override
+    public Integer visitId(CalcParser.IdContext ctx) {
+        String id = ctx.ID().getText();
+        if ( memory.containsKey(id) ) return memory.get(id);
+        return 0;
+    }
+
+    /** expr op=(&#39;*&#39;|&#39;/&#39;) expr */
+    @Override
+    public Integer visitMulDiv(CalcParser.MulDivContext ctx) {
+        int left = visit(ctx.expr(0));  // get value of left subexpression
+        int right = visit(ctx.expr(1)); // get value of right subexpression
+        if ( ctx.op.getType() == CalcParser.MUL ) return left * right;
+        return left / right; // must be DIV
+    }
+
+    /** expr op=(&#39;+&#39;|&#39;-&#39;) expr */
+    @Override
+    public Integer visitAddSub(CalcParser.AddSubContext ctx) {
+        int left = visit(ctx.expr(0));  // get value of left subexpression
+        int right = visit(ctx.expr(1)); // get value of right subexpression
+        if ( ctx.op.getType() == CalcParser.ADD ) return left + right;
+        return left - right; // must be SUB
+    }
+
+    /** &#39;(&#39; expr &#39;)&#39; */
+    @Override
+    public Integer visitParens(CalcParser.ParensContext ctx) {
+        return visit(ctx.expr()); // return child expr&#39;s value
+    }
+}
+</code></pre></div>
+<p>以前开发和测试语法都是使用的TestRig，这次我们试着编写计算器的主程序：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public class Calc {
+
+    public static void main(String[] args) throws Exception {
+        InputStream is = args.length &gt; 0 ? new FileInputStream(args[0]) : System.in;
+
+        ANTLRInputStream input = new ANTLRInputStream(is);
+        CalcLexer lexer = new CalcLexer(input);
+        CommonTokenStream tokens = new CommonTokenStream(lexer);
+        CalcParser parser = new CalcParser(tokens);
+        ParseTree tree = parser.prog();
+
+        EvalVisitor eval = new EvalVisitor();
+        // 开始遍历分析树
+        eval.visit(tree);
+
+        System.out.println(tree.toStringTree(parser));
+    }
+}
+</code></pre></div>
+<p>创建一个运行主程序的脚本：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">#!/bin/sh
+java -cp .:./antlr-4.5.1-complete.jar:$CLASSPATH $*
+</code></pre></div>
+<p>把它保存为run.sh后，执行以下命令：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">compile *.java
+run Calc calc.txt
+</code></pre></div>
+<p>然后你就会看到文本形式的分析树以及计算结果：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">193
+17
+9
+(prog (stat (expr 193)) (stat a = (expr 5)) (stat b = (expr 6))
+ (stat (expr (expr a) + (expr (expr b) * (expr 2)))) (stat (expr
+ (expr ( (expr (expr 1) + (expr 2)) )) * (expr 3))))
+</code></pre></div>
+<p><a href="/uploads/Calculator.zip" title="Calculator.zip">代码下载</a></p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（2）]]></title>
@@ -27,22 +233,22 @@
 <h3 id="安装antlr">安装ANTLR</h3>
 
 <p>ANTLR是由Java写成的，所以在安装ANTLR前必须保证已经安装有Java 1.6或以上版本。你可以到 <a href="http://www.antlr.org/download.html">http://www.antlr.org/download.html</a> 下载ANTLR的最新版本，或者也可使用命令行工具。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">curl -O http://www.antlr.org/download/antlr-4.0-complete.jar
+<div class="highlight"><pre><code class="language-text" data-lang="text">curl -O http://www.antlr.org/download/antlr-4.5.1-complete.jar
 </code></pre></div>
-<p>antlr-4.0-complete.jar包含运行ANTLR工具的所有必要依赖，以及编译和执行由ANTLR生成的识别器所需的运行库。ANTLR工具将由语法文件描述的语法转换成识别程序，识别程序利用ANTLR运行库中的某些支持类识别输入的句子。该jar包还包含两个支持库：<a href="https://github.com/abego/treelayout">TreeLayout（一个复杂的树布局库）</a>和<a href="http://www.stringtemplate.org/">StringTemplate（一个用于生成代码和其它结构化文本的模板引擎）</a>。</p>
+<p>antlr-4.5.1-complete.jar包含运行ANTLR工具的所有必要依赖，以及编译和执行由ANTLR生成的识别器所需的运行库。ANTLR工具将由语法文件描述的语法转换成识别程序，识别程序利用ANTLR运行库中的某些支持类识别输入的语句。该jar包还包含两个支持库：<a href="https://github.com/abego/treelayout">TreeLayout（一个复杂的树布局库）</a>和<a href="http://www.stringtemplate.org/">StringTemplate（一个用于生成代码和其它结构化文本的模板引擎）</a>。</p>
 
 <p>现在来测试下ANTLR工具是否工作正常：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">java -jar antlr-4.0-complete.jar  # 启动org.antlr.v4.Tool
+<div class="highlight"><pre><code class="language-text" data-lang="text">java -jar antlr-4.5.1-complete.jar  # 启动org.antlr.v4.Tool
 </code></pre></div>
 <p>如果正常会看到以下帮助信息：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">ANTLR Parser Generator  Version 4.0
+<div class="highlight"><pre><code class="language-text" data-lang="text">ANTLR Parser Generator  Version 4.5.1
  -o ___              specify output directory where all output is generated
  -lib ___            specify location of grammars, tokens files
  ...
 </code></pre></div>
 <p>每次运行ANTLR工具都要输入这么长的命令是否有些痛苦？写个脚本来解放我们的手指吧！</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">#!/bin/sh
-java -cp .:./antlr-4.0-complete.jar:$CLASSPATH org.antlr.v4.Tool $*
+java -cp .:./antlr-4.5.1-complete.jar:$CLASSPATH org.antlr.v4.Tool $*
 </code></pre></div>
 <p>把它保存为antlr.sh，以后就可以使用下列命令来运行ANTLR工具了：</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">antlr
@@ -63,8 +269,12 @@ WS : [ \t\r\n]+ -&gt; skip ;    // 跳过空格、制表符、回车符和换行
 <div class="highlight"><pre><code class="language-text" data-lang="text">Hello.tokens        HelloLexer.java         HelloParser.java
 HelloLexer.tokens   HelloBaseListener.java  HelloListener.java
 </code></pre></div>
-<p>编译下由ANTLR生成的Java代码：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">javac -cp .:./antlr-4.0-complete.jar:$CLASSPATH *.java
+<p>现在开始准备编译由ANTLR生成的Java代码。先写个脚本把编译命令包装起来：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">#!/bin/sh
+javac -cp .:./antlr-4.5.1-complete.jar:$CLASSPATH $*
+</code></pre></div>
+<p>把它保存为compile.sh文件，然后你就可以用以下命令编译代码了：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">compile *.java
 </code></pre></div>
 <p>到此，我们已经有了一个可以被HelloParser和HelloLexer利用的可执行的识别器，只缺一个主程序去触发语言识别了。</p>
 
@@ -72,7 +282,7 @@ HelloLexer.tokens   HelloBaseListener.java  HelloListener.java
 
 <p>同样地，创建一个脚本grun.sh来简化以后的打字数：</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">#!/bin/sh
-java -cp .:./antlr-4.0-complete.jar:$CLASSPATH org.antlr.v4.runtime.misc.TestRig $*
+java -cp .:./antlr-4.5.1-complete.jar:$CLASSPATH org.antlr.v4.gui.TestRig $*
 </code></pre></div>
 <p>现在，让我们来打印出识别期间创建的那些记号（记号是指像关键字hello和标识符world那样的词汇符号）：</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">grun Hello s -tokens
@@ -86,7 +296,7 @@ EOF          # Unix系统输入Ctrl+D或Windows系统输入Ctrl+Z并按回车
 [@1,6:10=&#39;world&#39;,&lt;2&gt;,1:6]
 [@2,13:12=&#39;&lt;EOF&gt;&#39;,&lt;-1&gt;,2:0]
 </code></pre></div>
-<p>这里详细讲解下<code>[@1,6:10=&#39;world&#39;,&lt;2&gt;,1:6]</code>的意义。@1表示记号索引（从0开始），6:10表示记号开始与结束的位置（从0开始），<2>表示记号类型，最后的1:6表示记号在第一行（从1开始），从第6个字符开始。</p>
+<p>这里详细讲解下<code>[@1,6:10=&#39;world&#39;,&lt;2&gt;,1:6]</code>的意义。@1表示记号索引（从0开始）；6:10表示记号开始与结束的位置（从0开始）；<2>表示记号类型，具体数值和类型存储在后缀名为tokens的文件中；最后的1:6表示记号在第一行（从1开始），从第6个字符开始（从0开始，制表符作为单个字符计算）。</p>
 
 <p>除此之外，还可以以LISP风格的文本形式查看记号：</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">grun Hello s -tree
@@ -97,7 +307,7 @@ EOF          # Unix系统输入Ctrl+D或Windows系统输入Ctrl+Z并按回车
 <p>你也可以以可视化的方式查看分析树：</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">grun Hello s -gui
 </code></pre></div>
-<p><img src="/uploads/parser-tree-hello.png" title="parser-tree-hello" ></p>
+<p><img src="/uploads/parse-tree-hello.png" title="parse-tree-hello" ></p>
 
 <p>以下是TestRig可用的所有参数：</p>
 
@@ -108,7 +318,7 @@ EOF          # Unix系统输入Ctrl+D或Windows系统输入Ctrl+Z并按回车
 <li>-ps file.ps 在PostScript中生成一个可视化的分析树表示，并把它存储在file.ps文件中。</li>
 <li>-encoding encodingname 指定输入文件的编码。</li>
 <li>-trace 在进入/退出规则前打印规则名字和当前的记号。</li>
-<li>-diagnostics 分析期间打开诊断消息。此生成消息仅用于异常情况，如二义性输入短语。</li>
+<li>-diagnostics 分析时打开诊断消息。此生成消息仅用于异常情况，如二义性输入短语。</li>
 <li>-SLL 使用更快但稍弱的分析策略。</li>
 </ul>
 ]]></content>
@@ -127,6 +337,8 @@ EOF          # Unix系统输入Ctrl+D或Windows系统输入Ctrl+Z并按回车
 <li>parse tree 分析树，表示语法如何匹配输入的数据结构。</li>
 <li>tree walker 树遍历器</li>
 <li>top-down 自顶向下</li>
+<li>backtracking 回溯</li>
+<li>semantic predicates 语义谓词</li>
 </ul>
 
 <p>ANTLR v4是一款强大的分析器生成器，可以用来阅读，处理，执行和转换结构化文本或二进制文件。通过语法文件，ANTLR可以自动生成分析器、分析树和树遍历器。</p>
@@ -137,7 +349,7 @@ EOF          # Unix系统输入Ctrl+D或Windows系统输入Ctrl+Z并按回车
 
 <p>此前，ANTLR v3用户必须用树构造操作增强语法。现在，ANTLR v4会自动构建分析树，也会以Listener和Visitor模式实现的形式自动生成树遍历器。所以，你不再需要构建树语法，可以用Visitor模式代替。降低在语法中嵌入动作的重要性使得甚至可以在不重新编译生成的分析器的情况下在不同的应用中重用相同的语法。</p>
 
-<p>ANTLR v3的<code>LL(*)</code>分析策略弱于v4的<code>ALL(*)</code>，因此v3有时候依赖回溯（backtracking）去正确地分析输入的短语。回溯使得很难去通过生成的分析器步进调试语法，因为分析器可能分析相同的输入多次（递归地）；回溯也能让分析器给出一个好的错误消息更难，在无效的输入之上。</p>
+<p>ANTLR v3的<code>LL(*)</code>分析策略弱于v4的<code>ALL(*)</code>，因此v3有时候依赖回溯去正确地分析输入的短语。回溯使得很难去通过生成的分析器步进调试语法，因为分析器可能分析相同的输入多次（递归地）；回溯也能让分析器给出一个好的错误消息更难，在无效的输入之上。</p>
 
 <h3 id="这本书里有什么？">这本书里有什么？</h3>
 
@@ -148,7 +360,7 @@ EOF          # Unix系统输入Ctrl+D或Windows系统输入Ctrl+Z并按回车
 <ul>
 <li>第一部分介绍ANTLR，提供一些语言的背景知识，带你开始一场ANTLR功能之旅，让你尝下句法的滋味和能用它做什么。</li>
 <li>第二部分是关于使用ANTLR语法结合树遍历器设计语法和构建语言应用。</li>
-<li>第三部分首先展示了如何定制ANTLR生成的分析器的错误处理。接下来，你将学习如何在语法中嵌入动作，因为有时候这样做比构建树然后遍历它更简单有效。关于动作，你还将学习使用语义谓词（semantic predicates）更改分析器的行为去处理一些具有挑战性的识别问题。最后一章解决一些具有挑战性的语言识别问题，例如识别XML和Python中上下文相关的newlines。</li>
+<li>第三部分首先展示了如何定制ANTLR生成的分析器的错误处理。接下来，你将学习如何在语法中嵌入动作，因为有时候这样做比构建树然后遍历它更简单有效。关于动作，你还将学习使用语义谓词更改分析器的行为去处理一些具有挑战性的识别问题。最后一章解决一些具有挑战性的语言识别问题，例如识别XML和Python中上下文相关的换行。</li>
 <li>第四部分是参考章节，列出了所有关于使用ANTLR语法元语言和它的运行库的规则。</li>
 </ul>
 ]]></content>
@@ -161,11 +373,11 @@ EOF          # Unix系统输入Ctrl+D或Windows系统输入Ctrl+Z并按回车
     <id>http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part4</id>
     <content type="html"><![CDATA[<p>什么是表达式</p>
 
-<p>简单的来说，表达式就是操作数和操作符根据语法规则结合后的结果，它通常被用来执行在变量或值上的操作处理。</p>
+<p>简单的来说，表达式就是运算元和运算符根据语法规则结合后的结果，它通常被用来执行在变量或值上的操作处理。</p>
 
 <p>主表达式（Primary Expression）</p>
 
-<p>到现在PowerScript的词法分析已经写的差不多了，接下来就要开始写语法分析。语法分析的主要组成部分是表达式（expression），而表达式的主要组成部分则是主表达式。主表达式包含了大部分简单的表达式，如字面量（literals），字段存取，方法调用和数组存取等。带圆括号的表达式通常也被认为是主表达式。其常见形式如下：</p>
+<p>到现在PowerScript的词法分析已经写的差不多了，接下来就要开始写语法分析。语法分析的主要组成部分是表达式（expression），而表达式的主要组成部分则是主表达式。主表达式包含了大部分简单的表达式，如字面量（literal），字段存取，方法调用和数组存取等。带圆括号的表达式通常也被认为是主表达式。其常见形式如下：</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">(x)
 x.y
 f(x)
@@ -269,122 +481,11 @@ literal
     <link href="http://codemany.com/blog/cannot-launch-the-remote-parser-because-port-49153-is-already-in-use/"/>
     <updated>2008-04-25T16:03:53+08:00</updated>
     <id>http://codemany.com/blog/cannot-launch-the-remote-parser-because-port-49153-is-already-in-use</id>
-    <content type="html"><![CDATA[<p>在Windows Server 2008使用ANTLRWorks调试语法文件时，总是提示说什么端口49153已被占用。使用netstat -an发现这个端口正在被别的进程监听着，虽然知道问题原因，但是不知道如何去解决。后来从<a href="http://www.cnblogs.com/zhoujg/archive/2008/03/29/1129281.html">如果AntlrWorks的Debug报错“当前端口已被占用”，可能是防火墙的原因</a>得到了启示：AntlrWorks是可以修改远程调试端口的。不过我没有像该文作者介绍的那样将调试端口改成49253，因为那样可能需要设置防火墙。而是直接将之设置到了一个不再使用的端口49151上。</p>
+    <content type="html"><![CDATA[<p>在Windows Server 2008使用ANTLRWorks调试语法文件时，总是提示说什么端口49153已被占用。使用netstat -an发现这个端口正在被别的进程监听着，虽然知道问题原因，但是不知道如何解决。后来从<a href="http://www.cnblogs.com/zhoujg/archive/2008/03/29/1129281.html">如果AntlrWorks的Debug报错“当前端口已被占用”，可能是防火墙的原因</a>得到启示：AntlrWorks是可以修改远程调试端口的。不过我没有像该文作者介绍的那样将调试端口改成49253，因为那样可能需要设置防火墙。而是直接将之设置到了一个不在使用的端口49151上。</p>
 
 <p>设置调试端口的路径如下：</p>
 
 <p>File -&gt; Preferences -&gt; Debugger -&gt; Default local port</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[使用ANTLR构建PowerScript语法分析器（3）]]></title>
-    <link href="http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part3/"/>
-    <updated>2007-09-07T16:40:49+08:00</updated>
-    <id>http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part3</id>
-    <content type="html"><![CDATA[<p>转义字符（Special ASCII Characters）</p>
-
-<p>PowerScript中转义字符是以波浪号（~）开头。下图是PowerScript支持的完整的转义字符，#字符表示数字。Decimal由三个十进制数组成，范围是000-255；Hexadecimal由两个十六进制数组成，范围是00-FF；Octal由三个八进制数组成，范围是000-377。</p>
-
-<p><img src="/uploads/pb-spefial-char.png" title="pb-spefial-char" ></p>
-
-<p>注意：#表示数字是必须的。譬如，必须用~007这种样式来表示转义字符，而不能是~7这种样式。</p>
-
-<p>这里是转义字符的词法代码：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">ESCAPE
-    : &#39;~&#39; (&#39;n&#39;|&#39;t&#39;|&#39;v&#39;|&#39;r&#39;|&#39;f&#39;|&#39;b&#39;|&#39;\&quot;&#39;|&#39;\&#39;&#39;|&#39;~&#39;)
-    | DecimalEscape
-    | HexEscape
-    | OctalEscape
-    ;
-
-fragment
-DecimalEscape
-    : &#39;~&#39; (&#39;0&#39;..&#39;1&#39;) (&#39;0&#39;..&#39;9&#39;) (&#39;0&#39;..&#39;9&#39;)    // 000 - 199
-    | &#39;~&#39; &#39;2&#39; (&#39;0&#39;..&#39;5&#39;) (&#39;0&#39;..&#39;5&#39;)           // 200 - 255
-    ;
-
-fragment
-HexEscape
-    : &#39;~h&#39; (&#39;0&#39;..&#39;9&#39;|&#39;a&#39;..&#39;f&#39;|&#39;A&#39;..&#39;F&#39;) (&#39;0&#39;..&#39;9&#39;|&#39;a&#39;..&#39;f&#39;|&#39;A&#39;..&#39;F&#39;)    // 00 - FF
-    ;
-
-fragment
-OctalEscape
-    : &#39;~o&#39; (&#39;0&#39;..&#39;3&#39;) (&#39;0&#39;..&#39;7&#39;) (&#39;0&#39;..&#39;7&#39;)   // 000 - 377
-    ;
-</code></pre></div>
-<p>续行（Statement Continuation）</p>
-
-<p>通常情况下，PowerScript的一条语句书写在一行上，语句书写完毕后，按Enter键转到下一行，开始下一条语句。有时候，为了阅读方便等原因，需要把一条语句书写在几行上，这时就需要使用续行符了。PowerScript的续行符是“&amp;”字符，它放在一行的末尾指示下一行是当前行的继续，并且续行符必须是一行的最后一个字符。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">CONTINUEDLINE
-    : &#39;&amp;&#39; NEWLINE
-    ;
-</code></pre></div>
-<p>字符和字符串字面量（Character and String Literal）</p>
-
-<p>PowerScript程序中字符和字符串字面量没有明显的区别。字符是指由单引号（&#39;）或双引号（&quot;）括起来的一个ASCII字符，例如：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">char c
-c = &#39;T&#39;
-c = &quot;T&quot;
-</code></pre></div>
-<p>字符串字面量则是指由单引号或双引号括起来的不多于1024个的ASCII字符串，例如：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">string s
-s = &#39;This is a string&#39;
-s = &quot;This is a string&quot;
-</code></pre></div>
-<p>由于两者没有明显区别，因此在词法分析阶段只能将两者都作为字符串字面量来处理。至于到底是字符还是字符串，只有到了语意分析阶段才能作出判断（字符串字面量支持续行符）。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">STRING_LITERAL
-    : ( &#39;\&#39;&#39; (ESCAPE|CONTINUEDLINE|~(&#39;~&#39;|&#39;r&#39;|&#39;n&#39;|&#39;\&#39;&#39;))* &#39;\&#39;&#39;
-      | &#39;\&quot;&#39; (ESCAPE|CONTINUEDLINE|~(&#39;~&#39;|&#39;r&#39;|&#39;n&#39;|&#39;\&quot;&#39;))* &#39;\&quot;&#39;
-      )
-      {
-          System.out.println(&quot;string&gt;&quot; + getText());
-      }
-    ;
-</code></pre></div>
-<p>数字和布尔字面量（Numeric and Boolean Literal）</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">INTEGER_LITERAL
-    : (&#39;0&#39;|&#39;1&#39;..&#39;9&#39; (&#39;0&#39;..&#39;9&#39;)*)
-    ;
-
-FLOAT_LITERAL
-    : (&#39;0&#39;..&#39;9&#39;)+ &#39;.&#39; (&#39;0&#39;..&#39;9&#39;)* Exponent?
-    | &#39;.&#39; (&#39;0&#39;..&#39;9&#39;)+ Exponent?
-    | (&#39;0&#39;..&#39;9&#39;)+ Exponent?
-    ;
-
-BOOLEAN_LITERAL
-    : (&#39;true&#39;|&#39;false&#39;)
-    ;
-
-fragment
-Exponent
-    : (&#39;e&#39;|&#39;E&#39;) (&#39;+&#39;|&#39;-&#39;)? (&#39;0&#39;..&#39;9&#39;)+
-    ;
-</code></pre></div>
-<p>标识符（Identifier）</p>
-
-<p>标识符规则可以参看<a href="http://codemany.com/blog/powerscript-identifier/">PowerScript标识符</a>一文，以下是标识符的词法代码。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">IDENTIFIER
-    : Letter (Letter|&#39;0&#39;..&#39;9&#39;|&#39;$&#39;|&#39;#&#39;|&#39;%&#39;)*    // 暂时不支持短横线（-）
-      {
-          System.out.println(&quot;identifier&gt;&quot; + getText());
-      }
-    ;
-
-fragment
-Letter
-    : (&#39;A&#39;..&#39;Z&#39;|&#39;a&#39;..&#39;z&#39;|&#39;_&#39;)
-    ;
-</code></pre></div>
-<p>PowerScript是否支持变量名的续行？</p>
-
-<blockquote>
-<p>Do not split a line by inserting the continuation character within a variable name. This causes an error and the statement fails.</p>
-</blockquote>
-
-<p>经过实际测试V9.0 Build 5507、V9.0.1 Build 7171和V8.0.3 Build 9704都不支持变量名的续行。</p>
 ]]></content>
   </entry>
   
