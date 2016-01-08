@@ -10,7 +10,7 @@
 
   
   <meta name="description" content="lexical 词法
-lexer 词法器
+lexer 词法分析器
 alternative 选项
 notation 表示法
 directive 指令
@@ -99,7 +99,7 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
 
 <div class="entry-content"><ul>
 <li>lexical 词法</li>
-<li>lexer 词法器</li>
+<li>lexer 词法分析器</li>
 <li>alternative 选项</li>
 <li>notation 表示法</li>
 <li>directive 指令</li>
@@ -159,9 +159,9 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
 
 <p>在上述的语法中，程序是由换行终止的语句序列，语句可以是表达式、赋值或者空行。那些以小写字母开头的像stat和expr是语法规则；由大写字母开头的诸如ID和INT为词法规则，识别标志符和整数这样的记号。我们用“|”运算符分隔规则的选项，我们也可以用“()”把符号分组成子规则。例如，子规则<code>(&#39;*&#39;|&#39;/&#39;)</code>匹配乘法符号或者除法符号。</p>
 
-<p>ANTLR v4最重要的新特性是它有能力处理（大多数类型的）左递归规则。例如，规则expr前两个选项就在左边缘递归地调用了expr自身。这种指定算术表达式表示法的方法比对于典型的自顶向下分析器策略我们所需要的更容易。当然，在这种策略下，我们需要定义多个规则，每个运算符优先级一个规则。</p>
+<p>ANTLR v4最重要的新特性是它有能力处理（大多数类型的）左递归规则。例如，规则expr前两个选项就在左边缘递归地调用了expr自身。这种指定算术表达式表示法的方法比对于典型的自顶向下语法分析器策略我们所需要的更容易。当然，在这种策略下，我们需要定义多个规则，每个运算符优先级一个规则。</p>
 
-<p>记号定义的表示法对那些有正则表达式经验的应该很熟悉。唯一不寻常的是在WS规则上的<code>-&gt; skip</code>运算。它是一个指令，告诉词法器去匹配但扔掉空格。（每个可能的输入字符都必须被至少一个词法规则匹配。）我们通过使用形式化的ANTLR表示法避免捆绑语法到某个特定的目标语言，而不是在语法中插入任意代码片段来告诉词法器去忽略。</p>
+<p>记号定义的表示法对那些有正则表达式经验的应该很熟悉。唯一不寻常的是在WS规则上的<code>-&gt; skip</code>运算。它是一个指令，告诉词法分析器去匹配但扔掉空格。（每个可能的输入字符都必须被至少一个词法规则匹配。）我们通过使用形式化的ANTLR表示法避免捆绑语法到某个特定的目标语言，而不是在语法中插入任意代码片段来告诉词法分析器去忽略。</p>
 
 <p>这里是一些用来评估所有语法特性的测试序列：</p>
 
@@ -185,13 +185,15 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
 </span><span class='line'>compile *.java
 </span><span class='line'>grun Calc prog -gui calc.txt</span></code></pre></td></tr></table></div></figure>
 
-<p>TestRig会弹出一个显示分析树的窗口：</p>
+<p>TestRig会弹出一个显示语法分析树的窗口：</p>
 
 <p><img src="/uploads/parse-tree-calc.png" title="parse-tree-calc" ></p>
 
 <h3 id="使用visitor模式计算结果">使用Visitor模式计算结果</h3>
 
-<p>为了让前面的算术表达式分析器计算出结果，我们还需要做些其它的事情。</p>
+<p>为了给前面的算术表达式语法分析器计算出结果，我们还需要做些其它的事情。</p>
+
+<p>ANTLR v4鼓励我们保持语法的整洁，使用语法分析树Visitor和其它遍历器来实现语言应用。不过在接触Visitor之前，我们需要对语法做些修改。</p>
 
 <p>首先，我们需要用标签标明规则的选项，标签可以是和规则名没有冲突的任意标志符。如果选项上没有标签，ANTLR只会为每个规则生成一个visit方法。</p>
 
@@ -239,7 +241,7 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
 </span><span class='line'>
 </span><span class='line'>SUB : '-' ;</span></code></pre></td></tr></table></div></figure>
 
-<p>现在，我们有了一个增强型的语法。接下来要做的事情是实现一个EvalVisitor类，它通过遍历表达式分析树计算和返回值。</p>
+<p>现在，我们有了一个增强型的语法。接下来要做的事情是实现一个EvalVisitor类，它通过遍历表达式语法分析树计算和返回值。</p>
 
 <p>执行下面的命令，让ANTLR生成Visitor接口和它的默认实现，其中-no-listener参数是告诉ANTLR不再生成Listener相关的代码：</p>
 
@@ -263,7 +265,7 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
 </span><span class='line'>    ...
 </span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>接口定义使用的是Java泛型，visit方法的返回值为参数化类型，这允许我们根据表达式计算返回值的类型去实现继承。因为表达式的计算结果是整型，所以我们的EvalVisitor应该继承CalcBaseVisitor<Integer>类。为计算分析树的每个节点，我们需要覆写与语句和表达式选项相关的方法。这里是全部的代码：</p>
+<p>接口定义使用的是Java泛型，visit方法的返回值为参数化类型，这允许我们根据表达式计算返回值的类型去设定实现的泛型参数。因为表达式的计算结果是整型，所以我们的EvalVisitor应该继承<code>CalcBaseVisitor&lt;Integer&gt;</code>类。为计算语法分析树的每个节点，我们需要覆写与语句和表达式选项相关的方法。这里是全部的代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -416,7 +418,7 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
 </span><span class='line'>        ParseTree tree = parser.prog();
 </span><span class='line'>
 </span><span class='line'>        EvalVisitor eval = new EvalVisitor();
-</span><span class='line'>        // 开始遍历分析树
+</span><span class='line'>        // 开始遍历语法分析树
 </span><span class='line'>        eval.visit(tree);
 </span><span class='line'>
 </span><span class='line'>        System.out.println(tree.toStringTree(parser));
@@ -437,7 +439,7 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
 </pre></td><td class='code'><pre><code class=''><span class='line'>compile *.java
 </span><span class='line'>run Calc calc.txt</span></code></pre></td></tr></table></div></figure>
 
-<p>然后你就会看到文本形式的分析树以及计算结果：</p>
+<p>然后你就会看到文本形式的语法分析树以及计算结果：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>

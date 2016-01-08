@@ -10,7 +10,7 @@
 
   
   <meta name="description" content="lexical 词法
-lexer 词法器
+lexer 词法分析器
 alternative 选项
 notation 表示法
 directive 指令
@@ -102,7 +102,7 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
 
   <div class="entry-content"><ul>
 <li>lexical 词法</li>
-<li>lexer 词法器</li>
+<li>lexer 词法分析器</li>
 <li>alternative 选项</li>
 <li>notation 表示法</li>
 <li>directive 指令</li>
@@ -162,9 +162,9 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
 
 <p>在上述的语法中，程序是由换行终止的语句序列，语句可以是表达式、赋值或者空行。那些以小写字母开头的像stat和expr是语法规则；由大写字母开头的诸如ID和INT为词法规则，识别标志符和整数这样的记号。我们用“|”运算符分隔规则的选项，我们也可以用“()”把符号分组成子规则。例如，子规则<code>(&#39;*&#39;|&#39;/&#39;)</code>匹配乘法符号或者除法符号。</p>
 
-<p>ANTLR v4最重要的新特性是它有能力处理（大多数类型的）左递归规则。例如，规则expr前两个选项就在左边缘递归地调用了expr自身。这种指定算术表达式表示法的方法比对于典型的自顶向下分析器策略我们所需要的更容易。当然，在这种策略下，我们需要定义多个规则，每个运算符优先级一个规则。</p>
+<p>ANTLR v4最重要的新特性是它有能力处理（大多数类型的）左递归规则。例如，规则expr前两个选项就在左边缘递归地调用了expr自身。这种指定算术表达式表示法的方法比对于典型的自顶向下语法分析器策略我们所需要的更容易。当然，在这种策略下，我们需要定义多个规则，每个运算符优先级一个规则。</p>
 
-<p>记号定义的表示法对那些有正则表达式经验的应该很熟悉。唯一不寻常的是在WS规则上的<code>-&gt; skip</code>运算。它是一个指令，告诉词法器去匹配但扔掉空格。（每个可能的输入字符都必须被至少一个词法规则匹配。）我们通过使用形式化的ANTLR表示法避免捆绑语法到某个特定的目标语言，而不是在语法中插入任意代码片段来告诉词法器去忽略。</p>
+<p>记号定义的表示法对那些有正则表达式经验的应该很熟悉。唯一不寻常的是在WS规则上的<code>-&gt; skip</code>运算。它是一个指令，告诉词法分析器去匹配但扔掉空格。（每个可能的输入字符都必须被至少一个词法规则匹配。）我们通过使用形式化的ANTLR表示法避免捆绑语法到某个特定的目标语言，而不是在语法中插入任意代码片段来告诉词法分析器去忽略。</p>
 
 <p>这里是一些用来评估所有语法特性的测试序列：</p>
 
@@ -188,13 +188,15 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
 </span><span class='line'>compile *.java
 </span><span class='line'>grun Calc prog -gui calc.txt</span></code></pre></td></tr></table></div></figure>
 
-<p>TestRig会弹出一个显示分析树的窗口：</p>
+<p>TestRig会弹出一个显示语法分析树的窗口：</p>
 
 <p><img src="/uploads/parse-tree-calc.png" title="parse-tree-calc" ></p>
 
 <h3 id="使用visitor模式计算结果">使用Visitor模式计算结果</h3>
 
-<p>为了让前面的算术表达式分析器计算出结果，我们还需要做些其它的事情。</p>
+<p>为了给前面的算术表达式语法分析器计算出结果，我们还需要做些其它的事情。</p>
+
+<p>ANTLR v4鼓励我们保持语法的整洁，使用语法分析树Visitor和其它遍历器来实现语言应用。不过在接触Visitor之前，我们需要对语法做些修改。</p>
 
 <p>首先，我们需要用标签标明规则的选项，标签可以是和规则名没有冲突的任意标志符。如果选项上没有标签，ANTLR只会为每个规则生成一个visit方法。</p>
 
@@ -242,7 +244,7 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
 </span><span class='line'>
 </span><span class='line'>SUB : '-' ;</span></code></pre></td></tr></table></div></figure>
 
-<p>现在，我们有了一个增强型的语法。接下来要做的事情是实现一个EvalVisitor类，它通过遍历表达式分析树计算和返回值。</p>
+<p>现在，我们有了一个增强型的语法。接下来要做的事情是实现一个EvalVisitor类，它通过遍历表达式语法分析树计算和返回值。</p>
 
 <p>执行下面的命令，让ANTLR生成Visitor接口和它的默认实现，其中-no-listener参数是告诉ANTLR不再生成Listener相关的代码：</p>
 
@@ -266,7 +268,7 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
 </span><span class='line'>    ...
 </span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>接口定义使用的是Java泛型，visit方法的返回值为参数化类型，这允许我们根据表达式计算返回值的类型去实现继承。因为表达式的计算结果是整型，所以我们的EvalVisitor应该继承CalcBaseVisitor<Integer>类。为计算分析树的每个节点，我们需要覆写与语句和表达式选项相关的方法。这里是全部的代码：</p>
+<p>接口定义使用的是Java泛型，visit方法的返回值为参数化类型，这允许我们根据表达式计算返回值的类型去设定实现的泛型参数。因为表达式的计算结果是整型，所以我们的EvalVisitor应该继承<code>CalcBaseVisitor&lt;Integer&gt;</code>类。为计算语法分析树的每个节点，我们需要覆写与语句和表达式选项相关的方法。这里是全部的代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -419,7 +421,7 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
 </span><span class='line'>        ParseTree tree = parser.prog();
 </span><span class='line'>
 </span><span class='line'>        EvalVisitor eval = new EvalVisitor();
-</span><span class='line'>        // 开始遍历分析树
+</span><span class='line'>        // 开始遍历语法分析树
 </span><span class='line'>        eval.visit(tree);
 </span><span class='line'>
 </span><span class='line'>        System.out.println(tree.toStringTree(parser));
@@ -440,7 +442,7 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
 </pre></td><td class='code'><pre><code class=''><span class='line'>compile *.java
 </span><span class='line'>run Calc calc.txt</span></code></pre></td></tr></table></div></figure>
 
-<p>然后你就会看到文本形式的分析树以及计算结果：</p>
+<p>然后你就会看到文本形式的语法分析树以及计算结果：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -610,7 +612,7 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'>(s hello world)  # (root children)</span></code></pre></td></tr></table></div></figure>
 
-<p>你也可以以可视化的方式查看分析树：</p>
+<p>你也可以以可视化的方式查看语法分析树：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'>grun Hello s -gui</span></code></pre></td></tr></table></div></figure>
@@ -621,9 +623,9 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
 
 <ul>
 <li>-tokens 打印出记号流。</li>
-<li>-tree 以LISP风格的文本形式打印出分析树。</li>
-<li>-gui 在对话框中可视化地显示分析树。</li>
-<li>-ps file.ps 在PostScript中生成一个可视化的分析树表示，并把它存储在file.ps文件中。</li>
+<li>-tree 以LISP风格的文本形式打印出语法分析树。</li>
+<li>-gui 在对话框中可视化地显示语法分析树。</li>
+<li>-ps file.ps 在PostScript中生成一个可视化的语法分析树表示，并把它存储在file.ps文件中。</li>
 <li>-encoding encodingname 指定输入文件的编码。</li>
 <li>-trace 在进入/退出规则前打印规则名字和当前的记号。</li>
 <li>-diagnostics 分析时打开诊断消息。此生成消息仅用于异常情况，如二义性输入短语。</li>
@@ -660,24 +662,23 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
   <div class="entry-content"><ul>
 <li>grammar 语法，一种形式化（formal）的语言描述。</li>
 <li>syntax 句法</li>
-<li>morphology 词法</li>
-<li>parser 分析器</li>
-<li>parse tree 分析树，表示语法如何匹配输入的数据结构。</li>
+<li>parser 语法分析器</li>
+<li>parse tree 语法分析树，表示语法如何匹配输入的数据结构。</li>
 <li>tree walker 树遍历器</li>
 <li>top-down 自顶向下</li>
 <li>backtracking 回溯</li>
 <li>semantic predicates 语义谓词</li>
 </ul>
 
-<p>ANTLR v4是一款强大的分析器生成器，可以用来阅读，处理，执行和转换结构化文本或二进制文件。通过语法文件，ANTLR可以自动生成分析器、分析树和树遍历器。</p>
+<p>ANTLR v4是一款强大的语法分析器生成器，可以用来阅读，处理，执行和转换结构化文本或二进制文件。通过语法文件，ANTLR可以自动生成语法分析器、语法分析树和树遍历器。</p>
 
-<p>ANTLR分析器使用一种新的分析技术称之为<code>Adaptive LL(*)</code>或<code>ALL(*)</code>，<code>ALL(*)</code>是v3版本<code>LL(*)</code>的扩展，它可以在生成的分析器执行前在运行时动态地执行语法分析而不是静态地。</p>
+<p>ANTLR语法分析器使用一种新的分析技术称之为<code>Adaptive LL(*)</code>或<code>ALL(*)</code>，<code>ALL(*)</code>是v3版本<code>LL(*)</code>的扩展，它可以在生成的语法分析器执行前在运行时动态地执行语法分析而不是静态地。</p>
 
-<p>ANTLR v4极大地简化了用来匹配像算术表达式句法结构的语法规则。对于传统的自顶向下的分析器生成器像ANTLR v3，识别表达式的最自然的语法是无效的，v4则不然。ANTLR v4会自动地重写左递归规则为非左递归等价物，唯一的约束是左递归必须是直接的——规则立刻引用它自身。</p>
+<p>ANTLR v4极大地简化了用来匹配像算术表达式句法结构的语法规则。对于传统的自顶向下的语法分析器生成器像ANTLR v3，识别表达式的最自然的语法是无效的，v4则不然。ANTLR v4会自动地重写左递归规则为非左递归等价物，唯一的约束是左递归必须是直接的——规则立刻引用它自身。</p>
 
-<p>此前，ANTLR v3用户必须用树构造操作增强语法。现在，ANTLR v4会自动构建分析树，也会以Listener和Visitor模式实现的形式自动生成树遍历器。所以，你不再需要构建树语法，可以用Visitor模式代替。降低在语法中嵌入动作的重要性使得甚至可以在不重新编译生成的分析器的情况下在不同的应用中重用相同的语法。</p>
+<p>此前，ANTLR v3用户必须用树构造操作增强语法。现在，ANTLR v4会自动构建语法分析树，也会以Listener和Visitor模式实现的形式自动生成树遍历器。所以，你不再需要构建树语法，可以用Visitor模式代替。降低在语法中嵌入动作的重要性使得甚至可以在不重新编译生成的语法分析器的情况下在不同的应用中重用相同的语法。</p>
 
-<p>ANTLR v3的<code>LL(*)</code>分析策略弱于v4的<code>ALL(*)</code>，因此v3有时候依赖回溯去正确地分析输入的短语。回溯使得很难去通过生成的分析器步进调试语法，因为分析器可能分析相同的输入多次（递归地）；回溯也能让分析器给出一个好的错误消息更难，在无效的输入之上。</p>
+<p>ANTLR v3的<code>LL(*)</code>分析策略弱于v4的<code>ALL(*)</code>，因此v3有时候依赖回溯去正确地分析输入的短语。回溯使得很难去通过生成的语法分析器步进调试语法，因为语法分析器可能分析相同的输入多次（递归地）；回溯也能让语法分析器给出一个好的错误消息更难，在无效的输入之上。</p>
 
 <h3 id="这本书里有什么？">这本书里有什么？</h3>
 
@@ -688,7 +689,7 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
 <ul>
 <li>第一部分介绍ANTLR，提供一些语言的背景知识，带你开始一场ANTLR功能之旅，让你尝下句法的滋味和能用它做什么。</li>
 <li>第二部分是关于使用ANTLR语法结合树遍历器设计语法和构建语言应用。</li>
-<li>第三部分首先展示了如何定制ANTLR生成的分析器的错误处理。接下来，你将学习如何在语法中嵌入动作，因为有时候这样做比构建树然后遍历它更简单有效。关于动作，你还将学习使用语义谓词更改分析器的行为去处理一些具有挑战性的识别问题。最后一章解决一些具有挑战性的语言识别问题，例如识别XML和Python中上下文相关的换行。</li>
+<li>第三部分首先展示了如何定制ANTLR生成的语法分析器的错误处理。接下来，你将学习如何在语法中嵌入动作，因为有时候这样做比构建树然后遍历它更简单有效。关于动作，你还将学习使用语义谓词更改语法分析器的行为去处理一些具有挑战性的识别问题。最后一章解决一些具有挑战性的语言识别问题，例如识别XML和Python中上下文相关的换行。</li>
 <li>第四部分是参考章节，列出了所有关于使用ANTLR语法元语言和它的运行库的规则。</li>
 </ul>
 </div>

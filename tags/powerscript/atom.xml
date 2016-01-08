@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: PowerScript | 乐者为王]]></title>
   <link href="http://codemany.com/tags/powerscript/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2016-01-05T23:58:33+08:00</updated>
+  <updated>2016-01-08T21:50:22+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -136,7 +136,7 @@ literal
 
 <p>注意：#表示数字是必须的。譬如，必须用~007这种样式来表示转义字符，而不能是~7这种样式。</p>
 
-<p>这里是转义字符的词法代码：</p>
+<p>这里是转义字符的词法规则：</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">ESCAPE
     : &#39;~&#39; (&#39;n&#39;|&#39;t&#39;|&#39;v&#39;|&#39;r&#39;|&#39;f&#39;|&#39;b&#39;|&#39;\&quot;&#39;|&#39;\&#39;&#39;|&#39;~&#39;)
     | DecimalEscape
@@ -179,7 +179,7 @@ c = &quot;T&quot;
 s = &#39;This is a string&#39;
 s = &quot;This is a string&quot;
 </code></pre></div>
-<p>由于两者没有明显区别，因此在词法分析阶段只能将两者都作为字符串字面量来处理。至于到底是字符还是字符串，只有到了语意分析阶段才能作出判断（字符串字面量支持续行符）。</p>
+<p>由于两者没有明显区别，因此在词法分析时只能将两者都作为字符串字面量来处理。至于到底是字符还是字符串，只有到了语意分析阶段才能作出判断（字符串字面量支持续行符）。</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">STRING_LITERAL
     : ( &#39;\&#39;&#39; (ESCAPE|CONTINUEDLINE|~(&#39;~&#39;|&#39;r&#39;|&#39;n&#39;|&#39;\&#39;&#39;))* &#39;\&#39;&#39;
       | &#39;\&quot;&#39; (ESCAPE|CONTINUEDLINE|~(&#39;~&#39;|&#39;r&#39;|&#39;n&#39;|&#39;\&quot;&#39;))* &#39;\&quot;&#39;
@@ -211,7 +211,7 @@ Exponent
 </code></pre></div>
 <p>标识符（Identifier）</p>
 
-<p>标识符规则可以参看<a href="http://codemany.com/blog/powerscript-identifier/">PowerScript标识符</a>一文，以下是标识符的词法代码。</p>
+<p>标识符规则可以参看<a href="http://codemany.com/blog/powerscript-identifier/">PowerScript标识符</a>一文，以下是标识符的词法规则：</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">IDENTIFIER
     : Letter (Letter|&#39;0&#39;..&#39;9&#39;|&#39;$&#39;|&#39;#&#39;|&#39;%&#39;)*    // 暂时不支持短横线（-）
       {
@@ -239,21 +239,37 @@ Letter
     <link href="http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part2/"/>
     <updated>2007-09-02T16:44:22+08:00</updated>
     <id>http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part2</id>
-    <content type="html"><![CDATA[<p>在<a href="http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part1/">上篇</a>文中写的词法分析文件存在有两个小问题：</p>
+    <content type="html"><![CDATA[<p>在<a href="http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part1/">使用ANTLR构建PowerScript语法分析器（1）</a>中写的词法分析存在几个小问题：</p>
 
 <ol>
-<li>处理换行符和回车符的词法定义有重复，在WS和EndOfLine中都有出现；</li>
+<li>换行符和回车符同时存在于WS和EndOfLine两个词法规则中，属于重复定义；</li>
+<li>输出单行注释时紧随其后会额外多输出一个空行；</li>
+<li>单行注释是文件的最后一行时不能被词法分析器识别；</li>
+<li>单行注释和多行注释同时存在时，只有最前面的同类注释能被识别；</li>
 <li>像<code>/* comments /* nested comments */ */</code>这种嵌套注释会被输出成：</li>
 </ol>
 <div class="highlight"><pre><code class="language-text" data-lang="text">bc&gt;/* comments /* nested comments */
 bc&gt;/* comments /* nested comments */ */
 </code></pre></div>
-<p>第1个问题比较容易解决，只要将EndOfLine前的fragment去掉，再将WS改成下面这样就可以。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">WS
-    : (&#39; &#39;|&#39;\t&#39;|&#39;\u000C&#39;) {$channel=HIDDEN;}
+<p>下面我们将逐个修复它们。</p>
+
+<p>解决第1个问题前先要问问自己，单行注释的词法规则中真的需要包含EndOfLine这个词法规则吗？真的需要吗？如果没有的话，当词法分析器识别到换行符或回车符时，就会去匹配词法规则WS。这样看来，EndOfLine这个词法规则在这里其实是不必要的，完全可以删除掉。</p>
+
+<p>第2个问题因为词法规则EndOfLine已经被删除，所以也就不存在了。这儿仅仅分析下问题的原因。词法分析器分析单行注释时，EndOfLine会被当作单行注释的一部分予以识别。翻看生成的词法识别器代码，可以看到打印代码块出现在词法规则EndOfLine调用的后面。打印代码块中的getText()方法是从CharStream中获取文本的，如果在词法规则EndOfLine被调用后才执行，因为词法规则EndOfLine被调用时会将CharStream的当前索引向尾部移动，这时获得的文本就会包含EndOfLine，导致打印时额外输出一个空行。</p>
+
+<p>第3个问题同样也由于第1个问题的修复而不存在了。它出现的原因是因为文件最后一行的结尾字符是EOF，无法匹配词法规则EndOfLine。</p>
+
+<p>第4个问题则是由于program规则下的两个注释规则是并列的，当匹配成功某条注释后，因为“+”的关系，语法分析器会循环地去匹配同类的注释，而不会跳去匹配另类的注释。可以把program的语法规则修改成以下来解决：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">program
+    : comment+
+    ;
+
+comment
+    : LINE_COMMENT
+    | BLOCK_COMMENT
     ;
 </code></pre></div>
-<p>第2个问题则可以通过计数器来处理。先初始化一个计数器变量depthOfComments来标记块注释的深度，当遇到<code>“/*”</code>时就加1，遇到“*/”时则减1。输出时只要判断depthOfComments是否等于0就行了。</p>
+<p>第5个问题则可以通过计数器来处理。先初始化一个计数器变量depthOfComments来标记块注释的深度，当遇到<code>“/*”</code>时就加1，遇到“*/”时则减1。输出时只要判断depthOfComments是否等于0就行了。</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">BLOCK_COMMENT
 @init {
     int depthOfComments = 0;
@@ -279,9 +295,9 @@ bc&gt;/* comments /* nested comments */ */
     <link href="http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part1/"/>
     <updated>2007-08-22T23:43:04+08:00</updated>
     <id>http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part1</id>
-    <content type="html"><![CDATA[<p>首先，让我们从最简单的做起，先实现一个能正确分析PowerScript注释的词法文件。PowerScript支持两种注释形式：单行注释（//）和多行注释（<code>/*...*/</code>）。</p>
+    <content type="html"><![CDATA[<p>首先，让我们从最简单的做起，先实现一套能正确分析PowerScript注释的词法规则。PowerScript支持两种注释形式：单行注释（//）和多行注释（<code>/*...*/</code>）。</p>
 
-<p>单行注释以双斜杠（//）起头，直到遇到行结束符为止，所以在这里要先明确一下行结束符用什么表示。在DOS系统中行结束符用“\r\n”表示，在Unix系统中行结束符用“\n”表示，现在的Mac系统也是以“\n”表示行结束符，但早期的Mac系统中行结束符则是以“\r”表示。所以兼容这几种操作系统的行结束符定义为：</p>
+<p>单行注释以双斜杠（//）起头，直到遇到行结束符为止，所以在这里要先明确一下行结束符用什么表示。在DOS系统中行结束符用“\r\n”表示，在Unix系统中行结束符用“\n”表示，现在的Mac系统也是以“\n”表示行结束符，但早期的Mac系统中行结束符则是以“\r”表示。所以兼容这几种操作系统的行结束符词法规则为：</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">fragment
 EndOfLine
     : &#39;\r&#39; &#39;\n&#39;    // DOS
@@ -289,7 +305,7 @@ EndOfLine
     | &#39;\n&#39;         // Unix
     ;
 </code></pre></div>
-<p>现在，有了行结束符定义，就可以定义单行注释的词法规则了：</p>
+<p>现在，有了行结束符词法规则，就可以定义单行注释的词法规则了：</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">LINE_COMMENT
     : &#39;//&#39; ~(&#39;\n&#39;|&#39;\r&#39;)* EndOfLine
     ;
@@ -334,7 +350,7 @@ EndOfLine
 // This entire line is a comment. */
 // This entire line is a comment. /*
 </code></pre></div>
-<p>PowerScript.g的内容如下：</p>
+<p>完整的PowerScript.g的内容如下：</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">grammar PowerScript;
 
 program
