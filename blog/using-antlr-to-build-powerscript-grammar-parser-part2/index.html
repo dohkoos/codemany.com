@@ -12,7 +12,7 @@
   <meta name="description" content="在使用ANTLR构建PowerScript语法分析器（1）中写的词法分析存在几个小问题： 换行符和回车符同时存在于WS和EndOfLine两个词法规则中，属于重复定义；
 输出单行注释时紧随其后会额外多输出一个空行；
 单行注释是文件的最后一行时不能被词法分析器识别；
-单行注释和多行注释同时存在时， &hellip;">
+像/* comments /* &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -101,7 +101,6 @@
 <li>换行符和回车符同时存在于WS和EndOfLine两个词法规则中，属于重复定义；</li>
 <li>输出单行注释时紧随其后会额外多输出一个空行；</li>
 <li>单行注释是文件的最后一行时不能被词法分析器识别；</li>
-<li>单行注释和多行注释同时存在时，只有最前面的同类注释能被识别；</li>
 <li>像<code>/* comments /* nested comments */ */</code>这种嵌套注释会被输出成：</li>
 </ol>
 
@@ -118,26 +117,7 @@
 
 <p>第3个问题同样也由于第1个问题的修复而不存在了。它出现的原因是因为文件最后一行的结尾字符是EOF，无法匹配词法规则EndOfLine。</p>
 
-<p>第4个问题则是由于program规则下的两个注释规则是并列的，当匹配成功某条注释后，因为“+”的关系，语法分析器会循环地去匹配同类的注释，而不会跳去匹配另类的注释。可以把program的语法规则修改成以下来解决：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>program
-</span><span class='line'>    : comment+
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>comment
-</span><span class='line'>    : LINE_COMMENT
-</span><span class='line'>    | BLOCK_COMMENT
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<p>第5个问题则可以通过计数器来处理。先初始化一个计数器变量depthOfComments来标记块注释的深度，当遇到<code>“/*”</code>时就加1，遇到“*/”时则减1。输出时只要判断depthOfComments是否等于0就行了。</p>
+<p>第4个问题则可以通过计数器来处理。先初始化一个计数器变量depthOfComments来标记块注释的深度，当遇到<code>“/*”</code>时就加1，遇到“*/”时则减1。输出时只要判断depthOfComments是否等于0就行了。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -156,13 +136,15 @@
 <span class='line-number'>15</span>
 <span class='line-number'>16</span>
 <span class='line-number'>17</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>BLOCK_COMMENT
-</span><span class='line'>@init {
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>@lexer::members {
 </span><span class='line'>    int depthOfComments = 0;
 </span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>BLOCK_COMMENT
 </span><span class='line'>    : '/*' {depthOfComments++;}
 </span><span class='line'>      ( options {greedy=false;}
-</span><span class='line'>      : ('/' '*')=&gt; BLOCK_COMMENT {depthOfComments++;}
+</span><span class='line'>      : ('/' '*')=&gt; BLOCK_COMMENT
 </span><span class='line'>      | '/' ~('*')
 </span><span class='line'>      | ~('/')
 </span><span class='line'>      )*
