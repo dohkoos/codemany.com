@@ -1,0 +1,668 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>ANTLR 4权威参考读书笔记（4） - 乐者为王</title>
+  <meta name="author" content="dohkoos">
+
+  
+  <meta name="description" content="在ANTLR 4权威参考读书笔记（3）中的计算器是以解释的方式执行的，现在我们想要把它转换成以编译的方式执行。编译执行和解释执行相比，需要依赖于特定的目标机器。在这里我们假设有一台这样的机器，它用堆栈进行运算，支持如下表所示的几种指令： 指令
+说明
+操作数个数
+用途 LDV
+Load &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part4/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/atom.xml" rel="alternate" title="乐者为王" type="application/atom+xml">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script>!window.jQuery && document.write(unescape('%3Cscript src="/javascripts/libs/jquery.min.js"%3E%3C/script%3E'))</script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  
+  
+  <script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-46570161-1']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">乐者为王</a></h1>
+  
+    <h2>Do one thing, and do it well.</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="https://www.google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="sitesearch" value="codemany.com">
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">ANTLR 4权威参考读书笔记（4）</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-01-18T15:06:54+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>3:06 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>在<a href="/blog/reading-notes-the-definitive-antlr4-reference-part3/">ANTLR 4权威参考读书笔记（3）</a>中的计算器是以解释的方式执行的，现在我们想要把它转换成以编译的方式执行。编译执行和解释执行相比，需要依赖于特定的目标机器。在这里我们假设有一台这样的机器，它用堆栈进行运算，支持如下表所示的几种指令：</p>
+
+<table><thead>
+<tr>
+<th>指令</th>
+<th>说明</th>
+<th>操作数个数</th>
+<th>用途</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>LDV</td>
+<td>Load Variable</td>
+<td>1</td>
+<td>变量入栈</td>
+</tr>
+<tr>
+<td>LDC</td>
+<td>Load Constant</td>
+<td>1</td>
+<td>常量入栈</td>
+</tr>
+<tr>
+<td>STR</td>
+<td>Store Value</td>
+<td>1</td>
+<td>栈顶一个元素存入指定变量</td>
+</tr>
+<tr>
+<td>ADD</td>
+<td>Add</td>
+<td>0</td>
+<td>栈顶两个元素出栈，求和后入栈</td>
+</tr>
+<tr>
+<td>SUB</td>
+<td>Subtract</td>
+<td>0</td>
+<td>栈顶两个元素出栈，求差后入栈</td>
+</tr>
+<tr>
+<td>MUL</td>
+<td>Multiply</td>
+<td>0</td>
+<td>栈顶两个元素出栈，求积后入栈</td>
+</tr>
+<tr>
+<td>DIV</td>
+<td>Divide</td>
+<td>0</td>
+<td>栈顶两个元素出栈，求商后入栈</td>
+</tr>
+<tr>
+<td>RET</td>
+<td>Return</td>
+<td>0</td>
+<td>栈顶一个元素出栈，计算结束</td>
+</tr>
+</tbody></table>
+
+<p>做这个最简单的方法是使用ANTLR的语法分析树Listener机制实现DirectiveListener类，然后它通过监听来自树遍历器触发的事件，输出对应的机器指令。</p>
+
+<p>Listener机制的优势是我们不必要自己去做任何树遍历，甚至我们不必要知道遍历树的运行时如何调用我们的方法，我们只要知道我们的DirectiveListener类得到通知，在与语法规则匹配的短语开始和结束时。这种方法减少了我们学习ANTLR必须要花费的时间，让我们回到我们所熟悉的编程语言领域。</p>
+
+<p>这里不需要创建新的语法规则，还是继续沿用前文Calc.g所包含的语法，标签也要保留：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Calc;
+</span><span class='line'>
+</span><span class='line'>prog
+</span><span class='line'>    : stat+
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>stat
+</span><span class='line'>    : expr                   # printExpr
+</span><span class='line'>    | ID '=' expr            # assign
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>expr
+</span><span class='line'>    : expr op=(MUL|DIV) expr # MulDiv
+</span><span class='line'>    | expr op=(ADD|SUB) expr # AddSub
+</span><span class='line'>    | INT                    # int
+</span><span class='line'>    | ID                     # id
+</span><span class='line'>    | '(' expr ')'           # parens
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>MUL : '*' ;
+</span><span class='line'>
+</span><span class='line'>DIV : '/' ;
+</span><span class='line'>
+</span><span class='line'>ADD : '+' ;
+</span><span class='line'>
+</span><span class='line'>SUB : '-' ;
+</span><span class='line'>
+</span><span class='line'>ID  : [a-zA-Z]+ ;
+</span><span class='line'>
+</span><span class='line'>INT : [0-9]+ ;
+</span><span class='line'>
+</span><span class='line'>WS  : [ \r\t\u000C\n]+ -&gt; skip ;    // toss out whitespace</span></code></pre></td></tr></table></div></figure>
+
+<p>然后，我们可以运行ANTLR工具：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr Calc.g</span></code></pre></td></tr></table></div></figure>
+
+<p>它会生成后缀名为tokens和java的六个文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Calc.tokens         CaclLexer.java          CalcParser.java
+</span><span class='line'>CalcLexer.tokens    CalcBaseListener.java   CalcListener.java</span></code></pre></td></tr></table></div></figure>
+
+<p>正如这里我们看到的，ANTLR会为我们自动生成Listener基础设施。其中CalcListener是语法和Listener对象之间的关键接口，描述我们可以实现的回调方法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public interface CalcListener extends ParseTreeListener {
+</span><span class='line'>  void enterProg(CalcParser.ProgContext ctx);
+</span><span class='line'>  void exitProg(CalcParser.ProgContext ctx);
+</span><span class='line'>  void enterPrintExpr(CalcParser.PrintExprContext ctx);
+</span><span class='line'>    ...
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>CalcBaseListener则是ANTLR生成的一组空的默认实现。ANTLR内建的树遍历器会去触发在Listener中像enterProg()和exitProg()这样的一串回调方法，如同它对语法分析树执行了一次深度优先遍历。为响应树遍历器触发的事件，我们的DirectiveListener需要继承CalcBaseListener并实现一些方法。我们不需要实现全部的接口方法，我们也不需要去覆写每个enter和exit方法，我们只需要去覆写那些我们感兴趣的回调方法。</p>
+
+<p>在本例中，我们需要通过覆写六个方法对六个事件作出响应：当树遍历器exit那些有标签的选项时。我们的基本策略是当树遍历器exit那些有标签的选项时打印出已转换的指令。以下是完整的实现代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class DirectiveListener extends CalcBaseListener {
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void exitPrintExpr(CalcParser.PrintExprContext ctx) {
+</span><span class='line'>        System.out.println("RET\n");
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void exitAssign(CalcParser.AssignContext ctx) {
+</span><span class='line'>        String id = ctx.ID().getText();
+</span><span class='line'>        System.out.println("STR " + id);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void exitMulDiv(CalcParser.MulDivContext ctx) {
+</span><span class='line'>        if (ctx.op.getType() == CalcParser.MUL) {
+</span><span class='line'>            System.out.println("MUL");
+</span><span class='line'>        } else {
+</span><span class='line'>            System.out.println("DIV");
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void exitAddSub(CalcParser.AddSubContext ctx) {
+</span><span class='line'>        if (ctx.op.getType() == CalcParser.ADD) {
+</span><span class='line'>            System.out.println("ADD");
+</span><span class='line'>        } else {
+</span><span class='line'>            System.out.println("SUB");
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void exitId(CalcParser.IdContext ctx) {
+</span><span class='line'>        System.out.println("LDV " + ctx.ID().getText());
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void exitInt(CalcParser.IntContext ctx) {
+</span><span class='line'>        System.out.println("LDC " + ctx.INT().getText());
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>为了让它运行起来，余下我们唯一需要做的事是创建一个主程序去调用它：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class Calc {
+</span><span class='line'>
+</span><span class='line'>    public static void main(String[] args) throws Exception {
+</span><span class='line'>        InputStream is = args.length &gt; 0 ? new FileInputStream(args[0]) : System.in;
+</span><span class='line'>
+</span><span class='line'>        ANTLRInputStream input = new ANTLRInputStream(is);
+</span><span class='line'>        CalcLexer lexer = new CalcLexer(input);
+</span><span class='line'>        CommonTokenStream tokens = new CommonTokenStream(lexer);
+</span><span class='line'>        CalcParser parser = new CalcParser(tokens);
+</span><span class='line'>        ParseTree tree = parser.prog();
+</span><span class='line'>
+</span><span class='line'>        ParseTreeWalker walker = new ParseTreeWalker();
+</span><span class='line'>        walker.walk(new DirectiveListener(), tree);
+</span><span class='line'>
+</span><span class='line'>        // print LISP-style tree
+</span><span class='line'>        System.out.println(tree.toStringTree(parser));
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>这个程序和前文Calc.java中的代码极度相似，区别只在12-13行。这两行代码负责创建树遍历器，然后让树遍历器去遍历那颗从语法分析器返回的树，当树遍历器遍历时，它就会触发调用到我们的DirectiveListener中实现的方法。此外，通过传入一个不同的Listener实现我们能简单地生成完全不同的输出。Listener机制有效地隔离了语法和语言应用，使语法可以被其它应用再次使用。</p>
+
+<p>现在一切完备，让我们尝试着去编译和运行它吧！下面是完整的命令序列：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>compile *.java
+</span><span class='line'>run Calc calc.txt</span></code></pre></td></tr></table></div></figure>
+
+<p>编译的输出结果如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>LDC 19
+</span><span class='line'>RET
+</span><span class='line'>
+</span><span class='line'>LDC 5
+</span><span class='line'>STR a
+</span><span class='line'>LDC 6
+</span><span class='line'>STR b
+</span><span class='line'>LDV a
+</span><span class='line'>LDV b
+</span><span class='line'>LDC 2
+</span><span class='line'>MUL
+</span><span class='line'>ADD
+</span><span class='line'>RET
+</span><span class='line'>
+</span><span class='line'>LDC 1
+</span><span class='line'>LDC 2
+</span><span class='line'>ADD
+</span><span class='line'>LDC 3
+</span><span class='line'>MUL
+</span><span class='line'>RET</span></code></pre></td></tr></table></div></figure>
+
+<p>代码下载：<a href="https://github.com/dohkoos/antlr4-calculator">https://github.com/dohkoos/antlr4-calculator</a></p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">dohkoos</span></span>
+
+      
+
+
+
+
+<time class='entry-date' datetime='2016-01-18T15:06:54+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>3:06 pm</span></time>
+      
+
+
+      
+
+<span class="tags">
+  
+    <a class='tag' href='/tags/antlr/'>ANTLR</a>
+  
+</span>
+
+
+    </p>
+    
+  <h3>Related Posts</h3>
+  <ul class="posts">
+  
+    <li class="related">
+      <a href="/blog/reading-notes-the-definitive-antlr4-reference-part3/">ANTLR 4权威参考读书笔记（3）</a>
+    </li>
+  
+    <li class="related">
+      <a href="/blog/reading-notes-the-definitive-antlr4-reference-part2/">ANTLR 4权威参考读书笔记（2）</a>
+    </li>
+  
+    <li class="related">
+      <a href="/blog/reading-notes-the-definitive-antlr4-reference-part1/">ANTLR 4权威参考读书笔记（1）</a>
+    </li>
+  
+    <li class="related">
+      <a href="/blog/using-antlr-to-build-powerscript-grammar-parser-part4/">使用ANTLR构建PowerScript语法分析器（4）</a>
+    </li>
+  
+    <li class="related">
+      <a href="/blog/cannot-launch-the-remote-parser-because-port-49153-is-already-in-use/">Cannot launch the remote parser because port 49153 is already in use</a>
+    </li>
+  
+  </ul>
+
+
+    
+      <div id="jiathis_style_32x32">
+	<a class="jiathis_button_qzone"></a>
+	<a class="jiathis_button_tsina"></a>
+	<a class="jiathis_button_tqq"></a>
+    <a class="jiathis_button_weixin"></a>
+	<a class="jiathis_button_renren"></a>
+	<a href="http://www.jiathis.com/share/" class="jiathis jiathis_txt jtico jtico_jiathis" target="_blank"></a>
+	<a class="jiathis_counter_style"></a>
+</div>
+<script type="text/javascript" src="http://v2.jiathis.com/code/jia.js" charset="utf-8"></script>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/reading-notes-the-definitive-antlr4-reference-part3/" title="Previous Post: ANTLR 4权威参考读书笔记（3）">&laquo; ANTLR 4权威参考读书笔记（3）</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part4/">ANTLR 4权威参考读书笔记（4）</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part3/">ANTLR 4权威参考读书笔记（3）</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part2/">ANTLR 4权威参考读书笔记（2）</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part1/">ANTLR 4权威参考读书笔记（1）</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/pbl-file-format-analysis/">PBL文件格式解析</a>
+      </li>
+    
+  </ul>
+</section>
+<section>
+  <h1>Recent Comments</h1>
+  <div class="dsq-widget">
+    <script type="text/javascript" src="http://codemany.disqus.com/recent_comments_widget.js"></script>
+  </div>
+</section>
+<section>
+  <h1>Tags</h1>
+  <ul class="tag-cloud">
+    <a style="font-size: 108%" href="/tags/antlr/">ANTLR</a>
+<a style="font-size: 105%" href="/tags/algorithm/">Algorithm</a>
+<a style="font-size: 133%" href="/tags/android/">Android</a>
+<a style="font-size: 93%" href="/tags/ant/">Ant</a>
+<a style="font-size: 111%" href="/tags/crack/">Crack</a>
+<a style="font-size: 105%" href="/tags/database/">Database</a>
+<a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
+<a style="font-size: 87%" href="/tags/git/">Git</a>
+<a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
+<a style="font-size: 142%" href="/tags/java/">Java</a>
+<a style="font-size: 93%" href="/tags/javascript/">JavaScript</a>
+<a style="font-size: 97%" href="/tags/listview/">ListView</a>
+<a style="font-size: 87%" href="/tags/maven/">Maven</a>
+<a style="font-size: 105%" href="/tags/mysql/">MySQL</a>
+<a style="font-size: 93%" href="/tags/other/">Other</a>
+<a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
+<a style="font-size: 116%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 93%" href="/tags/powerscript/">PowerScript</a>
+<a style="font-size: 118%" href="/tags/qianbao/">Qianbao</a>
+<a style="font-size: 150%" href="/tags/rails/">Rails</a>
+<a style="font-size: 111%" href="/tags/ruby/">Ruby</a>
+<a style="font-size: 93%" href="/tags/spring/">Spring</a>
+<a style="font-size: 101%" href="/tags/struts/">Struts</a>
+<a style="font-size: 111%" href="/tags/translation/">Translation</a>
+<a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
+<a style="font-size: 108%" href="/tags/windows-server-2008/">Windows Server 2008</a>
+<a style="font-size: 108%" href="/tags/wxwidgets/">wxWidgets</a>
+
+  </ul>
+</section>
+<section>
+  <h1>Blogroll</h1>
+  <ul>
+    <li><a href="http://mindhacks.cn/">刘未鹏MIND HACKS</a></li>
+    <li><a href="http://www.importnew.com/">ImportNew</a></li>
+    <li><a href="http://ifeve.com/">并发编程网</a></li>
+    <li><a href="http://codingnow.com/">云风的 BLOG</a></li>
+    <li><a href="http://dbanotes.net/">DBA Notes</a></li>
+    <li><a href="http://www.ruanyifeng.com/blog/">阮一峰的网络日志</a></li>
+    <li><a href="http://advdbg.org/">高端调试</a></li>
+    <li><a href="http://www.cs.usfca.edu/~galles/visualization/Algorithms.html">Data Structure Visualization</a></li>
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/dohkoos">@dohkoos</a> on GitHub
+  
+  <script type="text/javascript">
+    $(document).ready(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'dohkoos',
+            count: 5,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2016 - dohkoos -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'codemany';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part4/';
+        var disqus_url = 'http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part4/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = '//' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+</body>
+</html>

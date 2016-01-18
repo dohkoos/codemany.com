@@ -9,7 +9,12 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="wxWidgets提供了一个用来检测是否只有一个实例在运行的wxSingleInstanceChecker类。为了检测程序只运行一个实例，你可以在程序运行之初使用该类创建一个m_check对象，这个对象将存在于程序的整个生命周期。 &hellip;">
+  <meta name="description" content="无标题栏窗口的实现很简单。先将窗口从wxMiniFrame继承，然后在窗口的构造函数中设置一下窗口的样式。 1
+2
+3
+4
+5
+MainFrame::MainFrame(const wxPoint& pos, const wxSize& size) : wxMiniFrame(NULL, &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +78,109 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-implement-draggable-window-without-title-bar/">如何实现一个可拖动的无标题栏窗口</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-12-03T15:46:55+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2007</span></span> <span class='time'>3:46 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>无标题栏窗口的实现很简单。先将窗口从wxMiniFrame继承，然后在窗口的构造函数中设置一下窗口的样式。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>MainFrame::MainFrame(const wxPoint& pos, const wxSize& size)
+</span><span class='line'>    : wxMiniFrame(NULL, wxID_ANY, wxEmptyString, pos, size)
+</span><span class='line'>{
+</span><span class='line'>    SetWindowStyleFlag(wxFRAME_NO_TASKBAR | wxNO_BORDER);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>但是，窗口的移动通常都是通过鼠标点住标题栏拖动窗口来实现的，那么现在没有了标题栏，该如何移动窗口呢？我们知道，当鼠标拖动窗口时，它在窗口中的位置是始终不变的。所以如果能够在鼠标移动过程中，通过改变窗口在桌面上的坐标，并且始终保持鼠标相对于窗口的坐标不变，即可实现鼠标的拖动效果。</p>
+
+<p>在具体的设计中，先在鼠标的MouseDown事件中记录下鼠标相对于窗口的偏移，在鼠标的MouseMove事件中根据鼠标在桌面上的位置实时设置窗口的位置，即可达到鼠标拖动窗口的操作。利用此方法实现鼠标拖动，与常规的标题栏鼠标拖动在效果上有一点区别。通过标题栏拖动时，鼠标移动过程中不重画窗口，只有松开鼠标后才在固定位置重画窗口，因此其速度较快。而采用本方法的拖动过程中，每移动一步都需要重画窗口，因此对速度稍有影响，在慢一些的机器上可能会出现轻微的拖尾现象。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>void MainFrame::OnMouseMove(wxMouseEvent& event)
+</span><span class='line'>{
+</span><span class='line'>    if (event.Dragging() && event.LeftIsDown())
+</span><span class='line'>    {
+</span><span class='line'>        wxPoint pt = ClientToScreen(event.GetPosition());
+</span><span class='line'>        int x = pt.x - m_delta.x;
+</span><span class='line'>        int y = pt.y - m_delta.y;
+</span><span class='line'>        Move(x, y);
+</span><span class='line'>    }
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>void MainFrame::OnMouseLeftDown(wxMouseEvent& event)
+</span><span class='line'>{
+</span><span class='line'>    CaptureMouse();
+</span><span class='line'>    wxPoint pt = ClientToScreen(event.GetPosition());
+</span><span class='line'>    wxPoint origin = GetPosition();
+</span><span class='line'>    int dx = pt.x - origin.x;
+</span><span class='line'>    int dy = pt.y - origin.y;
+</span><span class='line'>    m_delta = wxPoint(dx, dy);
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>void MainFrame::OnMouseLeftUp(wxMouseEvent& WXUNUSED(event))
+</span><span class='line'>{
+</span><span class='line'>    if (HasCapture())
+</span><span class='line'>    {
+</span><span class='line'>        ReleaseMouse();
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p><a href="/uploads/wxDragAndDrop.zip" title="wxDragAndDrop.zip">代码下载</a></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1146,120 +1254,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/install-and-use-ruby-dbi/">Ruby DBI的安装和使用</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2007-09-04T22:35:15+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>4</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>10:35 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Ruby DBI是一个为Ruby程序访问数据库提供的与数据库无关的统一数据库编程接口。结构层次上可以分为两层：</p>
-
-<ol>
-<li>Database Interface 数据库接口层，与数据库无关，提供与数据库无关的标准接口</li>
-<li>Database Driver 数据库驱动，与数据库相关</li>
-</ol>
-
-<p>Ruby DBI模块可以从 <a href="http://ruby-dbi.sourceforge.net/">http://ruby-dbi.sourceforge.net/</a> 取得，下载后解压缩，配置，然后安装：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ruby setup.rb config --with=dbi,dbd_mysql
-</span><span class='line'>ruby setup.rb setup
-</span><span class='line'>ruby setup.rb install</span></code></pre></td></tr></table></div></figure>
-
-<p>注意：--with参数必须根据你所安装的数据库类型来选择。可以配置多个，但不能选择没有安装在你机器上的数据库类型。记得刚开始的时候我使用ruby setup.rb config来配置（我机器上只安装了MySQL和SQL Server），结果在ruby setup.rb setup时一直出现像下面这样的错误信息：</p>
-
-<p><img src="/uploads/ruby-dbi.png" title="ruby-dbi" ></p>
-
-<p>下面是一个完整的例子</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># dbitest.rb
-</span><span class='line'>require 'dbi'
-</span><span class='line'>
-</span><span class='line'># Connect to a database
-</span><span class='line'>dbh = DBI.connect('dbi:Mysql:rubydbi:localhost', 'root', '123456')
-</span><span class='line'>
-</span><span class='line'>dbh.do('DROP TABLE IF EXISTS people')
-</span><span class='line'>dbh.do('CREATE TABLE people (id int, name varchar(30))')
-</span><span class='line'>
-</span><span class='line'># Insert some rows, use placeholders
-</span><span class='line'>sql = 'INSERT INTO people VALUES (?, ?)'
-</span><span class='line'>dbh.prepare(sql) do |sth|
-</span><span class='line'>    sth.execute('100', 'Michael')
-</span><span class='line'>    sth.execute('200', 'John')
-</span><span class='line'>end
-</span><span class='line'>
-</span><span class='line'># Select all rows
-</span><span class='line'>sth = dbh.prepare('SELECT * FROM people')
-</span><span class='line'>sth.execute
-</span><span class='line'>
-</span><span class='line'># Print out each row
-</span><span class='line'>while row = sth.fetch do
-</span><span class='line'>    p row
-</span><span class='line'>end
-</span><span class='line'>
-</span><span class='line'># Close the statement handle when done
-</span><span class='line'>sth.finish
-</span><span class='line'>
-</span><span class='line'>dbh.do('DROP TABLE people')
-</span><span class='line'>
-</span><span class='line'># Finally, disconnect
-</span><span class='line'>dbh.disconnect</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/19">&larr; Older</a>
@@ -1277,6 +1271,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part4/">ANTLR 4权威参考读书笔记（4）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part3/">ANTLR 4权威参考读书笔记（3）</a>
       </li>
     
@@ -1292,10 +1290,6 @@
         <a href="/blog/pbl-file-format-analysis/">PBL文件格式解析</a>
       </li>
     
-      <li class="post">
-        <a href="/blog/random-with-weight-function/">带权随机函数</a>
-      </li>
-    
   </ul>
 </section>
 <section>
@@ -1307,7 +1301,7 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 105%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 108%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 105%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 93%" href="/tags/ant/">Ant</a>
