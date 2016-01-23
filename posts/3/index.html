@@ -9,7 +9,17 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="主机是Windows Server 2008，虚拟机Windows XP，VirtualBox的版本为4.3.6。 因为某种原因，需要修改XP系统的时间设置。但在设置后不到10秒钟就又和主机的时间自动同步了。 实时同步时间功能是由Guest Additions提供的，把它卸载就可以修改时间， &hellip;">
+  <meta name="description" content="在以前写的博文部署应用到Heroku时的问题里有这么一段话： 股票功能需要导入交割单文件，因为导入后的文本文件不再使用，可以把上传路径由public/uploads改为tmp，这样就避免了Heroku不能写文件的问题。 下面是那时候写的导入代码： 1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +83,247 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/refactoring-rails-code/">重构Rails代码</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2014-11-18T19:42:59+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>7:42 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在以前写的博文<a href="/blog/problem-when-deploying-application-to-heroku/">部署应用到Heroku时的问题</a>里有这么一段话：</p>
+
+<blockquote>
+<p>股票功能需要导入交割单文件，因为导入后的文本文件不再使用，可以把上传路径由public/uploads改为tmp，这样就避免了Heroku不能写文件的问题。</p>
+</blockquote>
+
+<p>下面是那时候写的导入代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class StocksController &lt; ApplicationController
+</span><span class='line'>  UPLOADS_DIRECTORY = File.join("#{Rails.root}", "public/uploads")
+</span><span class='line'>
+</span><span class='line'>  def import
+</span><span class='line'>    filename = upload_file(params[:file])
+</span><span class='line'>    lines = File.readlines("#{UPLOADS_DIRECTORY}/#{filename}")
+</span><span class='line'>    lines.each do |line|
+</span><span class='line'>      # do something
+</span><span class='line'>    end
+</span><span class='line'>    redirect_to stocks_url
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  protected
+</span><span class='line'>    def upload_file(file)
+</span><span class='line'>      if !file.original_filename.empty?
+</span><span class='line'>        @filename = get_file_name(file.original_filename)
+</span><span class='line'>        Dir.mkdir("#{UPLOADS_DIRECTORY}") unless Dir.exist?("#{UPLOADS_DIRECTORY}")
+</span><span class='line'>        File.open("#{UPLOADS_DIRECTORY}/#{@filename}", "wb") do |f|
+</span><span class='line'>          f.write(file.read)
+</span><span class='line'>        end
+</span><span class='line'>        return @filename
+</span><span class='line'>      end
+</span><span class='line'>    end
+</span><span class='line'>
+</span><span class='line'>    def get_file_name(filename)
+</span><span class='line'>      if !filename.nil?
+</span><span class='line'>        # does not support chinese filename?
+</span><span class='line'>        Time.now.strftime("%Y%m%d%H%M%S") + '.txt'
+</span><span class='line'>      end
+</span><span class='line'>    end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>这里的实现方法是先将上传文件保存到服务器上应用的public/uploads目录中，然后再读取和处理。</p>
+
+<p>其实根本不需要写的这么复杂，因为导入的文件被读取一次后就不再使用了。所以在当时写代码的时候一直有这样的想法，如果能直接获得上传文件的数据，那么就不需要再另外去写保存和读取文件的代码了。</p>
+
+<p>事实也是如此。通过表单提交的file数据会首先在服务器上形成临时文件，这时其实可以通过临时文件的路径来读取上传文件的数据。</p>
+
+<p>根据该想法重构后的代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class StocksController &lt; ApplicationController
+</span><span class='line'>  def import
+</span><span class='line'>    lines = File.readlines(params[:file].tempfile.to_path.to_s)
+</span><span class='line'>    lines.each do |line|
+</span><span class='line'>      # do something
+</span><span class='line'>    end
+</span><span class='line'>    redirect_to stocks_url
+</span><span class='line'>  end</span></code></pre></td></tr></table></div></figure>
+
+<p>重构后的代码果然清爽多了，不过还是有改进的空间。</p>
+
+<p>作为控制器，controller只是负责接收request，并返回response。而具体的业务逻辑，则应该交由model去完成。下面是依照该理念再次重构后的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class StocksController &lt; ApplicationController
+</span><span class='line'>  def import
+</span><span class='line'>    Stock.import(params[:file])
+</span><span class='line'>    redirect_to stocks_url
+</span><span class='line'>  end
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>class Stock &lt; ActiveRecord::Base
+</span><span class='line'>  def self.import(file)
+</span><span class='line'>    lines = File.readlines(file.tempfile.to_path.to_s)
+</span><span class='line'>    lines.each do |line|
+</span><span class='line'>      # do something
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/multipart-misspelling-cause-bug/">打错multipart引发的血案</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2014-11-13T09:27:17+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>13</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>9:27 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>浪费几个小时，杀死无数脑细胞，最终发现是单词打错了。不过错有错招，这个问题也让我重新温习了一遍关于form数据编码的知识。</p>
+
+<p>在做上传表单时，一直报告如下错误：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>undefined method 'original_filename' for "example.csv":String</span></code></pre></td></tr></table></div></figure>
+
+<p>在 <a href="http://guides.rubyonrails.org/form_helpers.html#what-gets-uploaded">http://guides.rubyonrails.org/form_helpers.html#what-gets-uploaded</a> 有这样一段文字：</p>
+
+<blockquote>
+<p>The object in the params hash is an instance of a subclass of IO. Depending on the size of the uploaded file it may in fact be a StringIO or an instance of File backed by a temporary file. In both cases the object will have an original_filename attribute containing the name the file had on the user&#39;s computer and a content_type attribute containing the MIME type of the uploaded file.</p>
+</blockquote>
+
+<p>说明example.csv应该是IO类型的，这里怎么显示是String呢？</p>
+
+<p>表单代码为</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= form_tag import_stocks_path, mutlipart: true do %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>或</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= form_tag import_stocks_path, method: :post, mutlipart: true do %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>生成后的HTML代码都是：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;form action="/stocks/import" method="post" mutlipart="true"&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>正确的HTML代码应该是：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;form action="/stocks/import" method="post" enctype="multipart/form-data"&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>使用HttpFox工具抓取表单提交信息如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>POST /stocks/import HTTP/1.1
+</span><span class='line'>Host localhost:3000
+</span><span class='line'>Referer   http://localhost:3000/stocks/import
+</span><span class='line'>Connection keep-alive
+</span><span class='line'>Content-Type application/x-www-form-urlencoded
+</span><span class='line'>Content-Length 112</span></code></pre></td></tr></table></div></figure>
+
+<p>什么是application/x-www-form-urlencoded？含有file类型字段的表单编码不应该是multipart/form-data吗。</p>
+
+<p>form的enctype属性通常有两种：application/x-www-form-urlencoded和multipart/form-data，默认为前者。当method=get时，浏览器用application/x-www-form-urlencoded编码方式把form数据转换成一个字串（name1=value1&amp;name2=value2...），然后把这个字串附加到url后面，用?分割。当method=post的时候，浏览器把form数据封装到post-body中。如果没有type=file的控件，就用默认的application/x-www-form-urlencoded编码。但是如果有type=file的话，就要用到multipart/form-data了。浏览器会把整个表单以控件为单位分割，并为每个部分加上Content-Disposition（form-data或者file），Content-Type（默认为text/plain），name等信息，并加上分割边界（boundary）。</p>
+
+<p>这时才发现原来是把multipart打错成mutlipart了，真是惨痛的教训啊！</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -662,167 +913,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/using-wifi-on-raspberry-pi/">在Raspberry Pi上使用无线网卡</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2014-07-06T20:25:08+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>6</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>8:25 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>使用的是EDUP EP-N1556这款无线网卡，体积小巧，支持300M速率，买回来插在RPi上直接就能识别了。</p>
-
-<p>输入lsusb命令，可以见到设备列表中有RTL8192CU 802.11n WLAN Adapter字样，说明网卡已经被系统识别，芯片是RTL8192。</p>
-
-<p>下面就给无线网卡设置静态IP地址：</p>
-
-<p>修改/etc/wpa_supplicant/wpa_supplicant.conf</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
-</span><span class='line'>update_config=1
-</span><span class='line'>
-</span><span class='line'>network={
-</span><span class='line'>  ssid="NETGEAR"
-</span><span class='line'>  psk="12345678"
-</span><span class='line'>  proto=RSN  # 也可以写成WPA2
-</span><span class='line'>  key_mgmt=WPA-PSK  # 一定不要写成WPA2-PSK
-</span><span class='line'>  id_str="edup1556"
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>修改/etc/network/interfaces</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>auto lo
-</span><span class='line'>
-</span><span class='line'>iface lo inet loopback
-</span><span class='line'>
-</span><span class='line'>iface eth0 inet static
-</span><span class='line'>  address 192.168.0.100
-</span><span class='line'>  netmask 255.255.255.0
-</span><span class='line'>  gateway 192.168.0.1
-</span><span class='line'>  dns-nameservers 8.8.8.8
-</span><span class='line'>
-</span><span class='line'>allow-hotplug wlan0
-</span><span class='line'>iface wlan0 inet manual
-</span><span class='line'>  wpa-roam /etc/wpa_supplicant/wpa_supplicant.conf
-</span><span class='line'>iface edup1556 inet static
-</span><span class='line'>  address 192.168.0.200
-</span><span class='line'>  netmask 255.255.255.0
-</span><span class='line'>  gateway 192.168.0.1
-</span><span class='line'>  dns-nameservers 8.8.8.8
-</span><span class='line'>
-</span><span class='line'>iface default inet dhcp</span></code></pre></td></tr></table></div></figure>
-
-<p>然后用ifconfig命令列出所有的网络设备，可以看到wlan0的IP是192.168.0.200了。</p>
-
-<p>你的树莓派自由了，不再需要网线拖着了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-i-made-ruby-script-156x-faster/">我是如何让Ruby脚本速度提升156倍的</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2014-06-28T13:04:08+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>28</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>1:04 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>以前写过<a href="/blog/using-ruby-to-batch-rename-filename-from-traditional-to-simplified/">使用Ruby批量修改繁体文件名为简体</a>，可惜脚本的性能很有问题，批量重命名时运行速度非常慢。这次准备优化下代码，提升脚本的执行效率。</p>
-
-<p>profile.rb是为Ruby程序准备的profiler，它可以统计并输出各方法的运行时间，以便于找到程序执行的性能瓶颈。这次就用它来剖析脚本的运行时间。使用方法很简单，加上命令行选项-r profile就可以：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ruby -r profile rename.rb</span></code></pre></td></tr></table></div></figure>
-
-<p>运行结束后，会把统计信息输出到标准错误输出中。如下图所示：</p>
-
-<p><img src="/uploads/profile-before-tuning.png" title="profile-before-tuning" ></p>
-
-<p>profile统计的是各方法的运行时间，分为两类。一类是计算的是从方法调用到方法返回之间的时间，称为整体时间；另一类则是从整体时间中扣除在该方法中调用其它方法所耗费时间之后得到的时间，称为实际时间。</p>
-
-<p>上图输出信息每行中各字段含义如下（从左到右）：</p>
-
-<ul>
-<li>该方法执行时间占整体时间的百分比，比例越高越说明这行代码可能需要优化</li>
-<li>整体时间的总和</li>
-<li>实际时间的总和</li>
-<li>被调用的次数</li>
-<li>每次调用的平均实际时间（毫秒）</li>
-<li>每次调用的平均整体时间（毫秒）</li>
-<li>方法名</li>
-</ul>
-
-<p>由上图可以看出，脚本执行的时间大部分耗在了循环上。解决方法有两个：消除循环或减少循环次数。前者很难实现，暂且还没有想到办法，也许根本就没有可能。脚本中mapping的大小为2685，所以每修改一个文件名需要执行2685次循环，且循环中的encode和gsub!都是耗时操作。通常文件名的长度不超过30个字符，通过遍历文件名中每个字符的方式重命名就可以把循环次数缩减到不超过30次。</p>
-
-<p>修改代码后重新执行分析命令，得到的结果是脚本运行时间从379395秒变成2418秒，性能整整提升了156倍，达到2个数量级的效果。</p>
-
-<p><img src="/uploads/profile-after-tuning.png" title="profile-after-tuning" ></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/4">&larr; Older</a>
@@ -840,6 +930,14 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/overnight-success-it-takes-years/">一夜成名：这需要好几年时间</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part5/">ANTLR 4权威参考读书笔记（5）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part4/">ANTLR 4权威参考读书笔记（4）</a>
       </li>
     
@@ -849,14 +947,6 @@
     
       <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part2/">ANTLR 4权威参考读书笔记（2）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part1/">ANTLR 4权威参考读书笔记（1）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/pbl-file-format-analysis/">PBL文件格式解析</a>
       </li>
     
   </ul>
@@ -870,14 +960,14 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 108%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 111%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 105%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 93%" href="/tags/ant/">Ant</a>
 <a style="font-size: 111%" href="/tags/crack/">Crack</a>
 <a style="font-size: 105%" href="/tags/database/">Database</a>
 <a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
-<a style="font-size: 87%" href="/tags/git/">Git</a>
+<a style="font-size: 87%" href="/tags/heroku/">Heroku</a>
 <a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
 <a style="font-size: 142%" href="/tags/java/">Java</a>
 <a style="font-size: 93%" href="/tags/javascript/">JavaScript</a>
@@ -893,7 +983,7 @@
 <a style="font-size: 111%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 93%" href="/tags/spring/">Spring</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 111%" href="/tags/translation/">Translation</a>
+<a style="font-size: 113%" href="/tags/translation/">Translation</a>
 <a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 108%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 108%" href="/tags/wxwidgets/">wxWidgets</a>

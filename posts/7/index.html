@@ -9,7 +9,10 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="HTTP Response Header有个Content-Disposition参数，该参数的目的是为了在客户端另存文件时提供一个建议的文件名。将它的值设置为attachment后，浏览器就会老老实实地显示另存为对话框，如果这个值设成inline， &hellip;">
+  <meta name="description" content="破解前的系统情况： 硬件版本号 V3.0
+软件版本号 F460_IMS_V2.30.10P1T6_JS1111
+BOOT版本号 V1.1.0P1T1
+版本日期 2012-02-29 16:29:07 中兴ZXA10-F460光猫（E8-C）在第一次安装的时候， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +76,266 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-crack-zte-zxa10-f460-v30-for-superuser-password/">如何破解中兴ZXA10-F460 v3.0获取超级管理员密码</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2012-07-20T14:12:59+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>20</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>2:12 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>破解前的系统情况：</p>
+
+<ul>
+<li>硬件版本号 V3.0</li>
+<li>软件版本号 F460_IMS_V2.30.10P1T6_JS1111</li>
+<li>BOOT版本号 V1.1.0P1T1</li>
+<li>版本日期 2012-02-29 16:29:07</li>
+</ul>
+
+<p>中兴ZXA10-F460光猫（E8-C）在第一次安装的时候，超级管理员帐号是telecomadmin，密码为nE7jA%5m，这个是默认的，由安装人员设置好相关设置后，会自动下载配置，这时候这个超级管理员密码会被修改为telecomadminXXXXXXXX（8个X是8位数字，每个用户是不同的）这种格式。因为很多设置需要在超级管理员下才能设置，所以破解这个超级管理员密码是非常必要的。</p>
+
+<p>其中V1.0和V2.0版本网上有破解方法，大家可以自己搜索。</p>
+
+<p>在命令行下输入telnet 192.168.1.1，帐号和密码都是root。连接成功后，会出现“F460 login:”这样的提示。</p>
+
+<p>注意：目前网上流传的查看/tmp目录下db_backup_cfg.xml文件内容的破解方法已经无效了。另外在/userconfig/cfg目录下有两个加密的配置文件db_backup_cfg.xml和db_user_cfg.xml，同目录下还有个db_default_cfg.xml是不加密的（该文件是出厂设置的配置文件），但是大家不要用这个文件去替换db_user_cfg.xml，否则会出现不可预知的后果。</p>
+
+<p>实际上只要修改一下/home/httpd/login.gch这个文件，就能看到密码了。patch文件内容如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>--- /home/httpd/login.gch 2012-07-03 14:05:16.000000000 +0800
+</span><span class='line'>+++ login.gch 2012-07-03 14:03:37.000000000 +0800
+</span><span class='line'>@@ -152,6 +152,17 @@
+</span><span class='line'>set_language("langcn.conf");
+</span><span class='line'>langclass = "login_title_centeren";
+</span><span class='line'>}
+</span><span class='line'>+var CK_HANDLE = create_paralist();
+</span><span class='line'>+var login_name = "telecomadmin";
+</span><span class='line'>+set_para(CK_HANDLE, "Username", login_name);
+</span><span class='line'>+qeury_list_bycond("OBJ_USERINFO_ID", "IGD", CK_HANDLE);
+</span><span class='line'>+destroy_paralist(CK_HANDLE);
+</span><span class='line'>+CK_HANDLE = create_paralist();
+</span><span class='line'>+var CK_IDENTITY = query_identity(0);
+</span><span class='line'>+get_inst(CK_HANDLE, "OBJ_USERINFO_ID", CK_IDENTITY);
+</span><span class='line'>+var now_pwd = get_para(CK_HANDLE, "Password");
+</span><span class='line'>+now_pwd = delMoreSlash(now_pwd);
+</span><span class='line'>+destroy_paralist(CK_HANDLE);
+</span><span class='line'>%&gt;
+</span><span class='line'>&lt;head&gt;
+</span><span class='line'>&lt;META HTTP-EQUIV="pragma" CONTENT="no-cache&gt;
+</span><span class='line'>@@ -239,4 +250,5 @@
+</span><span class='line'>&lt;/script&gt;
+</span><span class='line'>&lt;/head&gt;
+</span><span class='line'>&lt;body onload="onFocus();"&gt;
+</span><span class='line'>+&lt;div&gt;&lt;%=now_pwd;%&gt;&lt;/div&gt;
+</span><span class='line'>&lt;div id="container" class="content"&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>效果是浏览器登录192.168.1.1的时候，超级管理员密码会显示在首页界面的左上角。</p>
+
+<p>到这儿有人想了，怎么把上面的patch更新到/home/httpd/login.gch中呢？总结了三种方法：</p>
+
+<p>第一种方法是telent到F460上后，执行下面的命令即可：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>sed -i '155 s/^/var CK_HANDLE = create_paralist();\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '156 s/^/var login_name = "telecomadmin";\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '157 s/^/set_para(CK_HANDLE, "Username", login_name);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '158 s/^/qeury_list_bycond("OBJ_USERINFO_ID", "IGD", CK_HANDLE);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '159 s/^/destroy_paralist(CK_HANDLE);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '160 s/^/CK_HANDLE = create_paralist();\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '161 s/^/var CK_IDENTITY = query_identity(0);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '162 s/^/get_inst(CK_HANDLE, "OBJ_USERINFO_ID", CK_IDENTITY);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '163 s/^/var now_pwd = get_para(CK_HANDLE, "Password");\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '164 s/^/now_pwd = delMoreSlash(now_pwd);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '165 s/^/destroy_paralist(CK_HANDLE);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '253 s/^/&lt;div&gt;&lt;%=now_pwd;%&gt;&lt;\/div&gt;\n/' /home/httpd/login.gch</span></code></pre></td></tr></table></div></figure>
+
+<p>第二种方法是telent到F460上后，执行cp /home/httpd/login.gch /home/httpd/login_gch.xml，通过浏览器把login_gch.xml保存到电脑上，然后再把patch更新进去。可以在电脑上架设ftp服务器，在F460上执行以下命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>cd /home/httpd/
+</span><span class='line'>wget ftp://&lt;YOUR_COMPUTER_IP&gt;/login.gch  # 把&lt;YOUR_COMPUTER_IP&gt;替换成你自己的</span></code></pre></td></tr></table></div></figure>
+
+<p>第三种方法是telent到F460上后，执行df命令，查看是否有usb1_1或usb2_1，如果有就可以进行下一步操作。输入cp /home/httpd/login.gch /mnt/usb1_1/login.gch把文件拷贝到优盘上，修改后使用cp /mnt/usb1_1/login.gch /home/httpd/login.gch把文件更新到猫上就可以。</p>
+
+<p>2013/6/16更新</p>
+
+<p>其实还有种更简便的方法，中兴的光猫有个sendcmd命令，下面是语法的简单说明：</p>
+
+<ol>
+<li>读取全部表名 sendcmd 1 DB all；</li>
+<li>读取指定表信息 sendcmd 1 DB p 表名。比如sendcmd 1 DB p UserInfo，查看路由器帐号和密码，超级管理员密码也在这里查看；</li>
+<li>查看当前系统运行的服务状态 sendcmd -pc show；</li>
+<li>修改某个表的某个字段的值 sendcmd 1 DB set 表名 行数 字段名 字段值。比如要修改超级管理员密码，可以使用sendcmd 1 DB set UserInfo 0 Password 123456；</li>
+<li>保存对配置文件的修改 sendcmd 1 DB save。</li>
+</ol>
+
+<p>其实还有其它的命令，但是就修改光猫配置来说，这几条命令足够了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/summary-of-sql-join/">SQL连接总结</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2012-07-02T09:44:51+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2012</span></span> <span class='time'>9:44 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>连接（join）可以在SELECT语句的FROM子句或WHERE子句中建立，在FROM子句中指出连接时有助于将连接操作与WHERE子句中的搜索条件区分开来。连接可以对同一个表操作，也可以对多个表操作，对同一个表操作的连接称为自连接（self join）。</p>
+
+<p>连接类型（join type）分为三种：内连接、外连接和交叉连接。</p>
+
+<ul>
+<li>内连接（inner join）：使用比较运算符进行表间某（些）列数据的比较操作，并列出这些表中与连接条件相匹配的数据行。</li>
+<li>外连接（outer join）：与内连接不同的是外连接不只列出与连接条件相匹配的行，而且列出左表（左外连接时）、右表（右外连接时）或两个表（全外连接时）中所有符合条件的数据行。</li>
+<li>交叉连接（cross join）：返回连接表中所有数据行的笛卡尔积。</li>
+</ul>
+
+<p>内/外链接可以分为等值连接和不等连接：</p>
+
+<ul>
+<li>等值连接（equijoin）：在连接条件中使用等于（=）运算符比较被连接列的列值，其查询结果中列出被连接表中的所有列，包括其中的重复列。</li>
+<li>不等连接（non-equijoin）：在连接条件使用除等于运算符以外的其它比较运算符比较被连接的列的列值。</li>
+</ul>
+
+<p>注意：自然连接（natural join）是一种特殊的等值连接。它使用选择列表指出查询结果中所包括的列，由此删除连接表中的重复列。</p>
+
+<p>books数据表：</p>
+
+<p><img src="/uploads/books-table.png" title="books-table" ></p>
+
+<p>publishers数据表：</p>
+
+<p><img src="/uploads/publishers-table.png" title="publishers-table" ></p>
+
+<p>自连接查询：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SELECT * FROM books b1 [INNER] JOIN books b2 ON b1.price = b2.price</span></code></pre></td></tr></table></div></figure>
+
+<p><img src="/uploads/self-join.png" title="self-join" ></p>
+
+<p>内连接（简称连接）查询：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SELECT * FROM books b [INNER] JOIN publishers p ON b.publisher_id = p.publisher_id</span></code></pre></td></tr></table></div></figure>
+
+<p><img src="/uploads/inner-join.png" title="inner-join" ></p>
+
+<p>自然连接查询：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SELECT b.*, p.name FROM books b [INNER] JOIN publishers p ON b.publisher_id = p.publisher_id</span></code></pre></td></tr></table></div></figure>
+
+<p><img src="/uploads/natural-join.png" title="natural-join" ></p>
+
+<p>左外连接（简称左连接）查询：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SELECT * FROM books b LEFT [OUTER] JOIN publishers p ON b.publisher_id = p.publisher_id</span></code></pre></td></tr></table></div></figure>
+
+<p><img src="/uploads/left-outer-join.png" title="left-outer-join" ></p>
+
+<p>右外连接（简称右连接）查询：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SELECT * FROM books b RIGHT [OUTER] JOIN publishers p ON b.publisher_id = p.publisher_id</span></code></pre></td></tr></table></div></figure>
+
+<p><img src="/uploads/right-outer-join.png" title="right-outer-join" ></p>
+
+<p>全外连接（简称全连接）查询：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SELECT * FROM books b FULL [OUTER] JOIN publishers p ON b.publisher_id = p.publisher_id</span></code></pre></td></tr></table></div></figure>
+
+<p><img src="/uploads/full-outer-join.png" title="full-outer-join" ></p>
+
+<p>交叉连接查询：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SELECT * FROM books CROSS JOIN publishers</span></code></pre></td></tr></table></div></figure>
+
+<p><img src="/uploads/cross-join.png" title="cross-join" ></p>
+
+<p>下图是由Moffatt在2008年制作的连接集合表示：</p>
+
+<p><img src="/uploads/sql-joins.jpg" title="sql-joins" ></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -938,227 +1201,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/implement-bottom-toolbar-in-android/">实现Android底部工具栏</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2011-11-16T17:08:52+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2011</span></span> <span class='time'>5:08 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在网上大部分教程中，底部工具栏通常由TabHost和RadioGroup结合完成，每个工具栏项对应一个独立的Activity。不过，我们要实现的是多个工具栏项在单独的一个Activity上起作用。</p>
-
-<p><a href="http://www.cnblogs.com/figoyu/archive/2010/11/20/1882691.html">http://www.cnblogs.com/figoyu/archive/2010/11/20/1882691.html</a> 就是这个。不过该教程对每个工具栏项设置了固定宽度80dip，导致工具栏项或屏幕大小不定时代码布局会有问题。</p>
-
-<p>这里对该教程做了些改进，使之能做到适应不定的工具栏项或屏幕大小。改进后的布局代码如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
-</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-</span><span class='line'>    android:orientation="vertical"
-</span><span class='line'>    android:layout_width="fill_parent"
-</span><span class='line'>    android:layout_height="fill_parent"&gt;
-</span><span class='line'>    &lt;LinearLayout
-</span><span class='line'>        android:layout_width="fill_parent"
-</span><span class='line'>        android:layout_height="0dip"
-</span><span class='line'>        android:layout_weight="1.0"&gt;
-</span><span class='line'>        &lt;ScrollView
-</span><span class='line'>            android:layout_width="fill_parent"
-</span><span class='line'>            android:layout_height="fill_parent"
-</span><span class='line'>            android:scrollbars="vertical"
-</span><span class='line'>            android:fadingEdge="vertical"&gt;
-</span><span class='line'>            &lt;TextView
-</span><span class='line'>                android:id="@+id/content"
-</span><span class='line'>                android:layout_width="fill_parent"
-</span><span class='line'>                android:layout_height="wrap_content"
-</span><span class='line'>                android:textSize="17dip" /&gt;
-</span><span class='line'>        &lt;/ScrollView&gt;
-</span><span class='line'>    &lt;/LinearLayout&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;include layout="@layout/toolbar" /&gt;
-</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>以下是工具栏toolbar.xml的布局代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
-</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-</span><span class='line'>    android:orientation="horizontal"
-</span><span class='line'>    android:layout_width="fill_parent"
-</span><span class='line'>    android:layout_height="wrap_content"
-</span><span class='line'>    android:background="@drawable/toolbar_bg"&gt;
-</span><span class='line'>    &lt;ImageButton
-</span><span class='line'>        android:id="@+id/btn_index"
-</span><span class='line'>        android:src="@drawable/index"
-</span><span class='line'>        android:text="@string/index"
-</span><span class='line'>        style="@style/toolbar" /&gt;
-</span><span class='line'>    &lt;ImageButton
-</span><span class='line'>        android:id="@+id/btn_prev"
-</span><span class='line'>        android:src="@drawable/btn_prev_bg"
-</span><span class='line'>        android:text="@string/prev"
-</span><span class='line'>        style="@style/toolbar" /&gt;
-</span><span class='line'>    &lt;ImageButton
-</span><span class='line'>        android:id="@+id/btn_next"
-</span><span class='line'>        android:src="@drawable/btn_next_bg"
-</span><span class='line'>        android:text="@string/next"
-</span><span class='line'>        style="@style/toolbar" /&gt;
-</span><span class='line'>    &lt;ImageButton
-</span><span class='line'>        android:id="@+id/btn_zoomin"
-</span><span class='line'>        android:src="@drawable/zoomin"
-</span><span class='line'>        android:text="@string/zoomin"
-</span><span class='line'>        style="@style/toolbar" /&gt;
-</span><span class='line'>    &lt;ImageButton
-</span><span class='line'>        android:id="@+id/btn_zoomout"
-</span><span class='line'>        android:src="@drawable/zoomout"
-</span><span class='line'>        android:text="@string/zoomout"
-</span><span class='line'>        style="@style/toolbar" /&gt;
-</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/create-maven-archetype-from-existing-project/">从已有项目创建Maven archetype</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2011-10-12T16:19:04+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2011</span></span> <span class='time'>4:19 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>手里有这样的一个项目，其它项目都基于该项目创建，只是对包名做些修改，还有就是替换部分图片和文本内容。每次手工重复类似的修改工作很是繁琐，简直让人发指，需要寻找自动化的解决方案。</p>
-
-<p>Maven界有这么一句话：遇到重复的Maven项目初始配置，就创建自己的archetype。其实不光是Maven项目，其它也是如此。《测试驱动开发》中有个Triangulation法则，《重构》中也有Rule of three，都是用来指导如何解决类似重复问题的。第一次是特殊解决，第二次还是特殊解决，第三次就要抽象解决了。</p>
-
-<p>Maven Archetype Plugin允许从当前存在的项目创建archetype，这样以后用户就可以基于该archetype创建项目了。</p>
-
-<p><img src="/uploads/archetype-overview.png" title="archetype-overview" ></p>
-
-<p>那么如何通过现有的项目创建archetype呢？首先清理项目中那些不必要的文件和目录，然后在根目录下执行：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mvn archetype:create-from-project
-</span><span class='line'>cd target/generated-sources/archetype
-</span><span class='line'>mvn clean install  # 本地安装</span></code></pre></td></tr></table></div></figure>
-
-<p>现在就可以使用上面创建的archetype来建立新项目了。在新的目录中执行以下命令即可：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mvn archetype:generate                          \
-</span><span class='line'>  -DarchetypeCatalog=local                      \
-</span><span class='line'>  -DarchetypeGroupId=&lt;archetype-groupId&gt;        \
-</span><span class='line'>  -DarchetypeArtifactId=&lt;archetype-artifactId&gt;  \
-</span><span class='line'>  -DgroupId=&lt;your-groupId&gt;                      \
-</span><span class='line'>  -DartifactId=&lt;your-artifactId&gt;                \
-</span><span class='line'>  -Dpackage=&lt;your-package&gt;                      \
-</span><span class='line'>  -Dversion=1.0</span></code></pre></td></tr></table></div></figure>
-
-<p>这里要注意的是，不要在target/generated-sources/archetype目录下运行上述命令，否则会生成失败，报如下错误：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>[ERROR] Failed to execute goal archetype:generate:
-</span><span class='line'>  org.apache.maven.archetype.exception.InvalidPackaging:
-</span><span class='line'>  Unable to add module to the current project as it is not of packaging type 'pom'</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/8">&larr; Older</a>
@@ -1176,6 +1218,14 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/overnight-success-it-takes-years/">一夜成名：这需要好几年时间</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part5/">ANTLR 4权威参考读书笔记（5）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part4/">ANTLR 4权威参考读书笔记（4）</a>
       </li>
     
@@ -1185,14 +1235,6 @@
     
       <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part2/">ANTLR 4权威参考读书笔记（2）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part1/">ANTLR 4权威参考读书笔记（1）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/pbl-file-format-analysis/">PBL文件格式解析</a>
       </li>
     
   </ul>
@@ -1206,14 +1248,14 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 108%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 111%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 105%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 93%" href="/tags/ant/">Ant</a>
 <a style="font-size: 111%" href="/tags/crack/">Crack</a>
 <a style="font-size: 105%" href="/tags/database/">Database</a>
 <a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
-<a style="font-size: 87%" href="/tags/git/">Git</a>
+<a style="font-size: 87%" href="/tags/heroku/">Heroku</a>
 <a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
 <a style="font-size: 142%" href="/tags/java/">Java</a>
 <a style="font-size: 93%" href="/tags/javascript/">JavaScript</a>
@@ -1229,7 +1271,7 @@
 <a style="font-size: 111%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 93%" href="/tags/spring/">Spring</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 111%" href="/tags/translation/">Translation</a>
+<a style="font-size: 113%" href="/tags/translation/">Translation</a>
 <a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 108%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 108%" href="/tags/wxwidgets/">wxWidgets</a>

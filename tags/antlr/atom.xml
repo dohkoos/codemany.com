@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: ANTLR | 乐者为王]]></title>
   <link href="http://codemany.com/tags/antlr/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2016-01-18T22:31:55+08:00</updated>
+  <updated>2016-01-23T14:09:39+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,56 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（5）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part5/"/>
+    <updated>2016-01-22T21:18:51+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part5</id>
+    <content type="html"><![CDATA[<p>在<a href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part3/">ANTLR 4权威参考读书笔记（3）</a>以及<a href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part4/">ANTLR 4权威参考读书笔记（4）</a>中我们分别用Visitor和Listener机制实现了计算器的解释执行和编译执行。但并没有给出这两种机制的太多细节，这次就来详细地讲讲。</p>
+
+<p>ANTLR在它的运行库中为两种树遍历机制提供支持。默认情况下，ANTLR生成一个语法分析树Listener接口，在其中定义了回调方法，用于响应被内建的树遍历器触发的事件。</p>
+
+<p>在Listener和Visitor机制之间最大的不同是：Listener方法被ANTLR提供的遍历器对象调用；而Visitor方法必须显式的调用visit方法遍历它们的子节点，在一个节点的子节点上如果忘记调用visit方法就意味着那些子树没有得到访问。</p>
+
+<p>让我们首先从Listener开始。在我们了解Listener之后，我们也将看到ANTLR如何生成遵循Visitor设计模式的树遍历器。</p>
+
+<h3 id="语法分析树listener">语法分析树Listener</h3>
+
+<p>在Calc.java中有这样两行代码：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">ParseTreeWalker walker = new ParseTreeWalker();
+walker.walk(new DirectiveListener(), tree);
+</code></pre></div>
+<p>类ParseTreeWalker是ANTLR运行时提供的用于遍历语法分析树和触发Listener中回调方法的树遍历器。ANTLR工具根据Calc.g中的语法自动生成ParseTreeListener接口的子接口CalcListener和默认实现CalcBaseListener，其中含有针对语法中每个规则的enter和exit方法。DirectiveListener是我们编写的继承自CalcBaseListener的包含特定应用代码的实现，把它传递给树遍历器后，树遍历器在遍历语法分析树时就会触发DirectiveListener中的回调方法。</p>
+
+<p><img src="/uploads/calc-listener-hierachy.png" title="calc-listener-hierachy" ></p>
+
+<p>下图左边的语法分析树显示ParseTreeWalker执行了一次深度优先遍历，由粗虚线表示，箭头方向代表遍历方向。右边显示的是语法分析树的完整调用序列，它们由ParseTreeWalker触发调用。当树遍历器遇到规则assign的节点时，它触发enterAssign()并且给它传递AssignContext语法分析树节点。在树遍历器访问完assign节点的所有子节点后，它触发exitAssign()。</p>
+
+<p><img src="/uploads/listener-call-sequence.png" title="listener-call-sequence" ></p>
+
+<p>Listener机制的强大之处在于所有都是自动的。我们不必要写语法分析树遍历器，而且我们的Listener方法也不必要显式地访问它们的子节点。</p>
+
+<h3 id="语法分析树visitor">语法分析树Visitor</h3>
+
+<p>有些情况下，我们实际想要控制的是遍历本身，在那里我们可以显式地调用visit方法去访问子树节点。选项-visitor告诉ANTLR工具从相应语法生成Visitor接口和默认实现，其中含有针对语法中每个规则的visit方法。</p>
+
+<p>下图是我们熟悉的Visitor模式操作在语法分析树上。左边部分的粗虚线表示语法分析树的深度优先遍历，箭头方向代表遍历方向。右边部分指明Visitor中的方法调用序列。</p>
+
+<p><img src="/uploads/visitor-call-sequence.png" title="visitor-call-sequence" ></p>
+
+<p>下面是Calc.java中的两行代码：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">EvalVisitor eval = new EvalVisitor();
+// To start walking the parse tree
+eval.visit(tree);
+</code></pre></div>
+<p>我们首先初始化自制的树遍历器EvalVisitor，然后调用visit()去访问整棵语法分析树。ANTLR运行时提供的Visitor支持代码会在看到根节点时调用visitProg()。在那里，visitProg()会把子树作为参数调用visit方法继续遍历，如此等等。</p>
+
+<p><img src="/uploads/calc-visitor-hierachy.png" title="calc-visitor-hierachy" ></p>
+
+<p>ANTLR自动生成的Visitor接口和默认实现可以让我们为Visitor方法编写自己的实现，让我们避免必须覆写接口中的每个方法，让我们仅仅聚焦在我们感兴趣的方法上。这种方法减少了我们学习ANTLR必须要花费的时间，让我们回到我们所熟悉的编程语言领域。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（4）]]></title>
@@ -80,7 +130,7 @@
 
 <p>做这个最简单的方法是使用ANTLR的语法分析树Listener机制实现DirectiveListener类，然后它通过监听来自树遍历器触发的事件，输出对应的机器指令。</p>
 
-<p>Listener机制的优势是我们不必要自己去做任何树遍历，甚至我们不必要知道遍历树的运行时如何调用我们的方法，我们只要知道我们的DirectiveListener类得到通知，在与语法规则匹配的短语开始和结束时。这种方法减少了我们学习ANTLR必须要花费的时间，让我们回到我们所熟悉的编程语言领域。</p>
+<p>Listener机制的优势是我们不必要自己去做任何树遍历，甚至我们不必要知道遍历语法分析树的运行时如何调用我们的方法，我们只要知道我们的DirectiveListener类得到通知，在与语法规则匹配的短语开始和结束时。这种方法减少了我们学习ANTLR必须要花费的时间，让我们回到我们所熟悉的编程语言领域。</p>
 
 <p>这里不需要创建新的语法规则，还是继续沿用前文Calc.g所包含的语法，标签也要保留：</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">grammar Calc;
@@ -114,7 +164,7 @@ ID  : [a-zA-Z]+ ;
 
 INT : [0-9]+ ;
 
-WS  : [ \r\t\u000C\n]+ -&gt; skip ;    // toss out whitespace
+WS  : [ \t\r\n]+ -&gt; skip ;    // toss out whitespace
 </code></pre></div>
 <p>然后，我们可以运行ANTLR工具：</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">antlr Calc.g
@@ -196,7 +246,7 @@ CalcLexer.tokens    CalcBaseListener.java   CalcListener.java
     }
 }
 </code></pre></div>
-<p>这个程序和前文Calc.java中的代码极度相似，区别只在12-13行。这两行代码负责创建树遍历器，然后让树遍历器去遍历那颗从语法分析器返回的树，当树遍历器遍历时，它就会触发调用到我们的DirectiveListener中实现的方法。此外，通过传入一个不同的Listener实现我们能简单地生成完全不同的输出。Listener机制有效地隔离了语法和语言应用，使语法可以被其它应用再次使用。</p>
+<p>这个程序和前文Calc.java中的代码极度相似，区别只在12-13行。这两行代码负责创建树遍历器，然后让树遍历器去遍历那颗从语法分析器返回的语法分析树，当树遍历器遍历时，它就会触发调用到我们的DirectiveListener中实现的方法。此外，通过传入一个不同的Listener实现我们能简单地生成完全不同的输出。Listener机制有效地隔离了语法和语言应用，使语法可以被其它应用再次使用。</p>
 
 <p>现在一切完备，让我们尝试着去编译和运行它吧！下面是完整的命令序列：</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">compile *.java
@@ -265,7 +315,7 @@ ID  : [a-zA-Z]+ ;
 
 INT : [0-9]+ ;
 
-WS  : [ \r\t\u000C\n]+ -&gt; skip ;    // toss out whitespace
+WS  : [ \t\r\n]+ -&gt; skip ;    // toss out whitespace
 </code></pre></div>
 <p>在上述的语法中，程序是由空格（换行符也被当作空格）终止的语句序列，语句可以是表达式或者赋值。那些以小写字母开头的像stat和expr是语法规则；由大写字母开头的诸如ID和INT为词法规则，用于识别标志符和整数这样的记号。我们用“|”分隔规则的选项，我们也可以用“()”把符号分组成子规则。例如，子规则<code>(&#39;*&#39;|&#39;/&#39;)</code>匹配乘法符号或者除法符号。</p>
 
@@ -287,7 +337,7 @@ grun Calc prog -gui calc.txt
 </code></pre></div>
 <p>TestRig会弹出一个显示语法分析树的窗口：</p>
 
-<p><img src="/uploads/parse-tree-calc.png" title="parse-tree-calc" ></p>
+<p><img src="/uploads/calc-parse-tree.png" title="calc-parse-tree" ></p>
 
 <h3 id="使用visitor模式计算结果">使用Visitor模式计算结果</h3>
 
@@ -521,7 +571,7 @@ EOF          # Unix系统输入Ctrl+D或Windows系统输入Ctrl+Z并按回车
 <p>你也可以以可视化的方式查看语法分析树：</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">grun Hello s -gui
 </code></pre></div>
-<p><img src="/uploads/parse-tree-hello.png" title="parse-tree-hello" ></p>
+<p><img src="/uploads/hello-parse-tree.png" title="hello-parse-tree" ></p>
 
 <p>以下是TestRig可用的所有参数：</p>
 
@@ -575,120 +625,10 @@ EOF          # Unix系统输入Ctrl+D或Windows系统输入Ctrl+Z并按回车
 <ul>
 <li>第一部分介绍ANTLR，提供一些语言的背景知识，带你开始一场ANTLR功能之旅，让你尝下句法的滋味和能用它做什么。</li>
 <li>第二部分是关于使用ANTLR语法结合树遍历器设计语法和构建语言应用。</li>
-<li>第三部分首先展示了如何定制ANTLR生成的语法分析器的错误处理。接下来，你将学习如何在语法中嵌入动作，因为有时候这样做比构建树然后遍历它更简单有效。关于动作，你还将学习使用语义谓词更改语法分析器的行为去处理一些具有挑战性的识别问题。最后一章解决一些具有挑战性的语言识别问题，例如识别XML和Python中上下文相关的换行。</li>
+<li>第三部分首先展示了如何定制ANTLR生成的语法分析器的错误处理。接下来，你将学习如何在语法中嵌入动作，因为有时候这样做比构建语法分析树然后遍历它更简单有效。关于动作，你还将学习使用语义谓词更改语法分析器的行为去处理一些具有挑战性的识别问题。最后一章解决一些具有挑战性的语言识别问题，例如识别XML和Python中上下文相关的换行。</li>
 <li>第四部分是参考章节，列出了所有关于使用ANTLR语法元语言和它的运行库的规则。</li>
 </ul>
 ]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[使用ANTLR构建PowerScript语法分析器（4）]]></title>
-    <link href="http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part4/"/>
-    <updated>2008-04-26T22:17:05+08:00</updated>
-    <id>http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part4</id>
-    <content type="html"><![CDATA[<p>什么是表达式</p>
-
-<p>简单的来说，表达式就是运算元和运算符根据语法规则结合后的结果，它通常被用来执行在变量或值上的操作处理。</p>
-
-<p>主表达式（Primary Expression）</p>
-
-<p>到现在PowerScript的词法分析已经写的差不多了，接下来就要开始写语法分析。语法分析的主要组成部分是表达式（expression），而表达式的主要组成部分则是主表达式。主表达式包含了大部分简单的表达式，如字面量（literal），字段存取，方法调用和数组存取等。带圆括号的表达式通常也被认为是主表达式。其常见形式如下：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">(x)
-x.y
-f(x)
-a[x]
-x++
-x--
-new
-</code></pre></div>
-<p>当直接子类存有和父类相同签名的事件或函数时，可以通过super调用父类的事件或函数，但是：</p>
-
-<ol>
-<li>它不能调用父类中控件的脚本（猜测super后只能跟随“::”符号）；</li>
-<li>它只能在直接子类的函数或事件中调用父类的事件或函数。</li>
-</ol>
-
-<p>在哪些脚本中可以使用parent：</p>
-
-<ol>
-<li>窗口中的控件，此时parent指代包含该控件的窗口；</li>
-<li>定制的用户对象中的控件，这时parent指代定制的用户对象；</li>
-<li>菜单，这时候parent指代该菜单的上一级菜单。</li>
-</ol>
-
-<p>收集的一些语句：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">this.ls_array[1]
-this.event pfc_addrow()
-this.event rowfocuschanged(ll_row)
-this.uo_1.function hallo()
-post function column_order_update_from_grid()
-event ue_process()
-
-close(parent)
-parent.enabled
-parent.hide()
-parent.event ue_postconstructor()
-parent.function static trigger wf_process( )
-
-super::create
-super::clicked;
-super::event clicked()
-super::event clicked(xpos, ypos, row, dwo)
-super::of_remove_tail(anv_tailnode)
-super::event trigger selectionchanging(oldindex, newindex)
-
-iu_tab_postings.post of_enable_sort(dw_main, dw_detail, false)
-w_main.event doubleclicked(flags, xpos, ypos)
-dw_main.event pfc_retrieve()
-cb_ok.event trigger clicked()
-cb_ok.triggerevent(clicked!)
-</code></pre></div>
-<p>主表达式语法：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">primary_expression
-    : &#39;(&#39; expression &#39;)&#39;
-    | IDENTIFIER &#39;!&#39;?                   // build-in constant
-    | literal
-    | &#39;::&#39; IDENTIFIER                   // global variables
-    | call_type IDENTIFIER arguments    // example: post function to_string()
-    | &#39;create&#39; &#39;using&#39;? (STRING_LITERAL|IDENTIFIER)
-    | &#39;destroy&#39; IDENTIFIER
-    | &#39;super&#39; &#39;::&#39; call_type? IDENTIFIER arguments?
-    | object_name (&#39;.&#39; IDENTIFIER)* identifier_suffix?
-    ;
-
-object_name
-    : &#39;this&#39;
-    | &#39;parent&#39;
-    | IDENTIFIER
-    ;
-
-call_type
-    : ( &#39;function&#39;
-      | &#39;event&#39;
-      | &#39;static&#39;
-      | &#39;dynamic&#39;
-      | &#39;trigger&#39;
-      | &#39;post&#39;
-      )+
-    ;
-
-identifier_suffix
-    : arguments (&#39;.&#39; IDENTIFIER arguments)*    // cascaded calling
-    | &#39;[&#39; expression_list? &#39;]&#39;
-    | call_type IDENTIFIER arguments
-    ;
-
-arguments
-    : &#39;(&#39; expression_list? &#39;)&#39;
-    ;
-
-literal
-    : STRING_LITERAL
-    | INTEGER_LITERAL
-    | FLOAT_LITERAL
-    | BOOLEAN_LITERAL
-    ;
-</code></pre></div>]]></content>
   </entry>
   
 </feed>

@@ -9,9 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="今天我们讲如何用Rails结合Open Flash Chart II（以下简称OFC2）实现如下的图表： 在项目中安装OFC2插件，生成相关controller： 1
-2
-script/plugin install git://github.com/pullmonkey/ &hellip;">
+  <meta name="description" content="在网上大部分教程中，底部工具栏通常由TabHost和RadioGroup结合完成，每个工具栏项对应一个独立的Activity。不过，我们要实现的是多个工具栏项在单独的一个Activity上起作用。 http://www.cnblogs.com/figoyu/archive/2010/11/20/ &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -75,6 +73,227 @@ script/plugin install git://github.com/pullmonkey/ &hellip;">
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/implement-bottom-toolbar-in-android/">实现Android底部工具栏</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2011-11-16T17:08:52+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2011</span></span> <span class='time'>5:08 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在网上大部分教程中，底部工具栏通常由TabHost和RadioGroup结合完成，每个工具栏项对应一个独立的Activity。不过，我们要实现的是多个工具栏项在单独的一个Activity上起作用。</p>
+
+<p><a href="http://www.cnblogs.com/figoyu/archive/2010/11/20/1882691.html">http://www.cnblogs.com/figoyu/archive/2010/11/20/1882691.html</a> 就是这个。不过该教程对每个工具栏项设置了固定宽度80dip，导致工具栏项或屏幕大小不定时代码布局会有问题。</p>
+
+<p>这里对该教程做了些改进，使之能做到适应不定的工具栏项或屏幕大小。改进后的布局代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+</span><span class='line'>    android:orientation="vertical"
+</span><span class='line'>    android:layout_width="fill_parent"
+</span><span class='line'>    android:layout_height="fill_parent"&gt;
+</span><span class='line'>    &lt;LinearLayout
+</span><span class='line'>        android:layout_width="fill_parent"
+</span><span class='line'>        android:layout_height="0dip"
+</span><span class='line'>        android:layout_weight="1.0"&gt;
+</span><span class='line'>        &lt;ScrollView
+</span><span class='line'>            android:layout_width="fill_parent"
+</span><span class='line'>            android:layout_height="fill_parent"
+</span><span class='line'>            android:scrollbars="vertical"
+</span><span class='line'>            android:fadingEdge="vertical"&gt;
+</span><span class='line'>            &lt;TextView
+</span><span class='line'>                android:id="@+id/content"
+</span><span class='line'>                android:layout_width="fill_parent"
+</span><span class='line'>                android:layout_height="wrap_content"
+</span><span class='line'>                android:textSize="17dip" /&gt;
+</span><span class='line'>        &lt;/ScrollView&gt;
+</span><span class='line'>    &lt;/LinearLayout&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;include layout="@layout/toolbar" /&gt;
+</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>以下是工具栏toolbar.xml的布局代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+</span><span class='line'>    android:orientation="horizontal"
+</span><span class='line'>    android:layout_width="fill_parent"
+</span><span class='line'>    android:layout_height="wrap_content"
+</span><span class='line'>    android:background="@drawable/toolbar_bg"&gt;
+</span><span class='line'>    &lt;ImageButton
+</span><span class='line'>        android:id="@+id/btn_index"
+</span><span class='line'>        android:src="@drawable/index"
+</span><span class='line'>        android:text="@string/index"
+</span><span class='line'>        style="@style/toolbar" /&gt;
+</span><span class='line'>    &lt;ImageButton
+</span><span class='line'>        android:id="@+id/btn_prev"
+</span><span class='line'>        android:src="@drawable/btn_prev_bg"
+</span><span class='line'>        android:text="@string/prev"
+</span><span class='line'>        style="@style/toolbar" /&gt;
+</span><span class='line'>    &lt;ImageButton
+</span><span class='line'>        android:id="@+id/btn_next"
+</span><span class='line'>        android:src="@drawable/btn_next_bg"
+</span><span class='line'>        android:text="@string/next"
+</span><span class='line'>        style="@style/toolbar" /&gt;
+</span><span class='line'>    &lt;ImageButton
+</span><span class='line'>        android:id="@+id/btn_zoomin"
+</span><span class='line'>        android:src="@drawable/zoomin"
+</span><span class='line'>        android:text="@string/zoomin"
+</span><span class='line'>        style="@style/toolbar" /&gt;
+</span><span class='line'>    &lt;ImageButton
+</span><span class='line'>        android:id="@+id/btn_zoomout"
+</span><span class='line'>        android:src="@drawable/zoomout"
+</span><span class='line'>        android:text="@string/zoomout"
+</span><span class='line'>        style="@style/toolbar" /&gt;
+</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/create-maven-archetype-from-existing-project/">从已有项目创建Maven archetype</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2011-10-12T16:19:04+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2011</span></span> <span class='time'>4:19 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>手里有这样的一个项目，其它项目都基于该项目创建，只是对包名做些修改，还有就是替换部分图片和文本内容。每次手工重复类似的修改工作很是繁琐，简直让人发指，需要寻找自动化的解决方案。</p>
+
+<p>Maven界有这么一句话：遇到重复的Maven项目初始配置，就创建自己的archetype。其实不光是Maven项目，其它也是如此。《测试驱动开发》中有个Triangulation法则，《重构》中也有Rule of three，都是用来指导如何解决类似重复问题的。第一次是特殊解决，第二次还是特殊解决，第三次就要抽象解决了。</p>
+
+<p>Maven Archetype Plugin允许从当前存在的项目创建archetype，这样以后用户就可以基于该archetype创建项目了。</p>
+
+<p><img src="/uploads/archetype-overview.png" title="archetype-overview" ></p>
+
+<p>那么如何通过现有的项目创建archetype呢？首先清理项目中那些不必要的文件和目录，然后在根目录下执行：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>mvn archetype:create-from-project
+</span><span class='line'>cd target/generated-sources/archetype
+</span><span class='line'>mvn clean install  # 本地安装</span></code></pre></td></tr></table></div></figure>
+
+<p>现在就可以使用上面创建的archetype来建立新项目了。在新的目录中执行以下命令即可：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>mvn archetype:generate                          \
+</span><span class='line'>  -DarchetypeCatalog=local                      \
+</span><span class='line'>  -DarchetypeGroupId=&lt;archetype-groupId&gt;        \
+</span><span class='line'>  -DarchetypeArtifactId=&lt;archetype-artifactId&gt;  \
+</span><span class='line'>  -DgroupId=&lt;your-groupId&gt;                      \
+</span><span class='line'>  -DartifactId=&lt;your-artifactId&gt;                \
+</span><span class='line'>  -Dpackage=&lt;your-package&gt;                      \
+</span><span class='line'>  -Dversion=1.0</span></code></pre></td></tr></table></div></figure>
+
+<p>这里要注意的是，不要在target/generated-sources/archetype目录下运行上述命令，否则会生成失败，报如下错误：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>[ERROR] Failed to execute goal archetype:generate:
+</span><span class='line'>  org.apache.maven.archetype.exception.InvalidPackaging:
+</span><span class='line'>  Unable to add module to the current project as it is not of packaging type 'pom'</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1549,361 +1768,6 @@ script/plugin install git://github.com/pullmonkey/ &hellip;">
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/transfer-sms-from-nokia-6670-to-htc-hero-g3/">将Nokia 6670的短信导入HTC Hero G3</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2011-06-21T08:43:10+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>21</span><span class='date-suffix'>st</span>, <span class='date-year'>2011</span></span> <span class='time'>8:43 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>这事本该N久前就该干了（09年末把手机从Nokia 6670换到HTC Hero G3），却一直拖着没有做，今天终于把这事作了一个了结。</p>
-
-<p>Nokia下导出的短信是如Messages_Nokia 6670_20091215.xml这样的一个XML文件，文件内容的编码是unicode，格式就像下面这样：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="unicode"?&gt;
-</span><span class='line'>&lt;SMS PhoneModel="Nokia 6670"&gt;
-</span><span class='line'>  &lt;Message DateTime="2011-06-21 10:10:10"&gt;
-</span><span class='line'>    &lt;Sender&gt;路人甲&lt;/Sender&gt;
-</span><span class='line'>    &lt;PhoneNumber&gt;+8613988888888&lt;/PhoneNumber&gt;
-</span><span class='line'>    &lt;Location&gt;Inbox&lt;/Location&gt;
-</span><span class='line'>    &lt;Text&gt;我是路人甲&lt;/Text&gt;
-</span><span class='line'>  &lt;/Message&gt;
-</span><span class='line'>
-</span><span class='line'>  &lt;Message DateTime="2011-06-21 11:11:11"&gt;
-</span><span class='line'>    &lt;Sender&gt;路人乙&lt;/Sender&gt;
-</span><span class='line'>    &lt;PhoneNumber&gt;+8613966666666&lt;/PhoneNumber&gt;
-</span><span class='line'>    &lt;Location&gt;Outbox&lt;/Location&gt;
-</span><span class='line'>    &lt;Text&gt;我是路人乙&lt;/Text&gt;
-</span><span class='line'>  &lt;/Message&gt;
-</span><span class='line'>&lt;/SMS&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>本来是想写个Android应用来直接导入这些备份短信的，不过在实现的过程中发现了SMS Backup&amp;Restore应用导出的备份文件和Nokia的备份文件类似，产生了做个将Nokia备份文件转换成SMS Backup&amp;Restore备份文件的念头，又在网上发现了nicholashan的<a href="http://bbs.hiapk.com/thread-140564-1-1.html">将Nokia的短信导入Hero（可能适用所有Android机型）</a>，坚定了我的这个想法。</p>
-
-<p>分析了一下SMS Backup&amp;Restore备份文件的格式，文件内容的编码是utf-8的：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version='1.0' encoding='utf-8' standalone='yes' ?&gt;
-</span><span class='line'>&lt;smses count="3"&gt;
-</span><span class='line'>  &lt;sms protocol="0" address="10658658" date="1308629532000"
-</span><span class='line'>    type="1" subject="null" body="我是内容" toa="null"
-</span><span class='line'>    sc_toa="null" service_center="null" read="1"
-</span><span class='line'>    status="-1" locked="0" /&gt;
-</span><span class='line'>  &lt;sms protocol="0" address="13566666666" date="1308633733000"
-</span><span class='line'>    type="2" subject="null" body="我也是内容" toa="null"
-</span><span class='line'>    sc_toa="null" service_center="null" read="1"
-</span><span class='line'>    status="-1" locked="0" /&gt;
-</span><span class='line'>  &lt;sms protocol="0" address="+8613588888888" date="1308641377000"
-</span><span class='line'>    type="1" subject="null" body="我还是内容" toa="null"
-</span><span class='line'>    sc_toa="null" service_center="null" read="1"
-</span><span class='line'>    status="-1" locked="0" /&gt;
-</span><span class='line'>&lt;/smses&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>与转换相关的就address、date、type和body四个属性。address是发信人的号码；date是短信发送日期的timestamp。这点nicholashan的确说错了，后面不需要加什么0的（实际上nicholashan自己也怀疑自己的说法）；type等于1表示别人发给你的短信，如果是2的话就是你发给其他人的短信；body就是短信内容了。</p>
-
-<p>将Nokia中的时间转换到SMS Backup&amp;Restore的时间可以使用下面的代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>DateFormat dt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-</span><span class='line'>long value = 1355296332000L;    // 2012-12-12 12:12:12
-</span><span class='line'>Element e = (Element)iter.next();
-</span><span class='line'>Attribute attr = e.attribute("DateTime");
-</span><span class='line'>try {
-</span><span class='line'>    value = dt.parse(attr.getValue()).getTime();
-</span><span class='line'>} catch (ParseException ex) {
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>完整的代码如下（使用dom4j实现XML解析）：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-<span class='line-number'>44</span>
-<span class='line-number'>45</span>
-<span class='line-number'>46</span>
-<span class='line-number'>47</span>
-<span class='line-number'>48</span>
-<span class='line-number'>49</span>
-<span class='line-number'>50</span>
-<span class='line-number'>51</span>
-<span class='line-number'>52</span>
-<span class='line-number'>53</span>
-<span class='line-number'>54</span>
-<span class='line-number'>55</span>
-<span class='line-number'>56</span>
-<span class='line-number'>57</span>
-<span class='line-number'>58</span>
-<span class='line-number'>59</span>
-<span class='line-number'>60</span>
-<span class='line-number'>61</span>
-<span class='line-number'>62</span>
-<span class='line-number'>63</span>
-<span class='line-number'>64</span>
-<span class='line-number'>65</span>
-<span class='line-number'>66</span>
-<span class='line-number'>67</span>
-<span class='line-number'>68</span>
-<span class='line-number'>69</span>
-<span class='line-number'>70</span>
-<span class='line-number'>71</span>
-<span class='line-number'>72</span>
-<span class='line-number'>73</span>
-<span class='line-number'>74</span>
-<span class='line-number'>75</span>
-<span class='line-number'>76</span>
-<span class='line-number'>77</span>
-<span class='line-number'>78</span>
-<span class='line-number'>79</span>
-<span class='line-number'>80</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>import java.io.File;
-</span><span class='line'>import java.io.FileWriter;
-</span><span class='line'>import java.io.IOException;
-</span><span class='line'>import java.text.DateFormat;
-</span><span class='line'>import java.text.ParseException;
-</span><span class='line'>import java.text.SimpleDateFormat;
-</span><span class='line'>import java.util.Iterator;
-</span><span class='line'>import java.util.List;
-</span><span class='line'>
-</span><span class='line'>import org.dom4j.Attribute;
-</span><span class='line'>import org.dom4j.Document;
-</span><span class='line'>import org.dom4j.DocumentException;
-</span><span class='line'>import org.dom4j.DocumentHelper;
-</span><span class='line'>import org.dom4j.Element;
-</span><span class='line'>import org.dom4j.Node;
-</span><span class='line'>import org.dom4j.io.SAXReader;
-</span><span class='line'>import org.dom4j.io.XMLWriter;
-</span><span class='line'>
-</span><span class='line'>public class Main {
-</span><span class='line'>
-</span><span class='line'>    public static void main(String[] args) {
-</span><span class='line'>        try {
-</span><span class='line'>            SAXReader sr = new SAXReader();
-</span><span class='line'>            Document doc = sr.read(new File(args[0]));
-</span><span class='line'>
-</span><span class='line'>            generateDocument(doc);
-</span><span class='line'>        } catch (DocumentException e) {
-</span><span class='line'>            e.printStackTrace();
-</span><span class='line'>        } catch (IOException e) {
-</span><span class='line'>            e.printStackTrace();
-</span><span class='line'>        }
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    private static void generateDocument(Document doc) {
-</span><span class='line'>        List list = doc.selectNodes("//Message");
-</span><span class='line'>
-</span><span class='line'>        Document document = DocumentHelper.createDocument();
-</span><span class='line'>        Element smses = document.addElement("smses");
-</span><span class='line'>        smses.addAttribute("count", String.valueOf(list.size()));
-</span><span class='line'>
-</span><span class='line'>        DateFormat dt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-</span><span class='line'>        long value = 1355296332000L;    // 2012-12-12 12:12:12
-</span><span class='line'>        Iterator iter = list.iterator();
-</span><span class='line'>        while (iter.hasNext()) {
-</span><span class='line'>            Element e = (Element)iter.next();
-</span><span class='line'>            Attribute attr = e.attribute("DateTime");
-</span><span class='line'>            try {
-</span><span class='line'>                value = dt.parse(attr.getValue()).getTime();
-</span><span class='line'>            } catch (ParseException e) {
-</span><span class='line'>                System.out.println(e.getMessage());
-</span><span class='line'>            }
-</span><span class='line'>            Node phone = e.selectSingleNode("PhoneNumber");
-</span><span class='line'>            Node location = e.selectSingleNode("Location");
-</span><span class='line'>            Node text = e.selectSingleNode("Text");
-</span><span class='line'>
-</span><span class='line'>            Element sms = smses.addElement("sms");
-</span><span class='line'>            sms.addAttribute("protocol", "0");
-</span><span class='line'>            sms.addAttribute("address", phone.getText());
-</span><span class='line'>            sms.addAttribute("date", String.valueOf(value));
-</span><span class='line'>            if ("Inbox".equals(location.getText())) {
-</span><span class='line'>                sms.addAttribute("type", "1");
-</span><span class='line'>            } else if ("Outbox".equals(location.getText())) {
-</span><span class='line'>                sms.addAttribute("type", "2");
-</span><span class='line'>            }
-</span><span class='line'>            sms.addAttribute("subject", "null");
-</span><span class='line'>            sms.addAttribute("body", text.getText());
-</span><span class='line'>            sms.addAttribute("toa", "null");
-</span><span class='line'>            sms.addAttribute("sc_toa", "null");
-</span><span class='line'>            sms.addAttribute("service_center", "null");
-</span><span class='line'>            sms.addAttribute("read", "1");
-</span><span class='line'>            sms.addAttribute("status", "-1");
-</span><span class='line'>            sms.addAttribute("locked", "0");
-</span><span class='line'>        }
-</span><span class='line'>
-</span><span class='line'>        File f = new File("output.xml");
-</span><span class='line'>        XMLWriter output = new XMLWriter(new FileWriter(f));
-</span><span class='line'>        output.write(document);
-</span><span class='line'>        output.close();
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>代码下载：<a href="https://github.com/dohkoos/N6670Conv">https://github.com/dohkoos/N6670Conv</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-to-obtain-install-time-and-space-of-installed-apps/">如何获得已安装应用的安装时间和占用空间</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2011-06-18T09:59:11+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2011</span></span> <span class='time'>9:59 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>可以通过ApplicationInfo类中sourceDir取得应用的文件路径，再使用File类读取文件的相关属性实现。不过这可能导致:</p>
-
-<ol>
-<li>无法获取原始的创建时间，可能很早就被创建了，之后被替换了；</li>
-<li>如果这个应用在一个私有的位置，比如app-private目录（使用Market付费购买的应用在这个位置），没有ROOT权限的手机会导致读取失败。</li>
-</ol>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>List&lt;PackageInfo&gt; pkgs = getPackageManager().getInstalledPackages(0);
-</span><span class='line'>for (int i = 0; i &lt; pkgs.size(); i++) {
-</span><span class='line'>    PackageInfo pkg = pkgs.get(i);
-</span><span class='line'>
-</span><span class='line'>    File file = new File(pkg.applicationInfo.sourceDir);
-</span><span class='line'>    System.out.println("file size: " + file.length());
-</span><span class='line'>    System.out.println("file last modified: " + file.lastModified());
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>不过File类中文件大小和文件最后修改时间的值是long型，不是用户友好的，在显示前需要格式化一下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>String size = Formatter.formatFileSize(context, file.length())
-</span><span class='line'>
-</span><span class='line'>Date date = new Date(file.lastModified())
-</span><span class='line'>String lastModified = new SimpleDateFormat("yyyy-MM-dd").format(date)
-</span><span class='line'>
-</span><span class='line'>System.out.println("file size: " + size);
-</span><span class='line'>System.out.println("file last modified: " + lastModified);</span></code></pre></td></tr></table></div></figure>
-
-<p>从Android 2.3 API Level为9开始，ApplicationInfo类新增了firstInstallTime和lastUpdateTime两个字段，可以直接获取应用的创建和最后修改时间，即使是付费软件也能正常获取。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/9">&larr; Older</a>
@@ -1921,6 +1785,14 @@ script/plugin install git://github.com/pullmonkey/ &hellip;">
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/overnight-success-it-takes-years/">一夜成名：这需要好几年时间</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part5/">ANTLR 4权威参考读书笔记（5）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part4/">ANTLR 4权威参考读书笔记（4）</a>
       </li>
     
@@ -1930,14 +1802,6 @@ script/plugin install git://github.com/pullmonkey/ &hellip;">
     
       <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part2/">ANTLR 4权威参考读书笔记（2）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part1/">ANTLR 4权威参考读书笔记（1）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/pbl-file-format-analysis/">PBL文件格式解析</a>
       </li>
     
   </ul>
@@ -1951,14 +1815,14 @@ script/plugin install git://github.com/pullmonkey/ &hellip;">
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 108%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 111%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 105%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 93%" href="/tags/ant/">Ant</a>
 <a style="font-size: 111%" href="/tags/crack/">Crack</a>
 <a style="font-size: 105%" href="/tags/database/">Database</a>
 <a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
-<a style="font-size: 87%" href="/tags/git/">Git</a>
+<a style="font-size: 87%" href="/tags/heroku/">Heroku</a>
 <a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
 <a style="font-size: 142%" href="/tags/java/">Java</a>
 <a style="font-size: 93%" href="/tags/javascript/">JavaScript</a>
@@ -1974,7 +1838,7 @@ script/plugin install git://github.com/pullmonkey/ &hellip;">
 <a style="font-size: 111%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 93%" href="/tags/spring/">Spring</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 111%" href="/tags/translation/">Translation</a>
+<a style="font-size: 113%" href="/tags/translation/">Translation</a>
 <a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 108%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 108%" href="/tags/wxwidgets/">wxWidgets</a>
