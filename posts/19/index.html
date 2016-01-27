@@ -9,7 +9,13 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="wxWidgets是一个开源的跨平台C++类库，它包含一个可以支持现今几乎所有操作系统的图形用户界面（GUI）库和其它一些很有用的工具，提供了类似MFC的功能。wxWidgets的主体是由C++构建的，但你并不是必需通过C++才能使用wxWidgets。wxWidgets拥有许多其它语言的绑定， &hellip;">
+  <meta name="description" content="高亮数据窗口中的一行很简单，只要在数据窗口控件的rowfocuschanged事件中添加下面的代码就可以了： 1
+2
+3
+4
+5
+long ll_row = this.GetRow()
+if ll_row &gt; 0 then this.SelectRow(0, false) this. &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +79,56 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/problem-highlight-a-row-on-datawindow/">数据窗口中高亮一行时出现的问题</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-09-14T12:18:36+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>14</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>12:18 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>高亮数据窗口中的一行很简单，只要在数据窗口控件的rowfocuschanged事件中添加下面的代码就可以了：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>long ll_row = this.GetRow()
+</span><span class='line'>if ll_row &gt; 0 then
+</span><span class='line'>    this.SelectRow(0, false)
+</span><span class='line'>    this.SelectRow(ll_row, true)
+</span><span class='line'>end if</span></code></pre></td></tr></table></div></figure>
+
+<p>不过这样处理后会有些问题，当你点击某一行时该行会显示成边框为深蓝色，背景为白色的矩形，如下图：</p>
+
+<p><img src="/uploads/pb-highlight-1.png" title="pb-highlight-1" ></p>
+
+<p>这是因为该行中列的样式类型是Edit，可以编辑，所以才会出现上图的效果。由此推断，只要将列设置为不可编辑就行。将一列设为不可编辑有三种方式：TabSequence为0、Edit.DisplayOnly被选中、Protect为1，设置其中任何一种都会使列变为不可编辑。</p>
+
+<p>实践后发现选中Edit.DisplayOnly后还是会出现如上图那样的问题，而在设置TabSequence或Protect后则显示出了完美的高亮效果。</p>
+
+<p><img src="/uploads/pb-highlight-2.png" title="pb-highlight-2" ></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1282,78 +1338,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/stored-procedure-batch-replace-value-of-a-field-with-another-field-mysql-version/">批量更新表中某个字段的值到另一个字段的存储过程（MySQL版）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2007-06-03T06:16:16+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2007</span></span> <span class='time'>6:16 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>对博客做了一些修改，需要将entries表中的updatetime字段值替换成pubtime字段的值，为此写了一个MySQL存储过程，其中涉及游标的使用：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>DELIMITER //
-</span><span class='line'>
-</span><span class='line'>CREATE PROCEDURE sp_batch_replace_field_value_with_another()
-</span><span class='line'>BEGIN
-</span><span class='line'>    DECLARE p_id INT;
-</span><span class='line'>    DECLARE p_pubtime DATETIME;
-</span><span class='line'>    DECLARE p_done BOOL;
-</span><span class='line'>    DECLARE p_cursor CURSOR FOR SELECT id, pubtime FROM entries;
-</span><span class='line'>    DECLARE CONTINUE HANDLER FOR NOT FOUND SET p_done = true;
-</span><span class='line'>
-</span><span class='line'>    OPEN p_cursor;
-</span><span class='line'>        REPEAT
-</span><span class='line'>            FETCH p_cursor INTO p_id, p_pubtime;
-</span><span class='line'>            UPDATE entries SET updatetime = p_pubtime WHERE id = p_id;
-</span><span class='line'>            UNTIL p_done = true
-</span><span class='line'>        END REPEAT;
-</span><span class='line'>    CLOSE p_cursor;
-</span><span class='line'>END//
-</span><span class='line'>
-</span><span class='line'>DELIMITER ;</span></code></pre></td></tr></table></div></figure>
-
-<p>第一次在SQLyog中写存储过程，在修改了存储过程后竟然不知道如何保存。点击File -&gt; Save却是保存为另外一个文件，而不是直接保存修改的存储过程。经过多番尝试后发现按F5键就可以了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/20">&larr; Older</a>
@@ -1408,7 +1392,7 @@
 <a style="font-size: 111%" href="/tags/crack/">Crack</a>
 <a style="font-size: 105%" href="/tags/database/">Database</a>
 <a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
-<a style="font-size: 93%" href="/tags/git/">Git</a>
+<a style="font-size: 97%" href="/tags/git/">Git</a>
 <a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
 <a style="font-size: 142%" href="/tags/java/">Java</a>
 <a style="font-size: 93%" href="/tags/javascript/">JavaScript</a>
