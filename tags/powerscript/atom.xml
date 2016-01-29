@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: PowerScript | 乐者为王]]></title>
   <link href="http://codemany.com/tags/powerscript/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2016-01-29T17:38:22+08:00</updated>
+  <updated>2016-01-29T19:46:51+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,46 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[使用ANTLR构建PowerScript语法分析器（6）]]></title>
+    <link href="http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part6/"/>
+    <updated>2008-05-03T19:07:10+08:00</updated>
+    <id>http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part6</id>
+    <content type="html"><![CDATA[<p>构建完表达式的语法规则后就可以开始分析语句（statement）的语法规则。不过在这之前还需要先修复两个小缺陷：没有识别日期、时间和内建常量的词法规则。</p>
+
+<p>在PowerScript中，日期的格式是0000-00-00，年份是4位数从1000到3000，月份从01到12，天数从01到31；时间是24小时格式00:00:00:000000，秒的小数部分可有可无，最多能有6位数字，所以时间范围是从00:00:00到23:59:59:999999。内建常量则以字母开头，字母数字组合，以“!”符号结束的字符串。</p>
+
+<p>根据这些描述我们可以得到日期、时间和内建常量的词法规则：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">DATE_LITERAL    // 1996-09-26
+    : &#39;1&#39;..&#39;3&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;-&#39; &#39;0&#39;..&#39;1&#39; &#39;0&#39;..&#39;9&#39; &#39;-&#39; &#39;0&#39;..&#39;3&#39; &#39;0&#39;..&#39;9&#39;
+      {
+          System.out.println(&quot;date&gt;&quot; + getText());
+      }
+    ;
+
+TIME_LITERAL    // 00:00:00:000000
+    : &#39;0&#39;..&#39;2&#39; &#39;0&#39;..&#39;9&#39; &#39;:&#39; &#39;0&#39;..&#39;5&#39; &#39;0&#39;..&#39;9&#39; &#39;:&#39; &#39;0&#39;..&#39;5&#39; &#39;0&#39;..&#39;9&#39;
+      ( &#39;.&#39; &#39;0&#39;..&#39;9&#39;
+      | &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39;
+      | &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39;
+      | &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39;
+      | &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39;
+      | &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39;
+      )?
+      {
+          System.out.println(&quot;time&gt;&quot; + getText());
+      }
+    ;
+
+ENUM_LITERAL
+    : Letter (Letter|&#39;0&#39;..&#39;9&#39;)* &#39;!&#39;
+      {
+          System.out.println(&quot;enum&gt;&quot; + getText());
+      }
+    ;
+</code></pre></div>]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[使用ANTLR构建PowerScript语法分析器（5）]]></title>
@@ -225,9 +265,9 @@ unary_expression
     <id>http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part4</id>
     <content type="html"><![CDATA[<p>到目前为止，PowerScript的词法分析已经完成的差不多了，接下来就要开始实现它的语法规则。我们准备先从表达式（expression）开始下手，因为它是语法规则中最核心的部分。</p>
 
-<p>简单的来说，表达式是由一个或多个运算元和通常是一个运算符构成，运算元本身也可以是表达式。这样层层递归嵌套，直到被称为基本表达式（primary expression）的最简单部分。</p>
+<p>简单的来说，表达式是计算的最小单元，是可以被计算产生值的代码的任何部分。一般是由一个或多个运算元和通常是一个运算符构成，运算元本身也可以是表达式。这样层层递归嵌套，直到被称为基本表达式（primary expression）的最简单部分。</p>
 
-<p>基本表达式包含有标志符、字面量（literal）、字段存取、函数调用和数组存取等，圆括号括起的表达式通常也被认为是基本表达式。其常见表现形式如下：</p>
+<p>基本表达式包含有标志符、字面量（literal）、字段存取、函数调用和数组存取等，圆括号括起的表达式通常也被认为是基本表达式。以下是它们的大致表现形式：</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">rating
 &#39;This is a string&#39;
 x.y
@@ -490,107 +530,6 @@ BLOCK_COMMENT
               System.out.println(&quot;bc&gt;&quot; + getText());
           }
       }
-    ;
-</code></pre></div>]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[使用ANTLR构建PowerScript语法分析器（1）]]></title>
-    <link href="http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part1/"/>
-    <updated>2007-08-22T23:43:04+08:00</updated>
-    <id>http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part1</id>
-    <content type="html"><![CDATA[<p>首先，让我们从最简单的做起，先实现一套能正确分析PowerScript注释的词法规则。PowerScript支持两种注释形式：单行注释（//）和多行注释（<code>/*...*/</code>）。</p>
-
-<p>单行注释以双斜杠（//）起头，直到遇到行结束符为止，所以在这里要先明确一下行结束符用什么表示。在DOS系统中行结束符用“\r\n”表示，在Unix系统中行结束符用“\n”表示，现在的Mac系统也是以“\n”表示行结束符，但早期的Mac系统中行结束符则是以“\r”表示。所以兼容这几种操作系统的行结束符词法规则为：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">fragment
-EndOfLine
-    : &#39;\r&#39; &#39;\n&#39;    // DOS
-    | &#39;\r&#39;         // Mac
-    | &#39;\n&#39;         // Unix
-    ;
-</code></pre></div>
-<p>现在，有了行结束符词法规则，就可以定义单行注释的词法规则了：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">LINE_COMMENT
-    : &#39;//&#39; ~(&#39;\n&#39;|&#39;\r&#39;)* EndOfLine
-    ;
-</code></pre></div>
-<p>通常的多行注释词法规则是这样的：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">BLOCK_COMMENT
-    : &#39;/*&#39; ( options {greedy=false;} : . )* &#39;*/&#39;
-    ;
-</code></pre></div>
-<p>但由于PowerScript支持嵌套注释，所以上面的规则无效，必须重新定义。当词法分析器遇到<code>“/*”</code>后就进入了多行注释。这时假如遇到了“/”符号，词法分析器必须预取一个字符，看这个字符是否是“*”。如果是的话，就进入了嵌套的多行注释，否则，则还是处在多行注释中。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">BLOCK_COMMENT
-    : &#39;/*&#39;
-      ( options {greedy=false;}
-      : (&#39;/&#39; &#39;*&#39;)=&gt; BLOCK_COMMENT    // 在多行注释中遇到“/*”，用语法断言确定是嵌套多行注释
-      | &#39;/&#39; ~(&#39;*&#39;)                   // 在多行注释中只遇到“/”，而没有紧跟着的“*”
-      | ~(&#39;/&#39;)                       // 在多行注释中没有遇到“/”
-      )*
-      &#39;*/&#39;
-    ;
-</code></pre></div>
-<p>当然，我们还希望忽略空格、制表符、回车符、换行符等无意义字符。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">WS
-    : (&#39; &#39;|&#39;\t&#39;|&#39;\r&#39;|&#39;\n&#39;) {$channel=HIDDEN;}
-    ;
-</code></pre></div>
-<p>测试代码：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">/* This is a comment.   */
-/* /This is a comment. */
-/* *This is a comment. */
-/* This is a comment. /* */*/
-/* This is a comment. /* This is a nested comment. */ */
-/*  The comment starts here.
- /*  The nested comment starts here.
- The nested comment ends here.  */
- The comment ends here.  */
-/* The comment starts here,
- continues to this line,&amp;
- and finally ends here. */
-// This entire line is a comment.
-// This entire line is a comment. //
-// /This entire line is a comment.
-// This entire line is a comment. */
-// This entire line is a comment. /*
-</code></pre></div>
-<p>完整的PowerScript.g的内容如下：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">grammar PowerScript;
-
-program
-    : LINE_COMMENT+
-    | BLOCK_COMMENT+
-    ;
-
-LINE_COMMENT
-    : &#39;//&#39; ~(&#39;\n&#39;|&#39;\r&#39;)* EndOfLine
-      {
-          System.out.println(&quot;lc&gt;&quot; + getText());
-      }
-    ;
-
-BLOCK_COMMENT
-    : &#39;/*&#39;
-      ( options {greedy=false;}
-      : (&#39;/&#39; &#39;*&#39;)=&gt; BLOCK_COMMENT
-      | &#39;/&#39; ~(&#39;*&#39;)
-      | ~(&#39;/&#39;)
-      )*
-      &#39;*/&#39;
-      {
-          System.out.println(&quot;bc&gt;&quot; + getText());
-      }
-    ;
-
-WS
-    : (&#39; &#39;|&#39;\t&#39;|&#39;\r&#39;|&#39;\n&#39;) {$channel=HIDDEN;}
-    ;
-
-fragment
-EndOfLine
-    : &#39;\r&#39; &#39;\n&#39;    // DOS
-    | &#39;\r&#39;         // Mac
-    | &#39;\n&#39;         // Unix
     ;
 </code></pre></div>]]></content>
   </entry>

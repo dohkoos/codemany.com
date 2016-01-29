@@ -9,7 +9,10 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="在介绍本讲内容之前，先提出一个问题？普通的黑白针式打印机能打出灰度图来吗？如果说能，从针式打印机的打印原理来分析，似乎是不可能的。因为针打是靠撞针击打色带在纸上形成黑点的，不可能打出灰色的点来；如果说不能，可是我们的确见过用针式打印机打印出来的灰色图象。到底是怎么回事呢？ &hellip;">
+  <meta name="description" content="网上关于集成P6Spy到Spring的帖子说：在Spring的配置文件中添加： 1
+2
+3
+&lt;bean id="dataSource" class="com.p6spy.engine.spy.P6DataSource" destroy-method="close"&gt; &lt; &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +76,97 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/problem-does-not-generate-log-file-when-integrate-p6spy-into-spring/">集成P6Spy到Spring后没有产生log文件的问题</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-01-22T17:41:32+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2007</span></span> <span class='time'>5:41 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>网上关于集成P6Spy到Spring的帖子说：在Spring的配置文件中添加：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;bean id="dataSource" class="com.p6spy.engine.spy.P6DataSource" destroy-method="close"&gt;
+</span><span class='line'>    &lt;constructor-arg ref="dataSourceTarget" /&gt;
+</span><span class='line'>&lt;/bean&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>然后将原来dataSource定义的id值改为dataSourceTarget：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;bean id="dataSourceTarget" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close"&gt;
+</span><span class='line'>    &lt;property name="driverClassName" value="${driver}" /&gt;
+</span><span class='line'>    &lt;property name="url" value="${url}" /&gt;
+</span><span class='line'>    &lt;property name="username" value="${username}" /&gt;
+</span><span class='line'>    &lt;property name="password" value="${password}" /&gt;
+</span><span class='line'>&lt;/bean&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>但是照着这样做了以后却发现没有生成log文件。</p>
+
+<p>下载P6Spy的源代码进行阅读后找到了问题所在。打开P6Util.java文件，在classPathFile()方法中有这样一条语句：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>fp = classLoadPropertyFile(Thread.currentThread().getContextClassLoader().getResource(file))</span></code></pre></td></tr></table></div></figure>
+
+<p>getResource(file)用来读取spy.properties配置文件，file的值就是spy.properties的文件路径。我的syp.properties放在了C:\Tomcat 5.5\webapps\netlink\WEB-INF\classes目录下，所以它返回的值是C:/Tomcat%205.5/webapps/netlink/WEB-INF/classes/spy.properties，Tomcat 5.5中的空格被编码成了%20。然后在classLoadPropertyFile()方法中就直接使用该值来创建File对象。可想而知，肯定创建失败。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static File classLoadPropertyFile(java.net.URL purl) {
+</span><span class='line'>    try {
+</span><span class='line'>        if (purl != null) {
+</span><span class='line'>            // modified by jayakumar for JDK 1.2 support
+</span><span class='line'>            //return new File(purl.getPath());
+</span><span class='line'>            return new File(getPath(purl));
+</span><span class='line'>            // end of modification
+</span><span class='line'>        }
+</span><span class='line'>    } catch (Exception e) {
+</span><span class='line'>        // we ignore this, since JDK 1.2 does not suppport this method
+</span><span class='line'>    }
+</span><span class='line'>    return null;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>在classPathFile()方法中通过判断fp.exists()来决定是否返回log文件的路径，既然上面创建File对象失败了，那fp.exists()肯定不可能为true了，log文件也就不可能被创建了。</p>
+
+<p>解决问题的方法超简单，把Tomcat 5.5中的空格去掉就行了。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1277,158 +1371,6 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/ant-series-problem-using-emma-measure-test-coverage/">Ant系列之用EMMA测量测试覆盖率的问题</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2006-01-16T09:12:26+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2006</span></span> <span class='time'>9:12 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>EMMA是一个coverage工具，有on-the-fly和offline两种使用方式，在Ant里通常采用offline方式。</p>
-
-<p>到sourceforge下载了2.0版本的EMMA下来，由于将EMMA的生成文件做了重定向，因此遇到了些问题，比如出现以下错误：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>nothing to do: no runtime coverage data found in any of the data files</span></code></pre></td></tr></table></div></figure>
-
-<p>查找EMMA的FAQ 3.7节，只是告诉你可能少了metadata和runtime coverate date（对Ant用户来说一般是少了runtime coveraget date，它的后缀名默认是ec）。</p>
-
-<p>由FAQ 3.15节可以知道runtime coverage data文件默认是生成在user.dir目录下的（即build.xml中的basedir目录下），而由instr指令生成的metadata文件（后缀名默认为em）则已经被重定向到另外的目录（用来生成coverage report的地方），所以必须重新设置coverage.out.file的值，用来重定向生成的runtime coverage data。因为runtime coverage data是在junit任务执行时产生的，所以我们可以在junit任务中添加一行代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;sysproperty key="emma.coverage.out.file" value="${coverage.dir}/coverage.emma" /&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>注意：</p>
-
-<ol>
-<li>metadata和runtime文件的后缀名最好设置相同；</li>
-<li>一定要将junit任务的fork属性设置为true，这是因为EMMA 2.0的runtime coverage data是在JVM退出后生成的；</li>
-<li>instrumented classes必须是第一个被JVM执行的，所以instrumented classes目录必须处在junit任务的classpath的第一行，具体原因不明，如果谁知道还请告知下。</li>
-</ol>
-
-<p>其实EMMA附带的examples目录下的build-offline.xml里已经说明的很详细了，只不过下载后没有仔细看，才遇到了一些问题。下面是build.xml的部分代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-<span class='line-number'>44</span>
-<span class='line-number'>45</span>
-<span class='line-number'>46</span>
-<span class='line-number'>47</span>
-<span class='line-number'>48</span>
-<span class='line-number'>49</span>
-<span class='line-number'>50</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;path id="classpath"&gt;
-</span><span class='line'>  &lt;pathelement location="${instrumentedclasses}" /&gt;
-</span><span class='line'>  &lt;pathelement location="${classes}" /&gt;
-</span><span class='line'>  &lt;pathelement location="${testclasses}" /&gt;
-</span><span class='line'>  &lt;fileset dir="${lib}" includes="**/*.jar" /&gt;
-</span><span class='line'>&lt;/path&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;target name="compile" depends="prepare"&gt;
-</span><span class='line'>  &lt;javac srcdir="${src}" destdir="${classes}" debug="on"&gt;
-</span><span class='line'>    &lt;classpath refid="classpath" /&gt;
-</span><span class='line'>  &lt;/javac&gt;
-</span><span class='line'>  &lt;javac srcdir="${test}" destdir="${testclasses}" debug="on"&gt;
-</span><span class='line'>    &lt;classpath refid="classpath" /&gt;
-</span><span class='line'>  &lt;/javac&gt;
-</span><span class='line'>&lt;/target&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;target name="coverage.instrument" depends="compile"&gt;
-</span><span class='line'>  &lt;emma enabled="yes"&gt;
-</span><span class='line'>    &lt;instr instrpath="${classes}" destdir="${instrumentedclasses}"
-</span><span class='line'>        metadatafile="{coveragereports}/metadata.emma" merge="true"&gt;
-</span><span class='line'>    &lt;/instr&gt;
-</span><span class='line'>  &lt;/emma&gt;
-</span><span class='line'>&lt;/target&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;target name="junit" depends="coverage.instrument"&gt;
-</span><span class='line'>  &lt;junit printsummary="yes" haltonfailure="no" fork="true"&gt;
-</span><span class='line'>    &lt;sysproperty key="emma.coverage.out.file" value="${coveragereports}/coverage.emma" /&gt;
-</span><span class='line'>    &lt;classpath refid="classpath" /&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;formatter type="xml" /&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;batchtest fork="yes" todir="${junitreports}"&gt;
-</span><span class='line'>      &lt;fileset dir="${test}"&gt;
-</span><span class='line'>        &lt;include name="**/*Test*.java" /&gt;
-</span><span class='line'>      &lt;/fileset&gt;
-</span><span class='line'>    &lt;/batchtest&gt;
-</span><span class='line'>  &lt;/junit&gt;
-</span><span class='line'>&lt;/target&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;target name="coverage.report" depends="test"&gt;
-</span><span class='line'>  &lt;emma enabled="yes"&gt;
-</span><span class='line'>    &lt;report sourcepath="${src}"&gt;
-</span><span class='line'>      &lt;fileset dir="${coveragereports}"&gt;
-</span><span class='line'>        &lt;include name="*.emma" /&gt;
-</span><span class='line'>      &lt;/fileset&gt;
-</span><span class='line'>
-</span><span class='line'>      &lt;html outfile="${coveragereports}/coverage.html" depth="method" /&gt;
-</span><span class='line'>    &lt;/report&gt;
-</span><span class='line'>  &lt;/emma&gt;
-</span><span class='line'>&lt;/target&gt;</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/22">&larr; Older</a>
@@ -1476,7 +1418,7 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 113%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 116%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 105%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 93%" href="/tags/ant/">Ant</a>
@@ -1491,8 +1433,8 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
 <a style="font-size: 105%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 93%" href="/tags/other/">Other</a>
 <a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
-<a style="font-size: 118%" href="/tags/powerbuilder/">PowerBuilder</a>
-<a style="font-size: 97%" href="/tags/powerscript/">PowerScript</a>
+<a style="font-size: 120%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 101%" href="/tags/powerscript/">PowerScript</a>
 <a style="font-size: 118%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
 <a style="font-size: 111%" href="/tags/ruby/">Ruby</a>
