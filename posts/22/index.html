@@ -9,14 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="首先获取JDepend的最新jar文件jdepend-2.9.jar，把它添加到ANT_HOME/lib目录里。 在build.xml中添加： 1
-2
-3
-4
-5
-6
-7
-&lt;target name="jdepend" description="Generate dependency &hellip;">
+  <meta name="description" content="在使用CheckStyle时用了它提供的checkstyle-frames.xsl作为样式文件，不过checkstyle-frames.xsl生成报告时有些问题，主要是统计数据有点问题，Summary中报告的文件数目比真实的多，所以对xsl文件的summary模板作了小小的一些修改，解决了这个问题 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -80,6 +73,122 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/fix-problem-incorrect-file-count-in-summary-section-of-checkstyle-report/">修复CheckStyle报告中Summary部分文件数目错误问题</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2005-12-30T22:22:44+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>30</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>10:22 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在使用CheckStyle时用了它提供的checkstyle-frames.xsl作为样式文件，不过checkstyle-frames.xsl生成报告时有些问题，主要是统计数据有点问题，Summary中报告的文件数目比真实的多，所以对xsl文件的summary模板作了小小的一些修改，解决了这个问题，且添加了一个统计有错误的文件个数的功能。</p>
+
+<p>原来的xsl内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;xsl:template match="checkstyle" mode="summary"&gt;
+</span><span class='line'>    &lt;h3&gt;Summary&lt;/h3&gt;
+</span><span class='line'>    &lt;xsl:variable name="fileCount" select="count(file)"/&gt;
+</span><span class='line'>    &lt;xsl:variable name="errorCount" select="count(file/error)"/&gt;
+</span><span class='line'>    &lt;table class="log" border="0" cellpadding="5" cellspacing="2" width="100%"&gt;
+</span><span class='line'>        &lt;tr&gt;
+</span><span class='line'>            &lt;th&gt;Files&lt;/th&gt;
+</span><span class='line'>            &lt;th&gt;Errors&lt;/th&gt;
+</span><span class='line'>        &lt;/tr&gt;
+</span><span class='line'>        &lt;tr&gt;
+</span><span class='line'>            &lt;xsl:call-template name="alternated-row"/&gt;
+</span><span class='line'>            &lt;td&gt;&lt;xsl:value-of select="$fileCount"/&gt;&lt;/td&gt;
+</span><span class='line'>            &lt;td&gt;&lt;xsl:value-of select="$errorCount"/&gt;&lt;/td&gt;
+</span><span class='line'>        &lt;/tr&gt;
+</span><span class='line'>    &lt;/table&gt;
+</span><span class='line'>&lt;/xsl:template&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>修改后的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;xsl:template match="checkstyle" mode="summary"&gt;
+</span><span class='line'>    &lt;h3&gt;Summary&lt;/h3&gt;
+</span><span class='line'>    &lt;xsl:variable name="fileCount"&gt;
+</span><span class='line'>        &lt;xsl:value-of select="count(file[not(./@name = preceding-sibling::file/@name)])" /&gt;
+</span><span class='line'>    &lt;/xsl:variable&gt;
+</span><span class='line'>    &lt;xsl:variable name="fileErrorCount" select="count(file[count(error) &gt; 0])" /&gt;
+</span><span class='line'>    &lt;xsl:variable name="errorCount" select="count(file/error)" /&gt;
+</span><span class='line'>    &lt;table class="log" border="0" cellpadding="5" cellspacing="2" width="100%"&gt;
+</span><span class='line'>        &lt;tr&gt;
+</span><span class='line'>            &lt;th&gt;Total Files&lt;/th&gt;
+</span><span class='line'>            &lt;th&gt;Files With Errors&lt;/th&gt;
+</span><span class='line'>            &lt;th&gt;Errors&lt;/th&gt;
+</span><span class='line'>        &lt;/tr&gt;
+</span><span class='line'>        &lt;tr&gt;
+</span><span class='line'>            &lt;xsl:call-template name="alternated-row" /&gt;
+</span><span class='line'>            &lt;td&gt;&lt;xsl:value-of select="$fileCount" /&gt;&lt;/td&gt;
+</span><span class='line'>            &lt;td&gt;&lt;xsl:value-of select="$fileErrorCount" /&gt;&lt;/td&gt;
+</span><span class='line'>            &lt;td&gt;&lt;xsl:value-of select="$errorCount" /&gt;&lt;/td&gt;
+</span><span class='line'>        &lt;/tr&gt;
+</span><span class='line'>    &lt;/table&gt;
+</span><span class='line'>&lt;/xsl:template&gt;</span></code></pre></td></tr></table></div></figure>
+
+<ul>
+<li>following-sibling 按文档顺序选择文档中此后出现的当前节点的所有兄弟节点。</li>
+<li>preceding-silbling 按与文档顺序相反的方向选择文档中此前出现的当前节点的所有兄弟节点。</li>
+<li>following 除当前节点的所有后代节点外，按顺序选择文档中当前节点之后出现的所有节点，不包括属性节点或名称空间节点。</li>
+<li>preceding 按与文档方向顺序相反的方向选择文档中在当前节点之前出现的所有节点。</li>
+</ul>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1233,140 +1342,16 @@
 </span><span class='line'>if (getClass() != other.getClass()) {
 </span><span class='line'>    return false;
 </span><span class='line'>}
-</span><span class='line'>// 将other对象的类型转换为你的类所属类型
+</span><span class='line'>// 将other对象的类型转换为你的类所属的类型
 </span><span class='line'>ClassName obj = (ClassName)other;
-</span><span class='line'>// 最后就是比较需要比较的字段。使用==比较基本类型字段，使用equals比较对象类型字段</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
+</span><span class='line'>// 最后测试需要比较的字段。使用==比较基本类型字段，使用equals比较对象类型字段</span></code></pre></td></tr></table></div></figure>
 
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-to-solve-sitemesh-truncate-the-page-containing-chinese-character/">如何解决含有中文的页面末尾内容会被SiteMesh截掉的问题</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-07-22T14:33:59+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2005</span></span> <span class='time'>2:33 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>首先我们先要了解一下ServletResponse.setContentLength(int len)的含义。setContentLength是设置返回内容体长度的方法，len是内容体的长度。由于网络上传输内容是以字节（byte）为单位的，所以len就是指内容体有多少个字节。假设现在有长度为100个字节的数据，在输出数据到客户端前我们用setContentLength(90)设置内容体的长度为90个字节。那么在客户端接收到的数据长度就是90个字节而不是100。下面我们来做个试验：</p>
+<p>如果遵循以上的规则定义了一个类的equals方法，定义其子类的equals方法时，首先调用父类的equals方法，如果这项测试能通过，那么再比较子类的字段。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class PageTruncateFilter implements Filter {
-</span><span class='line'>
-</span><span class='line'>    public void init(FilterConfig config) throws ServletException {
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
-</span><span class='line'>                        throws IOException, ServletException {
-</span><span class='line'>        HttpServletRequest request = (HttpServletRequest)req;
-</span><span class='line'>        HttpServletResponse response = (HttpServletResponse)res;
-</span><span class='line'>
-</span><span class='line'>        String content = "&lt;html&gt;&lt;head&gt;&lt;title&gt;Truncated Page&lt;/title&gt;&lt;/head&gt;";
-</span><span class='line'>               content += "&lt;body&gt;这个页面的内容will be truncated.&lt;/body&gt;&lt;/html&gt;";
-</span><span class='line'>        response.setCharacterEncoding("gbk");
-</span><span class='line'>        response.setContentLength(content.length());
-</span><span class='line'>        PrintWriter out = response.getWriter();
-</span><span class='line'>        out.println(content);
-</span><span class='line'>        out.close();
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void destroy() {
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if (!super.equals(other)) return false;</span></code></pre></td></tr></table></div></figure>
 
-<p>由于content字符串含有两个中文字符，每一个中文字符又是由两个字节组成，所以content.length()的值比content的字节数要少2。在客户端显示的内容也会因此少2个字节，即缺少“l&gt;”这两个字符。</p>
-
-<p>现在我们来浏览SiteMesh的源码找出问题的原因。首先从PageFilter.java的doFilter方法开始。由于页面没有在decorators.xml中注册修饰，所以writeOriginal方法会被调用。下面是writeOriginal方法的源代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>/** Write the original page data to the response. */
-</span><span class='line'>private void writeOriginal(HttpServletRequest request, HttpServletResponse response,
-</span><span class='line'>                          Page page) throws IOException {
-</span><span class='line'>    response.setContentLength(page.getContentLength());
-</span><span class='line'>
-</span><span class='line'>    if (request.getAttribute(USING_STREAM).equals(Boolean.TRUE)) {
-</span><span class='line'>        PrintWriter writer = new PrintWriter(response.getOutputStream());
-</span><span class='line'>        page.writePage(writer);
-</span><span class='line'>        // flush writer to underlying outputStream
-</span><span class='line'>        writer.flush();
-</span><span class='line'>        response.getOutputStream().flush();
-</span><span class='line'>    } else {
-</span><span class='line'>        page.writePage(response.getWriter());
-</span><span class='line'>        response.getWriter().flush();
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>首行代码就是设置内容体长度的，让我们追到page.getContentLength()里面去看看（Page接口的getContentLength方法是由AbstractPage.java实现的）：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public int getContentLength() {
-</span><span class='line'>    return pageData.length;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>它返回pageData数组的长度。但是pageData数组是char类型的，假如pageData中有中文内容时，设置的内容体长度就会小于pageData的字节数。这时就会出现输出到客户端的数据截掉的问题。所以只要修改getContentLength方法返回的值就可以了，下面是修改后的getContentLength方法：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public int getContentLength() {
-</span><span class='line'>    String content = new String(pageData);
-</span><span class='line'>    return content.getBytes().length;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+<p>这里有个问题是如果this和other两个对象不是同一个类，equals方法该如何工作？有些程序员可能会使用instanceof代替getClass()来做判断，但这种方法是错误的，因为它违反了规则2所要求的对称性。</p>
 </div>
   
   
@@ -1421,7 +1406,7 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 111%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 113%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 105%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 93%" href="/tags/ant/">Ant</a>
@@ -1433,12 +1418,11 @@
 <a style="font-size: 142%" href="/tags/java/">Java</a>
 <a style="font-size: 93%" href="/tags/javascript/">JavaScript</a>
 <a style="font-size: 97%" href="/tags/listview/">ListView</a>
-<a style="font-size: 87%" href="/tags/maven/">Maven</a>
 <a style="font-size: 105%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 93%" href="/tags/other/">Other</a>
 <a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
-<a style="font-size: 116%" href="/tags/powerbuilder/">PowerBuilder</a>
-<a style="font-size: 93%" href="/tags/powerscript/">PowerScript</a>
+<a style="font-size: 118%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 97%" href="/tags/powerscript/">PowerScript</a>
 <a style="font-size: 118%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
 <a style="font-size: 111%" href="/tags/ruby/">Ruby</a>
@@ -1446,6 +1430,7 @@
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
 <a style="font-size: 113%" href="/tags/translation/">Translation</a>
 <a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
+<a style="font-size: 87%" href="/tags/w32dasm/">W32Dasm</a>
 <a style="font-size: 108%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 108%" href="/tags/wxwidgets/">wxWidgets</a>
 
