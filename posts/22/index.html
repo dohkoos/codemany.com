@@ -9,8 +9,8 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="EMMA是一个coverage工具，有on-the-fly和offline两种使用方式，在Ant里通常采用offline方式。 到sourceforge下载了2.0版本的EMMA下来，由于将EMMA的生成文件做了重定向，因此遇到了些问题，比如出现以下错误： 1
-nothing to do: no &hellip;">
+  <meta name="description" content="WinRAR在使用到期后，每次打开都会弹出如下图所示的对话框窗口，十分烦人。 去除Nag窗口常用的几种方法是： 使用资源修改工具将可执行文件中的Nag窗口的属性改成透明、不可见，可以变相的去除Nag窗口；
+找到创建和显示Nag窗口的代码，跳过即可。显示窗口的常用函数有MessageBox、 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -74,6 +74,246 @@ nothing to do: no &hellip;">
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-remove-registration-prompt-for-winrar-330/">如何去除WinRAR 3.30的注册提示框</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2006-03-23T22:50:59+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>23</span><span class='date-suffix'>rd</span>, <span class='date-year'>2006</span></span> <span class='time'>10:50 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>WinRAR在使用到期后，每次打开都会弹出如下图所示的对话框窗口，十分烦人。</p>
+
+<p><img src="/uploads/winrar-nag.png" title="winrar-nag" ></p>
+
+<p>去除Nag窗口常用的几种方法是：</p>
+
+<ol>
+<li>使用资源修改工具将可执行文件中的Nag窗口的属性改成透明、不可见，可以变相的去除Nag窗口；</li>
+<li>找到创建和显示Nag窗口的代码，跳过即可。显示窗口的常用函数有MessageBox、MessageBoxEx、DialogBoxParam、CreateWindowEx、CreateWindowEx、ShowWindow等；</li>
+<li>找到创建和显示Nag窗口的函数，更改其参数，让其调用失败就可以了；</li>
+<li>在Nag窗口弹出来后，给可以关闭它的BUTTON 送一个WM_COMMAND消息；</li>
+<li>通过静态和动态分析找到注册码。</li>
+</ol>
+
+<p>由于WinRAR未注册版本没有功能限制，用不着去找注册码注册。所以在这里可以用2和3两种方法去掉WinRAR的注册提示窗口。</p>
+
+<p>使用Resource Hacker打开WinRAR.exe，显示Nag窗口的资源如图所示：</p>
+
+<p><img src="/uploads/winrar-reminder.png" title="winrar-reminder" ></p>
+
+<p>Nag窗口的ID号是1049，换算成16进制是0x419。用W32dsm打开WinRAR.exe，打开Dialog References查找Dialog: DialogID_0419，结果没找到。由上图可知Nag窗口的资源名是REMINDER，打开String Data References查找REMINDER字符串试试，果然找到了，双击该项就可以来到相关代码处。</p>
+
+<p><img src="/uploads/winrar-w32dsm.png" title="winrar-w32dsm" ></p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>* Referenced by a (U)nconditional or (C)onditional Jump at Address:
+</span><span class='line'>|:0043FE89(C)
+</span><span class='line'>|
+</span><span class='line'>:0043FE8F C6055037490001          mov byte ptr [00493750], 01
+</span><span class='line'>:0043FE96 6A00                    push 00000000
+</span><span class='line'>:0043FE98 68143F4400              push 00443F14
+</span><span class='line'>:0043FE9D FF3588EC4A00            push dword ptr [004AEC88]
+</span><span class='line'>
+</span><span class='line'>* Possible StringData Ref from Data Obj -&gt;"REMINDER"
+</span><span class='line'>|
+</span><span class='line'>:0043FEA3 68C93C4900              push 00493CC9
+</span><span class='line'>:0043FEA8 FF3560D04900            push dword ptr [0049D060]
+</span><span class='line'>
+</span><span class='line'>* Reference To: USER32.DialogBoxParamA, Ord:0000h
+</span><span class='line'>|
+</span><span class='line'>:0043FEAE E837E30400              Call 0048E1EA
+</span><span class='line'>
+</span><span class='line'>* Referenced by a (U)nconditional or (C)onditional Jump at Addresses:
+</span><span class='line'>|:0043FE64(C), :0043FE6D(C), :0043FE76(C), :0043FE7F(C), :0043FE8D(C)
+</span><span class='line'>|
+</span><span class='line'>:0043FEB3 833DF8104B0000          cmp dword ptr [004B10F8], 00000000
+</span><span class='line'>:0043FEBA 752D                    jne 0043FEE9
+</span><span class='line'>:0043FEBC 833DF0104B0000          cmp dword ptr [004B10F0], 00000000
+</span><span class='line'>:0043FEC3 7524                    jne 0043FEE9
+</span><span class='line'>:0043FEC5 833D08114B00FF          cmp dword ptr [004B1108], FFFFFFFF
+</span><span class='line'>:0043FECC 741B                    je 0043FEE9
+</span><span class='line'>:0043FECE 6A0A                    push 0000000A
+</span><span class='line'>:0043FED0 FF3508114B00            push dword ptr [004B1108]</span></code></pre></td></tr></table></div></figure>
+
+<p>可以看到，REMINDER字符串地址是作为参数传给了DialogBoxParamA函数，而DialogBoxParamA函数正是创建对话框的API函数。这时只需将0043FEA3处的push 00493CC9改为push 0，将一个NULL传入DialogBoxParamA函数，这个函数就会调用失败。当然之后它也就不能正常显示了，就达到了去除的目的。</p>
+
+<p>现在再打开WinRAR，呵呵，大功告成，再也不会有Nag窗口出来Nag我了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/allow-struts-menu-to-access-resourcebundle-of-webwork/">让Struts-Menu能访问WebWork的ResourceBundle</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2006-03-12T07:01:48+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2006</span></span> <span class='time'>7:01 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Struts-Menu默认是通过JSTL或者Struts来读取ResourceBundle的，这就需要在web.xml中配置要读取的properties文件（JSTL方式）或在struts-config.xml中配置（Struts方式）。
+WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持访问WebWork的ResourceBundle的功能。所以参考着DisplayTag的实现对Struts-Menu进行了一番手术，实现了可访问WebWork的ResourceBundle的功能。</p>
+
+<p>下面是修改步骤：</p>
+
+<ul>
+<li>在Struts-Menu项目中增加net/sf/navigator/localization目录，将org.displaytag.localization中的*.java移到该目录中；</li>
+<li>将org.displaytag下的Message.java和messages.properties移到net/sf/navigator目录下；</li>
+<li>给MenuDisplayerMapping添加两个属性localeResover和ResourceProvider；</li>
+<li>在struts-menu.xml的Displayer标签下添加：</li>
+</ul>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;setProperty property="localeResover" value="net.sf.navigator.localization.I18nWebworkAdapter" /&gt;
+</span><span class='line'>&lt;setProperty property="resourceProvider" value="net.sf.navigator.localization.I18nWebworkAdapter" /&gt;</span></code></pre></td></tr></table></div></figure>
+
+<ul>
+<li>在MenuDisplayer中添加以下四个接口方法，并在AbstractMenuDisplayer里实现它们：</li>
+</ul>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public LocaleResolver getLocaleResolver();
+</span><span class='line'>public void setLocaleResolver(LocaleResolver localeResolver);
+</span><span class='line'>public I18nResourceProvider getResourceProvider();
+</span><span class='line'>public void setResourceProvider(I18nResourceProvider resourceProvider);</span></code></pre></td></tr></table></div></figure>
+
+<ul>
+<li>在AbstractMenuDisplayer里添加protected的PageContext对象，并在init方法里初始化它；</li>
+<li>覆写MessageResourcesMenuDisplayer.getMessage方法，代码如下：</li>
+</ul>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public String getMessage(String key) {
+</span><span class='line'>    String message = null;
+</span><span class='line'>
+</span><span class='line'>    if (resourceProvider != null) {
+</span><span class='line'>        message = resourceProvider.getResource(key, "???", null, pageContext);
+</span><span class='line'>    }
+</span><span class='line'>    if (message == null) {
+</span><span class='line'>        message = key;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    return message;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<ul>
+<li>在UseMenuDisplayerTag文件里添加代码（+后的代码是增加的）：</li>
+</ul>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>  // get an instance of the menu displayer
+</span><span class='line'>  MenuDisplayer displayerInstance = null;
+</span><span class='line'>+ LocaleResolver localeResolver = null;
+</span><span class='line'>+ I18nResourceProvider resourceProvider = null;
+</span><span class='line'>
+</span><span class='line'>  // default to use the config on the mapping
+</span><span class='line'>  if (displayerMapping.getConfig() != null) {
+</span><span class='line'>      // this value (config) is set on the displayer below
+</span><span class='line'>      setConfig(displayerMapping.getConfig());
+</span><span class='line'>  }
+</span><span class='line'>+ localeResolver =
+</span><span class='line'>+         (LocaleResolver) Class.forName(displayerMapping.getLocaleResover()).newInstance();
+</span><span class='line'>+ resourceProvider =
+</span><span class='line'>+         (I18nResourceProvider) Class.forName(displayerMapping.getLocaleProvider()).newInstance();
+</span><span class='line'>
+</span><span class='line'>  displayerInstance.setConfig(config);
+</span><span class='line'>+ displayerInstance.setResourceProvider(resourceProvider);
+</span><span class='line'>+ displayerInstance.setLocaleResolver(localeResolver);</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1226,223 +1466,6 @@ nothing to do: no &hellip;">
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/system-io-address-table/">系统I/O地址表</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-09-13T19:00:03+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>13</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>7:00 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>PC机中仅使用A[0]-A[9]地址位来表示I/O地址，即可有1024个地址。前512个供系统电路使用，后512个供扩充插槽使用。当A[9]=0时表示为系统板上的I/O地址；A[9]=1时表示为扩充插槽接口卡上的地址。</p>
-
-<p>系统I/O地址使用情况：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">I/O地址范围</th>
-<th>用途</th>
-<th style="text-align: center">I/O地址范围</th>
-<th>用途</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">0000-001F</td>
-<td>8237A DMA控制器1</td>
-<td style="text-align: center">00E0-00EF</td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center">0020-003F</td>
-<td>8259A中断控制器1</td>
-<td style="text-align: center">00F0</td>
-<td>重置协处理器总线</td>
-</tr>
-<tr>
-<td style="text-align: center">0040-005F</td>
-<td>8253/8254定时/计数器（PIT）</td>
-<td style="text-align: center">00F1</td>
-<td>设置协处理器总线</td>
-</tr>
-<tr>
-<td style="text-align: center">0060-006F</td>
-<td>8042键盘控制器（AT）</td>
-<td style="text-align: center">00F2-00F7</td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center">0070-007F</td>
-<td>CMOS RAM与NMI屏蔽寄存器（AT）</td>
-<td style="text-align: center">00F8-00FF</td>
-<td>协处理器</td>
-</tr>
-<tr>
-<td style="text-align: center">0080-009F</td>
-<td>DMA页寄存器</td>
-<td style="text-align: center">0100-01EF</td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center">00A0-00BF</td>
-<td>8259A中断控制器2</td>
-<td style="text-align: center">01F0-01F7</td>
-<td>硬盘</td>
-</tr>
-<tr>
-<td style="text-align: center">00C0-00DF</td>
-<td>8237A DMA控制器2</td>
-<td style="text-align: center">01F8-01FF</td>
-<td></td>
-</tr>
-</tbody></table>
-
-<p>扩充插槽I/O地址使用情况：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">I/O地址范围</th>
-<th>用途</th>
-<th style="text-align: center">I/O地址范围</th>
-<th>用途</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">0200-0207</td>
-<td>游戏卡I/O</td>
-<td style="text-align: center">0360-036F</td>
-<td>保留</td>
-</tr>
-<tr>
-<td style="text-align: center">0208-020F</td>
-<td></td>
-<td style="text-align: center">0370-0377</td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center">0210-0217</td>
-<td>扩展部件（仅XT用）</td>
-<td style="text-align: center">0378-037F</td>
-<td>并行口打印机1</td>
-</tr>
-<tr>
-<td style="text-align: center">0218-021F</td>
-<td></td>
-<td style="text-align: center">0380-038F</td>
-<td>SDLC 通信及同步通信1</td>
-</tr>
-<tr>
-<td style="text-align: center">0220-024F</td>
-<td>保留</td>
-<td style="text-align: center">0390-039F</td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center">0250-0277</td>
-<td></td>
-<td style="text-align: center">03A0-03AF</td>
-<td>同步通信2</td>
-</tr>
-<tr>
-<td style="text-align: center">0278-027F</td>
-<td>并行口打印机2</td>
-<td style="text-align: center">03B0-03BF</td>
-<td>MDA 单色显示器</td>
-</tr>
-<tr>
-<td style="text-align: center">0280-02EF</td>
-<td></td>
-<td style="text-align: center">03C0-03CF</td>
-<td>保留</td>
-</tr>
-<tr>
-<td style="text-align: center">02F0-02F7</td>
-<td>保留</td>
-<td style="text-align: center">03D0-03DF</td>
-<td>彩色图形适配器</td>
-</tr>
-<tr>
-<td style="text-align: center">02F8-02FF</td>
-<td>串行口2</td>
-<td style="text-align: center">03E0-03EF</td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center">0300-031F</td>
-<td>试验卡</td>
-<td style="text-align: center">03F0-03F7</td>
-<td>软盘适配器</td>
-</tr>
-<tr>
-<td style="text-align: center">0320-032F</td>
-<td>硬盘适配器</td>
-<td style="text-align: center">03F8-03FF</td>
-<td>串行口1</td>
-</tr>
-<tr>
-<td style="text-align: center">0330-035F</td>
-<td></td>
-<td style="text-align: center"></td>
-<td></td>
-</tr>
-</tbody></table>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/posix-conventions-for-command-line-arguments/">POSIX Conventions for Command Line Arguments</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-09-10T00:03:07+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>10</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>12:03 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><ol>
-<li>An option is a hyphen followed by a single alphanumeric character, like this: -o.</li>
-<li>An option may require an argument (which must appear immediately after the option); for example, -oargument or -o argument.</li>
-<li>Options that do not require arguments can be grouped after a hyphen, so, for example, -lst is equivalent to -t -l -s.</li>
-<li>Options can appear in any order; thus -lst is equivalent to -tls.</li>
-<li>Options can appear multiple times.</li>
-<li>Options precede other nonoption arguments: -lst nonoption.</li>
-<li>The -- argument terminates options.</li>
-<li>The - option is typically used to represent one of the standard input streams.</li>
-</ol>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/23">&larr; Older</a>
@@ -1497,7 +1520,7 @@ nothing to do: no &hellip;">
 <a style="font-size: 111%" href="/tags/crack/">Crack</a>
 <a style="font-size: 105%" href="/tags/database/">Database</a>
 <a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
-<a style="font-size: 97%" href="/tags/git/">Git</a>
+<a style="font-size: 101%" href="/tags/git/">Git</a>
 <a style="font-size: 105%" href="/tags/jbookshelf/">JBookShelf</a>
 <a style="font-size: 142%" href="/tags/java/">Java</a>
 <a style="font-size: 93%" href="/tags/javascript/">JavaScript</a>
