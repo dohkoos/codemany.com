@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: PowerScript | 乐者为王]]></title>
   <link href="http://codemany.com/tags/powerscript/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2016-02-07T17:44:15+08:00</updated>
+  <updated>2016-02-08T23:43:37+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,68 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[使用ANTLR构建PowerScript语法分析器（7）]]></title>
+    <link href="http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part7/"/>
+    <updated>2009-02-13T17:59:25+08:00</updated>
+    <id>http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part7</id>
+    <content type="html"><![CDATA[<p>耽搁这么长的时间，现在终于可以开始分析语句了。</p>
+
+<p>语句通常出现在命令式语言中，在你想要写不需要返回值的命令的情况下。
+语句是执行某些操作的完整代码行
+语句只能一条接一条的纵向结合
+语句是执行的最小单元
+语句是告诉计算机接下来干什么的命令。语句不同于申明，申明不会让计算机做任何事，但会去学习一些事情。
+语句做某事
+语句是单个指令</p>
+
+<p>在PowerScript中语句通常以分隔符结束
+在PowerScript中，没有表达式语句（expression statement）这个说法。纯粹的表达式后跟分隔符会报告语法错误，函数调用例外。
+PowerScript中赋值是语句，因为PowerScript中的语句没有返回值，而A=B=0的B=0必须有返回值，所以B=0其实是B==0</p>
+
+<p>如何处理赋值运算符(=)和关系运算符(=)使用同一个字符(=)的问题
+f(x)[g(y)] = answer = 42</p>
+
+<p>simple_assign: (simple_assign_expr ASSIGN)+ expr;
+simple_assign_expr: (variable_name)
+    | (STAR variable_name)
+    | (variable_name LBRACKET (variable_name | integer_constant) RBRACKET);</p>
+
+<p>I constantly got errors when replacing the code between the LBRACKET and RBRACKET with an generic expression.
+or
+simple_assign: expr (ASSIGN expr)+;</p>
+
+<p>PowerScript支持如下的几种语句：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">Assignment
+CALL
+CHOOSE CASE
+CONTINUE
+CREATE
+DESTROY
+DO...LOOP
+EXIT
+FOR...NEXT
+GOTO
+HALT
+IF...THEN
+RETURN
+THROW
+THROWS
+TRY CATCH FINALLY END TRY
+</code></pre></div>
+<p>halt [close]    // 遇到不包含CLOSE参数的HALT语句时，应用程序立即终止。
+                // 遇到包含CLOSE的时候，应用先执行CLOSE事件所对应的处理程序，然后再终止应用程序</p>
+
+<p>&#39;create&#39; &#39;using&#39;? (STRING_LITERAL|IDENTIFIER)
+&#39;destroy&#39; IDENTIFIER</p>
+
+<p>call w_ancestor::event ue_process()
+call ancestorobject {<code>controlname}::event
+call w_response::create
+m_bud_master</code>m_file</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[使用ANTLR构建PowerScript语法分析器（6）]]></title>
@@ -486,52 +548,6 @@ Letter
 
 <p>经过实际测试V9.0 Build 5507、V9.0.1 Build 7171和V8.0.3 Build 9704都不支持变量名的续行。</p>
 ]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[使用ANTLR构建PowerScript语法分析器（2）]]></title>
-    <link href="http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part2/"/>
-    <updated>2007-09-02T16:44:22+08:00</updated>
-    <id>http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part2</id>
-    <content type="html"><![CDATA[<p>在<a href="http://codemany.com/blog/using-antlr-to-build-powerscript-grammar-parser-part1/">使用ANTLR构建PowerScript语法分析器（1）</a>中写的词法规则存在几个小问题：</p>
-
-<ol>
-<li>换行符和回车符同时存在于WS和EndOfLine两个词法规则中，属于重复定义；</li>
-<li>输出单行注释时紧随其后会额外多输出一个空行；</li>
-<li>单行注释是文件的最后一行时不能被词法分析器识别；</li>
-<li>像<code>/* comments /* nested comments */ */</code>这种嵌套注释会被输出成：</li>
-</ol>
-<div class="highlight"><pre><code class="language-text" data-lang="text">bc&gt;/* comments /* nested comments */
-bc&gt;/* comments /* nested comments */ */
-</code></pre></div>
-<p>下面我们将逐个修复它们。</p>
-
-<p>解决第1个问题前先要问问自己，单行注释的词法规则中真的需要包含EndOfLine这个词法规则吗？真的需要吗？如果没有的话，当词法分析器识别到换行符或回车符时，就会去匹配词法规则WS。这样看来，EndOfLine这个词法规则在这里其实是不必要的，完全可以删除掉。</p>
-
-<p>第2个问题因为词法规则EndOfLine已经被删除，所以也就不存在了。这儿仅仅分析下问题的原因。词法分析器分析单行注释时，EndOfLine会被当作单行注释的一部分予以识别。翻看生成的词法识别器代码，可以看到打印代码块出现在词法规则EndOfLine调用的后面。打印代码块中的getText()方法是从CharStream中获取文本的，如果在词法规则EndOfLine被调用后才执行，因为词法规则EndOfLine被调用时会将CharStream的当前索引向尾部移动，这时获得的文本就会包含EndOfLine，导致打印时额外输出一个空行。</p>
-
-<p>第3个问题同样也由于第1个问题的修复而不存在了。它出现的原因是因为文件最后一行的结尾字符是EOF，无法匹配词法规则EndOfLine。</p>
-
-<p>第4个问题则可以通过计数器来处理。先初始化一个计数器变量depthOfComments来标记块注释的深度，当遇到<code>“/*”</code>时就加1，遇到<code>“*/”</code>时则减1。输出时只要判断depthOfComments是否等于0就行了。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">@lexer::members {
-    int depthOfComments = 0;
-}
-
-BLOCK_COMMENT
-    : &#39;/*&#39; {depthOfComments++;}
-      ( options {greedy=false;}
-      : (&#39;/&#39; &#39;*&#39;)=&gt; BLOCK_COMMENT
-      | &#39;/&#39; ~(&#39;*&#39;)
-      | ~(&#39;/&#39;)
-      )*
-      &#39;*/&#39; {depthOfComments--;}
-      {
-          if (depthOfComments == 0) {
-              System.out.println(&quot;bc&gt;&quot; + getText());
-          }
-      }
-    ;
-</code></pre></div>]]></content>
   </entry>
   
 </feed>
