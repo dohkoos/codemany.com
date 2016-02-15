@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="在Windows Server 2008下安装FreeMind后不能运行（0.8.1和0.9.0-RC4均是如此），使用的JRE是1.6.0_13。网上有的解决方法是在环境变量中添加jre\bin的路径。但是我不想这样做，想试试别的方法。 后来，从FreeMind的bug2750047中得到了启示 &hellip;">
+  <meta name="description" content="域名信息的查询原理非常简单，主要是基于RFC 954（RFC 812已被废弃）提供的WHOIS协议。WHOIS服务器是一个基于“查询/响应”的TCP事务服务器，用户程序通过访问WHOIS服务器，从WHOIS数据库中查询得到我们所需要的内容。其主要过程有以下三步： &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,143 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/using-whois-protocol-to-query-domain-information/">利用WHOIS协议查询域名信息</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2009-09-16T06:15:04+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>6:15 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>域名信息的查询原理非常简单，主要是基于RFC 954（RFC 812已被废弃）提供的WHOIS协议。WHOIS服务器是一个基于“查询/响应”的TCP事务服务器，用户程序通过访问WHOIS服务器，从WHOIS数据库中查询得到我们所需要的内容。其主要过程有以下三步：</p>
+
+<ol>
+<li>在TCP服务端口43连接WHOIS服务主机；</li>
+<li>发送一个命令，以回车换行符结尾；</li>
+<li>接受相应命令的返回信息，一旦输出结束，服务器将关闭连接。</li>
+</ol>
+
+<p>命令的格式非常简单。可以直接输入域名（例如example.com）查询相关域名信息；也可以使用help得到详细的帮助信息。以下是查询的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>wxString Whois::Lookup(wxString& host, wxString& szAddress)
+</span><span class='line'>{
+</span><span class='line'>    char szQuery[512];
+</span><span class='line'>    char szBuffer[512];
+</span><span class='line'>    wxString szResult;
+</span><span class='line'>
+</span><span class='line'>    strcpy(szQuery, szAddress);
+</span><span class='line'>    strcat(szQuery, "\r\n");
+</span><span class='line'>
+</span><span class='line'>    wxIPV4address addr;
+</span><span class='line'>    addr.Hostname(host);
+</span><span class='line'>    addr.Service(43);
+</span><span class='line'>
+</span><span class='line'>    wxSocketClient socket;
+</span><span class='line'>    socket.Connect(addr, false);
+</span><span class='line'>    socket.WaitOnConnect(30);
+</span><span class='line'>
+</span><span class='line'>    if (socket.IsConnected())
+</span><span class='line'>    {
+</span><span class='line'>        socket.Write(szQuery, strlen(szQuery));
+</span><span class='line'>        szResult = "";
+</span><span class='line'>        while (true)
+</span><span class='line'>        {
+</span><span class='line'>            // Clear buffer before each iteration
+</span><span class='line'>            memset(szBuffer, 0, 512);
+</span><span class='line'>
+</span><span class='line'>            // Try to receive some data
+</span><span class='line'>            socket.Read(szBuffer, 500);
+</span><span class='line'>            if (socket.LastCount() &lt;= 0)
+</span><span class='line'>            {
+</span><span class='line'>                break;
+</span><span class='line'>            }
+</span><span class='line'>            szResult += szBuffer;
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>    else
+</span><span class='line'>    {
+</span><span class='line'>        szResult = wxT("Failed! Unable to connect\n");
+</span><span class='line'>    }
+</span><span class='line'>    socket.Close();
+</span><span class='line'>
+</span><span class='line'>    return wxString::FromUTF8(szResult);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>常用的WHOIS服务器：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>.cn=whois.cnnic.net.cn
+</span><span class='line'>.com=whois.internic.com
+</span><span class='line'>.net=whois.internic.com
+</span><span class='line'>.name=www.whois.name
+</span><span class='line'>.cc=whois.nic.cc</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -538,92 +675,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/git-notes-create-project/">Git笔记之项目创建</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2009-01-04T13:42:54+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>4</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>1:42 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Git的官网地址：<a href="http://git-scm.com/">http://git-scm.com/</a></p>
-
-<p>学习路线推介：新手请浏览<a href="https://www.kernel.org/pub/software/scm/git/docs/gittutorial.html">gittutorial(7)</a>，然后是<a href="https://www.kernel.org/pub/software/scm/git/docs/giteveryday.html">Everyday Git</a>，接着是“git help command”，需要更全面的了解Git请看<a href="https://www.kernel.org/pub/software/scm/git/docs/user-manual.html">Git User&#39;s Manual</a>。</p>
-
-<p>1、初始化仓库</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mkdir gittest
-</span><span class='line'>cd gittest
-</span><span class='line'>git init  # 创建.git隐藏目录，即所谓的Git仓库，用来存储项目的所有历史和元信息</span></code></pre></td></tr></table></div></figure>
-
-<p>2、告诉项目你的信息</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git config --global user.name "yourname"
-</span><span class='line'>git config --global user.email yourname@example.com</span></code></pre></td></tr></table></div></figure>
-
-<p>3、跟踪新文件</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>echo 'Hello, Git!' &gt; greeting
-</span><span class='line'>git add greeting</span></code></pre></td></tr></table></div></figure>
-
-<p>这里Git给greeting这个文件的内容生成快照，并把快照存储在Git称之为索引的暂存区。你也可以使用git add .来将当前目录下所有的文件内容加入到暂存区。</p>
-
-<p>4、查看项目当前状态</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git status</span></code></pre></td></tr></table></div></figure>
-
-<p>5、提交内容到仓库</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git commit  # 将暂存区的内容写入仓库</span></code></pre></td></tr></table></div></figure>
-
-<p>在输入git commit后按回车会跳出一个文本编辑器窗口，要求开发者输入这次提交的开发信息。</p>
-
-<p>git commit的选项：</p>
-
-<ul>
-<li>-s 在提交日志信息末尾添加提交者的Signed-off-by行。</li>
-<li>-m 使用给定的信息作为提交信息。没有该选项会自动打开一个编辑器以填写提交信息。</li>
-<li>-a 自动将修改过的文件添到暂存区中（新建但没有git add的文件不会受到影响）。</li>
-</ul>
-
-<p>6、查看项目历史</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git log</span></code></pre></td></tr></table></div></figure>
-
-<p>如果你想看下每次提交的大致变动情况，可使用以下命令：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git log --stat --summary</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/16">&larr; Older</a>
@@ -641,6 +692,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part6/">ANTLR 4权威参考读书笔记（6）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/overnight-success-it-takes-years/">一夜成名：这需要好几年时间</a>
       </li>
     
@@ -656,10 +711,6 @@
         <a href="/blog/java-revisited-basics/">Java Revisited：语言基础</a>
       </li>
     
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part3/">ANTLR 4权威参考读书笔记（3）</a>
-      </li>
-    
   </ul>
 </section>
 <section>
@@ -671,7 +722,7 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 116%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 118%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 105%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 93%" href="/tags/ant/">Ant</a>
