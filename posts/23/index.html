@@ -9,8 +9,14 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="首先将checkstyle-all-4.1.jar文件拷贝到项目的lib目录下，并建立CheckStyle配置文件。 然后在build.xml文件中声明CheckStyle任务: 1
-&lt;taskdef resource="checkstyletask.properties" &hellip;">
+  <meta name="description" content="首先获取JDepend的最新jar文件jdepend-2.9.jar，把它添加到ANT_HOME/lib目录里。 在build.xml中添加： 1
+2
+3
+4
+5
+6
+7
+&lt;target name="jdepend" description="Generate dependency &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -74,6 +80,126 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/ant-series-problem-using-jdepend-generate-package-dependency-metrics/">Ant系列之用JDepend生成包依赖性度量的问题</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2005-12-29T18:04:59+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>29</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>6:04 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>首先获取JDepend的最新jar文件jdepend-2.9.jar，把它添加到ANT_HOME/lib目录里。</p>
+
+<p>在build.xml中添加：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;target name="jdepend" description="Generate dependency metrics for each package"&gt;
+</span><span class='line'>    &lt;jdepend format="xml" outputfile="${jdepend.dir}/jdepend-report.xml"&gt;
+</span><span class='line'>        &lt;classpath&gt;
+</span><span class='line'>            &lt;pathelement path="classes" /&gt;
+</span><span class='line'>        &lt;/classpath&gt;
+</span><span class='line'>    &lt;/jdepend&gt;
+</span><span class='line'>&lt;/target&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>运行任务后出现如下的错误：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>BUILD FAILED
+</span><span class='line'>build.xml:59: Missing classespath required argument
+</span><span class='line'>    at org.apache.tools.ant.taskdefs.optional.jdepend.JDependTask.execute(JDependTask.java:397)
+</span><span class='line'>    at org.apache.tools.ant.UnknownElement.execute(UnknownElement.java:275)
+</span><span class='line'>    at org.apache.tools.ant.Task.perform(Task.java:364)
+</span><span class='line'>    at org.apache.tools.ant.Target.execute(Target.java:341)
+</span><span class='line'>    at org.apache.tools.ant.Target.performTasks(Target.java:369)
+</span><span class='line'>    at org.apache.tools.ant.Project.executeSortedTargets(Project.java:1216)
+</span><span class='line'>    at org.apache.tools.ant.Project.executeTarget(Project.java:1185)
+</span><span class='line'>    at org.apache.tools.ant.helper.DefaultExecutor.executeTargets(DefaultExecutor.java:40)
+</span><span class='line'>    at org.eclipse.ant.internal.ui.antsupport.EclipseDefaultExecutor.executeTargets(EclipseDefaultExecutor.java:32)
+</span><span class='line'>    at org.apache.tools.ant.Project.executeTargets(Project.java:1068)
+</span><span class='line'>    at org.eclipse.ant.internal.ui.antsupport.InternalAntRunner.run(InternalAntRunner.java:423)
+</span><span class='line'>    at org.eclipse.ant.internal.ui.antsupport.InternalAntRunner.main(InternalAntRunner.java:137)</span></code></pre></td></tr></table></div></figure>
+
+<p>查看JDependTask.java文件的397行：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if (getSourcespath() == null && getClassespath() == null) {
+</span><span class='line'>    throw new BuildException("Missing classespath required argument");
+</span><span class='line'>} else if (getClassespath() == null) {
+</span><span class='line'>    String msg = "sourcespath is deprecated in JDepend &gt;= 2.5 - please convert to classespath";
+</span><span class='line'>    log(msg);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>发现是getClassespath() == null了，跳到221行：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public Path getClassespath() {
+</span><span class='line'>    return classesPath;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>不是写了classpath吗？怎么classesPath的值会等于null呢？结果发现在247行有：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void setClasspath(Path classpath) {
+</span><span class='line'>    if (compileClasspath == null) {
+</span><span class='line'>        compileClasspath = classpath;
+</span><span class='line'>    } else {
+</span><span class='line'>        compileClasspath.append(classpath);
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>原来是在build.xml中把classespath错写成classpath了，那样当然有问题啦。改过来，再运行就可以了。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1264,69 +1390,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/using-ssh2-to-access-gro-clinux-org-cvs-server-in-eclipse3/">在Eclipse 3中使用SSH2访问gro.clinux.org的CVS服务器</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-07-07T19:48:08+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>7</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>7:48 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在Eclipse中生成公钥和私钥</p>
-
-<p>打开Eclipse，进入Window -&gt; Preferences -&gt; Team -&gt; CVS -&gt; SSH2 Connection Method -&gt; Key Management，点击“Generate RSA Key...”，然后填写Passphrase和Confirm Passphrase，接着点击“Save Private Key...”保存公钥和私钥（公钥和私钥文件保存在~/.ssh/目录下，id_rsa是私钥文件，id_rsa.pub 是公钥文件）。</p>
-
-<p>将公钥上传至gro.clinux.org服务器</p>
-
-<p>登陆gro服务器，进入[帐号维护]，在页面底部你可以看到如下信息：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Shell帐号信息
-</span><span class='line'>
-</span><span class='line'>Shell box：
-</span><span class='line'>CVS/SSH 共享认证Key：0 [编辑Keys]</span></code></pre></td></tr></table></div></figure>
-
-<p>点击[编辑Keys]，然后把刚才生成的文件id_rsa.pub中的内容粘贴到文本框中（看看是不是符合它上面的要求，千万要仔细看看），如果没有问题的话，就更新吧。大约6个小时后Cron会自动更新，在服务器上你的目录下会自动添加文件夹/.ssh/，里面包含了名为authorized_keys2的文件，你的公钥就保存在这里。</p>
-
-<p>在Eclipse中建立CVS连接</p>
-
-<p>打开CVS Repository Exploring Perspective，进入New -&gt; Repository Location，填入以下内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Host：cvs.unixname.gro.clinux.org
-</span><span class='line'>Repository Path：/cvsroot/unixname
-</span><span class='line'>User：你在gro.clinux.org上注册的帐户
-</span><span class='line'>Password：先前保存公钥和私钥时输入的Passphrase
-</span><span class='line'>Connection Type：extssh</span></code></pre></td></tr></table></div></figure>
-
-<p>点击Finish。如果你是第一次登录的话，将会弹出一个对话框，不用看那么仔细，直接点击OK就好了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/24">&larr; Older</a>
@@ -1344,6 +1407,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/economic-inequality-the-short-version/">贫富差距精简版</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/how-to-detect-and-prevent-spam-traffic-in-ga/">Google Analytics中如何检测并防止垃圾流量</a>
       </li>
     
@@ -1357,10 +1424,6 @@
     
       <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part5/">ANTLR 4权威参考读书笔记（5）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part4/">ANTLR 4权威参考读书笔记（4）</a>
       </li>
     
   </ul>
@@ -1387,7 +1450,7 @@
 <a style="font-size: 93%" href="/tags/javascript/">JavaScript</a>
 <a style="font-size: 97%" href="/tags/listview/">ListView</a>
 <a style="font-size: 105%" href="/tags/mysql/">MySQL</a>
-<a style="font-size: 93%" href="/tags/other/">Other</a>
+<a style="font-size: 97%" href="/tags/other/">Other</a>
 <a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
 <a style="font-size: 120%" href="/tags/powerbuilder/">PowerBuilder</a>
 <a style="font-size: 101%" href="/tags/powerscript/">PowerScript</a>
