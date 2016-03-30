@@ -9,8 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="EMMA是一个coverage工具，有on-the-fly和offline两种使用方式，在Ant里通常采用offline方式。 到sourceforge下载了2.0版本的EMMA下来，由于将EMMA的生成文件做了重定向，因此遇到了些问题，比如出现以下错误： 1
-nothing to do: no &hellip;">
+  <meta name="description" content="Struts-Menu默认是通过JSTL或者Struts来读取ResourceBundle的，这就需要在web.xml中配置要读取的properties文件（JSTL方式）或在struts-config.xml中配置（Struts方式）。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -74,6 +73,134 @@ nothing to do: no &hellip;">
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/allow-struts-menu-to-access-resourcebundle-of-webwork/">让Struts-Menu能访问WebWork的ResourceBundle</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2006-03-12T07:01:48+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2006</span></span> <span class='time'>7:01 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Struts-Menu默认是通过JSTL或者Struts来读取ResourceBundle的，这就需要在web.xml中配置要读取的properties文件（JSTL方式）或在struts-config.xml中配置（Struts方式）。
+WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持访问WebWork的ResourceBundle的功能。所以参考着DisplayTag的实现对Struts-Menu进行了一番手术，实现了可访问WebWork的ResourceBundle的功能。</p>
+
+<p>下面是修改步骤：</p>
+
+<ul>
+<li>在Struts-Menu项目中增加net/sf/navigator/localization目录，将org.displaytag.localization中的*.java移到该目录中；</li>
+<li>将org.displaytag下的Message.java和messages.properties移到net/sf/navigator目录下；</li>
+<li>给MenuDisplayerMapping添加两个属性localeResover和ResourceProvider；</li>
+<li>在struts-menu.xml的Displayer标签下添加：</li>
+</ul>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;setProperty property="localeResover" value="net.sf.navigator.localization.I18nWebworkAdapter" /&gt;
+</span><span class='line'>&lt;setProperty property="resourceProvider" value="net.sf.navigator.localization.I18nWebworkAdapter" /&gt;</span></code></pre></td></tr></table></div></figure>
+
+<ul>
+<li>在MenuDisplayer中添加以下四个接口方法，并在AbstractMenuDisplayer里实现它们：</li>
+</ul>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public LocaleResolver getLocaleResolver();
+</span><span class='line'>public void setLocaleResolver(LocaleResolver localeResolver);
+</span><span class='line'>public I18nResourceProvider getResourceProvider();
+</span><span class='line'>public void setResourceProvider(I18nResourceProvider resourceProvider);</span></code></pre></td></tr></table></div></figure>
+
+<ul>
+<li>在AbstractMenuDisplayer里添加protected的PageContext对象，并在init方法里初始化它；</li>
+<li>覆写MessageResourcesMenuDisplayer.getMessage方法，代码如下：</li>
+</ul>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public String getMessage(String key) {
+</span><span class='line'>    String message = null;
+</span><span class='line'>
+</span><span class='line'>    if (resourceProvider != null) {
+</span><span class='line'>        message = resourceProvider.getResource(key, "???", null, pageContext);
+</span><span class='line'>    }
+</span><span class='line'>    if (message == null) {
+</span><span class='line'>        message = key;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    return message;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<ul>
+<li>在UseMenuDisplayerTag文件里添加代码（+后的代码是增加的）：</li>
+</ul>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>  // get an instance of the menu displayer
+</span><span class='line'>  MenuDisplayer displayerInstance = null;
+</span><span class='line'>+ LocaleResolver localeResolver = null;
+</span><span class='line'>+ I18nResourceProvider resourceProvider = null;
+</span><span class='line'>
+</span><span class='line'>  // default to use the config on the mapping
+</span><span class='line'>  if (displayerMapping.getConfig() != null) {
+</span><span class='line'>      // this value (config) is set on the displayer below
+</span><span class='line'>      setConfig(displayerMapping.getConfig());
+</span><span class='line'>  }
+</span><span class='line'>+ localeResolver =
+</span><span class='line'>+         (LocaleResolver) Class.forName(displayerMapping.getLocaleResover()).newInstance();
+</span><span class='line'>+ resourceProvider =
+</span><span class='line'>+         (I18nResourceProvider) Class.forName(displayerMapping.getLocaleProvider()).newInstance();
+</span><span class='line'>
+</span><span class='line'>  displayerInstance.setConfig(config);
+</span><span class='line'>+ displayerInstance.setResourceProvider(resourceProvider);
+</span><span class='line'>+ displayerInstance.setLocaleResolver(localeResolver);</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1414,44 +1541,6 @@ nothing to do: no &hellip;">
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/posix-conventions-for-command-line-arguments/">POSIX Conventions for Command Line Arguments</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-09-10T00:03:07+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>10</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>12:03 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><ol>
-<li>An option is a hyphen followed by a single alphanumeric character, like this: -o.</li>
-<li>An option may require an argument (which must appear immediately after the option); for example, -oargument or -o argument.</li>
-<li>Options that do not require arguments can be grouped after a hyphen, so, for example, -lst is equivalent to -t -l -s.</li>
-<li>Options can appear in any order; thus -lst is equivalent to -tls.</li>
-<li>Options can appear multiple times.</li>
-<li>Options precede other nonoption arguments: -lst nonoption.</li>
-<li>The -- argument terminates options.</li>
-<li>The - option is typically used to represent one of the standard input streams.</li>
-</ol>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/24">&larr; Older</a>
@@ -1469,6 +1558,10 @@ nothing to do: no &hellip;">
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/books-not-recommended/">哪些书不要读</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/economic-inequality-the-short-version/">贫富差距精简版</a>
       </li>
     
@@ -1482,10 +1575,6 @@ nothing to do: no &hellip;">
     
       <li class="post">
         <a href="/blog/overnight-success-it-takes-years/">一夜成名：这需要好几年时间</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part5/">ANTLR 4权威参考读书笔记（5）</a>
       </li>
     
   </ul>
@@ -1513,7 +1602,7 @@ nothing to do: no &hellip;">
 <a style="font-size: 93%" href="/tags/javascript/">JavaScript</a>
 <a style="font-size: 97%" href="/tags/listview/">ListView</a>
 <a style="font-size: 105%" href="/tags/mysql/">MySQL</a>
-<a style="font-size: 93%" href="/tags/other/">Other</a>
+<a style="font-size: 97%" href="/tags/other/">Other</a>
 <a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
 <a style="font-size: 120%" href="/tags/powerbuilder/">PowerBuilder</a>
 <a style="font-size: 101%" href="/tags/powerscript/">PowerScript</a>

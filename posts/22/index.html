@@ -9,7 +9,10 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="在介绍本讲内容之前，先提出一个问题？普通的黑白针式打印机能打出灰度图来吗？如果说能，从针式打印机的打印原理来分析，似乎是不可能的。因为针打是靠撞针击打色带在纸上形成黑点的，不可能打出灰色的点来；如果说不能，可是我们的确见过用针式打印机打印出来的灰色图象。到底是怎么回事呢？ &hellip;">
+  <meta name="description" content="网上关于集成P6Spy到Spring的帖子说：在Spring的配置文件中添加： 1
+2
+3
+&lt;bean id="dataSource" class="com.p6spy.engine.spy.P6DataSource" destroy-method="close"&gt; &lt; &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +76,97 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/problem-does-not-generate-log-file-when-integrate-p6spy-into-spring/">集成P6Spy到Spring后没有产生log文件的问题</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-01-22T17:41:32+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2007</span></span> <span class='time'>5:41 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>网上关于集成P6Spy到Spring的帖子说：在Spring的配置文件中添加：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;bean id="dataSource" class="com.p6spy.engine.spy.P6DataSource" destroy-method="close"&gt;
+</span><span class='line'>    &lt;constructor-arg ref="dataSourceTarget" /&gt;
+</span><span class='line'>&lt;/bean&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>然后将原来dataSource定义的id值改为dataSourceTarget：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;bean id="dataSourceTarget" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close"&gt;
+</span><span class='line'>    &lt;property name="driverClassName" value="${driver}" /&gt;
+</span><span class='line'>    &lt;property name="url" value="${url}" /&gt;
+</span><span class='line'>    &lt;property name="username" value="${username}" /&gt;
+</span><span class='line'>    &lt;property name="password" value="${password}" /&gt;
+</span><span class='line'>&lt;/bean&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>但是照着这样做了以后却发现没有生成log文件。</p>
+
+<p>下载P6Spy的源代码进行阅读后找到了问题所在。打开P6Util.java文件，在classPathFile()方法中有这样一条语句：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>fp = classLoadPropertyFile(Thread.currentThread().getContextClassLoader().getResource(file))</span></code></pre></td></tr></table></div></figure>
+
+<p>getResource(file)用来读取spy.properties配置文件，file的值就是spy.properties的文件路径。我的syp.properties放在了C:\Tomcat 5.5\webapps\netlink\WEB-INF\classes目录下，所以它返回的值是C:/Tomcat%205.5/webapps/netlink/WEB-INF/classes/spy.properties，Tomcat 5.5中的空格被编码成了%20。然后在classLoadPropertyFile()方法中就直接使用该值来创建File对象。可想而知，肯定创建失败。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static File classLoadPropertyFile(java.net.URL purl) {
+</span><span class='line'>    try {
+</span><span class='line'>        if (purl != null) {
+</span><span class='line'>            // modified by jayakumar for JDK 1.2 support
+</span><span class='line'>            //return new File(purl.getPath());
+</span><span class='line'>            return new File(getPath(purl));
+</span><span class='line'>            // end of modification
+</span><span class='line'>        }
+</span><span class='line'>    } catch (Exception e) {
+</span><span class='line'>        // we ignore this, since JDK 1.2 does not suppport this method
+</span><span class='line'>    }
+</span><span class='line'>    return null;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>在classPathFile()方法中通过判断fp.exists()来决定是否返回log文件的路径，既然上面创建File对象失败了，那fp.exists()肯定不可能为true了，log文件也就不可能被创建了。</p>
+
+<p>解决问题的方法超简单，把Tomcat 5.5中的空格去掉就行了。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -436,9 +530,9 @@
 
 <p><em>图1：Web应用的传统模型（左）与Ajax模型（右）的比较。</em></p>
 
-<p>This approach makes a lot of technical sense, but it doesn’t make for a great user experience. While the server is doing its thing, what’s the user doing? That’s right, waiting. And at every step in a task, the user waits some more.</p>
+<p>这种方法很有技术上的感觉，但它无助于很好的用户体验。当服务器在做它的事情的时候，用户在做什么？没错，等待。在任务中的每一步，用户都在等待。</p>
 
-<p>Obviously, if we were designing the Web from scratch for applications, we wouldn’t make users wait around. Once an interface is loaded, why should the user interaction come to a halt every time the application needs something from the server? In fact, why should the user see the application go to the server at all?</p>
+<p>显然，如果我们从头开始为应用设计Web，我们不会让用户呆呆地等待。一旦界面被加载后，为什么每次应用需要从服务器获得什么时用户交互就将陷入停顿？事实上，为什么用户应该看到所有进入服务器的应用？</p>
 
 <h3 id="ajax有何不同">Ajax有何不同</h3>
 
@@ -506,17 +600,17 @@
 
 <p>A. The answer to all of these questions is “maybe”. Many developers are already working on ways to address these concerns. We think there’s more work to be done to determine all the limitations of Ajax, and we expect the Ajax development community to uncover more issues like these along the way.</p>
 
-<p>Q. Some of the Google examples you cite don’t use XML at all. Do I have to use XML and/or XSLT in an Ajax application?</p>
+<p><strong>Q.</strong> 一些你举出的Google例子根本没有使用XML。我必须在Ajax应用中使用XML和/或XSLT吗？</p>
 
-<p>A. No. XML is the most fully-developed means of getting data in and out of an Ajax client, but there’s no reason you couldn’t accomplish the same effects using a technology like <a href="http://www.crockford.com/JSON/">JavaScript Object Notation</a> or any similar means of structuring data for interchange.</p>
+<p><strong>A.</strong> 不。XML是最全面发展的在Ajax客户端内外获取数据的手段，但没有理由使用<a href="http://www.crockford.com/JSON/">JavaScript Object Notation</a>之类的技术或任何类似的结构化数据的手段为交换不能达到同样的效果。</p>
 
-<p>Q. Are Ajax applications easier to develop than traditional web applications?</p>
+<p><strong>Q.</strong> Ajax应用比传统Web应用更易于开发吗？</p>
 
-<p>A. Not necessarily. Ajax applications inevitably involve running complex JavaScript code on the client. Making that complex code efficient and bug-free is not a task to be taken lightly, and better development tools and frameworks will be needed to help us meet that challenge.</p>
+<p><strong>A.</strong> 不一定。Ajax应用必然涉及到在客户端运行复杂的JavaScript代码。让复杂的代码高效并且无缺陷不是一个掉以轻心的任务，需要更好的开发工具和框架来帮助我们面对挑战。</p>
 
-<p>Q. Do Ajax applications always deliver a better experience than traditional web applications?</p>
+<p><strong>Q.</strong> Ajax应用经常交付比传统Web应用更好的体验吗？</p>
 
-<p>A. Not necessarily. Ajax gives interaction designers more flexibility. However, the more power we have, the more caution we must use in exercising it. We must be careful to use Ajax to enhance the user experience of our applications, not degrade it.</p>
+<p><strong>A.</strong> 不一定。Ajax给交互设计人员更多的灵活性。然而，我们拥有的能力越大，在运用它的时候我们必须使用的更谨慎。我们必须小心地使用Ajax来增强我们应用的用户体验，而不是削弱它。</p>
 
 <p>这篇文章被来自<a href="http://webhostinggeeks.com/">Webhostinggeeks.com</a>的Jovana Milutinovich翻译成了<a href="http://science.webhostinggeeks.com/ajaxnovi-pristup">Serbo-Croatian</a>语言。</p>
 </div>
@@ -1288,134 +1382,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/allow-struts-menu-to-access-resourcebundle-of-webwork/">让Struts-Menu能访问WebWork的ResourceBundle</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2006-03-12T07:01:48+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2006</span></span> <span class='time'>7:01 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Struts-Menu默认是通过JSTL或者Struts来读取ResourceBundle的，这就需要在web.xml中配置要读取的properties文件（JSTL方式）或在struts-config.xml中配置（Struts方式）。
-WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持访问WebWork的ResourceBundle的功能。所以参考着DisplayTag的实现对Struts-Menu进行了一番手术，实现了可访问WebWork的ResourceBundle的功能。</p>
-
-<p>下面是修改步骤：</p>
-
-<ul>
-<li>在Struts-Menu项目中增加net/sf/navigator/localization目录，将org.displaytag.localization中的*.java移到该目录中；</li>
-<li>将org.displaytag下的Message.java和messages.properties移到net/sf/navigator目录下；</li>
-<li>给MenuDisplayerMapping添加两个属性localeResover和ResourceProvider；</li>
-<li>在struts-menu.xml的Displayer标签下添加：</li>
-</ul>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;setProperty property="localeResover" value="net.sf.navigator.localization.I18nWebworkAdapter" /&gt;
-</span><span class='line'>&lt;setProperty property="resourceProvider" value="net.sf.navigator.localization.I18nWebworkAdapter" /&gt;</span></code></pre></td></tr></table></div></figure>
-
-<ul>
-<li>在MenuDisplayer中添加以下四个接口方法，并在AbstractMenuDisplayer里实现它们：</li>
-</ul>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public LocaleResolver getLocaleResolver();
-</span><span class='line'>public void setLocaleResolver(LocaleResolver localeResolver);
-</span><span class='line'>public I18nResourceProvider getResourceProvider();
-</span><span class='line'>public void setResourceProvider(I18nResourceProvider resourceProvider);</span></code></pre></td></tr></table></div></figure>
-
-<ul>
-<li>在AbstractMenuDisplayer里添加protected的PageContext对象，并在init方法里初始化它；</li>
-<li>覆写MessageResourcesMenuDisplayer.getMessage方法，代码如下：</li>
-</ul>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public String getMessage(String key) {
-</span><span class='line'>    String message = null;
-</span><span class='line'>
-</span><span class='line'>    if (resourceProvider != null) {
-</span><span class='line'>        message = resourceProvider.getResource(key, "???", null, pageContext);
-</span><span class='line'>    }
-</span><span class='line'>    if (message == null) {
-</span><span class='line'>        message = key;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    return message;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<ul>
-<li>在UseMenuDisplayerTag文件里添加代码（+后的代码是增加的）：</li>
-</ul>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>  // get an instance of the menu displayer
-</span><span class='line'>  MenuDisplayer displayerInstance = null;
-</span><span class='line'>+ LocaleResolver localeResolver = null;
-</span><span class='line'>+ I18nResourceProvider resourceProvider = null;
-</span><span class='line'>
-</span><span class='line'>  // default to use the config on the mapping
-</span><span class='line'>  if (displayerMapping.getConfig() != null) {
-</span><span class='line'>      // this value (config) is set on the displayer below
-</span><span class='line'>      setConfig(displayerMapping.getConfig());
-</span><span class='line'>  }
-</span><span class='line'>+ localeResolver =
-</span><span class='line'>+         (LocaleResolver) Class.forName(displayerMapping.getLocaleResover()).newInstance();
-</span><span class='line'>+ resourceProvider =
-</span><span class='line'>+         (I18nResourceProvider) Class.forName(displayerMapping.getLocaleProvider()).newInstance();
-</span><span class='line'>
-</span><span class='line'>  displayerInstance.setConfig(config);
-</span><span class='line'>+ displayerInstance.setResourceProvider(resourceProvider);
-</span><span class='line'>+ displayerInstance.setLocaleResolver(localeResolver);</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/23">&larr; Older</a>
@@ -1433,6 +1399,10 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/books-not-recommended/">哪些书不要读</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/economic-inequality-the-short-version/">贫富差距精简版</a>
       </li>
     
@@ -1446,10 +1416,6 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
     
       <li class="post">
         <a href="/blog/overnight-success-it-takes-years/">一夜成名：这需要好几年时间</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part5/">ANTLR 4权威参考读书笔记（5）</a>
       </li>
     
   </ul>
@@ -1477,7 +1443,7 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
 <a style="font-size: 93%" href="/tags/javascript/">JavaScript</a>
 <a style="font-size: 97%" href="/tags/listview/">ListView</a>
 <a style="font-size: 105%" href="/tags/mysql/">MySQL</a>
-<a style="font-size: 93%" href="/tags/other/">Other</a>
+<a style="font-size: 97%" href="/tags/other/">Other</a>
 <a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
 <a style="font-size: 120%" href="/tags/powerbuilder/">PowerBuilder</a>
 <a style="font-size: 101%" href="/tags/powerscript/">PowerScript</a>
