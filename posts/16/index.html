@@ -467,6 +467,357 @@
       
   <header>
     
+      <h1 class="entry-title"><a href="/blog/memory-leak-detection-using-windbg/">使用WinDbg检测内存泄漏</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2008-12-27T09:34:17+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>27</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>9:34 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>英文原文：<a href="http://www.codeproject.com/Articles/31382/Memory-Leak-Detection-Using-Windbg">http://www.codeproject.com/Articles/31382/Memory-Leak-Detection-Using-Windbg</a></p>
+
+<h3 id="introduction">Introduction</h3>
+
+<p>Memory leak is a time consuming bug often created by C++ developers. Detection of memory leaks is often tedious. Things get worst if the code is not written by you, or if the code base is quite huge.</p>
+
+<p>Though there are tools available in the market that will help you in memory leak detection, most of these tools are not free. I found Windbg as a freeware powerful tool to solve memory leak bugs. At least, we get an idea about the code location which might be suspected to cause memory leaks. COM Interface leaks are out of the scope of this article.</p>
+
+<p>Windbg is a powerful user/kernel space debugger from Microsoft, which can be downloaded and installed from <a href="http://www.microsoft.com/whdc/devtools/debugging/installx86.mspx">here</a>.</p>
+
+<h3 id="using-windbg">Using Windbg</h3>
+
+<p>To start working with Windbg:</p>
+
+<ol>
+<li>Configure the symbol file path to the Microsoft symbol server “SRV*d:\symbols*<a href="http://msdl.microsoft.com/download/symbols%E2%80%9D">http://msdl.microsoft.com/download/symbols”</a>.</li>
+<li>Add your program EXE/DLL PDB (program database) path to the symbol file path.</li>
+<li>You also need to to configure the Operating System&#39;s flag to enable user stack trace for the process which has memory leaks. This is simple, and can be done with gflags.exe. Gflags.exe is installed during Windbg&#39;s installation. This can also be done through command line, using the command “gflags.exe /i MemoryLeak.exe +ust”. My program name is Test2.exe; hence, for the demo, I will be using Test2.exe rather than MemoryLeak.exe. The snapshot below shows the setting of OS flags for the application Test2.exe.</li>
+</ol>
+
+<p><img src="/uploads/cmd.jpg" title="cmd" ></p>
+
+<p>Once we have configured Windbg for the symbol file path, start the process which is leaking memory, and attach Windbg to it. The Attach option in Windbg is available under the File menu, or can be launched using the F6 shortcut. The snapshot below shows the same:</p>
+
+<p><img src="/uploads/attach.jpg" title="attach" ></p>
+
+<p>The !heap command of Windbg is used to display heaps. !heap is well documented in the Windbg help.</p>
+
+<p>I have developed a small program which leaks memory, and will demonstrate further using the same.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>int _tmain(int argc, _TCHAR* argv[])
+</span><span class='line'>{
+</span><span class='line'>    while(1)
+</span><span class='line'>    {
+</span><span class='line'>        AllocateMemory();
+</span><span class='line'>    }
+</span><span class='line'>    return 0;
+</span><span class='line'>}
+</span><span class='line'>void AllocateMemory()
+</span><span class='line'>{
+</span><span class='line'>    int* a = new int[2000];
+</span><span class='line'>    ZeroMemory(a, 8000);
+</span><span class='line'>    Sleep(1);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>The above program leaks an integer array of size 2000*4 bytes.</p>
+
+<p>After attaching Windbg to the process, execute the !heap –s command. -s stands for summary. Below is the output of the !heap -s for the leaking process:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>0:001&gt; !heap -s
+</span><span class='line'>NtGlobalFlag enables following debugging aids for new heaps:
+</span><span class='line'>    validate parameters
+</span><span class='line'>    stack back traces
+</span><span class='line'>  Heap     Flags   Reserv  Commit  Virt   Free  List   UCR  Virt  Lock  Fast
+</span><span class='line'>                    (k)     (k)    (k)     (k) length      blocks cont. heap
+</span><span class='line'>-----------------------------------------------------------------------------
+</span><span class='line'>   00150000 58000062    1024     12     12      1     1     1    0      0   L
+</span><span class='line'>   00250000 58001062      64     24     24     15     1     1    0      0   L
+</span><span class='line'>   00260000 58008060      64     12     12     10     1     1    0      0
+</span><span class='line'>   00330000 58001062   64576  47404  47404     13     4     1    0      0
+</span><span class='line'>-----------------------------------------------------------------------------</span></code></pre></td></tr></table></div></figure>
+
+<p>Let the process execute for some time, and then re-break in to the process, and execute !heap -s again. Shown below is the output of the command:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>0:001&gt; !heap -s
+</span><span class='line'>NtGlobalFlag enables following debugging aids for new heaps:
+</span><span class='line'>   validate parameters
+</span><span class='line'>   stack back traces
+</span><span class='line'>   Heap     Flags   Reserv  Commit  Virt   Free  List   UCR  Virt  Lock  Fast
+</span><span class='line'>                     (k)     (k)    (k)     (k) length      blocks cont. heap
+</span><span class='line'>   -----------------------------------------------------------------------------
+</span><span class='line'>    00150000 58000062    1024     12     12      1     1     1    0      0   L
+</span><span class='line'>    00250000 58001062      64     24     24     15     1     1    0      0   L
+</span><span class='line'>    00260000 58008060      64     12     12     10     1     1    0      0
+</span><span class='line'>    00330000 58001062  261184 239484 239484     14     4     1    0      0
+</span><span class='line'>   -----------------------------------------------------------------------------</span></code></pre></td></tr></table></div></figure>
+
+<p>Lines marked in bold show the growing heap. The above snapshot shows a heap with the handle 00330000 growing.</p>
+
+<p>Execute “!heap -stat –h 00330000” for the growing heap. This command shows the heap statistics for the growing heap. Shown below is the command&#39;s output.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>0:001&gt; !heap -stat -h 00330000
+</span><span class='line'>heap @ 00330000
+</span><span class='line'>group-by: TOTSIZE max-display: 20
+</span><span class='line'>    size     #blocks     total     ( %) (percent of total busy bytes)
+</span><span class='line'>    1f64 76c6 - e905f58  (99.99)
+</span><span class='line'>    1800 1 - 1800  (0.00)
+</span><span class='line'>    824 2 - 1048  (0.00)
+</span><span class='line'>    238 2 - 470  (0.00)
+</span><span class='line'>    244 1 - 244  (0.00)
+</span><span class='line'>    4c 5 - 17c  (0.00)
+</span><span class='line'>    b0 2 - 160  (0.00)
+</span><span class='line'>    86 2 - 10c  (0.00)
+</span><span class='line'>    50 3 - f0  (0.00)
+</span><span class='line'>    74 2 - e8  (0.00)
+</span><span class='line'>    38 4 - e0  (0.00)
+</span><span class='line'>    48 3 - d8  (0.00)
+</span><span class='line'>    c4 1 - c4  (0.00)
+</span><span class='line'>    62 2 - c4  (0.00)
+</span><span class='line'>    be 1 - be  (0.00)
+</span><span class='line'>    b8 1 - b8  (0.00)
+</span><span class='line'>    ae 1 - ae  (0.00)
+</span><span class='line'>    ac 1 - ac  (0.00)
+</span><span class='line'>    55 2 - aa  (0.00)
+</span><span class='line'>    a4 1 - a4  (0.00)</span></code></pre></td></tr></table></div></figure>
+
+<p>The above snapshot shows 0x76c6 blocks of size 1f64 being allocated (marked in bold). Such a huge number of blocks of the same size makes us suspect that these can be leaked blocks. Rest of the block allocations do not have growing block numbers.</p>
+
+<p>The next step is to get the address of these blocks. Use the command !heap -flt s 1f64. This command filters all other blocks of heap and displays the details of blocks having size 1f64.</p>
+
+<p>Shown below is the output for the command:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>0:001&gt; !heap -flt s 1f64
+</span><span class='line'>    _HEAP @ 150000
+</span><span class='line'>    _HEAP @ 250000
+</span><span class='line'>    _HEAP @ 260000
+</span><span class='line'>    _HEAP @ 330000
+</span><span class='line'>      HEAP_ENTRY Size Prev Flags    UserPtr UserSize - state
+</span><span class='line'>        003360e0 03f0 0000  [07]   003360e8    01f64 - (busy)
+</span><span class='line'>        00338060 03f0 03f0  [07]   00338068    01f64 - (busy)
+</span><span class='line'>        00339fe0 03f0 03f0  [07]   00339fe8    01f64 - (busy)
+</span><span class='line'>        0033bf60 03f0 03f0  [07]   0033bf68    01f64 - (busy)
+</span><span class='line'>        0033dee0 03f0 03f0  [07]   0033dee8    01f64 - (busy)
+</span><span class='line'>        01420040 03f0 03f0  [07]   01420048    01f64 - (busy)
+</span><span class='line'>        01421fc0 03f0 03f0  [07]   01421fc8    01f64 - (busy)
+</span><span class='line'>        01423f40 03f0 03f0  [07]   01423f48    01f64 - (busy)
+</span><span class='line'>        01425ec0 03f0 03f0  [07]   01425ec8    01f64 - (busy)
+</span><span class='line'>        01427e40 03f0 03f0  [07]   01427e48    01f64 - (busy)
+</span><span class='line'>        01429dc0 03f0 03f0  [07]   01429dc8    01f64 - (busy)
+</span><span class='line'>        0142bd40 03f0 03f0  [07]   0142bd48    01f64 - (busy)
+</span><span class='line'>        0142dcc0 03f0 03f0  [07]   0142dcc8    01f64 - (busy)
+</span><span class='line'>        0142fc40 03f0 03f0  [07]   0142fc48    01f64 - (busy)
+</span><span class='line'>        01431bc0 03f0 03f0  [07]   01431bc8    01f64 - (busy)
+</span><span class='line'>        01433b40 03f0 03f0  [07]   01433b48    01f64 - (busy)
+</span><span class='line'>        01435ac0 03f0 03f0  [07]   01435ac8    01f64 - (busy)
+</span><span class='line'>        01437a40 03f0 03f0  [07]   01437a48    01f64 - (busy)
+</span><span class='line'>        014399c0 03f0 03f0  [07]   014399c8    01f64 - (busy)
+</span><span class='line'>        0143b940 03f0 03f0  [07]   0143b948    01f64 - (busy)
+</span><span class='line'>        0143d8c0 03f0 03f0  [07]   0143d8c8    01f64 - (busy)
+</span><span class='line'>        0143f840 03f0 03f0  [07]   0143f848    01f64 - (busy)
+</span><span class='line'>        014417c0 03f0 03f0  [07]   014417c8    01f64 - (busy)
+</span><span class='line'>        01443740 03f0 03f0  [07]   01443748    01f64 - (busy)
+</span><span class='line'>        014456c0 03f0 03f0  [07]   014456c8    01f64 - (busy)
+</span><span class='line'>        01447640 03f0 03f0  [07]   01447648    01f64 - (busy)
+</span><span class='line'>        014495c0 03f0 03f0  [07]   014495c8    01f64 - (busy)
+</span><span class='line'>        0144b540 03f0 03f0  [07]   0144b548    01f64 - (busy)
+</span><span class='line'>        0144d4c0 03f0 03f0  [07]   0144d4c8    01f64 - (busy)
+</span><span class='line'>        0144f440 03f0 03f0  [07]   0144f448    01f64 - (busy)
+</span><span class='line'>        014513c0 03f0 03f0  [07]   014513c8    01f64 - (busy)
+</span><span class='line'>        01453340 03f0 03f0  [07]   01453348    01f64 - (busy)
+</span><span class='line'>        014552c0 03f0 03f0  [07]   014552c8    01f64 - (busy)
+</span><span class='line'>        01457240 03f0 03f0  [07]   01457248    01f64 - (busy)
+</span><span class='line'>        014591c0 03f0 03f0  [07]   014591c8    01f64 - (busy)
+</span><span class='line'>        0145b140 03f0 03f0  [07]   0145b148    01f64 - (busy)
+</span><span class='line'>        0145d0c0 03f0 03f0  [07]   0145d0c8    01f64 - (busy)
+</span><span class='line'>        0145f040 03f0 03f0  [07]   0145f048    01f64 - (busy)
+</span><span class='line'>        01460fc0 03f0 03f0  [07]   01460fc8    01f64 - (busy)
+</span><span class='line'>        01462f40 03f0 03f0  [07]   01462f48    01f64 - (busy)
+</span><span class='line'>        01464ec0 03f0 03f0  [07]   01464ec8    01f64 - (busy)
+</span><span class='line'>        01466e40 03f0 03f0  [07]   01466e48    01f64 - (busy)
+</span><span class='line'>        01468dc0 03f0 03f0  [07]   01468dc8    01f64 - (busy)</span></code></pre></td></tr></table></div></figure>
+
+<p>Use any UsrPtr column value from the listed output, and then use the the command !heap -p -a UsrPtr to display the call stack for UsrPtr. I have selected 0143d8c8 marked in bold.</p>
+
+<p>Upon execution of !heap -p -a 0143d8c8, we get the call stack shown below:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>0:001&gt; !heap -p -a 0143d8c8
+</span><span class='line'>    address 0143d8c8 found in
+</span><span class='line'>    _HEAP @ 330000
+</span><span class='line'>      HEAP_ENTRY Size Prev Flags    UserPtr UserSize - state
+</span><span class='line'>        0143d8c0 03f0 0000  [07]   0143d8c8    01f64 - (busy)
+</span><span class='line'>        Trace: 0025
+</span><span class='line'>        7c96d6dc ntdll!RtlDebugAllocateHeap+0x000000e1
+</span><span class='line'>        7c949d18 ntdll!RtlAllocateHeapSlowly+0x00000044
+</span><span class='line'>        7c91b298 ntdll!RtlAllocateHeap+0x00000e64
+</span><span class='line'>        102c103e MSVCR90D!_heap_alloc_base+0x0000005e
+</span><span class='line'>        102cfd76 MSVCR90D!_heap_alloc_dbg_impl+0x000001f6
+</span><span class='line'>        102cfb2f MSVCR90D!_nh_malloc_dbg_impl+0x0000001f
+</span><span class='line'>        102cfadc MSVCR90D!_nh_malloc_dbg+0x0000002c
+</span><span class='line'>        102db25b MSVCR90D!malloc+0x0000001b
+</span><span class='line'>        102bd691 MSVCR90D!operator new+0x00000011
+</span><span class='line'>        102bd71f MSVCR90D!operator new[]+0x0000000f
+</span><span class='line'>        4113d8 Test2!AllocateMemory+0x00000028
+</span><span class='line'>        41145c Test2!wmain+0x0000002c
+</span><span class='line'>        411a08 Test2!__tmainCRTStartup+0x000001a8
+</span><span class='line'>        41184f Test2!wmainCRTStartup+0x0000000f
+</span><span class='line'>        7c816fd7 kernel32!BaseProcessStart+0x00000023</span></code></pre></td></tr></table></div></figure>
+
+<p>The lines marked in bold shows the functions from our code.</p>
+
+<p>Note: Sometimes, it might happen that the “!heap -s” command does not show a growing heap. In that case, use the “!heap -stat -h” command to list all the heaps with their sizes and number of blocks. Spot the growing number of blocks, and then use the “!heap –flt s SIZE” (SIZE = the size of the suspected block) command.</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
       <h1 class="entry-title"><a href="/blog/virtualbox-shared-folder-between-ubuntu-guest-and-windows-server-2008-host/">VirtualBox虚拟Ubuntu 8.10时共享文件夹的使用</a></h1>
     
     
@@ -767,78 +1118,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/change-sources-list-on-ubuntu-810/">修改Ubuntu 8.10的sources.list</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2008-11-14T18:56:45+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>14</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>6:56 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>系统自带的软件源速度太慢，更新一次安装包竟然要4个多小时，决定换个快点的软件源。这里 <a href="http://wiki.ubuntu.org.cn/Template:8.10source">http://wiki.ubuntu.org.cn/Template:8.10source</a> 列出了选多的选择，我选择了最下面的台湾官方源。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>deb http://tw.archive.ubuntu.com/ubuntu intrepid main restricted universe multiverse
-</span><span class='line'>deb http://tw.archive.ubuntu.com/ubuntu intrepid-security main restricted universe multiverse
-</span><span class='line'>deb http://tw.archive.ubuntu.com/ubuntu intrepid-updates main restricted universe multiverse
-</span><span class='line'>deb http://tw.archive.ubuntu.com/ubuntu intrepid-backports main restricted universe multiverse
-</span><span class='line'>deb http://tw.archive.ubuntu.com/ubuntu intrepid-proposed main restricted universe multiverse
-</span><span class='line'>deb-src http://tw.archive.ubuntu.com/ubuntu intrepid main restricted universe multiverse
-</span><span class='line'>deb-src http://tw.archive.ubuntu.com/ubuntu intrepid-security main restricted universe multiverse
-</span><span class='line'>deb-src http://tw.archive.ubuntu.com/ubuntu intrepid-updates main restricted universe multiverse
-</span><span class='line'>deb-src http://tw.archive.ubuntu.com/ubuntu intrepid-backports main restricted universe multiverse
-</span><span class='line'>deb-src http://tw.archive.ubuntu.com/ubuntu intrepid-proposed main restricted universe multiverse</span></code></pre></td></tr></table></div></figure>
-
-<p>首先备份sources.list</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sudo cp /etc/apt/sources.list /etc/apt/sources.list.original</span></code></pre></td></tr></table></div></figure>
-
-<p>然后用vi打开sources.list，把上面列出的源添加进去：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sudo vi /etc/apt/sources.list</span></code></pre></td></tr></table></div></figure>
-
-<p>接着就是更新源：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sudo apt-get update</span></code></pre></td></tr></table></div></figure>
-
-<p>现在我们就可以更新已安装的软件包了：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>apt-get upgrade</span></code></pre></td></tr></table></div></figure>
-
-<p>升级已安装的包为最新版本，不会安装新的或移除老的安装包。如果一个包因为改变了倚赖关系而需要安装一个新的包，那么它将不会被升级，会被标志为hold。建议使用“-u”选项，这样你就能看到哪些安装包将会被升级。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/17">&larr; Older</a>
@@ -890,7 +1169,6 @@
 <a style="font-size: 105%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 93%" href="/tags/ant/">Ant</a>
-<a style="font-size: 87%" href="/tags/css/">CSS</a>
 <a style="font-size: 111%" href="/tags/crack/">Crack</a>
 <a style="font-size: 105%" href="/tags/database/">Database</a>
 <a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
@@ -899,6 +1177,7 @@
 <a style="font-size: 142%" href="/tags/java/">Java</a>
 <a style="font-size: 93%" href="/tags/javascript/">JavaScript</a>
 <a style="font-size: 97%" href="/tags/listview/">ListView</a>
+<a style="font-size: 87%" href="/tags/maven/">Maven</a>
 <a style="font-size: 105%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 97%" href="/tags/other/">Other</a>
 <a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
@@ -909,7 +1188,7 @@
 <a style="font-size: 111%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 93%" href="/tags/spring/">Spring</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 120%" href="/tags/translation/">Translation</a>
+<a style="font-size: 122%" href="/tags/translation/">Translation</a>
 <a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 108%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 108%" href="/tags/wxwidgets/">wxWidgets</a>
