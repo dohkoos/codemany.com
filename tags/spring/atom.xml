@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Spring | 乐者为王]]></title>
   <link href="http://codemany.com/tags/spring/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2016-05-12T08:28:48+08:00</updated>
+  <updated>2016-05-12T14:56:56+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -293,6 +293,92 @@ public class ProductDaoImpl implements ProductDao {
   </entry>
   
   <entry>
+    <title type="html"><![CDATA[在iBatis中如何将JavaBean的boolean值映射成数据库的CHAR（Y或N）值]]></title>
+    <link href="http://codemany.com/blog/how-to-map-javabean-boolean-value-into-database-char-value-in-ibatis/"/>
+    <updated>2006-05-29T12:15:40+08:00</updated>
+    <id>http://codemany.com/blog/how-to-map-javabean-boolean-value-into-database-char-value-in-ibatis</id>
+    <content type="html"><![CDATA[<p>Spring 1.2.8 + iBatis 2.1.5</p>
+
+<p>JavaBean的boolean值映射到数据库的默认值是0和1，不是非常直观，现在希望能将boolean值映射成为Y和N。iBatis 2.0.5以后的版本提供了TypeHandlerCallback，可以用来解决这个问题。</p>
+
+<p>首先定义数据表：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">CREATE TABLE users (
+    username varchar(40),
+    password varchar(255),
+    enabled char(1),
+    PRIMARY KEY (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf-8;
+</code></pre></div>
+<p>YesNoTypeHandlerCallback实现代码：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public class YesNoTypeHandlerCallback implements TypeHandlerCallback {
+
+    public void setParameter(ParameterSetter setter, Object parameter) throws SQLException {
+        if (parameter == null) {
+            setter.setString(&quot;&quot;);
+        } else {
+            Boolean b = (Boolean)parameter;
+            if (b.booleanValue()) {
+                setter.setString(&quot;Y&quot;);
+            } else {
+                setter.setString(&quot;N&quot;);
+            }
+        }
+    }
+
+    public Object getResult(ResultGetter getter) throws SQLException {
+        String string = getter.getString();
+        if (string == null) {
+            return null;
+        } else if (&quot;Y&quot;.equalsIgnoreCase(string)) {
+            return new Boolean(true);
+        } else {
+            return new Boolean(false);
+        }
+    }
+
+    public Object valueOf(String s) {
+        return s;
+    }
+}
+</code></pre></div>
+<p>配置文件sql-map-config.xml中的内容如下：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;sqlMapConfig&gt;
+    &lt;typeHandler jdbcType=&quot;CHAR&quot; javaType=&quot;boolean&quot;
+                 callback=&quot;com.codemany.netlink.dao.support.YesNoTypeHandlerCallback&quot; /&gt;
+
+    &lt;sqlMap resource=&quot;com/codemany/netlink/dao/impl/User.xml&quot; /&gt;
+&lt;/sqlMapConfig&gt;
+</code></pre></div>
+<p>jdbcType=&quot;CHAR&quot; javaType=&quot;boolean&quot;必须有，否则YesNoTypeHandlerCallback.setParameter()不会被调用。</p>
+
+<p>SqlMap映射文件User.xml部分代码：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;typeAlias alias=&quot;user&quot; type=&quot;com.codemany.netlink.model.User&quot; /&gt;
+
+&lt;resultMap id=&quot;userResult&quot; class=&quot;user&quot;&gt;
+    &lt;result property=&quot;username&quot; column=&quot;username&quot; /&gt;
+    &lt;result property=&quot;password&quot; column=&quot;password&quot; /&gt;
+    &lt;result property=&quot;enabled&quot; column=&quot;enabled&quot; jdbcType=&quot;CHAR&quot; javaType=&quot;boolean&quot; /&gt;
+&lt;/resultMap&gt;
+
+&lt;select id=&quot;getUser&quot; parameterClass=&quot;string&quot; resultMap=&quot;userResult&quot;&gt;
+&lt;![CDATA[
+    SELECT username, password, enabled
+    FROM user WHERE username = #username#
+]]&gt;
+&lt;/select&gt;
+
+&lt;insert id=&quot;addUser&quot; parameterClass=&quot;user&quot;&gt;
+&lt;![CDATA[
+    INSERT INTO user (username, password, enabled)
+    VALUES (#username#, #password#, #enabled,jdbcType=CHAR,javaType=boolean#)
+]]&gt;
+&lt;/insert&gt;
+</code></pre></div>
+<p>jdbcType=&quot;CHAR&quot; javaType=&quot;boolean&quot;必须有，否则YesNoTypeHandlerCallback.getResult()不会被调用；#enabled,jdbcType=CHAR,javaType=boolean#也必须这样写，否则YesNoTypeHandlerCallback.setParameter()也不会被调用，写成#enabled:CHAR#或#enabled#都不起作用。</p>
+]]></content>
+  </entry>
+  
+  <entry>
     <title type="html"><![CDATA[DbUnit结合Spring进行SqlMap的单元测试]]></title>
     <link href="http://codemany.com/blog/sqlmap-unit-testing-with-spring-and-dbunit/"/>
     <updated>2006-04-11T20:39:04+08:00</updated>
@@ -442,90 +528,6 @@ protected DatabaseOperation getTearDownOperation() throws Exception {
 </code></pre></div>
 <p>如此就可以进行单元测试了。</p>
 ]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[一步一步整合WebWork和Spring]]></title>
-    <link href="http://codemany.com/blog/webwork-and-spring-integration-step-by-step/"/>
-    <updated>2005-09-26T10:50:27+08:00</updated>
-    <id>http://codemany.com/blog/webwork-and-spring-integration-step-by-step</id>
-    <content type="html"><![CDATA[<p>拷贝webwork-2.1.7.jar、spring-1.2.1.jar以及webwork2-srping.jar到WEB-INF/lib目录下。</p>
-
-<p>添加以下内容到web.xml文件中：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;listener&gt;
-    &lt;listener-class&gt;org.springframework.web.context.ContextLoaderListener&lt;/listener-class&gt;
-&lt;/listener&gt;
-
-&lt;listener&gt;
-    &lt;listener-class&gt;com.atlassian.xwork.ext.ResolverSetupServletContextListener&lt;/listener-class&gt;
-&lt;/listener&gt;
-</code></pre></div>
-<p>applicationContext.xml中的内容如下：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;beans&gt;
-    &lt;bean id=&quot;dataSource&quot; class=&quot;org.springframework.jdbc.datasource.SingleConnectionDataSource&quot;&gt;
-        &lt;property name=&quot;driverClassName&quot; value=&quot;${driver}&quot; /&gt;
-        &lt;property name=&quot;url&quot; value=&quot;${url}&quot; /&gt;
-        &lt;property name=&quot;username&quot; value=&quot;${username}&quot; /&gt;
-        &lt;property name=&quot;password&quot; value=&quot;${password}&quot; /&gt;
-    &lt;/bean&gt;
-
-    &lt;bean id=&quot;sqlMapClient&quot; class=&quot;org.springframework.orm.ibatis.SqlMapClientFactoryBean&quot;&gt;
-        &lt;property name=&quot;configLocation&quot; value=&quot;/WEB-INF/sql-map-config.xml&quot; /&gt;
-        &lt;property name=&quot;dataSource&quot; ref=&quot;dataSource&quot; /&gt;
-    &lt;/bean&gt;
-
-    &lt;bean id=&quot;userManager&quot; class=&quot;com.codemany.netlink.service.impl.UserManagerImpl&quot; singleton=&quot;true&quot;&gt;
-        &lt;property name=&quot;sqlMapClient&quot; ref=&quot;sqlMapClient&quot; /&gt;
-    &lt;/bean&gt;
-&lt;/beans&gt;
-</code></pre></div>
-<p>配置文件sql-map-config.xml中的内容如下：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;sqlMapConfig&gt;
-    &lt;sqlMap resource=&quot;com/codemany/netlink/dao/impl/User.xml&quot; /&gt;
-&lt;/sqlMapConfig&gt;
-</code></pre></div>
-<p>在xwork.xml中添加以下内容：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;package name=&quot;default&quot; extends=&quot;webwork-default&quot;
-        externalReferenceResolver=&quot;com.atlassian.xwork.ext.SpringServletContextReferenceResolver&quot;&gt;
-
-    &lt;interceptors&gt;
-        &lt;interceptor name=&quot;reference-resolver&quot;
-                class=&quot;com.opensymphony.xwork.interceptor.ExternalReferencesInterceptor&quot; /&gt;
-
-        &lt;interceptor-stack name=&quot;interceptors&quot;&gt;
-            &lt;interceptor-ref name=&quot;params&quot; /&gt;
-            &lt;interceptor-ref name=&quot;reference-resolver&quot; /&gt;
-        &lt;/interceptor-stack&gt;
-    &lt;/interceptors&gt;
-
-    &lt;default-interceptor-ref name=&quot;default-interceptor&quot; /&gt;
-
-    &lt;action name=&quot;login&quot; class=&quot;com.codemany.netlink.action.LoginAction&quot;&gt;
-        &lt;external-ref name=&quot;userManager&quot;&gt;userManager&lt;/external-ref&gt;
-        &lt;result name=&quot;success&quot; type=&quot;dispatcher&quot;&gt;/success.jsp&lt;/result&gt;
-        &lt;result name=&quot;error&quot; type=&quot;dispatcher&quot;&gt;/error.jsp&lt;/result&gt;
-    &lt;/action&gt;
-&lt;/package&gt;
-</code></pre></div>
-<p>在LoginAction.java中添加代码：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">private UserManager userManager = null;
-
-public void setUserManager(UserManager userManager) {
-    this.userManager = userManager;
-</code></pre></div>
-<p>建立UserManager.java接口文件：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public interface UserManager {
-    public User login(String username, String password) throws UserLoginException;
-}
-</code></pre></div>
-<p>UserManagerImpl.java实现代码：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public class UserManagerImpl extends SqlMapClientDaoSupport implements UserManager {
-
-    public User login(String username, String password) throws UserLoginException {
-        // do something
-    }
-}
-</code></pre></div>]]></content>
   </entry>
   
 </feed>

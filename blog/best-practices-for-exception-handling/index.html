@@ -1,0 +1,681 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>异常处理最佳实践 - 乐者为王</title>
+  <meta name="author" content="dohkoos">
+
+  
+  <meta name="description" content="英文原文：http://www.onjava.com/pub/a/onjava/2003/11/19/exceptions.html One of the problems with exception handling is knowing when and how to use it. In &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://codemany.com/blog/best-practices-for-exception-handling/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/atom.xml" rel="alternate" title="乐者为王" type="application/atom+xml">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script>!window.jQuery && document.write(unescape('%3Cscript src="/javascripts/libs/jquery.min.js"%3E%3C/script%3E'))</script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  
+  
+  <script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-46570161-1']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">乐者为王</a></h1>
+  
+    <h2>Do one thing, and do it well.</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="https://www.google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="sitesearch" value="codemany.com">
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">异常处理最佳实践</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2005-08-12T10:02:48+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>10:02 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>英文原文：<a href="http://www.onjava.com/pub/a/onjava/2003/11/19/exceptions.html">http://www.onjava.com/pub/a/onjava/2003/11/19/exceptions.html</a></p>
+
+<p>One of the problems with exception handling is knowing when and how to use it. In this article, I will cover some of the best practices for exception handling. I will also summarize the recent debate about the use of checked exceptions.</p>
+
+<p>We as programmers want to write quality code that solves problems. Unfortunately, exceptions come as side effects of our code. No one likes side effects, so we soon find our own ways to get around them. I have seen some smart programmers deal with exceptions the following way:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void consumeAndForgetAllExceptions(){
+</span><span class='line'>    try {
+</span><span class='line'>        ...some code that throws exceptions
+</span><span class='line'>    } catch (Exception ex){
+</span><span class='line'>        ex.printStacktrace();
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>What is wrong with the code above?</p>
+
+<p>Once an exception is thrown, normal program execution is suspended and control is transferred to the catch block. The catch block catches the exception and just suppresses it. Execution of the program continues after the catch block, as if nothing had happened.</p>
+
+<p>How about the following?</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void someMethod() throws Exception{
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>This method is a blank one; it does not have any code in it. How can a blank method throw exceptions? Java does not stop you from doing this. Recently, I came across similar code where the method was declared to throw exceptions, but there was no code that actually generated that exception. When I asked the programmer, he replied &quot;I know, it is corrupting the API, but I am used to doing it and it works.&quot; </p>
+
+<p>It took the C++ community several years to decide on how to use exceptions. This debate has just started in the Java community. I have seen several Java programmers struggle with the use of exceptions. If not used correctly, exceptions can slow down your program, as it takes memory and CPU power to create, throw, and catch exceptions. If overused, they make the code difficult to read and frustrating for the programmers using the API. We all know frustrations lead to hacks and code smells. The client code may circumvent the issue by just ignoring exceptions or throwing them, as in the previous two examples.</p>
+
+<h3 id="the-nature-of-exceptions">The Nature of Exceptions</h3>
+
+<p>Broadly speaking, there are three different situations that cause exceptions to be thrown:</p>
+
+<ul>
+<li><strong>Exceptions due to programming errors:</strong> In this category, exceptions are generated due to programming errors (e.g., NullPointerException and IllegalArgumentException). The client code usually cannot do anything about programming errors.</li>
+<li><strong>Exceptions due to client code errors:</strong> Client code attempts something not allowed by the API, and thereby violates its contract. The client can take some alternative course of action, if there is useful information provided in the exception. For example: an exception is thrown while parsing an XML document that is not well-formed. The exception contains useful information about the location in the XML document that causes the problem. The client can use this information to take recovery steps.</li>
+<li><strong>Exceptions due to resource failures:</strong> Exceptions that get generated when resources fail. For example: the system runs out of memory or a network connection fails. The client&#39;s response to resource failures is context-driven. The client can retry the operation after some time or just log the resource failure and bring the application to a halt.</li>
+</ul>
+
+<h3 id="types-of-exceptions-in-java">Types of Exceptions in Java</h3>
+
+<p>Java defines two kinds of exceptions:</p>
+
+<ul>
+<li><strong>Checked exceptions:</strong> Exceptions that inherit from the Exception class are checked exceptions. Client code has to handle the checked exceptions thrown by the API, either in a catch clause or by forwarding it outward with the throws clause.</li>
+<li><strong>Unchecked exceptions:</strong> RuntimeException also extends from Exception. However, all of the exceptions that inherit from RuntimeException get special treatment. There is no requirement for the client code to deal with them, and hence they are called unchecked exceptions.</li>
+</ul>
+
+<p>By way of example, Figure 1 shows the hierarchy for NullPointerException.</p>
+
+<p><img src="/uploads/exception-hierarchy.gif" title="exception-hierarchy" ></p>
+
+<p>Figure 1. Sample exception hierarchy</p>
+
+<p>In this diagram, NullPointerException extends from RuntimeException and hence is an unchecked exception.</p>
+
+<p>I have seen heavy use of checked exceptions and minimal use of unchecked exceptions. Recently, there has been a hot debate in the Java community regarding checked exceptions and their true value. The debate stems from fact that Java seems to be the first mainstream OO language with checked exceptions. C++ and C# do not have checked exceptions at all; all exceptions in these languages are unchecked.</p>
+
+<p>A checked exception thrown by a lower layer is a forced contract on the invoking layer to catch or throw it. The checked exception contract between the API and its client soon changes into an unwanted burden if the client code is unable to deal with the exception effectively. Programmers of the client code may start taking shortcuts by suppressing the exception in an empty catch block or just throwing it and, in effect, placing the burden on the client&#39;s invoker.</p>
+
+<p>Checked exceptions are also accused of breaking encapsulation. Consider the following: </p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public List getAllAccounts() throws
+</span><span class='line'>    FileNotFoundException, SQLException{
+</span><span class='line'>    ...
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>The method getAllAccounts() throws two checked exceptions. The client of this method has to explicitly deal with the implementation-specific exceptions, even if it has no idea what file or database call has failed within getAllAccounts(), or has no business providing filesystem or database logic. Thus, the exception handling forces an inappropriately tight coupling between the method and its callers. </p>
+
+<h3 id="best-practices-for-designing-the-api">Best Practices for Designing the API</h3>
+
+<p>Having said all of this, let us now talk about how to design an API that throws exceptions properly.</p>
+
+<h4 id="1-when-deciding-on-checked-exceptions-vs-unchecked-exceptions-ask-yourself-quot-what-action-can-the-client-code-take-when-the-exception-occurs-quot">1. When deciding on checked exceptions vs. unchecked exceptions, ask yourself, &quot;What action can the client code take when the exception occurs?&quot;</h4>
+
+<p>If the client can take some alternate action to recover from the exception, make it a checked exception. If the client cannot do anything useful, then make the exception unchecked. By useful, I mean taking steps to recover from the exception and not just logging the exception. To summarize:</p>
+
+<table><thead>
+<tr>
+<th>Client&#39;s reaction when exception happens</th>
+<th>Exception type</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>Client code cannot do anything</td>
+<td>Make it an unchecked exception</td>
+</tr>
+<tr>
+<td>Client code will take some useful recovery action based on information in exception</td>
+<td>Make it a checked exception</td>
+</tr>
+</tbody></table>
+
+<p>Moreover, prefer unchecked exceptions for all programming errors: unchecked exceptions have the benefit of not forcing the client API to explicitly deal with them. They propagate to where you want to catch them, or they go all the way out and get reported. The Java API has many unchecked exceptions, such as NullPointerException, IllegalArgumentException, and IllegalStateException. I prefer working with standard exceptions provided in Java rather than creating my own. They make my code easy to understand and avoid increasing the memory footprint of code. </p>
+
+<h4 id="2-preserve-encapsulation">2. Preserve encapsulation.</h4>
+
+<p>Never let implementation-specific checked exceptions escalate to the higher layers. For example, do not propagate SQLException from data access code to the business objects layer. Business objects layer do not need to know about SQLException. You have two options:</p>
+
+<ul>
+<li>Convert SQLException into another checked exception, if the client code is expected to recuperate from the exception.</li>
+<li>Convert SQLException into an unchecked exception, if the client code cannot do anything about it.</li>
+</ul>
+
+<p>Most of the time, client code cannot do anything about SQLExceptions. Do not hesitate to convert them into unchecked exceptions. Consider the following piece of code:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void dataAccessCode(){
+</span><span class='line'>    try{
+</span><span class='line'>        ..some code that throws SQLException
+</span><span class='line'>    }catch(SQLException ex){
+</span><span class='line'>        ex.printStacktrace();
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>This catch block just suppresses the exception and does nothing. The justification is that there is nothing my client could do about an SQLException. How about dealing with it in the following manner? </p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void dataAccessCode(){
+</span><span class='line'>    try{
+</span><span class='line'>        ..some code that throws SQLException
+</span><span class='line'>    }catch(SQLException ex){
+</span><span class='line'>        throw new RuntimeException(ex);
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>This converts SQLException to RuntimeException. If SQLException occurs, the catch clause throws a new RuntimeException. The execution thread is suspended and the exception gets reported. However, I am not corrupting my business object layer with unnecessary exception handling, especially since it cannot do anything about an SQLException. If my catch needs the root exception cause, I can make use of the getCause() method available in all exception classes as of JDK1.4.</p>
+
+<p>If you are confident that the business layer can take some recovery action when SQLException occurs, you can convert it into a more meaningful checked exception. But I have found that just throwing RuntimeException suffices most of the time. </p>
+
+<h4 id="3-try-not-to-create-new-custom-exceptions-if-they-do-not-have-useful-information-for-client-code">3. Try not to create new custom exceptions if they do not have useful information for client code.</h4>
+
+<p>What is wrong with following code?</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class DuplicateUsernameException extends Exception {}</span></code></pre></td></tr></table></div></figure>
+
+<p>It is not giving any useful information to the client code, other than an indicative exception name. Do not forget that Java Exception classes are like other classes, wherein you can add methods that you think the client code will invoke to get more information.</p>
+
+<p>We could add useful methods to DuplicateUsernameException, such as:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class DuplicateUsernameException
+</span><span class='line'>    extends Exception {
+</span><span class='line'>    public DuplicateUsernameException 
+</span><span class='line'>        (String username){....}
+</span><span class='line'>    public String requestedUsername(){...}
+</span><span class='line'>    public String[] availableNames(){...}
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>The new version provides two useful methods: requestedUsername(), which returns the requested name, and availableNames(), which returns an array of available usernames similar to the one requested. The client could use these methods to inform that the requested username is not available and that other usernames are available. But if you are not going to add extra information, then just throw a standard exception:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>throw new Exception("Username already taken");</span></code></pre></td></tr></table></div></figure>
+
+<p>Even better, if you think the client code is not going to take any action other than logging if the username is already taken, throw a unchecked exception:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>throw new RuntimeException("Username already taken");</span></code></pre></td></tr></table></div></figure>
+
+<p>Alternatively, you can even provide a method that checks if the username is already taken.</p>
+
+<p>It is worth repeating that checked exceptions are to be used in situations where the client API can take some productive action based on the information in the exception. Prefer unchecked exceptions for all programmatic errors. They make your code more readable.</p>
+
+<h4 id="4-document-exceptions">4. Document exceptions.</h4>
+
+<p>You can use Javadoc&#39;s @throws tag to document both checked and unchecked exceptions that your API throws. However, I prefer to write unit tests to document exceptions. Tests allow me to see the exceptions in action and hence serve as documentation that can be executed. Whatever you do, have some way by which the client code can learn of the exceptions that your API throws. Here is a sample unit test that tests for IndexOutOfBoundsException:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void testIndexOutOfBoundsException() {
+</span><span class='line'>    ArrayList blankList = new ArrayList();
+</span><span class='line'>    try {
+</span><span class='line'>        blankList.get(10);
+</span><span class='line'>        fail("Should raise an IndexOutOfBoundsException");
+</span><span class='line'>    } catch (IndexOutOfBoundsException success) {}
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>The code above should throw an IndexOutOfBoundsException when blankList.get(10) is invoked. If it does not, the fail(&quot;Should raise an IndexOutOfBoundsException&quot;) statement explicitly fails the test. By writing unit tests for exceptions, you not only document how the exceptions work, but also make your code robust by testing for exceptional scenarios.</p>
+
+<h3 id="best-practices-for-using-exceptions">Best Practices for Using Exceptions</h3>
+
+<p>The next set of best practices show how the client code should deal with an API that throws checked exceptions.</p>
+
+<h4 id="1-always-clean-up-after-yourself">1. Always clean up after yourself</h4>
+
+<p>If you are using resources like database connections or network connections, make sure you clean them up. If the API you are invoking uses only unchecked exceptions, you should still clean up resources after use, with try - finally blocks.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void dataAccessCode(){
+</span><span class='line'>    Connection conn = null;
+</span><span class='line'>    try{
+</span><span class='line'>        conn = getConnection();
+</span><span class='line'>        ..some code that throws SQLException
+</span><span class='line'>    }catch(SQLException ex){
+</span><span class='line'>        ex.printStacktrace();
+</span><span class='line'>    } finally{
+</span><span class='line'>        DBUtil.closeConnection(conn);
+</span><span class='line'>    }
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>class DBUtil{
+</span><span class='line'>    public static void closeConnection
+</span><span class='line'>        (Connection conn){
+</span><span class='line'>        try{
+</span><span class='line'>            conn.close();
+</span><span class='line'>        } catch(SQLException ex){
+</span><span class='line'>            logger.error("Cannot close connection");
+</span><span class='line'>            throw new RuntimeException(ex);
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>DBUtil is a utility class that closes the Connection. The important point is the use of finally block, which executes whether or not an exception is caught. In this example, the finally closes the connection and throws a RuntimeException if there is problem with closing the connection.</p>
+
+<h4 id="2-never-use-exceptions-for-flow-control">2. Never use exceptions for flow control</h4>
+
+<p>Generating stack traces is expensive and the value of a stack trace is in debugging. In a flow-control situation, the stack trace would be ignored, since the client just wants to know how to proceed.</p>
+
+<p>In the code below, a custom exception, MaximumCountReachedException, is used to control the flow.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void useExceptionsForFlowControl() {
+</span><span class='line'>    try {
+</span><span class='line'>        while (true) {
+</span><span class='line'>            increaseCount();
+</span><span class='line'>        }
+</span><span class='line'>    } catch (MaximumCountReachedException ex) {
+</span><span class='line'>    }
+</span><span class='line'>    //Continue execution
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>public void increaseCount()
+</span><span class='line'>    throws MaximumCountReachedException {
+</span><span class='line'>    if (count &gt;= 5000)
+</span><span class='line'>        throw new MaximumCountReachedException();
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>The useExceptionsForFlowControl() uses an infinite loop to increase the count until the exception is thrown. This not only makes the code difficult to read, but also makes it slower. Use exception handling only in exceptional situations.</p>
+
+<h4 id="3-do-not-suppress-or-ignore-exceptions">3. Do not suppress or ignore exceptions</h4>
+
+<p>When a method from an API throws a checked exception, it is trying to tell you that you should take some counter action. If the checked exception does not make sense to you, do not hesitate to convert it into an unchecked exception and throw it again, but do not ignore it by catching it with {} and then continue as if nothing had happened.</p>
+
+<h4 id="4-do-not-catch-top-level-exceptions">4. Do not catch top-level exceptions</h4>
+
+<p>Unchecked exceptions inherit from the RuntimeException class, which in turn inherits from Exception. By catching the Exception class, you are also catching RuntimeException as in the following code:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>try{
+</span><span class='line'>..
+</span><span class='line'>}catch(Exception ex){
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>The code above ignores unchecked exceptions, as well.</p>
+
+<h4 id="5-log-exceptions-just-once">5. Log exceptions just once</h4>
+
+<p>Logging the same exception stack trace more than once can confuse the programmer examining the stack trace about the original source of exception. So just log it once. </p>
+
+<h3 id="summary">Summary</h3>
+
+<p>These are some suggestions for exception-handling best practices. I have no intention of staring a religious war on checked exceptions vs. unchecked exceptions. You will have to customize the design and usage according to your requirements. I am confident that over time, we will find better ways to code with exceptions.</p>
+
+<p>I would like to thank Bruce Eckel, Joshua Kerievsky, and Somik Raha for their support in writing this article.</p>
+
+<h3 id="related-resources">Related Resources</h3>
+
+<ul>
+<li><a href="http://www.mindview.net/Etc/Discussions/CheckedExceptions">&quot;Does Java need Checked Exceptions?&quot;</a> by Bruce Eckel</li>
+<li><a href="http://www.octopull.demon.co.uk/java/ExceptionalJava.html">&quot;Exceptional Java,&quot;</a> by Alan Griffiths</li>
+<li><a href="http://www.artima.com/intv/handcuffs.html">&quot;The trouble with checked exceptions: A conversation with Anders Hejlsberg, Part II&quot;</a> on Artima.com</li>
+<li><a href="http://www.c2.com/cgi/wiki?CheckedExceptionsAreOfDubiousValue">&quot;Checked exceptions are of dubious value,&quot;</a> on C2.com</li>
+<li><a href="http://www.artima.com/intv/solid.html">Conversation with James Gosling</a> by Bill Venners</li>
+</ul>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">dohkoos</span></span>
+
+      
+
+
+
+
+<time class='entry-date' datetime='2005-08-12T10:02:48+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>10:02 am</span></time>
+      
+
+
+      
+
+<span class="tags">
+  
+    <a class='tag' href='/tags/exception/'>Exception</a>, <a class='tag' href='/tags/java/'>Java</a>, <a class='tag' href='/tags/translation/'>Translation</a>
+  
+</span>
+
+
+    </p>
+    
+  <h3>Related Posts</h3>
+  <ul class="posts">
+  
+    <li class="related">
+      <a href="/blog/developers-are-blinded-by-the-light/">开发者被灯光蒙蔽了双眼</a>
+    </li>
+  
+    <li class="related">
+      <a href="/blog/economic-inequality-the-short-version/">贫富差距精简版</a>
+    </li>
+  
+    <li class="related">
+      <a href="/blog/overnight-success-it-takes-years/">一夜成名：这需要好几年时间</a>
+    </li>
+  
+    <li class="related">
+      <a href="/blog/10-tips-for-writing-consistently-popular-programming-articles/">写出受欢迎的编程文章的10个技巧</a>
+    </li>
+  
+    <li class="related">
+      <a href="/blog/writing-great-oo-code-day-one/">一开始就编写优质的OO代码</a>
+    </li>
+  
+  </ul>
+
+
+    
+      <div id="jiathis_style_32x32">
+	<a class="jiathis_button_qzone"></a>
+	<a class="jiathis_button_tsina"></a>
+	<a class="jiathis_button_tqq"></a>
+    <a class="jiathis_button_weixin"></a>
+	<a class="jiathis_button_renren"></a>
+	<a href="http://www.jiathis.com/share/" class="jiathis jiathis_txt jtico jtico_jiathis" target="_blank"></a>
+	<a class="jiathis_counter_style"></a>
+</div>
+<script type="text/javascript" src="http://v2.jiathis.com/code/jia.js" charset="utf-8"></script>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/how-to-solve-sitemesh-truncate-the-page-containing-chinese-character/" title="Previous Post: 如何解决含有中文的页面末尾内容会被SiteMesh截掉的问题">&laquo; 如何解决含有中文的页面末尾内容会被SiteMesh截掉的问题</a>
+      
+      
+        <a class="basic-alignment right" href="/blog/how-to-write-perfect-equals-method/" title="Next Post: 如何编写完美的equals方法">如何编写完美的equals方法 &raquo;</a>
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/developers-are-blinded-by-the-light/">开发者被灯光蒙蔽了双眼</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/books-not-recommended/">哪些书不要读</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/economic-inequality-the-short-version/">贫富差距精简版</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part7/">ANTLR 4权威参考读书笔记（7）</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/how-to-detect-and-prevent-spam-traffic-in-ga/">Google Analytics中如何检测并防止垃圾流量</a>
+      </li>
+    
+  </ul>
+</section>
+<section>
+  <h1>Recent Comments</h1>
+  <div class="dsq-widget">
+    <script type="text/javascript" src="http://codemany.disqus.com/recent_comments_widget.js"></script>
+  </div>
+</section>
+<section>
+  <h1>Tags</h1>
+  <ul class="tag-cloud">
+    <a style="font-size: 119%" href="/tags/antlr/">ANTLR</a>
+<a style="font-size: 104%" href="/tags/algorithm/">Algorithm</a>
+<a style="font-size: 132%" href="/tags/android/">Android</a>
+<a style="font-size: 92%" href="/tags/ant/">Ant</a>
+<a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
+<a style="font-size: 110%" href="/tags/crack/">Crack</a>
+<a style="font-size: 107%" href="/tags/database/">Database</a>
+<a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
+<a style="font-size: 113%" href="/tags/git/">Git</a>
+<a style="font-size: 104%" href="/tags/jbookshelf/">JBookShelf</a>
+<a style="font-size: 148%" href="/tags/java/">Java</a>
+<a style="font-size: 101%" href="/tags/javascript/">JavaScript</a>
+<a style="font-size: 97%" href="/tags/listview/">ListView</a>
+<a style="font-size: 104%" href="/tags/mysql/">MySQL</a>
+<a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
+<a style="font-size: 119%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 101%" href="/tags/powerscript/">PowerScript</a>
+<a style="font-size: 117%" href="/tags/qianbao/">Qianbao</a>
+<a style="font-size: 150%" href="/tags/rails/">Rails</a>
+<a style="font-size: 119%" href="/tags/ruby/">Ruby</a>
+<a style="font-size: 97%" href="/tags/spring/">Spring</a>
+<a style="font-size: 101%" href="/tags/struts/">Struts</a>
+<a style="font-size: 125%" href="/tags/translation/">Translation</a>
+<a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
+<a style="font-size: 92%" href="/tags/w32dasm/">W32Dasm</a>
+<a style="font-size: 107%" href="/tags/windows-server-2008/">Windows Server 2008</a>
+<a style="font-size: 107%" href="/tags/wxwidgets/">wxWidgets</a>
+
+  </ul>
+</section>
+<section>
+  <h1>Blogroll</h1>
+  <ul>
+    <li><a href="http://mindhacks.cn/">刘未鹏MIND HACKS</a></li>
+    <li><a href="http://www.importnew.com/">ImportNew</a></li>
+    <li><a href="http://ifeve.com/">并发编程网</a></li>
+    <li><a href="http://codingnow.com/">云风的 BLOG</a></li>
+    <li><a href="http://dbanotes.net/">DBA Notes</a></li>
+    <li><a href="http://www.ruanyifeng.com/blog/">阮一峰的网络日志</a></li>
+    <li><a href="http://advdbg.org/">高端调试</a></li>
+    <li><a href="http://www.cs.usfca.edu/~galles/visualization/Algorithms.html">Data Structure Visualization</a></li>
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/dohkoos">@dohkoos</a> on GitHub
+  
+  <script type="text/javascript">
+    $(document).ready(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'dohkoos',
+            count: 5,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+<section>
+  <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nc-sa/4.0/88x31.png" /></a>
+  <div>This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/">Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License</a>.</div>
+</section>
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2016 - dohkoos -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'codemany';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://codemany.com/blog/best-practices-for-exception-handling/';
+        var disqus_url = 'http://codemany.com/blog/best-practices-for-exception-handling/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = '//' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+</body>
+</html>

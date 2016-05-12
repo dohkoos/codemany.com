@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Rails | 乐者为王]]></title>
   <link href="http://codemany.com/tags/rails/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2016-05-12T08:28:48+08:00</updated>
+  <updated>2016-05-12T14:56:56+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -156,6 +156,52 @@ end
   </entry>
   
   <entry>
+    <title type="html"><![CDATA[打错multipart引发的血案]]></title>
+    <link href="http://codemany.com/blog/multipart-misspelling-cause-bug/"/>
+    <updated>2014-11-13T09:27:17+08:00</updated>
+    <id>http://codemany.com/blog/multipart-misspelling-cause-bug</id>
+    <content type="html"><![CDATA[<p>浪费几个小时，杀死无数脑细胞，最终发现是单词打错了。不过错有错招，这个问题也让我重新温习了一遍关于form数据编码的知识。</p>
+
+<p>在做上传表单时，一直报告如下错误：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">undefined method &#39;original_filename&#39; for &quot;example.csv&quot;:String
+</code></pre></div>
+<p>在 <a href="http://guides.rubyonrails.org/form_helpers.html#what-gets-uploaded">http://guides.rubyonrails.org/form_helpers.html#what-gets-uploaded</a> 有这样一段文字：</p>
+
+<blockquote>
+<p>The object in the params hash is an instance of a subclass of IO. Depending on the size of the uploaded file it may in fact be a StringIO or an instance of File backed by a temporary file. In both cases the object will have an original_filename attribute containing the name the file had on the user&#39;s computer and a content_type attribute containing the MIME type of the uploaded file.</p>
+</blockquote>
+
+<p>说明example.csv应该是IO类型的，这里怎么显示是String呢？</p>
+
+<p>表单代码为</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;%= form_tag import_stocks_path, mutlipart: true do %&gt;
+</code></pre></div>
+<p>或</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;%= form_tag import_stocks_path, method: :post, mutlipart: true do %&gt;
+</code></pre></div>
+<p>生成后的HTML代码都是：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;form action=&quot;/stocks/import&quot; method=&quot;post&quot; mutlipart=&quot;true&quot;&gt;
+</code></pre></div>
+<p>正确的HTML代码应该是：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;form action=&quot;/stocks/import&quot; method=&quot;post&quot; enctype=&quot;multipart/form-data&quot;&gt;
+</code></pre></div>
+<p>使用HttpFox工具抓取表单提交信息如下：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">POST /stocks/import HTTP/1.1
+Host localhost:3000
+Referer http://localhost:3000/stocks/import
+Connection keep-alive
+Content-Type application/x-www-form-urlencoded
+Content-Length 112
+</code></pre></div>
+<p>什么是application/x-www-form-urlencoded？含有file类型字段的表单编码不应该是multipart/form-data吗。</p>
+
+<p>form的enctype属性通常有两种：application/x-www-form-urlencoded和multipart/form-data，默认为前者。当method=get时，浏览器用application/x-www-form-urlencoded编码方式把form数据转换成一个字串（name1=value1&amp;name2=value2...），然后把这个字串附加到url后面，用?分割。当method=post的时候，浏览器把form数据封装到post-body中。如果没有type=file的控件，就用默认的application/x-www-form-urlencoded编码。但是如果有type=file的话，就要用到multipart/form-data了。浏览器会把整个表单以控件为单位分割，并为每个部分加上Content-Disposition（form-data或者file），Content-Type（默认为text/plain），name等信息，并加上分割边界（boundary）。</p>
+
+<p>这时才发现原来是把multipart打错成mutlipart了，真是惨痛的教训啊！</p>
+]]></content>
+  </entry>
+  
+  <entry>
     <title type="html"><![CDATA[使用Pry调试Rails应用]]></title>
     <link href="http://codemany.com/blog/debugging-rails-application-with-pry/"/>
     <updated>2014-07-07T23:26:08+08:00</updated>
@@ -221,67 +267,6 @@ gem &#39;pg&#39;
 </code></pre></div>
 <p>这个可以使用to_f函数解决：</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">if stock.amount.to_f &lt; 0
-</code></pre></div>]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Rails中通过Checkbox实现批量删除]]></title>
-    <link href="http://codemany.com/blog/deleting-multiple-records-using-checkboxes-in-rails/"/>
-    <updated>2012-12-14T18:20:20+08:00</updated>
-    <id>http://codemany.com/blog/deleting-multiple-records-using-checkboxes-in-rails</id>
-    <content type="html"><![CDATA[<p>在Rails生成的控制器模版中，包含的destroy方法只能处理单个对象，而批量删除要求能够同时处理多个对象，这需要自定义一个批量操作action。批量删除的效果图如下：</p>
-
-<p><img src="/uploads/table-with-checkboxes.png" title="table-with-checkboxes" ></p>
-
-<p>每一行记录的第一列设置成Checkbox，用于标记此行是否被选中。表下方放置一个全选Checkbox，表示全部选中或全部反选。全选和反选的JavaScript代码如下：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;script&gt;
-function toggle_checkall(field_name, state) {
-  var checkboxes = document.getElementsByTagName(&#39;input&#39;);
-  var count = checkboxes.length;
-  for (var i = 0; i &lt; count; i++) {
-    if (checkboxes[i].type == &quot;checkbox&quot;
-        &amp;&amp; checkboxes[i].name == field_name + &quot;_ids[]&quot;) {
-      checkboxes[i].checked = state;
-    }
-  }
-}
-&lt;/script&gt;
-</code></pre></div>
-<p>在routes.rb中配置批量删除action的映射：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">resources :departs do
-  delete &#39;destroy_multiple&#39;, :on =&gt; collection
-end
-</code></pre></div>
-<p>在index.html.erb中添加代码：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;%= form_tag destroy_multiple_departs_path, method: :delete do %&gt;
-&lt;%= submit_tag &quot;删除选中&quot; %&gt;
-&lt;table&gt;
-  &lt;thead&gt;
-    &lt;tr&gt;
-      &lt;th&gt;&lt;input type=&quot;checkbox&quot; onclick=&quot;toggle_checkall(&#39;depart&#39;, this.checked);&quot; /&gt;&lt;/th&gt;
-    &lt;/tr&gt;
-  &lt;/thead&gt;
-
-  &lt;tbody&gt;
-    &lt;tr&gt;
-      &lt;td&gt;&lt;%= check_box_tag &quot;depart_ids[]&quot;, depart.id %&gt;&lt;/td&gt;
-    &lt;/tr&gt;
-    &lt;tr&gt;
-      &lt;td&gt;&lt;%= check_box_tag &quot;depart_ids[]&quot;, depart.id %&gt;&lt;/td&gt;
-    &lt;/tr&gt;
-  &lt;/tbody&gt;
-&lt;/table&gt;
-&lt;% end %&gt;
-</code></pre></div>
-<p>在controller中添加批量删除实现代码：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">def destroy_multiple
-  Depart.destroy(params[:depart_ids]) unless params[:depart_ids].blank?
-
-  respond_to do |format|
-    format.html { redirect_to departs }
-    format.json { head :no_content }
-  end
-end
 </code></pre></div>]]></content>
   </entry>
   

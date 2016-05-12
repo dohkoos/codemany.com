@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Tag: Exception | 乐者为王]]></title>
+  <link href="http://codemany.com/tags/exception/atom.xml" rel="self"/>
+  <link href="http://codemany.com/"/>
+  <updated>2016-05-12T14:56:56+08:00</updated>
+  <id>http://codemany.com/</id>
+  <author>
+    <name><![CDATA[dohkoos]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[异常处理最佳实践]]></title>
+    <link href="http://codemany.com/blog/best-practices-for-exception-handling/"/>
+    <updated>2005-08-12T10:02:48+08:00</updated>
+    <id>http://codemany.com/blog/best-practices-for-exception-handling</id>
+    <content type="html"><![CDATA[<p>英文原文：<a href="http://www.onjava.com/pub/a/onjava/2003/11/19/exceptions.html">http://www.onjava.com/pub/a/onjava/2003/11/19/exceptions.html</a></p>
+
+<p>One of the problems with exception handling is knowing when and how to use it. In this article, I will cover some of the best practices for exception handling. I will also summarize the recent debate about the use of checked exceptions.</p>
+
+<p>We as programmers want to write quality code that solves problems. Unfortunately, exceptions come as side effects of our code. No one likes side effects, so we soon find our own ways to get around them. I have seen some smart programmers deal with exceptions the following way:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public void consumeAndForgetAllExceptions(){
+    try {
+        ...some code that throws exceptions
+    } catch (Exception ex){
+        ex.printStacktrace();
+    }
+}
+</code></pre></div>
+<p>What is wrong with the code above?</p>
+
+<p>Once an exception is thrown, normal program execution is suspended and control is transferred to the catch block. The catch block catches the exception and just suppresses it. Execution of the program continues after the catch block, as if nothing had happened.</p>
+
+<p>How about the following?</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public void someMethod() throws Exception{
+}
+</code></pre></div>
+<p>This method is a blank one; it does not have any code in it. How can a blank method throw exceptions? Java does not stop you from doing this. Recently, I came across similar code where the method was declared to throw exceptions, but there was no code that actually generated that exception. When I asked the programmer, he replied &quot;I know, it is corrupting the API, but I am used to doing it and it works.&quot; </p>
+
+<p>It took the C++ community several years to decide on how to use exceptions. This debate has just started in the Java community. I have seen several Java programmers struggle with the use of exceptions. If not used correctly, exceptions can slow down your program, as it takes memory and CPU power to create, throw, and catch exceptions. If overused, they make the code difficult to read and frustrating for the programmers using the API. We all know frustrations lead to hacks and code smells. The client code may circumvent the issue by just ignoring exceptions or throwing them, as in the previous two examples.</p>
+
+<h3 id="the-nature-of-exceptions">The Nature of Exceptions</h3>
+
+<p>Broadly speaking, there are three different situations that cause exceptions to be thrown:</p>
+
+<ul>
+<li><strong>Exceptions due to programming errors:</strong> In this category, exceptions are generated due to programming errors (e.g., NullPointerException and IllegalArgumentException). The client code usually cannot do anything about programming errors.</li>
+<li><strong>Exceptions due to client code errors:</strong> Client code attempts something not allowed by the API, and thereby violates its contract. The client can take some alternative course of action, if there is useful information provided in the exception. For example: an exception is thrown while parsing an XML document that is not well-formed. The exception contains useful information about the location in the XML document that causes the problem. The client can use this information to take recovery steps.</li>
+<li><strong>Exceptions due to resource failures:</strong> Exceptions that get generated when resources fail. For example: the system runs out of memory or a network connection fails. The client&#39;s response to resource failures is context-driven. The client can retry the operation after some time or just log the resource failure and bring the application to a halt.</li>
+</ul>
+
+<h3 id="types-of-exceptions-in-java">Types of Exceptions in Java</h3>
+
+<p>Java defines two kinds of exceptions:</p>
+
+<ul>
+<li><strong>Checked exceptions:</strong> Exceptions that inherit from the Exception class are checked exceptions. Client code has to handle the checked exceptions thrown by the API, either in a catch clause or by forwarding it outward with the throws clause.</li>
+<li><strong>Unchecked exceptions:</strong> RuntimeException also extends from Exception. However, all of the exceptions that inherit from RuntimeException get special treatment. There is no requirement for the client code to deal with them, and hence they are called unchecked exceptions.</li>
+</ul>
+
+<p>By way of example, Figure 1 shows the hierarchy for NullPointerException.</p>
+
+<p><img src="/uploads/exception-hierarchy.gif" title="exception-hierarchy" ></p>
+
+<p>Figure 1. Sample exception hierarchy</p>
+
+<p>In this diagram, NullPointerException extends from RuntimeException and hence is an unchecked exception.</p>
+
+<p>I have seen heavy use of checked exceptions and minimal use of unchecked exceptions. Recently, there has been a hot debate in the Java community regarding checked exceptions and their true value. The debate stems from fact that Java seems to be the first mainstream OO language with checked exceptions. C++ and C# do not have checked exceptions at all; all exceptions in these languages are unchecked.</p>
+
+<p>A checked exception thrown by a lower layer is a forced contract on the invoking layer to catch or throw it. The checked exception contract between the API and its client soon changes into an unwanted burden if the client code is unable to deal with the exception effectively. Programmers of the client code may start taking shortcuts by suppressing the exception in an empty catch block or just throwing it and, in effect, placing the burden on the client&#39;s invoker.</p>
+
+<p>Checked exceptions are also accused of breaking encapsulation. Consider the following: </p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public List getAllAccounts() throws
+    FileNotFoundException, SQLException{
+    ...
+}
+</code></pre></div>
+<p>The method getAllAccounts() throws two checked exceptions. The client of this method has to explicitly deal with the implementation-specific exceptions, even if it has no idea what file or database call has failed within getAllAccounts(), or has no business providing filesystem or database logic. Thus, the exception handling forces an inappropriately tight coupling between the method and its callers. </p>
+
+<h3 id="best-practices-for-designing-the-api">Best Practices for Designing the API</h3>
+
+<p>Having said all of this, let us now talk about how to design an API that throws exceptions properly.</p>
+
+<h4 id="1-when-deciding-on-checked-exceptions-vs-unchecked-exceptions-ask-yourself-quot-what-action-can-the-client-code-take-when-the-exception-occurs-quot">1. When deciding on checked exceptions vs. unchecked exceptions, ask yourself, &quot;What action can the client code take when the exception occurs?&quot;</h4>
+
+<p>If the client can take some alternate action to recover from the exception, make it a checked exception. If the client cannot do anything useful, then make the exception unchecked. By useful, I mean taking steps to recover from the exception and not just logging the exception. To summarize:</p>
+
+<table><thead>
+<tr>
+<th>Client&#39;s reaction when exception happens</th>
+<th>Exception type</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>Client code cannot do anything</td>
+<td>Make it an unchecked exception</td>
+</tr>
+<tr>
+<td>Client code will take some useful recovery action based on information in exception</td>
+<td>Make it a checked exception</td>
+</tr>
+</tbody></table>
+
+<p>Moreover, prefer unchecked exceptions for all programming errors: unchecked exceptions have the benefit of not forcing the client API to explicitly deal with them. They propagate to where you want to catch them, or they go all the way out and get reported. The Java API has many unchecked exceptions, such as NullPointerException, IllegalArgumentException, and IllegalStateException. I prefer working with standard exceptions provided in Java rather than creating my own. They make my code easy to understand and avoid increasing the memory footprint of code. </p>
+
+<h4 id="2-preserve-encapsulation">2. Preserve encapsulation.</h4>
+
+<p>Never let implementation-specific checked exceptions escalate to the higher layers. For example, do not propagate SQLException from data access code to the business objects layer. Business objects layer do not need to know about SQLException. You have two options:</p>
+
+<ul>
+<li>Convert SQLException into another checked exception, if the client code is expected to recuperate from the exception.</li>
+<li>Convert SQLException into an unchecked exception, if the client code cannot do anything about it.</li>
+</ul>
+
+<p>Most of the time, client code cannot do anything about SQLExceptions. Do not hesitate to convert them into unchecked exceptions. Consider the following piece of code:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public void dataAccessCode(){
+    try{
+        ..some code that throws SQLException
+    }catch(SQLException ex){
+        ex.printStacktrace();
+    }
+}
+</code></pre></div>
+<p>This catch block just suppresses the exception and does nothing. The justification is that there is nothing my client could do about an SQLException. How about dealing with it in the following manner? </p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public void dataAccessCode(){
+    try{
+        ..some code that throws SQLException
+    }catch(SQLException ex){
+        throw new RuntimeException(ex);
+    }
+}
+</code></pre></div>
+<p>This converts SQLException to RuntimeException. If SQLException occurs, the catch clause throws a new RuntimeException. The execution thread is suspended and the exception gets reported. However, I am not corrupting my business object layer with unnecessary exception handling, especially since it cannot do anything about an SQLException. If my catch needs the root exception cause, I can make use of the getCause() method available in all exception classes as of JDK1.4.</p>
+
+<p>If you are confident that the business layer can take some recovery action when SQLException occurs, you can convert it into a more meaningful checked exception. But I have found that just throwing RuntimeException suffices most of the time. </p>
+
+<h4 id="3-try-not-to-create-new-custom-exceptions-if-they-do-not-have-useful-information-for-client-code">3. Try not to create new custom exceptions if they do not have useful information for client code.</h4>
+
+<p>What is wrong with following code?</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public class DuplicateUsernameException extends Exception {}
+</code></pre></div>
+<p>It is not giving any useful information to the client code, other than an indicative exception name. Do not forget that Java Exception classes are like other classes, wherein you can add methods that you think the client code will invoke to get more information.</p>
+
+<p>We could add useful methods to DuplicateUsernameException, such as:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public class DuplicateUsernameException
+    extends Exception {
+    public DuplicateUsernameException 
+        (String username){....}
+    public String requestedUsername(){...}
+    public String[] availableNames(){...}
+}
+</code></pre></div>
+<p>The new version provides two useful methods: requestedUsername(), which returns the requested name, and availableNames(), which returns an array of available usernames similar to the one requested. The client could use these methods to inform that the requested username is not available and that other usernames are available. But if you are not going to add extra information, then just throw a standard exception:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">throw new Exception(&quot;Username already taken&quot;);
+</code></pre></div>
+<p>Even better, if you think the client code is not going to take any action other than logging if the username is already taken, throw a unchecked exception:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">throw new RuntimeException(&quot;Username already taken&quot;);
+</code></pre></div>
+<p>Alternatively, you can even provide a method that checks if the username is already taken.</p>
+
+<p>It is worth repeating that checked exceptions are to be used in situations where the client API can take some productive action based on the information in the exception. Prefer unchecked exceptions for all programmatic errors. They make your code more readable.</p>
+
+<h4 id="4-document-exceptions">4. Document exceptions.</h4>
+
+<p>You can use Javadoc&#39;s @throws tag to document both checked and unchecked exceptions that your API throws. However, I prefer to write unit tests to document exceptions. Tests allow me to see the exceptions in action and hence serve as documentation that can be executed. Whatever you do, have some way by which the client code can learn of the exceptions that your API throws. Here is a sample unit test that tests for IndexOutOfBoundsException:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public void testIndexOutOfBoundsException() {
+    ArrayList blankList = new ArrayList();
+    try {
+        blankList.get(10);
+        fail(&quot;Should raise an IndexOutOfBoundsException&quot;);
+    } catch (IndexOutOfBoundsException success) {}
+}
+</code></pre></div>
+<p>The code above should throw an IndexOutOfBoundsException when blankList.get(10) is invoked. If it does not, the fail(&quot;Should raise an IndexOutOfBoundsException&quot;) statement explicitly fails the test. By writing unit tests for exceptions, you not only document how the exceptions work, but also make your code robust by testing for exceptional scenarios.</p>
+
+<h3 id="best-practices-for-using-exceptions">Best Practices for Using Exceptions</h3>
+
+<p>The next set of best practices show how the client code should deal with an API that throws checked exceptions.</p>
+
+<h4 id="1-always-clean-up-after-yourself">1. Always clean up after yourself</h4>
+
+<p>If you are using resources like database connections or network connections, make sure you clean them up. If the API you are invoking uses only unchecked exceptions, you should still clean up resources after use, with try - finally blocks.</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public void dataAccessCode(){
+    Connection conn = null;
+    try{
+        conn = getConnection();
+        ..some code that throws SQLException
+    }catch(SQLException ex){
+        ex.printStacktrace();
+    } finally{
+        DBUtil.closeConnection(conn);
+    }
+}
+
+class DBUtil{
+    public static void closeConnection
+        (Connection conn){
+        try{
+            conn.close();
+        } catch(SQLException ex){
+            logger.error(&quot;Cannot close connection&quot;);
+            throw new RuntimeException(ex);
+        }
+    }
+}
+</code></pre></div>
+<p>DBUtil is a utility class that closes the Connection. The important point is the use of finally block, which executes whether or not an exception is caught. In this example, the finally closes the connection and throws a RuntimeException if there is problem with closing the connection.</p>
+
+<h4 id="2-never-use-exceptions-for-flow-control">2. Never use exceptions for flow control</h4>
+
+<p>Generating stack traces is expensive and the value of a stack trace is in debugging. In a flow-control situation, the stack trace would be ignored, since the client just wants to know how to proceed.</p>
+
+<p>In the code below, a custom exception, MaximumCountReachedException, is used to control the flow.</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public void useExceptionsForFlowControl() {
+    try {
+        while (true) {
+            increaseCount();
+        }
+    } catch (MaximumCountReachedException ex) {
+    }
+    //Continue execution
+}
+
+public void increaseCount()
+    throws MaximumCountReachedException {
+    if (count &gt;= 5000)
+        throw new MaximumCountReachedException();
+}
+</code></pre></div>
+<p>The useExceptionsForFlowControl() uses an infinite loop to increase the count until the exception is thrown. This not only makes the code difficult to read, but also makes it slower. Use exception handling only in exceptional situations.</p>
+
+<h4 id="3-do-not-suppress-or-ignore-exceptions">3. Do not suppress or ignore exceptions</h4>
+
+<p>When a method from an API throws a checked exception, it is trying to tell you that you should take some counter action. If the checked exception does not make sense to you, do not hesitate to convert it into an unchecked exception and throw it again, but do not ignore it by catching it with {} and then continue as if nothing had happened.</p>
+
+<h4 id="4-do-not-catch-top-level-exceptions">4. Do not catch top-level exceptions</h4>
+
+<p>Unchecked exceptions inherit from the RuntimeException class, which in turn inherits from Exception. By catching the Exception class, you are also catching RuntimeException as in the following code:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">try{
+..
+}catch(Exception ex){
+}
+</code></pre></div>
+<p>The code above ignores unchecked exceptions, as well.</p>
+
+<h4 id="5-log-exceptions-just-once">5. Log exceptions just once</h4>
+
+<p>Logging the same exception stack trace more than once can confuse the programmer examining the stack trace about the original source of exception. So just log it once. </p>
+
+<h3 id="summary">Summary</h3>
+
+<p>These are some suggestions for exception-handling best practices. I have no intention of staring a religious war on checked exceptions vs. unchecked exceptions. You will have to customize the design and usage according to your requirements. I am confident that over time, we will find better ways to code with exceptions.</p>
+
+<p>I would like to thank Bruce Eckel, Joshua Kerievsky, and Somik Raha for their support in writing this article.</p>
+
+<h3 id="related-resources">Related Resources</h3>
+
+<ul>
+<li><a href="http://www.mindview.net/Etc/Discussions/CheckedExceptions">&quot;Does Java need Checked Exceptions?&quot;</a> by Bruce Eckel</li>
+<li><a href="http://www.octopull.demon.co.uk/java/ExceptionalJava.html">&quot;Exceptional Java,&quot;</a> by Alan Griffiths</li>
+<li><a href="http://www.artima.com/intv/handcuffs.html">&quot;The trouble with checked exceptions: A conversation with Anders Hejlsberg, Part II&quot;</a> on Artima.com</li>
+<li><a href="http://www.c2.com/cgi/wiki?CheckedExceptionsAreOfDubiousValue">&quot;Checked exceptions are of dubious value,&quot;</a> on C2.com</li>
+<li><a href="http://www.artima.com/intv/solid.html">Conversation with James Gosling</a> by Bill Venners</li>
+</ul>
+]]></content>
+  </entry>
+  
+</feed>

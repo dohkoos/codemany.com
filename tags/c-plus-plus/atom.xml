@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: C++ | 乐者为王]]></title>
   <link href="http://codemany.com/tags/c-plus-plus/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2016-05-12T08:28:48+08:00</updated>
+  <updated>2016-05-12T14:56:56+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,471 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[利用WHOIS协议查询域名信息]]></title>
+    <link href="http://codemany.com/blog/using-whois-protocol-to-query-domain-information/"/>
+    <updated>2009-09-16T06:15:04+08:00</updated>
+    <id>http://codemany.com/blog/using-whois-protocol-to-query-domain-information</id>
+    <content type="html"><![CDATA[<p>域名信息的查询原理非常简单，主要是基于RFC 954（RFC 812已被废弃）提供的WHOIS协议。WHOIS服务器是一个基于“查询/响应”的TCP事务服务器，用户程序通过访问WHOIS服务器，从WHOIS数据库中查询得到我们所需要的内容。其主要过程有以下三步：</p>
+
+<ol>
+<li>在TCP服务端口43连接WHOIS服务主机；</li>
+<li>发送一个命令，以回车换行符结尾；</li>
+<li>接受相应命令的返回信息，一旦输出结束，服务器将关闭连接。</li>
+</ol>
+
+<p>命令的格式非常简单。可以直接输入域名（例如example.com）查询相关域名信息；也可以使用help得到详细的帮助信息。以下是查询的代码：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">wxString Whois::Lookup(wxString&amp; host, wxString&amp; szAddress)
+{
+    char szQuery[512];
+    char szBuffer[512];
+    wxString szResult;
+
+    strcpy(szQuery, szAddress);
+    strcat(szQuery, &quot;\r\n&quot;);
+
+    wxIPV4address addr;
+    addr.Hostname(host);
+    addr.Service(43);
+
+    wxSocketClient socket;
+    socket.Connect(addr, false);
+    socket.WaitOnConnect(30);
+
+    if (socket.IsConnected())
+    {
+        socket.Write(szQuery, strlen(szQuery));
+        szResult = &quot;&quot;;
+        while (true)
+        {
+            // Clear buffer before each iteration
+            memset(szBuffer, 0, 512);
+
+            // Try to receive some data
+            socket.Read(szBuffer, 500);
+            if (socket.LastCount() &lt;= 0)
+            {
+                break;
+            }
+            szResult += szBuffer;
+        }
+    }
+    else
+    {
+        szResult = wxT(&quot;Failed! Unable to connect\n&quot;);
+    }
+    socket.Close();
+
+    return wxString::FromUTF8(szResult);
+}
+</code></pre></div>
+<p>常用的WHOIS服务器：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">.cn=whois.cnnic.net.cn
+.com=whois.internic.com
+.net=whois.internic.com
+.name=www.whois.name
+.cc=whois.nic.cc
+</code></pre></div>]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[XRC和动态子菜单]]></title>
+    <link href="http://codemany.com/blog/xrc-and-dynamic-sub-menu/"/>
+    <updated>2008-01-11T15:08:59+08:00</updated>
+    <id>http://codemany.com/blog/xrc-and-dynamic-sub-menu</id>
+    <content type="html"><![CDATA[<p>1、什么是XRC</p>
+
+<p>XRC是基于XML的资源系统。它的基本出发点是将界面布局和程序逻辑分离，即将界面布局代码保存在分离的XML文件中，在程序中不涉及控件的创建和布局，只需要加载相应的资源并处理事件绑定即可。</p>
+
+<p>2、XRC文件格式</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;?xml version=&quot;1.0&quot;?&gt;
+&lt;resource version=&quot;2.3.0.1&quot;&gt;
+    &lt;object class=&quot;wxFrame&quot; name=&quot;ID_MAIN_FRAME&quot;&gt;
+        &lt;size&gt;200, 300&lt;/size&gt;
+    &lt;/object&gt;
+&lt;/resource&gt;
+</code></pre></div>
+<p>3、XRC文件中菜单资源的相关属性</p>
+
+<table><thead>
+<tr>
+<th>类</th>
+<th>属性</th>
+<th>描述</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>wxMenuBar</td>
+<td>style</td>
+<td>Menu bar style: wxMB_DOCKABLE</td>
+</tr>
+<tr>
+<td>wxMenu</td>
+<td>style</td>
+<td>Menu style: wxMENU_TEAROFF</td>
+</tr>
+<tr>
+<td></td>
+<td>label</td>
+<td>Text: label of the menu.</td>
+</tr>
+<tr>
+<td></td>
+<td>help</td>
+<td>Text: displayed help string.</td>
+</tr>
+<tr>
+<td>wxMenuItem</td>
+<td>style</td>
+<td>Menu style: wxMENU_TEAROFF</td>
+</tr>
+<tr>
+<td></td>
+<td>label</td>
+<td>Text: label of the menu.</td>
+</tr>
+<tr>
+<td></td>
+<td>accel</td>
+<td>Text: accelerator associated to this item ( Alt-X for example ).</td>
+</tr>
+<tr>
+<td></td>
+<td>help</td>
+<td>Text: displayed help string.</td>
+</tr>
+<tr>
+<td></td>
+<td>radio</td>
+<td>bool value(0/1): 1 if this item is a radio menu item.</td>
+</tr>
+<tr>
+<td></td>
+<td>checkable</td>
+<td>bool value(0/1): 1 if this item is a check menu item.</td>
+</tr>
+<tr>
+<td></td>
+<td>enabled</td>
+<td>bool value(0/1): 1 if this item is initially enabled.</td>
+</tr>
+<tr>
+<td></td>
+<td>checked</td>
+<td>bool value(0/1): 1 if this (check) item is initially checked.</td>
+</tr>
+<tr>
+<td></td>
+<td>bitmap</td>
+<td>Text: path to a bitmap to draw at the left of the item.</td>
+</tr>
+</tbody></table>
+
+<p>4、使用XRC创建菜单</p>
+
+<p>创建一个包含菜单布局信息的XML资源文件MenuBar.xrc：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot; ?&gt;
+&lt;resource version=&quot;2.3.0.1&quot; xmlns=&quot;http://www.wxwindows.org/wxxrc&quot;&gt;
+    &lt;object class=&quot;wxMenuBar&quot; name=&quot;ID_MENUBAR&quot;&gt;
+        &lt;object class=&quot;wxMenu&quot; name=&quot;ID_MENU_FILE&quot;&gt;
+            &lt;label&gt;&amp;File&lt;/label&gt;
+            &lt;object class=&quot;wxMenuItem&quot; name=&quot;wxID_CLOSE&quot;&gt;
+                &lt;label&gt;E&amp;xit&lt;/label&gt;
+                &lt;accel&gt;Ctrl+Q&lt;/accel&gt;
+                &lt;help&gt;Quit the application&lt;/help&gt;
+            &lt;/object&gt;
+        &lt;/object&gt;
+        &lt;object class=&quot;wxMenu&quot; name=&quot;ID_MENU_VIEW&quot;&gt;
+            &lt;label&gt;&amp;View&lt;/label&gt;
+        &lt;/object&gt;
+        &lt;object class=&quot;wxMenu&quot; name=&quot;ID_MENU_TOOLS&quot;&gt;
+            &lt;label&gt;&amp;Tools&lt;/label&gt;
+            &lt;object class=&quot;wxMenuItem&quot; name=&quot;wxID_OPTIONS&quot;&gt;
+                &lt;label&gt;&amp;Options...&lt;/label&gt;
+            &lt;/object&gt;
+        &lt;/object&gt;
+        &lt;object class=&quot;wxMenu&quot; name=&quot;ID_MENU_HELP&quot;&gt;
+            &lt;label&gt;&amp;Help&lt;/label&gt;
+            &lt;object class=&quot;wxMenuItem&quot; name=&quot;wxID_CHECKFORUPDATES&quot;&gt;
+                &lt;label&gt;Check for &amp;Updates...&lt;/label&gt;
+            &lt;/object&gt;
+            &lt;object class=&quot;separator&quot; /&gt;
+            &lt;object class=&quot;wxMenuItem&quot; name=&quot;wxID_ABOUT&quot;&gt;
+                &lt;label&gt;&amp;About...&lt;/label&gt;
+            &lt;/object&gt;
+        &lt;/object&gt;
+    &lt;/object&gt;
+&lt;/resource&gt;
+</code></pre></div>
+<p>加载资源文件：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">bool MainApp::OnInit()
+{
+    wxXmlResource* pResource = wxXmlResource::Get();
+    pResource-&gt;AddHandler(new wxMenuBarXmlHandler);
+    pResource-&gt;AddHandler(new wxMenuXmlHandler);
+    pResource-&gt;Load(wxT(&quot;resources/MenuBar.xrc&quot;));
+</code></pre></div>
+<p>初始化资源文件：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">MainFrame::MainFrame(const wxString&amp; title) : wxFrame(NULL, wxID_ANY, title)
+{
+    m_menuBar = NULL;
+    InitMenuBar();
+}
+
+bool MainFrame::InitMenuBar()
+{
+    if (m_menuBar)
+    {
+        SetMenuBar(NULL);
+        delete m_menuBar;
+    }
+    // Initialize the resource system
+    m_menuBar = wxXmlResource::Get()-&gt;LoadMenuBar(wxT(&quot;ID_MENUBAR&quot;));
+    if (!m_menuBar)
+    {
+        wxLogError(wxT(&quot;Cannot load main menu from resource file&quot;));
+        return false;
+    }
+    SetMenuBar(m_menuBar);
+    return true;
+}
+</code></pre></div>
+<p>5、在XRC菜单上添加动态子菜单</p>
+
+<p>在资源文件中添加一个新的菜单项（wxID_LANGUAGES）：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;object class=&quot;wxMenu&quot; name=&quot;ID_MENU_VIEW&quot;&gt;
+    &lt;label&gt;&amp;View&lt;/label&gt;
+    &lt;object class=&quot;wxMenu&quot; name=&quot;wxID_LANGUAGE&quot;&gt;
+        &lt;label&gt;&amp;Language&lt;/label&gt;
+        &lt;object class=&quot;wxMenuItem&quot; name=&quot;wxID_LANGUAGES&quot;&gt;
+            &lt;label&gt;Get Additional/Update language pack&lt;/label&gt;
+            &lt;help&gt;Downloading Additional/Update language pack&lt;/help&gt;
+        &lt;/object&gt;
+        &lt;object class=&quot;separator&quot; /&gt;
+    &lt;/object&gt;
+&lt;/object&gt;
+</code></pre></div>
+<p>创建动态子菜单：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">// Initialize the resource system
+m_menuBar = wxXmlResource::Get()-&gt;LoadMenuBar(wxT(&quot;ID_MENUBAR&quot;));
+if (!m_menuBar)
+{
+    wxLogError(wxT(&quot;Cannot load main menu from resource file&quot;));
+    return false;
+}
+/*
+ * 这里很奇怪，在XRC文件wxID_LANGUAGE的类型明明是wxMenu，可在这里确只能用wxMenuItem。
+ * 查看wxWidgets源代码发现XRC系统只会把最上层的class为wxMenu的object创建为wxMenu对象。
+ * 其它的则都被创建成了wxMenuItem对象。
+ */
+// 使用XRCID方法获取控件ID，创建动态子菜单
+wxMenuItem* menuItem = m_menuBar-&gt;FindItem(XRCID(&quot;wxID_LANGUAGE&quot;));
+if (menuItem)
+{
+    wxMenu* subMenu = menuItem-&gt;GetSubMenu();
+    subMenu-&gt;AppendRadioItem(wxID_LANGUAGE_LOWEST + 1, wxT(&quot;English&quot;));
+    subMenu-&gt;AppendRadioItem(wxID_LANGUAGE_LOWEST + 2, wxT(&quot;Chinese(Simplified)&quot;));
+}
+SetMenuBar(m_menuBar);
+return true;
+</code></pre></div>
+<p><a href="/uploads/wxXRC.zip" title="wxXRC.zip">代码下载</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[如何实现一个可拖动的无标题栏窗口]]></title>
+    <link href="http://codemany.com/blog/how-to-implement-draggable-window-without-title-bar/"/>
+    <updated>2007-12-03T15:46:55+08:00</updated>
+    <id>http://codemany.com/blog/how-to-implement-draggable-window-without-title-bar</id>
+    <content type="html"><![CDATA[<p>无标题栏窗口的实现很简单。先将窗口从wxMiniFrame继承，然后在窗口的构造函数中设置一下窗口的样式。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">MainFrame::MainFrame(const wxPoint&amp; pos, const wxSize&amp; size)
+    : wxMiniFrame(NULL, wxID_ANY, wxEmptyString, pos, size)
+{
+    SetWindowStyleFlag(wxFRAME_NO_TASKBAR | wxNO_BORDER);
+}
+</code></pre></div>
+<p>但是，窗口的移动通常都是通过鼠标点住标题栏拖动窗口来实现的，那么现在没有了标题栏，该如何移动窗口呢？我们知道，当鼠标拖动窗口时，它在窗口中的位置是始终不变的。所以如果能够在鼠标移动过程中，通过改变窗口在桌面上的坐标，并且始终保持鼠标相对于窗口的坐标不变，即可实现鼠标的拖动效果。</p>
+
+<p>在具体的设计中，先在鼠标的MouseDown事件中记录下鼠标相对于窗口的偏移，在鼠标的MouseMove事件中根据鼠标在桌面上的位置实时设置窗口的位置，即可达到鼠标拖动窗口的操作。利用此方法实现鼠标拖动，与常规的标题栏鼠标拖动在效果上有一点区别。通过标题栏拖动时，鼠标移动过程中不重画窗口，只有松开鼠标后才在固定位置重画窗口，因此其速度较快。而采用本方法的拖动过程中，每移动一步都需要重画窗口，因此对速度稍有影响，在慢一些的机器上可能会出现轻微的拖尾现象。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">void MainFrame::OnMouseMove(wxMouseEvent&amp; event)
+{
+    if (event.Dragging() &amp;&amp; event.LeftIsDown())
+    {
+        wxPoint pt = ClientToScreen(event.GetPosition());
+        int x = pt.x - m_delta.x;
+        int y = pt.y - m_delta.y;
+        Move(x, y);
+    }
+}
+
+void MainFrame::OnMouseLeftDown(wxMouseEvent&amp; event)
+{
+    CaptureMouse();
+    wxPoint pt = ClientToScreen(event.GetPosition());
+    wxPoint origin = GetPosition();
+    int dx = pt.x - origin.x;
+    int dy = pt.y - origin.y;
+    m_delta = wxPoint(dx, dy);
+}
+
+void MainFrame::OnMouseLeftUp(wxMouseEvent&amp; WXUNUSED(event))
+{
+    if (HasCapture())
+    {
+        ReleaseMouse();
+    }
+}
+</code></pre></div>
+<p><a href="/uploads/wxDragAndDrop.zip" title="wxDragAndDrop.zip">代码下载</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[程序只运行一个实例，并将前一个实例提到前台]]></title>
+    <link href="http://codemany.com/blog/run-only-one-instance-and-active-an-instance-of-the-former/"/>
+    <updated>2007-12-01T09:59:19+08:00</updated>
+    <id>http://codemany.com/blog/run-only-one-instance-and-active-an-instance-of-the-former</id>
+    <content type="html"><![CDATA[<p>wxWidgets提供了一个用来检测是否只有一个实例在运行的wxSingleInstanceChecker类。为了检测程序只运行一个实例，你可以在程序运行之初使用该类创建一个m_check对象，这个对象将存在于程序的整个生命周期。然后就可以在OnInit函数中调用其IsAnotherRunning函数检测是否已经有别的实例在运行。代码如下所示：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">bool MainApp::OnInit()
+{
+    wxString name = wxString::Format(wxT(&quot;MainApp-%s&quot;), wxGetUserId().GetData());
+    m_checker = new wxSingleInstanceChecker(name);
+    if (m_checker-&gt;IsAnotherRunning())
+    {
+        wxLogError(wxT(&quot;Another program instance is already running, aborting.&quot;));
+        delete m_checker;
+        return false;
+    }
+    // more initializations
+    return true;
+}
+
+int MainApp::OnExit()
+{
+    delete m_checker;
+    return 0;
+}
+</code></pre></div>
+<p>注意：上面使用了wxGetUserId()来构建实例名，这表示允许不同的用户能同时运行程序的一个实例。如果不这样，那么程序就只能被一个用户运行一次。</p>
+
+<p>但是，如果你想把旧的实例提到前台，或者想使旧的实例打开传递给新的实例的作为命令行参数的文件，该怎么办呢？一般来说，这需要在这两个实例间进行通讯。我们可以使用wxWidgets提供的进程间通讯类来实现。</p>
+
+<p>在下面的实例中，我们将实现程序多个实例间的通讯，以便允许第二个实例请求第一个实例将自己带到前台以提醒用户它已经在运行。下面的代码实现了一个连接类，这个类将被两个实例使用。一个服务器类被旧的实例使用，以便监听新的实例的连接请求。一个客户端类被新的实例使用，以便和旧的实例进行通讯。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">class AppServer : public wxServer
+{
+public:
+    virtual wxConnectionBase* OnAcceptConnection(const wxString&amp; topic);
+};
+</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">class AppClient : public wxClient
+{
+public:
+    virtual wxConnectionBase* OnMakeConnection();
+};
+</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">class AppConnection : public wxConnection
+{
+public:
+    virtual bool OnExecute(const wxString&amp; WXUNUSED(topic), wxChar* WXUNUSED(data),
+                          int WXUNUSED(size), wxIPCFormat WXUNUSED(format));
+};
+</code></pre></div>
+<p>当有新的实例（作为Client）进行连接请求时，旧的实例（作为Server）中的OnAcceptConnection函数首先检查旧的实例中没有任何模式对话框。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">wxConnectionBase* AppServer::OnAcceptConnection(const wxString&amp; topic)
+{
+    if (topic.Lower() == wxT(&quot;only-one&quot;))
+    {
+        wxWindowList::Node* node = wxTopLevelWindows.GetFirst();
+        while (node)
+        {
+            wxDialog* dialog = wxDynamicCast(node-&gt;GetData(), wxDialog);
+            if (dialog &amp;&amp; dialog-&gt;IsModal())
+            {
+                return false;
+            }
+            node = node-&gt;GetNext();
+        }
+        return new AppConnection();
+    }
+    else
+    {
+        return NULL;
+    }
+}
+</code></pre></div>
+<p>OnExecute函数是一个回调函数，在新的实例对其连接对象（由AppConnection创建的对象）调用Execute函数时被调用。OnExecute函数可以有一个空的参数，这表示它只要将自己提到前台就可以了。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">bool AppConnection::OnExecute(const wxString&amp; WXUNUSED(topic), wxChar* WXUNUSED(data),
+                              int WXUNUSED(size), wxIPCFormat WXUNUSED(format))
+{
+    wxFrame* frame = wxDynamicCast(wxGetApp().GetTopWindow(), wxFrame);
+    if (frame)
+    {
+        frame-&gt;Restore();    // 必须要有这句，不然当主窗口最小化时，就不能被提到前台
+        frame-&gt;Raise();
+    }
+    return true;
+}
+</code></pre></div>
+<p>接下来我们还需要修改OnInit()函数。当没有别的实例在运行时，这个实例需要将自己设置为Server，等待别的实例的连接请求，如果已经有实例在运行，那么就创建一个和那个实例的连接，请求那个实例将程序的主窗口提到前台。下面的修改后的代码：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">bool MainApp::OnInit()
+{
+    wxString name = wxString::Format(wxT(&quot;MainApp-%s&quot;), wxGetUserId().GetData());
+    m_checker = new wxSingleInstanceChecker(name);
+    if (!m_checker-&gt;IsAnotherRunning())
+    {
+        m_server = new AppServer();
+        if (!m_server-&gt;Create(wxT(&quot;wxMainApp&quot;)))
+        {
+            wxLogDebug(wxT(&quot;Failed to create an IPC service.&quot;));
+            return false;
+        }
+    }
+    else
+    {
+        AppClient* client = new AppClient();
+        wxString hostName = wxT(&quot;localhost&quot;);
+        wxConnectionBase* conn = client-&gt;MakeConnection(hostName, wxT(&quot;wxMainApp&quot;), wxT(&quot;only-one&quot;));
+        if (conn)
+        {
+            conn-&gt;Execute(wxEmptyString);
+            conn-&gt;Disconnect();
+            delete conn;
+        }
+        else
+        {
+            wxString msg = wxT(&quot;Sorry, the existing instance may be too busy to respond.\nPlease close any open dialogs and retry.&quot;);
+            wxMessageBox(msg, wxT(&quot;wxMainApp&quot;), wxICON_INFORMATION | wxOK);
+        }
+        delete client;    // 如果没有这句，在运行Debug版本时就会显示如下图的警告
+        return false;
+    }
+    // more initializations
+    return true;
+}
+</code></pre></div>
+<p><img src="/uploads/wxdde-alert.png" title="wxdde-alert" ></p>
+
+<p>释放实例资源</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">int MainApp::OnExit()
+{
+    delete m_checker;
+    delete m_server;
+    return 0;
+}
+</code></pre></div>
+<p>遇到的问题：</p>
+
+<p>1、调用wxGetApp时编译错误</p>
+
+<p>在调用wxGetApp()时可能会有编译错误，提示说“identifier not found”。这可以通过在App类后加上一行DECLARE_APP(XXXApp)来解决。</p>
+
+<p>2、引入ipc.h和wx.h时的顺序问题</p>
+
+<p>运行第二个实例的时候，发现它总是会挂起在MakeConnection处，查看进程可以看到有两个实例在运行。在网上找了n久，只在wxWidgets Forum上发现有提到这个问题（<a href="http://wxforum.shadonet.com/viewtopic.php?t=4367&highlight=makeconnection">Windows service using wxWidgets ipc</a>），可是也没有提到如何解决。只能靠自己啦，经过对程序的一步步排除，终于发现是因为引入头文件时将ipc.h放在wx.h之前的原因，掉换引入头文件的顺序后问题被解决。</p>
+
+<p><a href="/uploads/wxSingleton.zip" title="wxSingleton.zip">代码下载</a></p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Hello wxWidgets!]]></title>
@@ -68,15 +533,6 @@ MainFrame::MainFrame(const wxString&amp; title) : wxFrame(NULL, wxID_ANY, title)
     // TODO: add member initialization code here
 }
 </code></pre></div>]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[在Visual C#中调试C++的DLL]]></title>
-    <link href="http://codemany.com/blog/debugging-cpp-dll-in-visual-csharp/"/>
-    <updated>2007-07-03T21:09:09+08:00</updated>
-    <id>http://codemany.com/blog/debugging-cpp-dll-in-visual-csharp</id>
-    <content type="html"><![CDATA[<p>在Visual C#中调试C++的DLL很简单，只要在C#项目属性的Debug一项中钩上“Enable unmanaged code debugging”，然后你就可以像调试一般程序那样调试DLL了。</p>
-]]></content>
   </entry>
   
 </feed>
