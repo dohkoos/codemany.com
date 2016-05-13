@@ -9,7 +9,9 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="下午在机房值班，14:00的时候有人报告说交易客户端不能登录了，确定问题后两同事急忙重启AR和AS以及交易网关，可是还是不能登录。紧急重启数据库后问题才解决。 出了问题不可怕，关键是找到问题根源所在，解决问题，使同样的错误不再重复地发生。 打电话联系恒生的工程师，向他们提供系统的日志文件， &hellip;">
+  <meta name="description" content="通过有with check option选项的视图操作基表，有以下结论： 首先视图只操作它可以查询出来的数据，对于它查询不出的数据，即使基表有，也不可以通过视图来操作；
+对于update，有with check option，要保证update后，数据能被视图查询出来；
+对于delete， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +75,119 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/with-check-option-in-view/">创建视图时的with check option选项</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2010-06-28T20:33:27+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>28</span><span class='date-suffix'>th</span>, <span class='date-year'>2010</span></span> <span class='time'>8:33 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>通过有with check option选项的视图操作基表，有以下结论：</p>
+
+<ol>
+<li>首先视图只操作它可以查询出来的数据，对于它查询不出的数据，即使基表有，也不可以通过视图来操作；</li>
+<li>对于update，有with check option，要保证update后，数据能被视图查询出来；</li>
+<li>对于delete，有无with check option都一样；</li>
+<li>对于insert，有with check option，要保证insert后，数据要被视图查询出来。</li>
+</ol>
+
+<p>对于没有where子句的视图，使用with check option是多余的。</p>
+
+<p>下面用一个例子来说明第4条：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>CREATE TABLE students (
+</span><span class='line'>    id int NOT NULL AUTO_INCREMENT,
+</span><span class='line'>    name varchar(50) NOT NULL,
+</span><span class='line'>    age int,
+</span><span class='line'>    sex char(1),
+</span><span class='line'>    PRIMARY KEY (id)
+</span><span class='line'>);
+</span><span class='line'>
+</span><span class='line'>CREATE VIEW male_students_view AS
+</span><span class='line'>    SELECT name, age FROM students
+</span><span class='line'>    WHERE sex = 'M'
+</span><span class='line'>    WITH CHECK OPTION;</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>-- 报CHECK OPTION failed错误，原因如4，插入数据后要还能被视图查询出来。
+</span><span class='line'>INSERT INTO male_students_view VALUES('WU', 18);</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>-- 报Column count doesn't match value count错误，因为视图中根本没有sex列。
+</span><span class='line'>INSERT INTO male_students_view VALUES('WU', 18, 'M');</span></code></pre></td></tr></table></div></figure>
+
+<p>将students.sex列改成默认值为M：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ALTER TABLE students MODIFY sex char(1) NOT NULL DEFAULT 'M'</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>-- 执行成功，1 row affected。
+</span><span class='line'>INSERT INTO male_students_view VALUES('WU', 18);</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>-- 还是同样的问题，Column count doesn't match value count。
+</span><span class='line'>INSERT INTO male_students_view VALUES('WU', 18, 'M');</span></code></pre></td></tr></table></div></figure>
+
+<p>或者不修改students.sex的属性，将视图改成：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>CREATE VIEW male_students_view AS
+</span><span class='line'>    SELECT name, age, sex FROM students
+</span><span class='line'>    WHERE sex = 'M'
+</span><span class='line'>    WITH CHECK OPTION;</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>-- 会报CHECK OPTION failed错误。
+</span><span class='line'>INSERT INTO male_students_view VALUES('WU', 18);</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>-- 执行成功，1 row affected。
+</span><span class='line'>INSERT INTO male_students_view VALUES('WU', 18, 'M');</span></code></pre></td></tr></table></div></figure>
+
+<p>以上例子都在MySQL上实际执行过。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -727,139 +842,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/using-rails-23-to-create-a-simple-accounting-app-part10/">用Rails 2.3打造简单记账软件（10）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2010-01-04T20:34:41+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>4</span><span class='date-suffix'>th</span>, <span class='date-year'>2010</span></span> <span class='time'>8:34 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>从2.2版本起Rails开始内置支持i18n，因此以后实现国际化/本地化就可以不再需要各种各样的插件了。</p>
-
-<p>Rails默认的Locale文件夹是config/locales，假设你要支持中文和英文，那么你需要在这个文件夹下放置zh.yml和en.yml两个文件。</p>
-
-<p>相应的入门教程网上有不少，我也就不多讲了。这里主要说一下如何在记账应用中实现可以让用户指定语言的i18n实现，即当用户选择English，那么界面就切换成英文界面，并且以后打开的页面也是以英文出现，反之亦如此。</p>
-
-<p>首先在header区添加以下代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= link_to 'Chinese', :locale =&gt; 'zh' %&gt;
-</span><span class='line'>&lt;%= link_to 'English', :locale =&gt; 'en' %&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>点击其中某个链接后，浏览器就会传递对应的参数zh或en到后台。</p>
-
-<p>然后在app/controllers/application_controller.rb中添加以下代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>before_filter :set_locale
-</span><span class='line'>
-</span><span class='line'>protected
-</span><span class='line'>  def set_locale
-</span><span class='line'>    I18n.locale = params[:locale]
-</span><span class='line'>  end</span></code></pre></td></tr></table></div></figure>
-
-<p>不过这里有个问题就是url中必须得带着参数，不然的话用户的选择就会失效。要想使选择达到持续的效果，可以考虑把这些信息保存在session中，改进后的代码如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>def set_locale
-</span><span class='line'>  I18n.locale = params[:locale] || session[:locale]
-</span><span class='line'>  session[:locale] = I18n.locale
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<p>现在这样就基本上差不多了。剩下的就是处理第一次访问时的语言，这个可以从request的ACCEPT_LANGUAGE参数中获取。最终实现的代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>def set_locale
-</span><span class='line'>  accept_lang = request.env['HTTP_ACCEPT_LANGUAGE'].scan(/^[a-z]{2}/).first
-</span><span class='line'>  I18n.locale = params[:locale] || session[:locale] || accept_lang || 'zh'
-</span><span class='line'>  session[:locale] = I18n.locale
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<p>不过当用户选择中文后，在新建记录时会报以下错误：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>can't convert Symbol into String
-</span><span class='line'>
-</span><span class='line'>Extracted source (around line #8):
-</span><span class='line'>
-</span><span class='line'>    6:   &lt;p&gt;
-</span><span class='line'>    7:     &lt;%= t(:effective_date) %&gt;&lt;br /&gt;
-</span><span class='line'>    8:     &lt;%= f.date_select :effective_date %&gt;
-</span><span class='line'>    9:   &lt;/p&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>查找资料后发现可以通过在date_select中加入order来解决，不过日期下拉列表中的月份还有问题，出现的是一些随机数，不是正常月份。这个也可以通过添加month_names参数解决。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= t(:effective_date) %&gt;&lt;br /&gt;
-</span><span class='line'>&lt;%= f.date_select :effective_date, :order =&gt; [:year, :month, :day] %&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>更好的办法是把它们放到对应的Locale文件里：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># en.yml
-</span><span class='line'>en:
-</span><span class='line'>  date:
-</span><span class='line'>    month_names: [~, January, February, ..., November, December]
-</span><span class='line'>    order: [:year, :month, :day]</span></code></pre></td></tr></table></div></figure>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># zh.yml
-</span><span class='line'>zh:
-</span><span class='line'>  date:
-</span><span class='line'>    month_names: [~, 一月, 二月, ..., 十一月, 十二月]
-</span><span class='line'>    order: [:year, :month, :day]</span></code></pre></td></tr></table></div></figure>
-
-<p>代码下载：<a href="https://github.com/dohkoos/qianbao">https://github.com/dohkoos/qianbao</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/14">&larr; Older</a>
@@ -929,7 +911,7 @@
 <a style="font-size: 119%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 97%" href="/tags/spring/">Spring</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 125%" href="/tags/translation/">Translation</a>
+<a style="font-size: 127%" href="/tags/translation/">Translation</a>
 <a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 92%" href="/tags/w32dasm/">W32Dasm</a>
 <a style="font-size: 107%" href="/tags/windows-server-2008/">Windows Server 2008</a>
