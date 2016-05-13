@@ -9,9 +9,13 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="因为要在其它设备上测试响应式设计的效果，需要先对开发环境做些简单的配置。 启动服务器时需加上本机的IP地址和访问端口（通常是80）： 1
-rails s -b 192.168.0.100 -p 80 配置Windows系统的内置防火墙，开启80端口以供其它设备访问： 1
-netsh &hellip;">
+  <meta name="description" content="机房没有温湿度监控系统，只有温湿度计，还不是数字的，只能得到个大概的读数，不是非常精确。怎么办？自己动手DIY个在线的温湿度监控系统吧！ 物品清单： 金士顿16G的SDHC卡1张
+SDHC读卡器1个（可选）
+网线1条
+手机充电器（5V/1A）1个
+MicroUSB数据线1条
+电脑1台
+1P- &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -75,6 +79,229 @@ netsh &hellip;">
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/using-raspberry-pi-to-monitor-home-humiture/">使用Raspberry Pi监控室内温湿度</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2014-06-24T14:19:44+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>24</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>2:19 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>机房没有温湿度监控系统，只有温湿度计，还不是数字的，只能得到个大概的读数，不是非常精确。怎么办？自己动手DIY个在线的温湿度监控系统吧！</p>
+
+<p>物品清单：</p>
+
+<ul>
+<li>金士顿16G的SDHC卡1张</li>
+<li>SDHC读卡器1个（可选）</li>
+<li>网线1条</li>
+<li>手机充电器（5V/1A）1个</li>
+<li>MicroUSB数据线1条</li>
+<li>电脑1台</li>
+<li>1P-1P双头母杜邦线3条</li>
+<li>10K电位器一个</li>
+<li>DHT11或DHT22温湿度传感器一个（可以购买已经焊好电阻的传感器模块）</li>
+</ul>
+
+<h3 id="让树莓派（raspberry-pi）工作起来">让树莓派（Raspberry Pi）工作起来</h3>
+
+<p>从 <a href="http://www.raspberrypi.org/downloads">http://www.raspberrypi.org/downloads</a> 下载基于debian的wheezy镜像Raspbian。如果使用Windows系统，官方建议使用<a href="http://sourceforge.net/projects/win32diskimager/">Win32DiskImager</a>来复制image文件到SD卡（如果是Linux系统可以用工具dd）。写入系统后，把卡插到板子上，接上网线、电源，然后就启动了。等个20多秒，板上3个小灯都亮了，表明系统已经启动成功。</p>
+
+<p>登录路由器后台找到raspberrypi设备分配到的IP。然后使用SSH或VNC（前者是命令行界面，后者是图形界面）连接刚才从路由器找到的IP地址。登录的默认账号是pi，密码是raspberry。登录RPi之后输入ping qq.com测试上网是否正常。</p>
+
+<h3 id="使用固定的ip访问rpi">使用固定的IP访问RPi</h3>
+
+<p>默认情况下RPi使用的是自动分配的IP地址，每次登录都需要在路由器中查找对应IP，实在太麻烦，可以把它设置成静态的。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>sudo vi /etc/network/interfaces</span></code></pre></td></tr></table></div></figure>
+
+<p>打开配置文件，看到如下内容</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>auto lo
+</span><span class='line'>
+</span><span class='line'>iface lo inet loopback
+</span><span class='line'>iface eth0 inet dhcp
+</span><span class='line'>
+</span><span class='line'>allow-hotplug wlan0
+</span><span class='line'>iface wlan0 inet manual
+</span><span class='line'>wpa-roam /etc/wpa_supplicant/wpa_supplicant.conf
+</span><span class='line'>iface default inet dhcp</span></code></pre></td></tr></table></div></figure>
+
+<p>将之修改成</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>auto lo
+</span><span class='line'>
+</span><span class='line'>iface lo inet loopback
+</span><span class='line'>
+</span><span class='line'>iface eth0 inet static
+</span><span class='line'>  address 192.168.0.100
+</span><span class='line'>  netmask 255.255.255.0
+</span><span class='line'>  gateway 192.168.0.1
+</span><span class='line'>  dns-nameservers 8.8.8.8
+</span><span class='line'>
+</span><span class='line'>allow-hotplug wlan0
+</span><span class='line'>iface wlan0 inet manual
+</span><span class='line'>  wpa-roam /etc/wpa_supplicant/wpa_supplicant.conf
+</span><span class='line'>
+</span><span class='line'>iface default inet dhcp</span></code></pre></td></tr></table></div></figure>
+
+<p>然后存盘退出。以后就可以通过192.168.0.100来登录RPi了。</p>
+
+<h3 id="把温湿度传感器接到rpi上">把温湿度传感器接到RPi上</h3>
+
+<p><img src="/uploads/rpi-dht22.png" title="rpi-dht22" ></p>
+
+<p>DHT11/DHT22共有4根引脚：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>1 -&gt; 3.3v 接左边第1个GPIO针脚
+</span><span class='line'>2 -&gt; GPIO 数据接口，可随意连接1个GPIO针脚（第7个针脚对应的是GPIO Pin #4）
+</span><span class='line'>3 -&gt; NC 不接
+</span><span class='line'>4 -&gt; GND 接地（第14个针脚）</span></code></pre></td></tr></table></div></figure>
+
+<p>注意：在1脚和2脚间还需要并联10K的电阻，以保持读数稳定。</p>
+
+<p>安装好的样子：</p>
+
+<p><img src="/uploads/rpi-actual.png" title="rpi-actual" ></p>
+
+<h3 id="用c代码读取当前的温度和湿度值">用C代码读取当前的温度和湿度值</h3>
+
+<p>用的是树莓派2红色B型，它采用Broadcom BCM2835 (CPU, GPU, DSP, and SDRAM)芯片。所以读取GPIO口需要到 <a href="http://www.open.com.au/mikem/bcm2835/index.html">http://www.open.com.au/mikem/bcm2835/index.html</a> 获取最新的BCM2835 C语言库，然后下载，编译和安装。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>wget http://www.open.com.au/mikem/bcm2835/bcm2835-1.36.tar.gz
+</span><span class='line'>tar -zxvf bcm2835-1.36.tar.gz
+</span><span class='line'>cd bcm2835-1.36
+</span><span class='line'>./configure
+</span><span class='line'>make
+</span><span class='line'>sudo make install</span></code></pre></td></tr></table></div></figure>
+
+<p>从GitHub库中获取DHT11/DHT22温湿度程序，编译测试。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>cd /home/pi
+</span><span class='line'>git clone https://github.com/dohkoos/Raspberry-Pi-Code.git
+</span><span class='line'>cd Raspberry-Pi-Code/DHT22
+</span><span class='line'>make
+</span><span class='line'>sudo ./dht 22 4 # 数据接口接在第7针脚，所以这里是4</span></code></pre></td></tr></table></div></figure>
+
+<h3 id="记录曲线图到云端">记录曲线图到云端</h3>
+
+<p>这里使用<a href="http://www.yeelink.net/">Yeelink</a>的服务，Yeelink是国内比较知名的免费物联网数据平台。根据它的API规则，提交的数据必须为JSON格式：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>{"timestamp": "2012-03-15 16:13:14", "value": 294.34}</span></code></pre></td></tr></table></div></figure>
+
+<p>将温湿度值提交到Yeelink的Ruby代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># Capture temperature & humidity value from the console
+</span><span class='line'>output = `sudo ./dht 22 4`
+</span><span class='line'>mt = /Temp =\s+([0-9.]+)/.match(output)
+</span><span class='line'>temperature = mt[1]
+</span><span class='line'>
+</span><span class='line'>mt = /Hum =\s+([0-9.]+)/.match(output)
+</span><span class='line'>humidity = mt[1]
+</span><span class='line'>
+</span><span class='line'># Combined temperature & humidity value into json format
+</span><span class='line'>json_temperature = %Q[{\\"timestamp\\": \\"#{Time.now}\\", \\"value\\": #{temperature}}]
+</span><span class='line'>json_humidity = %Q[{\\"timestamp\\": \\"#{Time.now}\\", \\"value\\": #{humidity}}]
+</span><span class='line'>
+</span><span class='line'># Post json data to Yeelink
+</span><span class='line'>`curl -X POST -d "#{json_temperature}" -H "Content-Type: application/json" -H "U-ApiKey:XXXXXXXXXXXXXXXX" http://api.yeelink.net/v1.0/device/&lt;device_id&gt;/sensor/&lt;sensor_id&gt;/datapoints`
+</span><span class='line'>`curl -X POST -d "#{json_humidity}" -H "Content-Type: application/json" -H "U-ApiKey:XXXXXXXXXXXXXXXX" http://api.yeelink.net/v1.0/device/&lt;device_id&gt;/sensor/&lt;sensor_id&gt;/datapoints`</span></code></pre></td></tr></table></div></figure>
+
+<p>将U-ApiKey:XXXXXXXXXXXXXXXX替换为自已账户的API Key，后面的URL也需要替换为自己申请的传感器URL。</p>
+
+<h3 id="添加到计划任务">添加到计划任务</h3>
+
+<p>使用crontab命令将以下内容添加到计划任务中：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># m h dom mon dow command
+</span><span class='line'>*/10 * * * * cd /home/pi/Raspberry-Pi-Code/DHT22/ && ruby yeelink.rb</span></code></pre></td></tr></table></div></figure>
+
+<p>重启计划任务，然后每隔10分钟就会上传一次数据到云端。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>sudo /etc/init.d/cron restart</span></code></pre></td></tr></table></div></figure>
+
+<p>下面是我的曲线图：</p>
+
+<p><img src="/uploads/rpi-yeelink.png" title="rpi-yeelink" ></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -812,7 +1039,7 @@ netsh &hellip;">
 
   <div class="entry-content"><p>每个程序猿家里都有一堆技术书籍，偶也不例外，因此想写个Android应用来管理自己的藏书以及想买的书籍。在网上找到marshal的<a href="http://marshal.easymorse.com/archives/2745">识别图书ISBN号并输出查询结果的示例</a>和<a href="http://marshal.easymorse.com/archives/2756">完善图书查询原型，增加收藏夹功能</a>两篇文章，写的非常不错，还提供源代码。下载代码研究后发现已基本具备了想要的功能，决定在它的基础上做些修改供自己使用。</p>
 
-<p>把原来uses-sdk的minSdkVersion改成了9，增加android:targetSdkVersion=&quot;17&quot;。然后使用手机测试程序时发现，在连接网络时后台会抛出了android.os.NetworkOnMainThreadException异常，并且应用崩溃打不开。通过查阅相关资料了解到，自从Android 2.3之后，系统增加了一个类StrictMode。这个类对网络的访问方式进行了一定的改变。官方文档给出了这个类设置的目的：</p>
+<p>把原来uses-sdk的minSdkVersion改成了9，增加android:targetSdkVersion=&quot;17&quot;。然后使用手机测试程序时发现，在连接网络时后台会抛出android.os.NetworkOnMainThreadException，并且应用崩溃打不开。通过查阅相关资料了解到，自从Android 2.3之后，系统增加了一个类StrictMode。这个类对网络的访问方式进行了一定的改变。官方文档给出了这个类设置的目的：</p>
 
 <blockquote>
 <p>StrictMode is a developer tool which detects things you might be doing by accident and brings them to your attention so you can fix them.</p>
@@ -1464,135 +1691,6 @@ netsh &hellip;">
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/htaccess-example-explanation/">.htaccess实例详解</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2013-03-10T12:01:35+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>10</span><span class='date-suffix'>th</span>, <span class='date-year'>2013</span></span> <span class='time'>12:01 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>又一次迁移博客服务器。因为是迁移，就没有采取安装的方式，而是把以前的程序拷贝到新服务器上。</p>
-
-<p>打开首页的时候没问题，访问具体文章时就出错了：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Not Found
-</span><span class='line'>The requested URL /sample-article.html was not found on this server.</span></code></pre></td></tr></table></div></figure>
-
-<p>试着去后台重新做设置，然后就发现在根目录下多了个.htaccess文件，内容如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;IfModule mod_rewrite.c&gt;
-</span><span class='line'>RewriteEngine On
-</span><span class='line'>RewriteBase /
-</span><span class='line'>RewriteRule ^index\.php$ - [L]
-</span><span class='line'>RewriteCond %{REQUEST_FILENAME} !-f
-</span><span class='line'>RewriteCond %{REQUEST_FILENAME} !-d
-</span><span class='line'>RewriteRule . /index.php [L]
-</span><span class='line'>&lt;/IfModule&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>以前也看过这个文件，总是模模糊糊不太明白。今天研究的时候发现一下子就清清楚楚了（这大概就是佛家所说的顿悟吧，不过它的发生应该还是建立在渐修的基础上）。</p>
-
-<p>下面来说说这些内容的理解：</p>
-
-<p>第1行就是打开重写引擎。</p>
-
-<p>第2行是设置URI前缀。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Syntax:  RewriteRule Pattern Substitution [flags]
-</span><span class='line'>
-</span><span class='line'>- (dash)
-</span><span class='line'> A dash indicates that no substitution should be performed (the existing path
-</span><span class='line'> is passed through untouched). This is used when a flag (see below) needs to
-</span><span class='line'> be applied without changing the path.
-</span><span class='line'>
-</span><span class='line'>last|L
-</span><span class='line'> Stop the rewriting process immediately and don't apply any more rules.
-</span><span class='line'> Especially note caveats for per-directory and .htaccess context.</span></code></pre></td></tr></table></div></figure>
-
-<p>第3行是完全匹配index.php的URI，但不做替换，并且匹配成功后就停止执行重写过程。</p>
-
-<p>第6行就是把所有的访问请求重写，指给index.php，然后停止执行重写过程。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Syntax: RewriteCond TestString CondPattern
-</span><span class='line'>
-</span><span class='line'>REQUEST_FILENAME
-</span><span class='line'> The full local filesystem path to the file or script matching the request,
-</span><span class='line'> if this has already been determined by the server at the time REQUEST_FILENAME
-</span><span class='line'> is referenced. Otherwise, such as when used in virtual host context, the same
-</span><span class='line'> value as REQUEST_URI.
-</span><span class='line'>
-</span><span class='line'>You can prefix the pattern string with a '!' character (exclamation mark) to
-</span><span class='line'>specify a non-matching pattern.
-</span><span class='line'>
-</span><span class='line'>'-d' (is directory)
-</span><span class='line'> Treats the TestString as a pathname and tests whether or not it exists, and
-</span><span class='line'> is a directory.
-</span><span class='line'>
-</span><span class='line'>'-f' (is regular file)
-</span><span class='line'> Treats the TestString as a pathname and tests whether or not it exists, and
-</span><span class='line'> is a regular file.</span></code></pre></td></tr></table></div></figure>
-
-<p>第4和第5行是不去测试访问URI是否是目录或文件。其实有了第6行这两行基本就是摆设了。</p>
-
-<p>最后再唠叨一句，有问题直接查官方文档应该是最好的选择。官方文档链接：<a href="http://httpd.apache.org/docs/current/mod/mod_rewrite.html">Apache Module mod_rewrite</a>。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/6">&larr; Older</a>
@@ -1610,6 +1708,10 @@ netsh &hellip;">
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/logic-problems-who-owns-the-fish/">逻辑题-谁养鱼</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/developers-are-blinded-by-the-light/">开发者被灯光蒙蔽了双眼</a>
       </li>
     
@@ -1625,10 +1727,6 @@ netsh &hellip;">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part7/">ANTLR 4权威参考读书笔记（7）</a>
       </li>
     
-      <li class="post">
-        <a href="/blog/how-to-detect-and-prevent-spam-traffic-in-ga/">Google Analytics中如何检测并防止垃圾流量</a>
-      </li>
-    
   </ul>
 </section>
 <section>
@@ -1641,7 +1739,7 @@ netsh &hellip;">
   <h1>Tags</h1>
   <ul class="tag-cloud">
     <a style="font-size: 119%" href="/tags/antlr/">ANTLR</a>
-<a style="font-size: 104%" href="/tags/algorithm/">Algorithm</a>
+<a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 132%" href="/tags/android/">Android</a>
 <a style="font-size: 92%" href="/tags/ant/">Ant</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
