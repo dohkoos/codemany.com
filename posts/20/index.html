@@ -9,13 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="1、什么是XRC XRC是基于XML的资源系统。它的基本出发点是将界面布局和程序逻辑分离，即将界面布局代码保存在分离的XML文件中，在程序中不涉及控件的创建和布局，只需要加载相应的资源并处理事件绑定即可。 2、XRC文件格式 1
-2
-3
-4
-5
-6
-&lt;?xml version="1.0"?& &hellip;">
+  <meta name="description" content="最近忽然突发奇想，想统计一下我最经常上的网站是哪些，并且在这些网站上都停留了多久。为此决定写一个BHO插件来做这件事。 BHO（Browser Help Objects）是实现了特定接口（IObjectWithSite）的COM组件。开发好的BHO插件除了要在注册表中注册为COM Server外， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -79,6 +73,239 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/develop-bho-plugin-urltrack-with-csharp/">C#开发BHO插件UrlTrack</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2008-01-23T17:53:24+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>23</span><span class='date-suffix'>rd</span>, <span class='date-year'>2008</span></span> <span class='time'>5:53 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>最近忽然突发奇想，想统计一下我最经常上的网站是哪些，并且在这些网站上都停留了多久。为此决定写一个BHO插件来做这件事。</p>
+
+<p>BHO（Browser Help Objects）是实现了特定接口（IObjectWithSite）的COM组件。开发好的BHO插件除了要在注册表中注册为COM Server外，还必须将它的CLSID在HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Browser Helper Objects下注册为子键。每当浏览器[1]启动时，首先会在上述注册表位置查看是否有注册的BHO CLSID，如果有则分别创建一个实例，并对BHO实例进行初始化。BHO实例运行在浏览器的地址空间内，能对可访问的对象（如窗口、模块等等）执行任何操作，且因为它依附于浏览器的主窗口，所以其生命周期与浏览器实例的生命周期一致。下图演示了BHO的创建过程：</p>
+
+<p><img src="/uploads/bho-process.png" title="bho-process" ></p>
+
+<p>下面就来介绍一下如何开发BHO插件。首先创建一个C#项目，类型为Class Library。然后将Class1.cs改名为IObjectWithSite.cs，还要给IObjectWithSite添加两个功能：GetSite和SetSite。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Public Interface Iobjectwithsite
+</span><span class='line'>{
+</span><span class='line'>    [Preservesig]
+</span><span class='line'>    Int Setsite([Marshalas(Unmanagedtype.Iunknown)]Object Site);
+</span><span class='line'>    [Preservesig]
+</span><span class='line'>    Int Getsite(Ref Guid Guid, Out Intptr Ppvsite);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>添加一个UrlTrack.cs文件，并且实现IObjectWithSite接口。使用BHO还需要添加两个引用SHDocVw.dll和MSHTML.dll，可以在Windows\System32目录下找到。</p>
+
+<p><img src="/uploads/bho-references.png" title="bho-references" ></p>
+
+<p>在IObjectWithSite.cs中，还需要为我们的程序指出IE的GUID，使得它可以挂接（attach）到IE上：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>[
+</span><span class='line'>ComVisible(true),
+</span><span class='line'>InterfaceType(ComInterfaceType.InterfaceIsIUnknown),
+</span><span class='line'>Guid("FC4801A3-2BA9-11CF-A229-00AA003D7352")
+</span><span class='line'>]</span></code></pre></td></tr></table></div></figure>
+
+<p>另外，还需要给BHO程序分配一个GUID，这个可以通过System.Guid.NewGuid()方法得到。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>[
+</span><span class='line'>ComVisible(true),
+</span><span class='line'>Guid("e90da13b-117a-4178-8111-0f712da09ff9"),
+</span><span class='line'>ClassInterface(ClassInterfaceType.None)
+</span><span class='line'>]</span></code></pre></td></tr></table></div></figure>
+
+<p>在UrlTrack.cs中，我们还需要写两个方法用来DLL注册和移除注册。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static string BHOKEYNAME = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Browser Helper Objects";
+</span><span class='line'>
+</span><span class='line'>[ComRegisterFunction]
+</span><span class='line'>public static void RegisterBHO(Type type)
+</span><span class='line'>{
+</span><span class='line'>    RegistryKey registryKey = Registry.LocalMachine.OpenSubKey(BHO_KEY_NAME, true);
+</span><span class='line'>    if (registryKey == null)
+</span><span class='line'>    {
+</span><span class='line'>        registryKey = Registry.LocalMachine.CreateSubKey(BHO_KEY_NAME);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    string guid = type.GUID.ToString("B");
+</span><span class='line'>    RegistryKey bhoKey = registryKey.OpenSubKey(guid, true);
+</span><span class='line'>    if (bhoKey == null)
+</span><span class='line'>    {
+</span><span class='line'>        bhoKey = registryKey.CreateSubKey(guid);
+</span><span class='line'>    }
+</span><span class='line'>    // NoExplorer: dword = 1 prevents the BHO to be loaded by Explorer.exe
+</span><span class='line'>    bhoKey.SetValue("NoExplorer", 1);
+</span><span class='line'>    bhoKey.Close();
+</span><span class='line'>
+</span><span class='line'>    registryKey.Close();
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>[ComUnregisterFunction]
+</span><span class='line'>public static void UnregisterBHO(Type type)
+</span><span class='line'>{
+</span><span class='line'>    RegistryKey registryKey = Registry.LocalMachine.OpenSubKey(BHO_KEY_NAME, true);
+</span><span class='line'>    string guid = type.GUID.ToString("B");
+</span><span class='line'>
+</span><span class='line'>    if (registryKey != null)
+</span><span class='line'>        registryKey.DeleteSubKey(guid, false);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>接下来就是实现具体的统计功能了。考虑一下，当输入网址后，我们需要记录下网址以及当前的时间；当在同一浏览窗口中切换网址时，不仅需要记录下网址和当前时间，还要设置前一个浏览记录的结束时间；并且在关闭浏览器时，也要记下结束时间。所以在SetSite中需要挂载NavigateComplete2和OnQuit事件。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private void NavigateComplete2(object pDisp, ref object URL)
+</span><span class='line'>{
+</span><span class='line'>    string url = URL as string;
+</span><span class='line'>    if (url.IndexOf("about:blank") &gt;= 0)
+</span><span class='line'>    {
+</span><span class='line'>        return;
+</span><span class='line'>    }
+</span><span class='line'>    if (visitHists.Count &gt; 0)
+</span><span class='line'>    {
+</span><span class='line'>        VisitHist currentHist = visitHists[visitHists.Count - 1];
+</span><span class='line'>        if (currentHist.VisitUrl != url)
+</span><span class='line'>        {
+</span><span class='line'>            currentHist.EndTime = System.DateTime.Now;
+</span><span class='line'>        }
+</span><span class='line'>        else
+</span><span class='line'>        {
+</span><span class='line'>            return;
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>    VisitHist newHist = new VisitHist();
+</span><span class='line'>    newHist.StartTime = System.DateTime.Now;
+</span><span class='line'>    newHist.VisitUrl = url;
+</span><span class='line'>    visitHists.Add(newHist);
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>private void OnQuit()
+</span><span class='line'>{
+</span><span class='line'>    if (visitHists.Count &gt; 0)
+</span><span class='line'>    {
+</span><span class='line'>        VisitHist currentHist = visitHists[visitHists.Count - 1];
+</span><span class='line'>        currentHist.EndTime = System.DateTime.Now;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    // 输出统计记录</span></code></pre></td></tr></table></div></figure>
+
+<p>开始编译，然后就可以在bin目录下找到项目的dll文件了。在Console中使用regasm /codebase &quot;UrlTrack.dll&quot;注册dll。打开注册表，在HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Browser Helper Objects可以看到多出了一个子项{E90DA13B-117A-4178-8111-0F712DA09FF9}。</p>
+
+<p>需要注意的是，需要将AssemblyInfo.cs文件中的ComVisible属性设为true，否则在注册BHO时会得到这样的信息：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>RegAsm : warning RA0000 : No types were registered.</span></code></pre></td></tr></table></div></figure>
+
+<p>更多的BHO资料可以看<a href="http://msdn.microsoft.com/en-us/library/aa753587.aspx">Browser Extensions</a>。</p>
+
+<p>[1] 在Windows操作系统上有两种浏览器：资源浏览器（Explorer.exe，应用于文件系统）和Internet浏览器（IEXPLORE.EXE，应用于互联网资源）。</p>
+
+<p>代码下载：<a href="https://github.com/dohkoos/UrlTrack">https://github.com/dohkoos/UrlTrack</a></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1315,58 +1542,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/editmask-useformat-property-of-column-control-on-datawindow/">数据窗口中Column控件的EditMask.UseFormat属性的作用</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2007-09-10T21:11:37+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>10</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>9:11 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>当数据窗口中的EditMask控件失去焦点时，如果EditMask.UseFormat为yes，则使用Format属性值格式化EditMask的内容，否则，使用EditMask.Mask属性值格式化控件的内容。当EditMask得到焦点时，使用EditMask.Mask格式化内容。</p>
-
-<p>根据此规则写的伪代码如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if (isFocused) {
-</span><span class='line'>    EditMask.Mask
-</span><span class='line'>} else if (loseFocus) {
-</span><span class='line'>    if (EditMask.UseFormat == "yes" && Format != "") {
-</span><span class='line'>        Format
-</span><span class='line'>    } else {
-</span><span class='line'>        EditMask.Mask
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>Painter: Use Format option</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/21">&larr; Older</a>
@@ -1424,7 +1599,7 @@
 <a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
 <a style="font-size: 113%" href="/tags/git/">Git</a>
 <a style="font-size: 104%" href="/tags/jbookshelf/">JBookShelf</a>
-<a style="font-size: 148%" href="/tags/java/">Java</a>
+<a style="font-size: 149%" href="/tags/java/">Java</a>
 <a style="font-size: 101%" href="/tags/javascript/">JavaScript</a>
 <a style="font-size: 97%" href="/tags/listview/">ListView</a>
 <a style="font-size: 104%" href="/tags/mysql/">MySQL</a>
@@ -1436,7 +1611,7 @@
 <a style="font-size: 119%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 97%" href="/tags/spring/">Spring</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 127%" href="/tags/translation/">Translation</a>
+<a style="font-size: 128%" href="/tags/translation/">Translation</a>
 <a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 92%" href="/tags/w32dasm/">W32Dasm</a>
 <a style="font-size: 107%" href="/tags/windows-server-2008/">Windows Server 2008</a>
