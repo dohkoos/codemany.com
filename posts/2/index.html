@@ -9,11 +9,11 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="lexical 词法的
-alternative 选项
-notation 表示法
-directive 指令
-label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计算器是个不错的主意。为了使它容易理解且保持简单，我们将只允许基本的算术运算符（加、减、乘、除）、括号表达式、整数和变量。 &hellip;">
+  <meta name="description" content="在ANTLR 4权威参考读书笔记（3）中的计算器是以解释的方式执行的，现在我们想要把它转换成以编译的方式执行。编译执行和解释执行相比，需要依赖于特定的目标机器。在这里我们假设有一台这样的机器，它用堆栈进行运算，支持如下表所示的几种指令： 指令
+说明
+操作数个数
+用途 LDV
+Load &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -77,6 +77,371 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part4/">ANTLR 4权威参考读书笔记（4）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-01-18T15:06:54+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>3:06 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在<a href="/blog/reading-notes-the-definitive-antlr4-reference-part3/">ANTLR 4权威参考读书笔记（3）</a>中的计算器是以解释的方式执行的，现在我们想要把它转换成以编译的方式执行。编译执行和解释执行相比，需要依赖于特定的目标机器。在这里我们假设有一台这样的机器，它用堆栈进行运算，支持如下表所示的几种指令：</p>
+
+<table><thead>
+<tr>
+<th>指令</th>
+<th>说明</th>
+<th>操作数个数</th>
+<th>用途</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>LDV</td>
+<td>Load Variable</td>
+<td>1</td>
+<td>变量入栈</td>
+</tr>
+<tr>
+<td>LDC</td>
+<td>Load Constant</td>
+<td>1</td>
+<td>常量入栈</td>
+</tr>
+<tr>
+<td>STR</td>
+<td>Store Value</td>
+<td>1</td>
+<td>栈顶一个元素存入指定变量</td>
+</tr>
+<tr>
+<td>ADD</td>
+<td>Add</td>
+<td>0</td>
+<td>栈顶两个元素出栈，求和后入栈</td>
+</tr>
+<tr>
+<td>SUB</td>
+<td>Subtract</td>
+<td>0</td>
+<td>栈顶两个元素出栈，求差后入栈</td>
+</tr>
+<tr>
+<td>MUL</td>
+<td>Multiply</td>
+<td>0</td>
+<td>栈顶两个元素出栈，求积后入栈</td>
+</tr>
+<tr>
+<td>DIV</td>
+<td>Divide</td>
+<td>0</td>
+<td>栈顶两个元素出栈，求商后入栈</td>
+</tr>
+<tr>
+<td>RET</td>
+<td>Return</td>
+<td>0</td>
+<td>栈顶一个元素出栈，计算结束</td>
+</tr>
+</tbody></table>
+
+<p>做这个最简单的方法是使用ANTLR的语法分析树Listener机制实现DirectiveListener类，然后它通过监听来自树遍历器触发的事件，输出对应的机器指令。</p>
+
+<p>Listener机制的优势是我们不必要自己去做任何树遍历，甚至我们不必要知道遍历语法分析树的运行时如何调用我们的方法，我们只要知道我们的DirectiveListener类得到通知，在与语法规则匹配的短语开始和结束时。这种方法减少了我们学习ANTLR必须要花费的时间，让我们回到我们所熟悉的编程语言领域。</p>
+
+<p>这里不需要创建新的语法规则，还是继续沿用前文Calc.g所包含的语法，标签也要保留：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Calc;
+</span><span class='line'>
+</span><span class='line'>prog
+</span><span class='line'>    : stat+
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>stat
+</span><span class='line'>    : expr                   # printExpr
+</span><span class='line'>    | ID '=' expr            # assign
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>expr
+</span><span class='line'>    : expr op=(MUL|DIV) expr # MulDiv
+</span><span class='line'>    | expr op=(ADD|SUB) expr # AddSub
+</span><span class='line'>    | INT                    # int
+</span><span class='line'>    | ID                     # id
+</span><span class='line'>    | '(' expr ')'           # parens
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>MUL : '*' ;
+</span><span class='line'>
+</span><span class='line'>DIV : '/' ;
+</span><span class='line'>
+</span><span class='line'>ADD : '+' ;
+</span><span class='line'>
+</span><span class='line'>SUB : '-' ;
+</span><span class='line'>
+</span><span class='line'>ID  : [a-zA-Z]+ ;
+</span><span class='line'>
+</span><span class='line'>INT : [0-9]+ ;
+</span><span class='line'>
+</span><span class='line'>WS  : [ \t\r\n]+ -&gt; skip ;    // toss out whitespace</span></code></pre></td></tr></table></div></figure>
+
+<p>然后，我们可以运行ANTLR工具：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr Calc.g</span></code></pre></td></tr></table></div></figure>
+
+<p>它会生成后缀名为tokens和java的六个文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Calc.tokens         CaclLexer.java          CalcParser.java
+</span><span class='line'>CalcLexer.tokens    CalcBaseListener.java   CalcListener.java</span></code></pre></td></tr></table></div></figure>
+
+<p>正如这里我们看到的，ANTLR会为我们自动生成Listener基础设施。其中CalcListener是语法和Listener对象之间的关键接口，描述我们可以实现的回调方法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public interface CalcListener extends ParseTreeListener {
+</span><span class='line'>  void enterProg(CalcParser.ProgContext ctx);
+</span><span class='line'>  void exitProg(CalcParser.ProgContext ctx);
+</span><span class='line'>  void enterPrintExpr(CalcParser.PrintExprContext ctx);
+</span><span class='line'>    ...
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>CalcBaseListener则是ANTLR生成的一组空的默认实现。ANTLR内建的树遍历器会去触发在Listener中像enterProg()和exitProg()这样的一串回调方法，如同它对语法分析树执行了一次深度优先遍历。为响应树遍历器触发的事件，我们的DirectiveListener需要继承CalcBaseListener并实现一些方法。我们不需要实现全部的接口方法，我们也不需要去覆写每个enter和exit方法，我们只需要去覆写那些我们感兴趣的回调方法。</p>
+
+<p>在本例中，我们需要通过覆写6个方法对6个事件——当树遍历器exit那些有标签的选项时触发——作出响应。我们的基本策略是当这些事件发生时打印出已转换的指令。以下是完整的实现代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class DirectiveListener extends CalcBaseListener {
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void exitPrintExpr(CalcParser.PrintExprContext ctx) {
+</span><span class='line'>        System.out.println("RET\n");
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void exitAssign(CalcParser.AssignContext ctx) {
+</span><span class='line'>        String id = ctx.ID().getText();
+</span><span class='line'>        System.out.println("STR " + id);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void exitMulDiv(CalcParser.MulDivContext ctx) {
+</span><span class='line'>        if (ctx.op.getType() == CalcParser.MUL) {
+</span><span class='line'>            System.out.println("MUL");
+</span><span class='line'>        } else {
+</span><span class='line'>            System.out.println("DIV");
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void exitAddSub(CalcParser.AddSubContext ctx) {
+</span><span class='line'>        if (ctx.op.getType() == CalcParser.ADD) {
+</span><span class='line'>            System.out.println("ADD");
+</span><span class='line'>        } else {
+</span><span class='line'>            System.out.println("SUB");
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void exitId(CalcParser.IdContext ctx) {
+</span><span class='line'>        System.out.println("LDV " + ctx.ID().getText());
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void exitInt(CalcParser.IntContext ctx) {
+</span><span class='line'>        System.out.println("LDC " + ctx.INT().getText());
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>为了让它运行起来，余下我们唯一需要做的事是创建一个主程序去调用它：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class Calc {
+</span><span class='line'>
+</span><span class='line'>    public static void main(String[] args) throws Exception {
+</span><span class='line'>        InputStream is = args.length &gt; 0 ? new FileInputStream(args[0]) : System.in;
+</span><span class='line'>
+</span><span class='line'>        ANTLRInputStream input = new ANTLRInputStream(is);
+</span><span class='line'>        CalcLexer lexer = new CalcLexer(input);
+</span><span class='line'>        CommonTokenStream tokens = new CommonTokenStream(lexer);
+</span><span class='line'>        CalcParser parser = new CalcParser(tokens);
+</span><span class='line'>        ParseTree tree = parser.prog();
+</span><span class='line'>
+</span><span class='line'>        ParseTreeWalker walker = new ParseTreeWalker();
+</span><span class='line'>        walker.walk(new DirectiveListener(), tree);
+</span><span class='line'>
+</span><span class='line'>        // print LISP-style tree
+</span><span class='line'>        System.out.println(tree.toStringTree(parser));
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>这个程序和前文Calc.java中的代码极度相似，区别只在12-13行。这两行代码负责创建树遍历器，然后让树遍历器去遍历那颗从语法分析器返回的语法分析树，当树遍历器遍历时，它就会触发调用到我们的DirectiveListener中实现的方法。此外，通过传入一个不同的Listener实现我们能简单地生成完全不同的输出。Listener机制有效地隔离了语法和语言应用，使语法可以被其它应用再次使用。</p>
+
+<p>现在一切完备，让我们尝试着去编译和运行它吧！下面是完整的命令序列：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>compile *.java
+</span><span class='line'>run Calc calc.txt</span></code></pre></td></tr></table></div></figure>
+
+<p>编译的输出结果如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>LDC 19
+</span><span class='line'>RET
+</span><span class='line'>
+</span><span class='line'>LDC 5
+</span><span class='line'>STR a
+</span><span class='line'>LDC 6
+</span><span class='line'>STR b
+</span><span class='line'>LDV a
+</span><span class='line'>LDV b
+</span><span class='line'>LDC 2
+</span><span class='line'>MUL
+</span><span class='line'>ADD
+</span><span class='line'>RET
+</span><span class='line'>
+</span><span class='line'>LDC 1
+</span><span class='line'>LDC 2
+</span><span class='line'>ADD
+</span><span class='line'>LDC 3
+</span><span class='line'>MUL
+</span><span class='line'>RET</span></code></pre></td></tr></table></div></figure>
+
+<p>代码下载：<a href="https://github.com/dohkoos/antlr4-calculator">https://github.com/dohkoos/antlr4-calculator</a></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1766,91 +2131,6 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/ruby-debugger-overview/">Ruby调试工具概览</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2015-10-19T10:50:09+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>19</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>10:50 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>调试Ruby代码最简单的方式就是使用puts或p方法。当有很多变量需要查看时，到处添加puts或p方法就可能变的不那么实际。幸好，Ruby社区提供了许多强大的调试工具。</p>
-
-<h3 id="ruby-1-8-时代">Ruby 1.8+时代</h3>
-
-<p>调试Ruby代码使用<a href="https://github.com/ruby-debug/ruby-debug">ruby-debug</a>。调试Rails代码则是<a href="https://github.com/nixme/pry-nav">pry-nav</a>。不过在Ruby 1.9出来后ruby-debug就有问题了，于是就有了<a href="https://github.com/mark-moseley/ruby-debug">ruby-debug19</a>，一个针对Ruby 1.9的ruby-debug移植版本。</p>
-
-<h3 id="ruby-1-9-2-时代">Ruby 1.9.2+时代</h3>
-
-<p>等到Ruby 1.9.2发布，ruby-debug彻底歇菜，然后<a href="https://github.com/cldwalker/debugger">debugger</a>就出现了。pry-nav也不好使了，还好有<a href="https://github.com/nixme/pry-debugger">pry-debugger</a>。</p>
-
-<h3 id="ruby-2-时代">Ruby 2+时代</h3>
-
-<p>新的Ruby调试工具<a href="https://github.com/deivid-rodriguez/byebug">byebug</a>来了。虽然byebug也能调试Rails应用，但它不提供语法高亮，所以使用<a href="https://github.com/deivid-rodriguez/pry-byebug">pry-byebug</a>是个更好的选择。</p>
-
-<table><thead>
-<tr>
-<th></th>
-<th>Ruby 1.8+</th>
-<th>Ruby 1.9</th>
-<th>Ruby 1.9.2+</th>
-<th>Ruby 2+</th>
-</tr>
-</thead><tbody>
-<tr>
-<td>Ruby</td>
-<td>ruby-debug</td>
-<td>ruby-debug19</td>
-<td>debugger</td>
-<td>byebug</td>
-</tr>
-<tr>
-<td>Rails</td>
-<td>pry-nav</td>
-<td>pry-nav</td>
-<td>pry-debugger</td>
-<td>pry-byebug</td>
-</tr>
-</tbody></table>
-
-<h3 id="其它">其它</h3>
-
-<p><a href="https://github.com/pry/pry">Pry</a>其实不是纯粹的调试工具，它只是IRB的替代品，所以缺乏必要的调试指令。pry-nav、pry-debugger和pry-byebug做的只是分别把ruby-debug、debugger和byebug中的step、next、continue等指令添加到Pry中。</p>
-
-<ul>
-<li>pry-nav = Pry + ruby-debug</li>
-<li>pry-debugger = Pry + debugger</li>
-<li>pry-byebug = Pry + byebug</li>
-</ul>
-
-<p>如果要调试view怎么办？可以使用<a href="https://github.com/rails/web-console">Web Console</a>。在view里面加上&lt;%= console %&gt;，当view出现异常时，就会在异常界面下方，出现一个网页版的IRB，方便调试。Web Console默认只接受localhost的请求，假如需要让别的IP也能访问的话，可以这样做：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class Application &lt; Rails::Application
-</span><span class='line'>  config.web_console.whitelisted_ips = '192.168.0.100'
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/3">&larr; Older</a>
@@ -1868,6 +2148,10 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/how-to-build-a-news-website-layout-with-flexbox/">如何使用Flexbox构建新闻站点布局</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/logic-problems-who-owns-the-fish/">逻辑题-谁养鱼</a>
       </li>
     
@@ -1883,10 +2167,6 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
         <a href="/blog/economic-inequality-the-short-version/">贫富差距精简版</a>
       </li>
     
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part7/">ANTLR 4权威参考读书笔记（7）</a>
-      </li>
-    
   </ul>
 </section>
 <section>
@@ -1898,31 +2178,31 @@ label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计�
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 119%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 124%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 132%" href="/tags/android/">Android</a>
-<a style="font-size: 92%" href="/tags/ant/">Ant</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
+<a style="font-size: 101%" href="/tags/css/">CSS</a>
 <a style="font-size: 110%" href="/tags/crack/">Crack</a>
 <a style="font-size: 107%" href="/tags/database/">Database</a>
 <a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
 <a style="font-size: 113%" href="/tags/git/">Git</a>
+<a style="font-size: 97%" href="/tags/html/">HTML</a>
 <a style="font-size: 104%" href="/tags/jbookshelf/">JBookShelf</a>
 <a style="font-size: 149%" href="/tags/java/">Java</a>
 <a style="font-size: 101%" href="/tags/javascript/">JavaScript</a>
 <a style="font-size: 97%" href="/tags/listview/">ListView</a>
 <a style="font-size: 104%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
-<a style="font-size: 119%" href="/tags/powerbuilder/">PowerBuilder</a>
-<a style="font-size: 101%" href="/tags/powerscript/">PowerScript</a>
+<a style="font-size: 124%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 110%" href="/tags/powerscript/">PowerScript</a>
 <a style="font-size: 117%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
 <a style="font-size: 119%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 97%" href="/tags/spring/">Spring</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 130%" href="/tags/translation/">Translation</a>
+<a style="font-size: 131%" href="/tags/translation/">Translation</a>
 <a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
-<a style="font-size: 92%" href="/tags/w32dasm/">W32Dasm</a>
 <a style="font-size: 107%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 107%" href="/tags/wxwidgets/">wxWidgets</a>
 

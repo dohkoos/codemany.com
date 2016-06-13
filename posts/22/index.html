@@ -9,12 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="运行环境：WebLogic 8.16 + Sybase ASE 12.5 问题：The New, Save from File menu are grayed out 分析打印出来的日志文件找到有以下异常出现： 1
-2
-3
-4
-5
-org.springframework.jdbc. &hellip;">
+  <meta name="description" content="首先，让我们从最简单的做起，先实现一套能正确分析PowerScript注释的词法规则。PowerScript支持两种注释形式：单行注释（//）和多行注释（/*...*/）。 单行注释以双斜杠（//）起头，直到遇到行结束符为止，所以在这里要先明确一下行结束符用什么表示。在DOS系统中行结束符用“\r &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -78,6 +73,698 @@ org.springframework.jdbc. &hellip;">
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/using-antlr-to-build-powerscript-grammar-parser-part1/">使用ANTLR构建PowerScript语法分析器（1）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-08-22T23:43:04+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2007</span></span> <span class='time'>11:43 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>首先，让我们从最简单的做起，先实现一套能正确分析PowerScript注释的词法规则。PowerScript支持两种注释形式：单行注释（//）和多行注释（<code>/*...*/</code>）。</p>
+
+<p>单行注释以双斜杠（//）起头，直到遇到行结束符为止，所以在这里要先明确一下行结束符用什么表示。在DOS系统中行结束符用“\r\n”表示，在Unix系统中行结束符用“\n”表示，现在的Mac系统也是以“\n”表示行结束符，但早期的Mac系统中行结束符则是以“\r”表示。所以兼容这几种操作系统的行结束符词法规则为：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>fragment
+</span><span class='line'>EndOfLine
+</span><span class='line'>    : '\r' '\n'    // DOS
+</span><span class='line'>    | '\r'         // Mac
+</span><span class='line'>    | '\n'         // Unix
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>现在，有了行结束符词法规则，就可以定义单行注释的词法规则了：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>LINE_COMMENT
+</span><span class='line'>    : '//' ~('\n'|'\r')* EndOfLine
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>通常的多行注释词法规则是这样的：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>BLOCK_COMMENT
+</span><span class='line'>    : '/*' ( options {greedy=false;} : . )* '*/'
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>但由于PowerScript支持嵌套注释，所以上面的规则无效，必须重新定义。当词法分析器遇到<code>“/*”</code>后就进入了多行注释。这时假如遇到了“/”符号，词法分析器必须预取一个字符，看这个字符是否是“*”。如果是的话，就进入了嵌套的多行注释，否则，则还是处在多行注释中。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>BLOCK_COMMENT
+</span><span class='line'>    : '/*'
+</span><span class='line'>      ( options {greedy=false;}
+</span><span class='line'>      : ('/' '*')=&gt; BLOCK_COMMENT    // 在多行注释中遇到“/*”，用语法断言确定是嵌套多行注释
+</span><span class='line'>      | '/' ~('*')                   // 在多行注释中只遇到“/”，而没有紧跟着的“*”
+</span><span class='line'>      | ~('/')                       // 在多行注释中没有遇到“/”
+</span><span class='line'>      )*
+</span><span class='line'>      '*/'
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>当然，我们还希望忽略空格、制表符、回车符、换行符等无意义字符。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>WS
+</span><span class='line'>    : (' '|'\t'|'\r'|'\n') {$channel=HIDDEN;}
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>测试代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>/* This is a comment.   */
+</span><span class='line'>/* /This is a comment. */
+</span><span class='line'>/* *This is a comment. */
+</span><span class='line'>/* This is a comment. /* */*/
+</span><span class='line'>/* This is a comment. /* This is a nested comment. */ */
+</span><span class='line'>/*  The comment starts here.
+</span><span class='line'> /*  The nested comment starts here.
+</span><span class='line'> The nested comment ends here.  */
+</span><span class='line'> The comment ends here.  */
+</span><span class='line'>/* The comment starts here,
+</span><span class='line'> continues to this line,&
+</span><span class='line'> and finally ends here. */
+</span><span class='line'>// This entire line is a comment.
+</span><span class='line'>// This entire line is a comment. //
+</span><span class='line'>// /This entire line is a comment.
+</span><span class='line'>// This entire line is a comment. */
+</span><span class='line'>// This entire line is a comment. /*</span></code></pre></td></tr></table></div></figure>
+
+<p>完整的PowerScript.g的内容如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar PowerScript;
+</span><span class='line'>
+</span><span class='line'>program
+</span><span class='line'>    : LINE_COMMENT+
+</span><span class='line'>    | BLOCK_COMMENT+
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>LINE_COMMENT
+</span><span class='line'>    : '//' ~('\n'|'\r')* EndOfLine
+</span><span class='line'>      {
+</span><span class='line'>          System.out.println("lc&gt;" + getText());
+</span><span class='line'>      }
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>BLOCK_COMMENT
+</span><span class='line'>    : '/*'
+</span><span class='line'>      ( options {greedy=false;}
+</span><span class='line'>      : ('/' '*')=&gt; BLOCK_COMMENT
+</span><span class='line'>      | '/' ~('*')
+</span><span class='line'>      | ~('/')
+</span><span class='line'>      )*
+</span><span class='line'>      '*/'
+</span><span class='line'>      {
+</span><span class='line'>          System.out.println("bc&gt;" + getText());
+</span><span class='line'>      }
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>WS
+</span><span class='line'>    : (' '|'\t'|'\r'|'\n') {$channel=HIDDEN;}
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>fragment
+</span><span class='line'>EndOfLine
+</span><span class='line'>    : '\r' '\n'    // DOS
+</span><span class='line'>    | '\r'         // Mac
+</span><span class='line'>    | '\n'         // Unix
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/getting-started-jpa-with-spring2/">JPA + Spring 2入门</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-08-10T18:33:42+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>10</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>6:33 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>JPA（Java Persistence API）是EJB 3.0 新引入的一个把Java数据对象映射成关系数据库对象的数据持久化编程模型，它弥补了JDBC、ORM、EJB 2等在Java对象持久化方面的不足之处，并且非常易于使用。JPA可以被当作一个单独的 POJO（Plain Old Java Object）持续化使用，或者被集成到任意Java EE兼容的容器或其它的轻量级框架（例如Spring）等一起使用。</p>
+
+<h3 id="配置jpa">配置JPA</h3>
+
+<p>Spring提供了两种方法创建JPA的EntityManagerFactory对象。</p>
+
+<p>方法1：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;beans&gt;
+</span><span class='line'>    &lt;bean id="entityManagerFactory" class="org.springframework.orm.jpa.LocalEntityManagerFactoryBean"&gt;
+</span><span class='line'>        &lt;property name="persistenceUnitName" value="persistenceUnit" /&gt;
+</span><span class='line'>    &lt;/bean&gt;
+</span><span class='line'>&lt;/beans&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>FactoryBean创建的EntityManagerFactory适用于仅通过JPA进行数据访问的环境。由于使用了PersistenceProvider自动侦测机制，所以只能从默认路径classpath:META-INF/persistence.xml中读取配置信息。</p>
+
+<p>方法2：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;beans&gt;
+</span><span class='line'>    &lt;bean id="entityManagerFactory" class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean"&gt;
+</span><span class='line'>        &lt;property name="dataSource" ref="someDataSource" /&gt;
+</span><span class='line'>        &lt;property name="loadTimeWeaver"&gt;
+</span><span class='line'>            &lt;bean class="org.springframework.instrument.classloading.SimpleLoadTimeWeaver" /&gt;
+</span><span class='line'>        &lt;/property&gt;
+</span><span class='line'>    &lt;/bean&gt;
+</span><span class='line'>&lt;/beans&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>FactoryBean提供了对JPA EntityManagerFactory的完整控制，非常适合那种有简单定制需要的环境。你可以处理多个persistence.xml配置文件；覆盖persistence.xml文件的默认路径；可以传递Spring托管的JDBC DataSource给JPA PersistenceProvider，用来替代persistence.xml中的JDBC配置（这个Spring托管的DataSource通常被作为nonJtaDataSource传送给PersistenceProvider，并且覆盖persistence.xml中相同的nonJtaDataSource）。</p>
+
+<h3 id="数据访问">数据访问</h3>
+
+<p>基于JPA的DAO可以通过三种方式进行数据访问JpaDaoSupport，JpaTemplate和plain JPA。其中JpaTemplate是plain JPA的封装，而JpaDaoSupport又是JpaTemplate的封装。无疑，使用不对Spring产生任何依赖的Plain JPA的API进行编程是最好选择。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class ProductDaoImpl implements ProductDao {
+</span><span class='line'>    private EntityManager entityManager = null;
+</span><span class='line'>
+</span><span class='line'>    @PersistenceContext
+</span><span class='line'>    public void setEntityManager(EntityManager entityManager) {
+</span><span class='line'>        this.entityManager = entityManager;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public Collection loadProductsByCategory(String category) {
+</span><span class='line'>         Query query = em.createQuery("from Product as p where p.category = :category");
+</span><span class='line'>         query.setParameter("category", category);
+</span><span class='line'>         return query.getResultList();
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>需要注意的是，必须激活PersistenceAnnotationBeanPostProcessor功能才能让Spring识别@PersistenceContext注解。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;beans&gt;
+</span><span class='line'>    &lt;!-- JPA annotations bean post processor --&gt;
+</span><span class='line'>    &lt;bean class="org.springframework.orm.jpa.support.PersistenceAnnotationBeanPostProcessor" /&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;bean id="productDao" class="com.codemany.netlink.dao.impl.ProductDaoImpl" /&gt;
+</span><span class='line'>&lt;/beans&gt;</span></code></pre></td></tr></table></div></figure>
+
+<h3 id="异常转化">异常转化</h3>
+
+<p>Spring提供了一个允许通过使用@Repository注解进行透明的异常转化的解决方案。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>@Repository
+</span><span class='line'>public class ProductDaoImpl implements ProductDao {</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;beans&gt;
+</span><span class='line'>    &lt;!-- Exception translation bean post processor --&gt;
+</span><span class='line'>    &lt;bean class="org.springframework.dao.annotation.PersistenceExceptionTranslationPostProcessor" /&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>后置处理器将自动的寻找所有的异常转化器（PersistenceExceptionTranslator这个接口的实现类）并通知所有打上@Repository注解的bean，从而能够使得被找到的异常转化器能够在抛出异常时做相应的异常转化工作。</p>
+
+<p>总的来说，DAO能够基于普通的Java持久层API和注解来实现，但同样也能享受到由Spring管理事务、IoC和透明的异常转化（转化成为Spring的异常体系）等好处。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/debugging-cpp-dll-in-visual-csharp/">在Visual C#中调试C++的DLL</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-07-03T21:09:09+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2007</span></span> <span class='time'>9:09 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在Visual C#中调试C++的DLL很简单，只要在C#项目属性的Debug一项中钩上“Enable unmanaged code debugging”，然后你就可以像调试一般程序那样调试DLL了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/getting-started-dll-programming-with-visual-cpp/">VC++动态链接库（DLL）编程入门</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-06-23T09:35:02+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>23</span><span class='date-suffix'>rd</span>, <span class='date-year'>2007</span></span> <span class='time'>9:35 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>DLL是一个包含可由多个程序同时使用的代码和数据的集合。例如，在Windows操作系统中，Comdlg32动态链接库 执行与对话框有关的常见函数。因此，每个程序都可以使用该DLL中包含的功能来实现“打开”对话框。这有助于促进代码重用和内存的有效使用。通过使用DLL，程序可以实现模块化，由相对独立的组件组成。例如，一个计帐程序可以按模块来销售。可以在运行时将各个模块加载到主程序中（如果安装了相应模块）。因为模块是彼此独立的，所以程序的加载速度更快，而且模块只在相应的功能被请求时才加载。</p>
+
+<h3 id="dll的优点">DLL的优点</h3>
+
+<ol>
+<li>使用较少的资源。当多个程序使用同一个函数库时，DLL可以减少在磁盘和物理内存中加载的代码的重复量。这不仅可以大大影响在前台运行的程序，而且可以大大影响其他在Windows操作系统上运行的程序；</li>
+<li>简化部署和安装。当DLL中的函数需要更新或修复时，只要函数的参数和返回值没有更改，就不需重新编译或重新建立程序与该DLL的链接。此外，如果多个程序使用同一个DLL，那么多个程序都将从该更新或修复中获益；</li>
+<li>支持多语言程序。只要程序遵循函数的调用约定，用不同编程语言编写的程序就可以调用相同的DLL函数。程序与DLL函数在下列方面必须是兼容的：函数期望其参数被推送到堆栈上的顺序，是函数还是应用程序负责清理堆栈，以及寄存器中是否传递了任何参数；</li>
+<li>使国际版本的创建轻松完成。通过将资源放到DLL中，创建应用程序的国际版本变得容易得多。可将用于应用程序的每个语言版本的字符串放到单独的DLL资源文件中，并使不同的语言版本加载合适的资源。</li>
+</ol>
+
+<h3 id="dll的类型（kinds-of-dlls）">DLL的类型（Kinds of DLLs）</h3>
+
+<p>Visual C++支持三种类型的DLL，它们分别是Non-MFC DLL、MFC Regular DLL和MFC Extension DLL：</p>
+
+<ol>
+<li>Non-MFC DLL指的是不用MFC的类库结构，直接用C语言写的DLL，其导出的函数是标准的C接口，能被MFC或非MFC编写的客户程序调用；</li>
+<li>Extension DLL支持C++接口，也就是说它导出C++函数或者整个类给客户程序。导出函数可以使用C++或MFC的数据形式作为参数或返回值，当导出整个类时，客户程序可以创建此类的对象或者从这些类进行派生。使用Extension DLL的一个问题就是该DLL仅能和MFC客户程序一起工作；</li>
+<li>Regular DLL和上述的Extension Dll一样，也是用MFC类库编写的，它的一个明显的特点是在源文件里有一个继承CWinApp的类（注意：此类DLL虽然从CWinApp派生，但没有消息循环）。Regular DLL有一个很大的限制就是，它只可以导出C风格的函数，但不能导出C++类、成员函数或重载函数。调用Regular DLL的客户程序不必是MFC应用程序，也可以是在Visual C++、Dephi、Visual Basic等环境下开发的客户程序。</li>
+</ol>
+
+<h3 id="dll的加载">DLL的加载</h3>
+
+<p>客户程序使用DLL的方式有两种：隐式链接（静态加载或加载时动态链接）和显式链接（动态加载或运行时动态链接）。</p>
+
+<p>为了隐式链接到DLL，客户程序必须从DLL的提供程序获取下列项：</p>
+
+<ol>
+<li>包含导出函数或C++类声明的头文件（.h文件）；</li>
+<li>要链接的导入库（.lib文件）；</li>
+<li>实际的DLL（.dll文件）。</li>
+</ol>
+
+<p>使用DLL的客户程序必须include头文件（此头文件包含每个DLL中的导出函数或C++类），并且链接到此DLL的创建者所提供的导入库。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// Cacl.cpp
+</span><span class='line'>DLLAPI int Sum(int a, int b)
+</span><span class='line'>{
+</span><span class='line'>    return a + b;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// Cacl.h
+</span><span class='line'>#ifdef CACL_EXPORTS
+</span><span class='line'>#define DLLAPI __declspec(dllexport)
+</span><span class='line'>#else
+</span><span class='line'>#define DLLAPI __declspec(dllimport)
+</span><span class='line'>#endif
+</span><span class='line'>
+</span><span class='line'>DLLAPI int Sum(int a, int b);</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// Client.cpp
+</span><span class='line'>DLLAPI int Sum(int a, int b);</span></code></pre></td></tr></table></div></figure>
+
+<p>为了显式链接到DLL，客户程序必须在运行时通过函数调显式加载DLL：</p>
+
+<ol>
+<li>调用LoadLibrary加载DLL和获取模块句柄；</li>
+<li>调用GetProcAddress获取指向客户程序要调用的每个导出函数的函数指针（由于客户程序是通过指针调用DLL的函数，编译器不生成外部引用，故无需与导入库链接）；</li>
+<li>使用完DLL后调用FreeLibrary释放资源。</li>
+</ol>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// Client.cpp
+</span><span class='line'>HINSTANCE hDLL = LoadLibrary("demo");
+</span><span class='line'>if (hDLL != NULL)
+</span><span class='line'>{
+</span><span class='line'>    LPFNDLLFUNC1 lpfnDllFunc1 = GetProcAddress(hDLL, "Sum");
+</span><span class='line'>    if (lpfnDllFunc1 == NULL)
+</span><span class='line'>    {
+</span><span class='line'>        FreeLibrary(hDLL);
+</span><span class='line'>        return SOME_ERROR_CODE;
+</span><span class='line'>    }
+</span><span class='line'>    return lpfnDllFunc1(dwParam, uParam);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<h3 id="客户程序如何找到dll">客户程序如何找到DLL</h3>
+
+<p>如果用LoadLibrary显式链接DLL的话，可以指定DLL的全路径名。如果没有指定路径名，或者使用了隐式链接，则系统将使用下面的搜索序列来定位DLL：</p>
+
+<ol>
+<li>包含客户可执行文件所在的目录；</li>
+<li>当前目录；</li>
+<li>Windows系统目录（可用GetSystemDirectory函数获取）；</li>
+<li>Windows目录（可用GetWindowsDirectory函数获取）；</li>
+<li>在Path环境变量里列出的目录（注意：不使用LIBPATH环境变量）。</li>
+</ol>
+
+<h3 id="导出dll函数">导出DLL函数</h3>
+
+<p>DLL文件的布局与EXE文件非常相似，但有一个重要差异：DLL文件包含导出表。导出表包含DLL导出到客户程序的每个函数的名称。只有导出表中的函数可由客户程序访问。DLL中的任何其他函数都是DLL私有的。通过使用带/EXPORTS选项的dumpbin工具，可以查看DLL的导出表。有两种方法可以从DLL导出函数：</p>
+
+<p>方法1：在定义中使用__declspec(dllexport)关键字。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// 导出函数
+</span><span class='line'>__declspec(dllexport) void __cdecl Function();
+</span><span class='line'>
+</span><span class='line'>// 导出类中的所有公共数据成员和成员函数
+</span><span class='line'>class __declspec(dllexport) CExampleExport : public CObject
+</span><span class='line'>{
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>方法2：在生成DLL时，创建一个后缀名为def的模块定义文件（如果希望按序号而不是按名称从DLL导出函数，则使用此方法）。</p>
+
+<p>实例DLL和客户程序代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// Cacl.h
+</span><span class='line'>#ifdef CACL_EXPORTS
+</span><span class='line'>#define DLLAPI __declspec(dllexport)
+</span><span class='line'>#else
+</span><span class='line'>#define DLLAPI __declspec(dllimport)
+</span><span class='line'>#endif
+</span><span class='line'>
+</span><span class='line'>DLLAPI int Sum(int a, int b);</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// Cacl.cpp
+</span><span class='line'>#include &lt;windows.h&gt;
+</span><span class='line'>#include "Cacl.h"
+</span><span class='line'>
+</span><span class='line'>BOOL APIENTRY DllMain(HANDLE hModule, DWORD reason, LPVOID lpReserved)
+</span><span class='line'>{
+</span><span class='line'>    switch (reason)
+</span><span class='line'>    {
+</span><span class='line'>        case DLL_PROCESS_ATTACH:
+</span><span class='line'>        case DLL_THREAD_ATTACH:
+</span><span class='line'>        case DLL_THREAD_DETACH:
+</span><span class='line'>        case DLL_PROCESS_DETACH:
+</span><span class='line'>            break;
+</span><span class='line'>    }
+</span><span class='line'>    return TRUE;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>DLLAPI int Sum(int a, int b)
+</span><span class='line'>{
+</span><span class='line'>    return a + b;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// Client.cpp
+</span><span class='line'>#include &lt;stdio.h&gt;
+</span><span class='line'>#include "Cacl.h"
+</span><span class='line'>
+</span><span class='line'>int main(int argc, char* argv[])
+</span><span class='line'>{
+</span><span class='line'>    printf("Sum = %d\n", Sum(5, 3));
+</span><span class='line'>    return 0;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<h3 id="如何调试dll">如何调试DLL</h3>
+
+<p>调试DLL很容易，只要从DLL工程启动调试器即可。第一次这样做的时候，调试器会请求给出客户EXE程序的路径。之后，每次从调试器运行DLL时，调试器会自动装入客户EXE程序，而EXE用搜索序列找到DLL。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/stored-procedure-batch-replace-value-of-a-field-with-another-field-mysql-version/">批量更新表中某个字段的值到另一个字段的存储过程（MySQL版）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-06-03T06:16:16+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2007</span></span> <span class='time'>6:16 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>对博客做了一些修改，需要将entries表中的updatetime字段值替换成pubtime字段的值，为此写了一个MySQL存储过程，其中涉及游标的使用：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>DELIMITER //
+</span><span class='line'>
+</span><span class='line'>CREATE PROCEDURE sp_batch_replace_field_value_with_another()
+</span><span class='line'>BEGIN
+</span><span class='line'>    DECLARE p_id INT;
+</span><span class='line'>    DECLARE p_pubtime DATETIME;
+</span><span class='line'>    DECLARE p_done BOOL;
+</span><span class='line'>    DECLARE p_cursor CURSOR FOR SELECT id, pubtime FROM entries;
+</span><span class='line'>    DECLARE CONTINUE HANDLER FOR NOT FOUND SET p_done = true;
+</span><span class='line'>
+</span><span class='line'>    OPEN p_cursor;
+</span><span class='line'>        REPEAT
+</span><span class='line'>            FETCH p_cursor INTO p_id, p_pubtime;
+</span><span class='line'>            UPDATE entries SET updatetime = p_pubtime WHERE id = p_id;
+</span><span class='line'>            UNTIL p_done = true
+</span><span class='line'>        END REPEAT;
+</span><span class='line'>    CLOSE p_cursor;
+</span><span class='line'>END//
+</span><span class='line'>
+</span><span class='line'>DELIMITER ;</span></code></pre></td></tr></table></div></figure>
+
+<p>第一次在SQLyog中写存储过程，在修改了存储过程后竟然不知道如何保存。点击File -&gt; Save却是保存为另外一个文件，而不是直接保存修改的存储过程。经过多番尝试后发现按F5键就可以了。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -376,492 +1063,6 @@ org.springframework.jdbc. &hellip;">
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/w3c-dom-setattribute/">W3C DOM - {setAttribute()}</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2007-02-26T17:43:36+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>5:43 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>setAttribute(string name, string value)：增加一个指定名称和值的新属性，或者把一个现有的属性设定为指定的值。</p>
-
-<h3 id="setattribute-的差异">setAttribute()的差异</h3>
-
-<p>我们经常需要在JavaScript中给Element动态添加各种属性，这可以通过使用setAttribute()来实现，这就涉及到了浏览器的兼容性问题。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>var obj = document.getElementById("obj");
-</span><span class='line'>obj.setAttribute("onclick", "javascript:alert('This is a test!');");</span></code></pre></td></tr></table></div></figure>
-
-<p>这里利用setAttribute指定Element的onclick属性，简单，很好理解。但是IE不支持，IE并不是不支持setAttribute这个函数，而是不支持用setAttribute设置某些属性，例如对象属性、集合属性、事件属性，也就是说用setAttribute设置style和onclick 这些属性在IE中是行不通的。为达到兼容各种浏览器的效果，可以用点符号法来设置Element的对象属性、集合属性和事件属性。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>document.getElementById("obj").className = "fruit";
-</span><span class='line'>document.getElementById("obj").style.cssText = "color: #00f;";
-</span><span class='line'>document.getElementById("obj").style.color = "#00f";
-</span><span class='line'>document.getElementById("obj").onclick = function () { alert("This is a test!"); }</span></code></pre></td></tr></table></div></figure>
-
-<h3 id="关于class和classname">关于class和className</h3>
-
-<p>class属性在W3C DOM中扮演着很重要的角色，但由于浏览器差异性仍然存在。使用setAttribute(&quot;class&quot;, vName)语句动态设置element的class属性在Firefox中是行的通的，在IE中却不行。因为使用IE内核的浏览器不认识“class”，要改用“className”；同样，Firefox也不认识“className”。所以常用的方法是二者兼备：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>element.setAttribute("class", vName);
-</span><span class='line'>element.setAttribute("className", vName);    // for IE</span></code></pre></td></tr></table></div></figure>
-
-<h3 id="cellspacing和cellpadding">cellspacing和cellpadding</h3>
-
-<p>虽然在CSS中存在与cellpadding和cellspacing这两个属性等价的样式属性padding和border-spacing。然而，浏览器对这些样式属性支持的不一致，有时仍会使用cellpadding和cellspacing来调整表格的间距。不过，在Firefox中有效的setAttribute(&quot;cellpadding&quot;, value)到了IE下就不行了，必须改成cellPadding才可以（注意：p要大写）。幸好Firefox也支持setAttribute(&quot;cellPadding&quot;, value)。所以二者兼容的代码是：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>element.setAttribute("cellSpacing", value);
-</span><span class='line'>element.setAttribute("cellPadding", value);</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/json-in-javascript/">JSON in JavaScript</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2007-02-09T23:29:14+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>9</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>11:29 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="http://www.json.org/js.html">http://www.json.org/js.html</a></p>
-
-<p><a href="http://www.crockford.com/javascript">JavaScript</a>是一门通用编程语言，被作为页面脚本语言引入Netscape Navigator。<a href="http://www.crockford.com/javascript/javascript.html">它仍被广泛地认为是Java的一个子集，但它不是。</a>它是一门有着<a href="http://www.crockford.com/javascript/survey.html">类C语法</a>和<a href="http://www.crockford.com/javascript/inheritance.html">soft objects</a>的类<a href="http://www.crockford.com/javascript/little.html">Scheme</a>语言，JavaScript在<a href="http://www.ecma-international.org/publications/files/ecma-st/ECMA-262.pdf">ECMAScript Language Specification, Third Edition</a>中被标准化。</p>
-
-<p><a href="http://www.json.org/">JSON</a>是JavaScript对象字面量表示法（object literal notation）的一个子集。因为JSON是JavaScript的一个子集，所以它可以毫不费力地被用在这门语言中。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>var myJSONObject = {"bindings": [
-</span><span class='line'>        {"ircEvent": "PRIVMSG", "method": "newURI", "regex": "^http://.*"},
-</span><span class='line'>        {"ircEvent": "PRIVMSG", "method": "deleteURI", "regex": "^delete.*"},
-</span><span class='line'>        {"ircEvent": "PRIVMSG", "method": "randomURI", "regex": "^random.*"}
-</span><span class='line'>    ]
-</span><span class='line'>};</span></code></pre></td></tr></table></div></figure>
-
-<p>在这个例子中，一个含有单个成员“bindings”的对象被创建，该成员包含一个含有三个对象的数组，每个对象含有“ircEvent”，“method”和“regex”三个成员。</p>
-
-<p>成员可以通过点或下标运算符检索。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>myJSONObject.bindings[0].method    // "newURI"</span></code></pre></td></tr></table></div></figure>
-
-<p>你可以使用eval函数将一段JSON文本转换成一个对象，eval函数会调用JavaScript编译器。因为JSON是JavaScript的一个真子集（a proper subset），编译器将正确地对文本作语法分析并产生一个对象结构。文本必须被包裹在括号内，以免在JavaScript的语法中的歧义上犯错误。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>var myObject = eval('(' + myJSONtext + ')');</span></code></pre></td></tr></table></div></figure>
-
-<p>eval函数是非常快的。然而，它可以编译和执行任何JavaScript程序，所以可能会有安全问题。当源代码是可信的与合格的的时候才可以使用eval函数。使用JSON语法分析器则安全的多。在基于XMLHttpRequest的Web应用中，通讯只被允许朝着提供该页面的同源的方向，所以它是可信的。但它可能不是合格的。如果服务器在它的JSON编码里不是严格的，或者它没有严谨地验证所有的输入，然后它可能交付无效的JSON文本，它们可能携带危险的脚本。eval函数将会执行这些脚本，释放恶意。</p>
-
-<p>为抵御这些，应该使用JSON语法分析器。JSON语法分析器将只识别JSON文本，拒绝所有的脚本。在提供本地JSON支持的浏览器里，JSON语法分析器也比eval快的多。预计本地JSON支持将会被包含在下一个ECMAScript标准中。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>var myObject = JSON.parse(myJSONtext, reviver);</span></code></pre></td></tr></table></div></figure>
-
-<p>可选的reviver参数是一个函数，它会被最终结果的各个层面上的每个键和值调用。每个值会被reviver函数的返回结果替换。这可以被用来将通用对象改编成为伪类实例，或者被用来将date字符串转化成Date对象。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>myData = JSON.parse(text, function (key, value) {
-</span><span class='line'>    var type;
-</span><span class='line'>    if (value && typeof value === 'object') {
-</span><span class='line'>        type = value.type;
-</span><span class='line'>        if (typeof type === 'string' && typeof window[type] === 'function') {
-</span><span class='line'>            return new (window[type])(value);
-</span><span class='line'>        }
-</span><span class='line'>    }
-</span><span class='line'>    return value;
-</span><span class='line'>});</span></code></pre></td></tr></table></div></figure>
-
-<p>JSON stringifier则作相反的工作，它将JavaScript数据结构转换为JSON文本。JSON不支持循环的数据结构，所以注意不要把循环的结构交给JSON stringifier。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>var myJSONText = JSON.stringify(myObject, replacer);</span></code></pre></td></tr></table></div></figure>
-
-<p>如果stringify方法看到一个对象包含toJSON方法，它会调用该方法，并字符串化返回的值。这允许一个对象去确定其自己的JSON表示。</p>
-
-<p>stringify~~原文是stringifier，疑似拼错~~方法可以接受一个可选的字符串数组。这些字符串被用于选取那些将会被包含在JSON文本中的属性。</p>
-
-<p>stringify~~原文是stringifier，疑似拼错~~方法可以接受一个可选的replacer函数。该函数会在结构中每个值的toJSON方法（如果有）之后被调用。它将每个键和值作为参数传递，并且this将会被绑定到持有键的对象上。返回的值会被字符串化。</p>
-
-<p>没有在JSON中表示的值（例如函数和undefined）被排除在外。</p>
-
-<p>非有限的数字被替换为null。要替换成其它的值，你可以使用像这样的replacer函数：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>function replacer(key, value) {
-</span><span class='line'>    if (typeof value === 'number' && !isFinite(value)) {
-</span><span class='line'>        return String(value);
-</span><span class='line'>    }
-</span><span class='line'>    return value;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>给JSON.parse一个相应的reviver可以还原这些。</p>
-
-<p><a href="https://github.com/douglascrockford/JSON-js">The open source code of a JSON parser and JSON stringifier is available.</a> When <a href="http://www.crockford.com/javascript/jsmin.html">minified</a> it is less than 2.5K.</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/problem-does-not-generate-log-file-when-integrate-p6spy-into-spring/">集成P6Spy到Spring后没有产生日志文件的问题</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2007-01-22T17:41:32+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2007</span></span> <span class='time'>5:41 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>网上关于集成P6Spy到Spring的帖子说：在Spring的配置文件中添加：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;bean id="dataSource" class="com.p6spy.engine.spy.P6DataSource" destroy-method="close"&gt;
-</span><span class='line'>    &lt;constructor-arg ref="dataSourceTarget" /&gt;
-</span><span class='line'>&lt;/bean&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>然后将原来dataSource定义的id值改为dataSourceTarget：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;bean id="dataSourceTarget" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close"&gt;
-</span><span class='line'>    &lt;property name="driverClassName" value="${driver}" /&gt;
-</span><span class='line'>    &lt;property name="url" value="${url}" /&gt;
-</span><span class='line'>    &lt;property name="username" value="${username}" /&gt;
-</span><span class='line'>    &lt;property name="password" value="${password}" /&gt;
-</span><span class='line'>&lt;/bean&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>但是照着这样做了以后却发现没有生成日志文件。</p>
-
-<p>下载P6Spy的源代码进行阅读后找到了问题所在。打开P6Util.java文件，在classPathFile()方法中有这样一条语句：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>fp = classLoadPropertyFile(Thread.currentThread().getContextClassLoader().getResource(file))</span></code></pre></td></tr></table></div></figure>
-
-<p>getResource(file)用来读取spy.properties配置文件，file的值就是spy.properties的文件路径。我的syp.properties放在了C:\Tomcat 5.5\webapps\netlink\WEB-INF\classes目录下，所以它返回的值是C:/Tomcat%205.5/webapps/netlink/WEB-INF/classes/spy.properties，Tomcat 5.5中的空格被编码成了%20。然后在classLoadPropertyFile()方法中就直接使用该值来创建File对象。可想而知，肯定创建失败。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public static File classLoadPropertyFile(java.net.URL purl) {
-</span><span class='line'>    try {
-</span><span class='line'>        if (purl != null) {
-</span><span class='line'>            // modified by jayakumar for JDK 1.2 support
-</span><span class='line'>            //return new File(purl.getPath());
-</span><span class='line'>            return new File(getPath(purl));
-</span><span class='line'>            // end of modification
-</span><span class='line'>        }
-</span><span class='line'>    } catch (Exception e) {
-</span><span class='line'>        // we ignore this, since JDK 1.2 does not suppport this method
-</span><span class='line'>    }
-</span><span class='line'>    return null;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>在classPathFile()方法中通过判断fp.exists()来决定是否返回日志文件的路径，既然上面创建File对象失败了，那fp.exists()肯定不可能为true了，日志文件也就不可能被创建了。</p>
-
-<p>解决问题的方法超简单，把Tomcat 5.5中的空格去掉就行了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/images-halftone-dithering/">图象的半影调和抖动技术</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2007-01-02T16:58:06+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2007</span></span> <span class='time'>4:58 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在介绍本讲内容之前，先提出一个问题？普通的黑白针式打印机能打出灰度图来吗？如果说能，从针式打印机的打印原理来分析，似乎是不可能的。因为针打是靠撞针击打色带在纸上形成黑点的，不可能打出灰色的点来；如果说不能，可是我们的确见过用针式打印机打印出来的灰色图象。到底是怎么回事呢？你再仔细看看那些打印出来的所谓的灰色图象，最好用放大镜看。你会发现，原来这些灰色图象都是由一些黑点组成的，黑点多一些，图象就暗一些；黑点少一些，图案就亮一些。下面这几张图就能说明这一点。</p>
-
-<p><img src="/uploads/halftone-l401.gif" title="halftone-l401" >
-图1. 用黑白两种颜色打印出灰度效果</p>
-
-<p>图中最左边的是原图，是一幅真正的灰度图，另外三张图都是黑白二值图。容易看出，最左的那幅和原图最接近。由二值图象显示出灰度效果的方法，就是我们今天要讲的半影调（halftone）技术，它的一个主要用途就是在只有二值输出的打印机上打印图象。我们介绍两种方法：图案法和抖动法。</p>
-
-<h3 id="图案法（patterning）">图案法（patterning）</h3>
-
-<p>图案法是指灰度可以用一定比例的黑白点组成的区域表示，从而达到整体图象的灰度感。黑白点的位置选择称为图案化。在具体介绍图案法之前，先介绍一下分辨率的概念。计算机显示器，打印机，扫描仪等设备的一个重要指标就是分辨率，单位是dpi（dot per inch），即每英寸点数，点数越多，分辨率就越高，图象就越清晰。让我们来计算一下，计算机显示器的分辨率有多高。设显示器为15英寸（指对角线长度），最多显示1280 * 1024个点。因为宽高比为4:3，则宽有12英寸，高有9英寸，则该显示器的水平分辨率为106dpi，垂直分辨率为113.8dpi。一般的激光打印机的分辨率有300dpi * 300dpi的，有600dpi * 600dpi的，720dpi * 720dpi。所以打出来的图象要比计算机显示出来的清晰的多。扫描仪的分辨率要高一些，数码相机的分辨率更高。</p>
-
-<p>言归正传，前面讲了，图案化使用图案来表示像素的灰度，那么我们来做一道计算题。假设有一幅240 * 180 * 8bit的灰度图，当用分辨率为300dpi * 300dpi的激光打印机将其打印到12.8 * 9.6英寸的纸上时，每个像素的图案有多大？这道题很简单，这张纸最多可以打(300 * 12.8) * (300 * 9.6) = 3840 * 2880个点，所以每个像素可以用(3840 / 240) * (2880 / 180) = 16 * 16个点大小的图案来表示，即一个像素256个点。如果这16 * 16的方块中一个黑点也没有，就可以表示灰度256，有一个黑点，就表示灰度255，依次类推，当都是黑点时，表示灰度0，这样，16 * 16的方块可以表示257级灰度。比要求的8bit共256级灰度还多了一个，所以上面的那幅图的灰度级别完全能够打印出来。</p>
-
-<p>这里有一个图案构成的问题，即黑点打在哪里？比如说，只有一个黑点时，我们可以打在正中央，也可以打16 * 16的左上角。图案可以是规则的，也可以是不规则的。一般情况下，有规则的图案比随即图案能够避免点的丛集，但有时会导致图象中有明显的线条。如图2中，2 * 2的图案可以表示5级灰度，当图象中有一片灰度为的1的区域时，如图3所示，有明显的水平和垂直线条。</p>
-
-<p><img src="/uploads/halftone-l402.gif" title="halftone-l402" >
-图2. 2 * 2的图案</p>
-
-<p><img src="/uploads/halftone-l403.gif" title="halftone-l403" >
-图3. 规则图案导致线条</p>
-
-<p>如果想存储256级灰度的图案，就需要256 * 16 * 16的二值点阵，占用的空间还是相当可观的。有一个更好的办法是：只存储一个整数矩阵，称为标准图案，其中的每个值从0到255。图象的实际灰度和阵列中的每个值比较，当该值大于等于灰度时，对应点打一黑点。下面举一个25级灰度的例子加以说明。</p>
-
-<p><img src="/uploads/halftone-l404.gif" title="halftone-l404" >
-图4. 标准图案举例</p>
-
-<p>图4中，左边为标准图案，右边为灰度为15的图案，共有10个黑点，15个白点。其实道理很简单，灰度为0时全是黑点，灰度每增加1，减少一个黑点。要注意的是，5 * 5的图案可以表示26种灰度，灰度25才是全白点，而不是24。下面介绍一种设计标准图案的算法，是由Limb在1969年提出的。以一个2 * 2的矩阵开始<img src="/uploads/halftone-l4formu01.gif" title="halftone-l4formu01" >，通过递归关系有<img src="/uploads/halftone-l4formu02.gif" title="halftone-l4formu02" >，其中2n * 2n是阵列中元素的个数，Un是一个2n * 2n 的方阵，所有元素都是1。根据这个算法，可以得到<img src="/uploads/halftone-l4matrix01.gif" title="halftone-l4matrix01" >，为16级灰度的标准图案。M3（8 * 8阵）比较特殊，称为Bayer抖动表。M4是一个16 * 16的矩阵。根据上面的算法，如果利用M3，一个像素要用8 * 8的图案表示，则一幅N * N的图将变成8N * 8N大小。如果利用M4，就更不得了，变成16N * 16N了。能不能在保持原图大小的情况下利用图案化技术呢？一种很自然的想法是：如果用M2阵，则将原图中每8 * 8个点中取一点，即重新采样，然后再应用图案化技术，就能够保持原图大小。实际上，这种方法并不可行。首先，你不知道这8 * 8个点中找哪一点比较合适，另外，8 * 8的间隔实在太大了，生成的图象和原图肯定相差很大，就象图1最右边的那幅图一样。我们可以采用这样的做法：假设原图是256级灰度，利用Bayer抖动表，做如下处理if (g[y][x] &gt;&gt; 2) &gt; bayer[y &amp; 7][x &amp; 7] then 打一白点 else 打一黑点。其中，x，y代表原图的像素坐标，g[y][x]代表该点灰度。首先将灰度右移两位，变成64级，然后将x，y做模8运算，找到Bayer表中的对应点，两者做比较，根据上面给出的判据做处理。</p>
-
-<p>我们可以看到，模8运算使得原图分成了一个个8 * 8的小块，每个小块和8 * 8的Bayer表相对应。小块中的每个点都参与了比较，这样就避免了上面提到的选点和块划分过大的问题。模8运算实质上是引入了随机成分，这就是我们下面要讲到的抖动技术。</p>
-
-<p>下面的图5就是利用这个算法，使用M3（Bayer抖动表）阵得到的，图6是使用M4阵得到的，可见两者的差别并不是很大，所以一般用Bayer表就可以了。</p>
-
-<p><img src="/uploads/halftone-l405.gif" title="halftone-l405" >
-图5. 利用M3抖动生成的图</p>
-
-<p><img src="/uploads/halftone-l406.gif" title="halftone-l406" >
-图6. 利用M4抖动生成的图</p>
-
-<p><a href="/uploads/limbpatternm3.txt" title="limbpatternm3.txt">图案法源程序</a></p>
-
-<h3 id="抖动法（dithering）">抖动法（dithering）</h3>
-
-<p>让我们考虑更坏的情况：即使使用了图案化技术，仍然得不到要求的灰度级别。举例说明：假设有一幅600 * 450 * 8bit的灰度图，当用分辨率为300dpi * 300dpi的激光打印机将其打印到8 * 6英寸的纸上时，每个像素可以用(2400 / 600) * (1800 / 450) = 4 * 4个点大小的图案来表示，最多能表示17级灰度，无法满足256级灰度的要求。可有两种解决方案：1.减小图象尺寸，由600 * 450变为150 * 113；2.降低图象灰度级，由256级变成16级。这两种方案都不理想。这时，我们就可以采用抖动法的技术来解决这个问题。其实刚才给出的算法就是一种抖动算法，称为规则抖动（regular dithering）。规则抖动的优点是算法简单；缺点是图案化有时很明显，这是因为取模运算虽然引入了随机成分，但还是有规律的，另外，点之间进行比较时，只要比标准图案上点的值大就打白点，这种做法并不理想，因为，如果当标准图案点的灰度值本身就很小，而图象中点的灰度只比它大一点儿时，图象中的点更接近黑色，而不是白色。一种更好的方法是将这个误差传播到邻近的像素。下面介绍的Floyd-Steinberg算法就采用了这种方案。</p>
-
-<p>假设灰度级别的范围从b（black）到w（white），中间值t为(b + w) /2，对应256级灰度，b = 0, w = 255, t = 127.5；设原图中像素的灰度为g，误差值为e，则新图中对应像素的值用如下的方法得到：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if g &gt; t then
-</span><span class='line'>    打白点
-</span><span class='line'>    e = g - w
-</span><span class='line'>else
-</span><span class='line'>    打黑点
-</span><span class='line'>    e = g - b
-</span><span class='line'>    3 / 8 * e 加到右边的像素
-</span><span class='line'>    3 / 8 * e 加到下边的像素
-</span><span class='line'>    1 / 4 * e 加到右下方的像素</span></code></pre></td></tr></table></div></figure>
-
-<p>算法的意思很明白，以256级灰度为例，假设一个点的灰度为130，在灰度图中应该是一个灰点。由于一般图象中灰度是连续变化的，相邻像素的灰度值很可能与本像素非常接近，所以该点及周围应该是一片灰色区域。在新图中，130大于128，所以打了白点，但130离真正的白点255还差的比较远，误差e = 130 - 255 = -125 比较大。将3 / 8 * (-125)加到相邻像素后，使得相邻像素的值接近0而打黑点。下一次，e又变成正的，使得相邻像素的相邻像素打白点，这样一白一黑一白，表现出来刚好就是灰色。如果不传递误差，就是一片白色了。再举个例子，如果一个点的灰度为250，在灰度图中应该是一个白点，该点及周围应该是一片白色区域。在新图中，虽然e = -5也是负的，但其值很小，对相邻像素的影响不大，所以还是能够打出一片白色区域来。这样就验证了算法的正确性。其它的情况可以自己推敲。图7是利用Floyd-Steinberg算法抖动生成的图</p>
-
-<p><img src="/uploads/halftone-l407.gif" title="halftone-l407" >
-图7. 利用Floyd-Steinberg算法抖动生成的图</p>
-
-<p><a href="/uploads/steinberg.txt" title="steinberg.txt">Floyd-Steinberg算法的源代码</a></p>
-
-<h3 id="bmp2txt（bmp-to-txt）">bmp2txt（bmp to txt）</h3>
-
-<p>在讲图案化技术时，我突然想到了一个非常有趣的应用，那就是bmp2txt。如果你喜欢上BBS（电子公告牌系统），你可能想做一个花哨的签名档。瞧，这是我好朋友Casper的签名档，胖乎乎的，是不是特别可爱？</p>
-
-<p><img src="/uploads/halftone-l408.gif" title="halftone-l408" >
-图8. Casper的签名档</p>
-
-<p>你仔细观察一下，就会发现，这是一幅全部由字符组成的图，因为在BBS中只能出现文字的东西。那么，这幅图是怎么做出来的呢？难道是自己一个字符一个字符拼出来的。当然不是了，有一种叫bmp2txt的应用程序（2的发音和“to”一样，所以如此命名），能把位图文件转换成和图案很相似的字符文本。是不是觉得很神奇？其实原理很简单，用到了和图案化技术类似的思想：首先将位图分成同样大小的小块，求出每一块灰度的平均值，然后和每个字符的灰度做比较，找出最接近的那个字符，来代表这一小块图象。那么，怎么确定字符的灰度呢？做下面的实验就明白了。</p>
-
-<p>打开Notepad，输入字符“1”，选定该字符，使其反色。按Alt+PrintScreen键拷贝窗口屏幕。打开Paintbrush，粘贴，然后把图放到最大（*8），打开“查看” -&gt; “缩放” -&gt; “显示网格”菜单，如下图所示：</p>
-
-<p><img src="/uploads/halftone-l409.gif" title="halftone-l409" >
-图9. 字符“1”的灰度</p>
-
-<p>这时数数字符“1”用了几个点？是22个。我想你已经明白了，字符的灰度和它所占的黑色点数有关，点越少，灰度值越大，空格字符的灰度最大，为全白，因为它一个黑点也没有；而字符“W”的灰度值就比较低了。每个字符的面积是8 * 16（宽 * 高），所以一个字符的灰度值可以用如下的公式计算(1 - 所占的黑点数 / (8 * 16)) * 255。下面是可显示的字符，及对应的灰度，共有95个。这可是casper辛辛苦苦整理出来的呦！</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>static char ch[95] = {
-</span><span class='line'>    ' ',
-</span><span class='line'>    '`', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\\',
-</span><span class='line'>    'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']',
-</span><span class='line'>    'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', ''',
-</span><span class='line'>    'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/',
-</span><span class='line'>    '~', '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '|',
-</span><span class='line'>    'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}',
-</span><span class='line'>    'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"',
-</span><span class='line'>    'Z', 'X', 'C', 'V', 'B', 'N', 'M', '&lt;', '&gt;', '?'
-</span><span class='line'>};
-</span><span class='line'>
-</span><span class='line'>static int gr[95] = {
-</span><span class='line'>    0,
-</span><span class='line'>    7, 22, 28, 31, 31, 27, 32, 22, 38, 32, 40, 6, 12, 20, 38, 32, 26, 20, 24, 40,
-</span><span class='line'>    29, 24, 28, 38, 32, 32, 26, 22, 34, 24, 44, 33, 32, 32, 24, 16, 6, 22, 26, 22,
-</span><span class='line'>    26, 34, 29, 35, 10, 6, 20, 14, 22, 47, 42, 34, 40, 10, 35, 21, 22, 22, 16, 14,
-</span><span class='line'>    26, 40, 39, 29, 38, 22, 28, 36, 22, 36, 30, 22, 22, 36, 26, 36, 25, 34, 38, 24,
-</span><span class='line'>    36, 22, 12, 12, 26, 30, 30, 34, 39, 42, 41, 18, 18, 22
-</span><span class='line'>};</span></code></pre></td></tr></table></div></figure>
-
-<p><a href="/uploads/bmp2txt.txt" title="bmp2txt.txt">bmp2txt源程序</a></p>
-
-<p>其实利用图案化技术，还可以实现更有趣的应用，如下面这幅图，你仔细看看，贝多芬的头像是由许多个音乐符号组成的。</p>
-
-<p><img src="/uploads/halftone-l410.gif" title="halftone-l410" >
-图10. 贝多芬的头像</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/the-story-about-the-best-salesman-in-the-world/">世界上最好的推销员的故事</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2006-12-18T18:01:12+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2006</span></span> <span class='time'>6:01 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>一个乡下来的小伙子去应聘城里“世界最大”的“应有尽有”百货公司的销售员。老板问他：“你以前做过销售员吗？”他回答说：“我以前是村里挨家挨户推销的小贩子。”老板喜欢他的机灵：“你明天可以来上班了。等下班的时候，我会来看一下。”</p>
-
-<p>一天的光阴对这个乡下来的穷小子来说太长了，而且还有些难熬。但是年轻人还是熬到了5点，差不多该下班了。老板真的来了，问他说：“你今天做了几单买卖”</p>
-
-<p>“一单。”年轻人回答说。</p>
-
-<p>“只有一单？”老板很吃惊地说：“我们这儿的售货员一天基本上可以完成20到30单生意呢。你卖了多少钱?”</p>
-
-<p>“300,000美元，”年轻人回答道。</p>
-
-<p>“你怎么卖到那么多钱的？”目瞪口呆，半晌才回过神来的老板问道。</p>
-
-<p>“是这样的，”乡下来的年轻人说，“一个男士进来买东西，我先卖给他一个小号的鱼钩，然后中号的鱼钩，最后大号的鱼钩。接着，我卖给他小号的鱼线，中号的鱼线，最后是大号的鱼线。我问他上哪儿钓鱼，他说海边。我建议他买条船，所以我带他到卖船的专柜，卖给他长20英尺有两个发动机的纵帆船。然后他说他的大众牌汽车可能拖不动这么大的船。我于是带他去汽车销售区，卖给他一辆丰田新款豪华型‘巡洋舰’。”</p>
-
-<p>老板后退两步，几乎难以置信地问道：“一个顾客仅仅来买个鱼钩，你就能卖给他这么多东西？”</p>
-
-<p>“不是的，”乡下来的年轻售货员回答道，“他是来给他妻子买卫生棉的。我就告诉他‘你的周末算是毁了，干吗不去钓鱼呢？’”</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/23">&larr; Older</a>
@@ -879,6 +1080,10 @@ org.springframework.jdbc. &hellip;">
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/how-to-build-a-news-website-layout-with-flexbox/">如何使用Flexbox构建新闻站点布局</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/logic-problems-who-owns-the-fish/">逻辑题-谁养鱼</a>
       </li>
     
@@ -894,10 +1099,6 @@ org.springframework.jdbc. &hellip;">
         <a href="/blog/economic-inequality-the-short-version/">贫富差距精简版</a>
       </li>
     
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part7/">ANTLR 4权威参考读书笔记（7）</a>
-      </li>
-    
   </ul>
 </section>
 <section>
@@ -909,31 +1110,31 @@ org.springframework.jdbc. &hellip;">
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 119%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 124%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 132%" href="/tags/android/">Android</a>
-<a style="font-size: 92%" href="/tags/ant/">Ant</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
+<a style="font-size: 101%" href="/tags/css/">CSS</a>
 <a style="font-size: 110%" href="/tags/crack/">Crack</a>
 <a style="font-size: 107%" href="/tags/database/">Database</a>
 <a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
 <a style="font-size: 113%" href="/tags/git/">Git</a>
+<a style="font-size: 97%" href="/tags/html/">HTML</a>
 <a style="font-size: 104%" href="/tags/jbookshelf/">JBookShelf</a>
 <a style="font-size: 149%" href="/tags/java/">Java</a>
 <a style="font-size: 101%" href="/tags/javascript/">JavaScript</a>
 <a style="font-size: 97%" href="/tags/listview/">ListView</a>
 <a style="font-size: 104%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
-<a style="font-size: 119%" href="/tags/powerbuilder/">PowerBuilder</a>
-<a style="font-size: 101%" href="/tags/powerscript/">PowerScript</a>
+<a style="font-size: 124%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 110%" href="/tags/powerscript/">PowerScript</a>
 <a style="font-size: 117%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
 <a style="font-size: 119%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 97%" href="/tags/spring/">Spring</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 130%" href="/tags/translation/">Translation</a>
+<a style="font-size: 131%" href="/tags/translation/">Translation</a>
 <a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
-<a style="font-size: 92%" href="/tags/w32dasm/">W32Dasm</a>
 <a style="font-size: 107%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 107%" href="/tags/wxwidgets/">wxWidgets</a>
 
