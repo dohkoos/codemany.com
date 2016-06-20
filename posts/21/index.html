@@ -9,7 +9,8 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="wxWidgets提供了一个用来检测是否只有一个实例在运行的wxSingleInstanceChecker类。为了检测程序只运行一个实例，你可以在程序运行之初使用该类创建一个m_check对象，这个对象将存在于程序的整个生命周期。 &hellip;">
+  <meta name="description" content="方法一：使用OutputDebugString函数 函数的原型如下： 1
+void OutputDebugString(LPCTSTR lpOutputString); 该函数会输出信息到系统的DEBUGER，输出结果可以使用工具DebugView观察。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +74,743 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-debug-win32-program/">如何调试Win32程序</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2008-02-13T17:00:53+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>13</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>5:00 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>方法一：使用OutputDebugString函数</p>
+
+<p>函数的原型如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>void OutputDebugString(LPCTSTR lpOutputString);</span></code></pre></td></tr></table></div></figure>
+
+<p>该函数会输出信息到系统的DEBUGER，输出结果可以使用工具<a href="http://www.microsoft.com/technet/sysinternals/Miscellaneous/DebugView.mspx">DebugView</a>观察。因为OutputDebugString的参数是字符串，而我们在实际使用过程中通常希望能像printf一样支持变参。下面的方法实现了这个效果：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>void DebugString(LPCTSTR lpszFormat, ...)
+</span><span class='line'>{
+</span><span class='line'>    va_list args;
+</span><span class='line'>    TCHAR szText[1024];
+</span><span class='line'>
+</span><span class='line'>    va_start(args, lpszFormat);
+</span><span class='line'>    wvsprintf(szText, lpszFormat, args);
+</span><span class='line'>    OutputDebugString(szText);
+</span><span class='line'>    va_end(args);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>方法二：输出调试信息到Console上</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>FILE *stream;
+</span><span class='line'>AllocConsole();
+</span><span class='line'>freopen_s(&stream, "CONOUT$", "w", stdout);
+</span><span class='line'>printf("Hello, world!\n");</span></code></pre></td></tr></table></div></figure>
+
+<p>这里AllocConsole()用来打开Console，而freopen_s则把标准输出和Cosole关联。“CONOUT$”这个很关键。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/develop-bho-plugin-urltrack-with-csharp/">C#开发BHO插件UrlTrack</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2008-01-23T17:53:24+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>23</span><span class='date-suffix'>rd</span>, <span class='date-year'>2008</span></span> <span class='time'>5:53 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>最近忽然突发奇想，想统计一下我最经常上的网站是哪些，并且在这些网站上都停留了多久。为此决定写一个BHO插件来做这件事。</p>
+
+<p>BHO（Browser Help Objects）是实现了特定接口（IObjectWithSite）的COM组件。开发好的BHO插件除了要在注册表中注册为COM Server外，还必须将它的CLSID在HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Browser Helper Objects下注册为子键。每当浏览器[1]启动时，首先会在上述注册表位置查看是否有注册的BHO CLSID，如果有则分别创建一个实例，并对BHO实例进行初始化。BHO实例运行在浏览器的地址空间内，能对可访问的对象（如窗口、模块等等）执行任何操作，且因为它依附于浏览器的主窗口，所以其生命周期与浏览器实例的生命周期一致。下图演示了BHO的创建过程：</p>
+
+<p><img src="/uploads/bho-process.png" title="bho-process" ></p>
+
+<p>下面就来介绍一下如何开发BHO插件。首先创建一个C#项目，类型为Class Library。然后将Class1.cs改名为IObjectWithSite.cs，还要给IObjectWithSite添加两个功能：GetSite和SetSite。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Public Interface Iobjectwithsite
+</span><span class='line'>{
+</span><span class='line'>    [Preservesig]
+</span><span class='line'>    Int Setsite([Marshalas(Unmanagedtype.Iunknown)]Object Site);
+</span><span class='line'>    [Preservesig]
+</span><span class='line'>    Int Getsite(Ref Guid Guid, Out Intptr Ppvsite);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>添加一个UrlTrack.cs文件，并且实现IObjectWithSite接口。使用BHO还需要添加两个引用SHDocVw.dll和MSHTML.dll，可以在Windows\System32目录下找到。</p>
+
+<p><img src="/uploads/bho-references.png" title="bho-references" ></p>
+
+<p>在IObjectWithSite.cs中，还需要为我们的程序指出IE的GUID，使得它可以挂接（attach）到IE上：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>[
+</span><span class='line'>ComVisible(true),
+</span><span class='line'>InterfaceType(ComInterfaceType.InterfaceIsIUnknown),
+</span><span class='line'>Guid("FC4801A3-2BA9-11CF-A229-00AA003D7352")
+</span><span class='line'>]</span></code></pre></td></tr></table></div></figure>
+
+<p>另外，还需要给BHO程序分配一个GUID，这个可以通过System.Guid.NewGuid()方法得到。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>[
+</span><span class='line'>ComVisible(true),
+</span><span class='line'>Guid("e90da13b-117a-4178-8111-0f712da09ff9"),
+</span><span class='line'>ClassInterface(ClassInterfaceType.None)
+</span><span class='line'>]</span></code></pre></td></tr></table></div></figure>
+
+<p>在UrlTrack.cs中，我们还需要写两个方法用来DLL注册和移除注册。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static string BHOKEYNAME = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Browser Helper Objects";
+</span><span class='line'>
+</span><span class='line'>[ComRegisterFunction]
+</span><span class='line'>public static void RegisterBHO(Type type)
+</span><span class='line'>{
+</span><span class='line'>    RegistryKey registryKey = Registry.LocalMachine.OpenSubKey(BHO_KEY_NAME, true);
+</span><span class='line'>    if (registryKey == null)
+</span><span class='line'>    {
+</span><span class='line'>        registryKey = Registry.LocalMachine.CreateSubKey(BHO_KEY_NAME);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    string guid = type.GUID.ToString("B");
+</span><span class='line'>    RegistryKey bhoKey = registryKey.OpenSubKey(guid, true);
+</span><span class='line'>    if (bhoKey == null)
+</span><span class='line'>    {
+</span><span class='line'>        bhoKey = registryKey.CreateSubKey(guid);
+</span><span class='line'>    }
+</span><span class='line'>    // NoExplorer: dword = 1 prevents the BHO to be loaded by Explorer.exe
+</span><span class='line'>    bhoKey.SetValue("NoExplorer", 1);
+</span><span class='line'>    bhoKey.Close();
+</span><span class='line'>
+</span><span class='line'>    registryKey.Close();
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>[ComUnregisterFunction]
+</span><span class='line'>public static void UnregisterBHO(Type type)
+</span><span class='line'>{
+</span><span class='line'>    RegistryKey registryKey = Registry.LocalMachine.OpenSubKey(BHO_KEY_NAME, true);
+</span><span class='line'>    string guid = type.GUID.ToString("B");
+</span><span class='line'>
+</span><span class='line'>    if (registryKey != null)
+</span><span class='line'>        registryKey.DeleteSubKey(guid, false);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>接下来就是实现具体的统计功能了。考虑一下，当输入网址后，我们需要记录下网址以及当前的时间；当在同一浏览窗口中切换网址时，不仅需要记录下网址和当前时间，还要设置前一个浏览记录的结束时间；并且在关闭浏览器时，也要记下结束时间。所以在SetSite中需要挂载NavigateComplete2和OnQuit事件。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private void NavigateComplete2(object pDisp, ref object URL)
+</span><span class='line'>{
+</span><span class='line'>    string url = URL as string;
+</span><span class='line'>    if (url.IndexOf("about:blank") &gt;= 0)
+</span><span class='line'>    {
+</span><span class='line'>        return;
+</span><span class='line'>    }
+</span><span class='line'>    if (visitHists.Count &gt; 0)
+</span><span class='line'>    {
+</span><span class='line'>        VisitHist currentHist = visitHists[visitHists.Count - 1];
+</span><span class='line'>        if (currentHist.VisitUrl != url)
+</span><span class='line'>        {
+</span><span class='line'>            currentHist.EndTime = System.DateTime.Now;
+</span><span class='line'>        }
+</span><span class='line'>        else
+</span><span class='line'>        {
+</span><span class='line'>            return;
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>    VisitHist newHist = new VisitHist();
+</span><span class='line'>    newHist.StartTime = System.DateTime.Now;
+</span><span class='line'>    newHist.VisitUrl = url;
+</span><span class='line'>    visitHists.Add(newHist);
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>private void OnQuit()
+</span><span class='line'>{
+</span><span class='line'>    if (visitHists.Count &gt; 0)
+</span><span class='line'>    {
+</span><span class='line'>        VisitHist currentHist = visitHists[visitHists.Count - 1];
+</span><span class='line'>        currentHist.EndTime = System.DateTime.Now;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    // 输出统计记录</span></code></pre></td></tr></table></div></figure>
+
+<p>开始编译，然后就可以在bin目录下找到项目的dll文件了。在Console中使用regasm /codebase &quot;UrlTrack.dll&quot;注册dll。打开注册表，在HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Browser Helper Objects可以看到多出了一个子项{E90DA13B-117A-4178-8111-0F712DA09FF9}。</p>
+
+<p>需要注意的是，需要将AssemblyInfo.cs文件中的ComVisible属性设为true，否则在注册BHO时会得到这样的信息：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>RegAsm : warning RA0000 : No types were registered.</span></code></pre></td></tr></table></div></figure>
+
+<p>更多的BHO资料可以看<a href="http://msdn.microsoft.com/en-us/library/aa753587.aspx">Browser Extensions</a>。</p>
+
+<p>[1] 在Windows操作系统上有两种浏览器：资源浏览器（Explorer.exe，应用于文件系统）和Internet浏览器（IEXPLORE.EXE，应用于互联网资源）。</p>
+
+<p>代码下载：<a href="https://github.com/dohkoos/UrlTrack">https://github.com/dohkoos/UrlTrack</a></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/xrc-and-dynamic-sub-menu/">XRC和动态子菜单</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2008-01-11T15:08:59+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>11</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>3:08 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>1、什么是XRC</p>
+
+<p>XRC是基于XML的资源系统。它的基本出发点是将界面布局和程序逻辑分离，即将界面布局代码保存在分离的XML文件中，在程序中不涉及控件的创建和布局，只需要加载相应的资源并处理事件绑定即可。</p>
+
+<p>2、XRC文件格式</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0"?&gt;
+</span><span class='line'>&lt;resource version="2.3.0.1"&gt;
+</span><span class='line'>    &lt;object class="wxFrame" name="ID_MAIN_FRAME"&gt;
+</span><span class='line'>        &lt;size&gt;200, 300&lt;/size&gt;
+</span><span class='line'>    &lt;/object&gt;
+</span><span class='line'>&lt;/resource&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>3、XRC文件中菜单资源的相关属性</p>
+
+<table><thead>
+<tr>
+<th>类</th>
+<th>属性</th>
+<th>描述</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>wxMenuBar</td>
+<td>style</td>
+<td>Menu bar style: wxMB_DOCKABLE</td>
+</tr>
+<tr>
+<td>wxMenu</td>
+<td>style</td>
+<td>Menu style: wxMENU_TEAROFF</td>
+</tr>
+<tr>
+<td></td>
+<td>label</td>
+<td>Text: label of the menu.</td>
+</tr>
+<tr>
+<td></td>
+<td>help</td>
+<td>Text: displayed help string.</td>
+</tr>
+<tr>
+<td>wxMenuItem</td>
+<td>style</td>
+<td>Menu style: wxMENU_TEAROFF</td>
+</tr>
+<tr>
+<td></td>
+<td>label</td>
+<td>Text: label of the menu.</td>
+</tr>
+<tr>
+<td></td>
+<td>accel</td>
+<td>Text: accelerator associated to this item ( Alt-X for example ).</td>
+</tr>
+<tr>
+<td></td>
+<td>help</td>
+<td>Text: displayed help string.</td>
+</tr>
+<tr>
+<td></td>
+<td>radio</td>
+<td>bool value(0/1): 1 if this item is a radio menu item.</td>
+</tr>
+<tr>
+<td></td>
+<td>checkable</td>
+<td>bool value(0/1): 1 if this item is a check menu item.</td>
+</tr>
+<tr>
+<td></td>
+<td>enabled</td>
+<td>bool value(0/1): 1 if this item is initially enabled.</td>
+</tr>
+<tr>
+<td></td>
+<td>checked</td>
+<td>bool value(0/1): 1 if this (check) item is initially checked.</td>
+</tr>
+<tr>
+<td></td>
+<td>bitmap</td>
+<td>Text: path to a bitmap to draw at the left of the item.</td>
+</tr>
+</tbody></table>
+
+<p>4、使用XRC创建菜单</p>
+
+<p>创建一个包含菜单布局信息的XML资源文件MenuBar.xrc：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8" ?&gt;
+</span><span class='line'>&lt;resource version="2.3.0.1" xmlns="http://www.wxwindows.org/wxxrc"&gt;
+</span><span class='line'>    &lt;object class="wxMenuBar" name="ID_MENUBAR"&gt;
+</span><span class='line'>        &lt;object class="wxMenu" name="ID_MENU_FILE"&gt;
+</span><span class='line'>            &lt;label&gt;&File&lt;/label&gt;
+</span><span class='line'>            &lt;object class="wxMenuItem" name="wxID_CLOSE"&gt;
+</span><span class='line'>                &lt;label&gt;E&xit&lt;/label&gt;
+</span><span class='line'>                &lt;accel&gt;Ctrl+Q&lt;/accel&gt;
+</span><span class='line'>                &lt;help&gt;Quit the application&lt;/help&gt;
+</span><span class='line'>            &lt;/object&gt;
+</span><span class='line'>        &lt;/object&gt;
+</span><span class='line'>        &lt;object class="wxMenu" name="ID_MENU_VIEW"&gt;
+</span><span class='line'>            &lt;label&gt;&View&lt;/label&gt;
+</span><span class='line'>        &lt;/object&gt;
+</span><span class='line'>        &lt;object class="wxMenu" name="ID_MENU_TOOLS"&gt;
+</span><span class='line'>            &lt;label&gt;&Tools&lt;/label&gt;
+</span><span class='line'>            &lt;object class="wxMenuItem" name="wxID_OPTIONS"&gt;
+</span><span class='line'>                &lt;label&gt;&Options...&lt;/label&gt;
+</span><span class='line'>            &lt;/object&gt;
+</span><span class='line'>        &lt;/object&gt;
+</span><span class='line'>        &lt;object class="wxMenu" name="ID_MENU_HELP"&gt;
+</span><span class='line'>            &lt;label&gt;&Help&lt;/label&gt;
+</span><span class='line'>            &lt;object class="wxMenuItem" name="wxID_CHECKFORUPDATES"&gt;
+</span><span class='line'>                &lt;label&gt;Check for &Updates...&lt;/label&gt;
+</span><span class='line'>            &lt;/object&gt;
+</span><span class='line'>            &lt;object class="separator" /&gt;
+</span><span class='line'>            &lt;object class="wxMenuItem" name="wxID_ABOUT"&gt;
+</span><span class='line'>                &lt;label&gt;&About...&lt;/label&gt;
+</span><span class='line'>            &lt;/object&gt;
+</span><span class='line'>        &lt;/object&gt;
+</span><span class='line'>    &lt;/object&gt;
+</span><span class='line'>&lt;/resource&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>加载资源文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>bool MainApp::OnInit()
+</span><span class='line'>{
+</span><span class='line'>    wxXmlResource* pResource = wxXmlResource::Get();
+</span><span class='line'>    pResource-&gt;AddHandler(new wxMenuBarXmlHandler);
+</span><span class='line'>    pResource-&gt;AddHandler(new wxMenuXmlHandler);
+</span><span class='line'>    pResource-&gt;Load(wxT("resources/MenuBar.xrc"));</span></code></pre></td></tr></table></div></figure>
+
+<p>初始化资源文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>MainFrame::MainFrame(const wxString& title) : wxFrame(NULL, wxID_ANY, title)
+</span><span class='line'>{
+</span><span class='line'>    m_menuBar = NULL;
+</span><span class='line'>    InitMenuBar();
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>bool MainFrame::InitMenuBar()
+</span><span class='line'>{
+</span><span class='line'>    if (m_menuBar)
+</span><span class='line'>    {
+</span><span class='line'>        SetMenuBar(NULL);
+</span><span class='line'>        delete m_menuBar;
+</span><span class='line'>    }
+</span><span class='line'>    // Initialize the resource system
+</span><span class='line'>    m_menuBar = wxXmlResource::Get()-&gt;LoadMenuBar(wxT("ID_MENUBAR"));
+</span><span class='line'>    if (!m_menuBar)
+</span><span class='line'>    {
+</span><span class='line'>        wxLogError(wxT("Cannot load main menu from resource file"));
+</span><span class='line'>        return false;
+</span><span class='line'>    }
+</span><span class='line'>    SetMenuBar(m_menuBar);
+</span><span class='line'>    return true;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>5、在XRC菜单上添加动态子菜单</p>
+
+<p>在资源文件中添加一个新的菜单项（wxID_LANGUAGES）：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;object class="wxMenu" name="ID_MENU_VIEW"&gt;
+</span><span class='line'>    &lt;label&gt;&View&lt;/label&gt;
+</span><span class='line'>    &lt;object class="wxMenu" name="wxID_LANGUAGE"&gt;
+</span><span class='line'>        &lt;label&gt;&Language&lt;/label&gt;
+</span><span class='line'>        &lt;object class="wxMenuItem" name="wxID_LANGUAGES"&gt;
+</span><span class='line'>            &lt;label&gt;Get Additional/Update language pack&lt;/label&gt;
+</span><span class='line'>            &lt;help&gt;Downloading Additional/Update language pack&lt;/help&gt;
+</span><span class='line'>        &lt;/object&gt;
+</span><span class='line'>        &lt;object class="separator" /&gt;
+</span><span class='line'>    &lt;/object&gt;
+</span><span class='line'>&lt;/object&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>创建动态子菜单：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// Initialize the resource system
+</span><span class='line'>m_menuBar = wxXmlResource::Get()-&gt;LoadMenuBar(wxT("ID_MENUBAR"));
+</span><span class='line'>if (!m_menuBar)
+</span><span class='line'>{
+</span><span class='line'>    wxLogError(wxT("Cannot load main menu from resource file"));
+</span><span class='line'>    return false;
+</span><span class='line'>}
+</span><span class='line'>/*
+</span><span class='line'> * 这里很奇怪，在XRC文件wxID_LANGUAGE的类型明明是wxMenu，可在这里确只能用wxMenuItem。
+</span><span class='line'> * 查看wxWidgets源代码发现XRC系统只会把最上层的class为wxMenu的object创建为wxMenu对象。
+</span><span class='line'> * 其它的则都被创建成了wxMenuItem对象。
+</span><span class='line'> */
+</span><span class='line'>// 使用XRCID方法获取控件ID，创建动态子菜单
+</span><span class='line'>wxMenuItem* menuItem = m_menuBar-&gt;FindItem(XRCID("wxID_LANGUAGE"));
+</span><span class='line'>if (menuItem)
+</span><span class='line'>{
+</span><span class='line'>    wxMenu* subMenu = menuItem-&gt;GetSubMenu();
+</span><span class='line'>    subMenu-&gt;AppendRadioItem(wxID_LANGUAGE_LOWEST + 1, wxT("English"));
+</span><span class='line'>    subMenu-&gt;AppendRadioItem(wxID_LANGUAGE_LOWEST + 2, wxT("Chinese(Simplified)"));
+</span><span class='line'>}
+</span><span class='line'>SetMenuBar(m_menuBar);
+</span><span class='line'>return true;</span></code></pre></td></tr></table></div></figure>
+
+<p><a href="/uploads/wxXRC.zip" title="wxXRC.zip">代码下载</a></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-implement-draggable-window-without-title-bar/">如何实现一个可拖动的无标题栏窗口</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-12-03T15:46:55+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2007</span></span> <span class='time'>3:46 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>无标题栏窗口的实现很简单。先将窗口从wxMiniFrame继承，然后在窗口的构造函数中设置一下窗口的样式。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>MainFrame::MainFrame(const wxPoint& pos, const wxSize& size)
+</span><span class='line'>    : wxMiniFrame(NULL, wxID_ANY, wxEmptyString, pos, size)
+</span><span class='line'>{
+</span><span class='line'>    SetWindowStyleFlag(wxFRAME_NO_TASKBAR | wxNO_BORDER);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>但是，窗口的移动通常都是通过鼠标点住标题栏拖动窗口来实现的，那么现在没有了标题栏，该如何移动窗口呢？我们知道，当鼠标拖动窗口时，它在窗口中的位置是始终不变的。所以如果能够在鼠标移动过程中，通过改变窗口在桌面上的坐标，并且始终保持鼠标相对于窗口的坐标不变，即可实现鼠标的拖动效果。</p>
+
+<p>在具体的设计中，先在鼠标的MouseDown事件中记录下鼠标相对于窗口的偏移，在鼠标的MouseMove事件中根据鼠标在桌面上的位置实时设置窗口的位置，即可达到鼠标拖动窗口的操作。利用此方法实现鼠标拖动，与常规的标题栏鼠标拖动在效果上有一点区别。通过标题栏拖动时，鼠标移动过程中不重画窗口，只有松开鼠标后才在固定位置重画窗口，因此其速度较快。而采用本方法的拖动过程中，每移动一步都需要重画窗口，因此对速度稍有影响，在慢一些的机器上可能会出现轻微的拖尾现象。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>void MainFrame::OnMouseMove(wxMouseEvent& event)
+</span><span class='line'>{
+</span><span class='line'>    if (event.Dragging() && event.LeftIsDown())
+</span><span class='line'>    {
+</span><span class='line'>        wxPoint pt = ClientToScreen(event.GetPosition());
+</span><span class='line'>        int x = pt.x - m_delta.x;
+</span><span class='line'>        int y = pt.y - m_delta.y;
+</span><span class='line'>        Move(x, y);
+</span><span class='line'>    }
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>void MainFrame::OnMouseLeftDown(wxMouseEvent& event)
+</span><span class='line'>{
+</span><span class='line'>    CaptureMouse();
+</span><span class='line'>    wxPoint pt = ClientToScreen(event.GetPosition());
+</span><span class='line'>    wxPoint origin = GetPosition();
+</span><span class='line'>    int dx = pt.x - origin.x;
+</span><span class='line'>    int dy = pt.y - origin.y;
+</span><span class='line'>    m_delta = wxPoint(dx, dy);
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>void MainFrame::OnMouseLeftUp(wxMouseEvent& WXUNUSED(event))
+</span><span class='line'>{
+</span><span class='line'>    if (HasCapture())
+</span><span class='line'>    {
+</span><span class='line'>        ReleaseMouse();
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p><a href="/uploads/wxDragAndDrop.zip" title="wxDragAndDrop.zip">代码下载</a></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -760,498 +1498,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/built-wxwidgets-286-development-environment-under-visual-studio-2005/">Visual Studio 2005下wxWidgets-2.8.6开发环境的搭建</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2007-09-11T15:27:51+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>11</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>3:27 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>wxWidgets是一个开源的跨平台C++类库，它包含一个可以支持现今几乎所有操作系统的图形用户界面（GUI）库和其它一些很有用的工具，提供了类似MFC的功能。wxWidgets的主体是由C++构建的，但你并不是必需通过C++才能使用wxWidgets。wxWidgets拥有许多其它语言的绑定，使你在用其它语言编写程序的时候也可以使用wxWidgets。</p>
-
-<h3 id="wxwidgets的下载、安装和编译">wxWidgets的下载、安装和编译</h3>
-
-<ol>
-<li>去 <a href="http://www.wxwidgets.org/downloads/">http://www.wxwidgets.org/downloads/</a> 下载一个wxMSW版本的wxWidgets；</li>
-<li>运行安装文件。在安装好后设置环境变量WXWIN，指向wxWidgets的安装目录。因为安装过程仅仅是把文件拷贝到指定的目录，所以还需要对wxWidgets进行编译；</li>
-<li>进入$(WXWIN)/build/msw目录，用VS2005打开wx.dsw，提示是否进行项目转换，点确定。如果想要链接静态运行库，在编译前应该对每个项目进行设置，如下图：</li>
-</ol>
-
-<p><img src="/uploads/wxwidgets-compile.png" title="wxwidgets-compile" ></p>
-
-<p>编译好后的wxWidgets会在$(WXWIN)/lib/vc_lib目录下生成一系列的lib文件，这些lib文件的名字遵循下面的命名规则：不依赖于GUI组件的库会以wxbase开头，紧跟着的是版本号，然后的字母表明这个库是否是编译为Unicode(&#39;u&#39;)或是否是编译为Debug(&#39;d&#39;)，名字中的最后部分是wxWidgets组件的名字。</p>
-
-<p>注意：wxWidgets编译完后在$(WXWIN)/build/msw目录下会生成许多预编译头文件，占了很大的空间，如果确定以后不再编译wxWidgets库的话，可以考虑删掉。</p>
-
-<h3 id="设置开发环境">设置开发环境</h3>
-
-<p>打开Tools -&gt; Options -&gt; Projects and Solutions -&gt; VC++ Directories</p>
-
-<ol>
-<li>在Include files中加入$(WXWIN)/include和$(WXWIN)/include/msvc</li>
-<li>在Library files中加入$(WXWIN)/lib/vc_lib</li>
-</ol>
-
-<h3 id="创建wxwidgets项目">创建wxWidgets项目</h3>
-
-<p>新建一个General -&gt; Empty Project或Win32 -&gt; Win32 Project项目，然后设置项目的一些属性，可以选择下面的其中一个来设置。譬如你如果打算使用Unicode，那么选择Unicode Debug或Unicode Release，如果你仅仅想调试程序而非发布，则只需要选择Debug设置。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Debug：
-</span><span class='line'>Project Properties -&gt; General -&gt; Character Set: No Set
-</span><span class='line'>Project Properties -&gt; C/C++ -&gt; Code Generation -&gt; Runtime Library: Multi-threaded Debug (/MTd)
-</span><span class='line'>Project Properties -&gt; Linker -&gt; Input -&gt; Additional Dependencies: wxbase28d.lib wxmsw28d_core.lib winmm.lib comctl32.lib rpcrt4.lib wsock32.lib oleacc.lib
-</span><span class='line'>
-</span><span class='line'>Release：
-</span><span class='line'>Project Properties -&gt; General -&gt; Character Set: No Set
-</span><span class='line'>Project Properties -&gt; C/C++ -&gt; Code Generation -&gt; Runtime Library: Multi-threaded (/MT)
-</span><span class='line'>Project Properties -&gt; Linker -&gt; Input -&gt; Additional Dependencies: wxbase28.lib wxmsw28_core.lib winmm.lib comctl32.lib rpcrt4.lib wsock32.lib oleacc.lib
-</span><span class='line'>
-</span><span class='line'>Unicode Debug：
-</span><span class='line'>Project Properties -&gt; General -&gt; Character Set: Use Unicode Character Set
-</span><span class='line'>Project Properties -&gt; C/C++ -&gt; Code Generation -&gt; Runtime Library: Multi-threaded Debug (/MTd)
-</span><span class='line'>Project Properties -&gt; Linker -&gt; Input -&gt; Additional Dependencies: wxbase28ud.lib wxmsw28ud_core.lib winmm.lib comctl32.lib rpcrt4.lib wsock32.lib oleacc.lib
-</span><span class='line'>
-</span><span class='line'>Unicode Release：
-</span><span class='line'>Project Properties -&gt; General -&gt; Character Set: Use Unicode Character Set
-</span><span class='line'>Project Properties -&gt; C/C++ -&gt; Code Generation -&gt; Runtime Library: Multi-threaded (/MT)
-</span><span class='line'>Project Properties -&gt; Linker -&gt; Input -&gt; Additional Dependencies: wxbase28u.lib wxmsw28u_core.lib winmm.lib comctl32.lib rpcrt4.lib wsock32.lib oleacc.lib</span></code></pre></td></tr></table></div></figure>
-
-<h3 id="问题">问题</h3>
-
-<p>1、编译时出现</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Cannot open include file: '../mswu/wx/setup.h': No such file or directory</span></code></pre></td></tr></table></div></figure>
-
-<p>是因为项目属性的Character Set设置不正确，必须与使用的wxWidgets库的Character Set一致。</p>
-
-<p>2、编译时如果出现</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>MSVCRT.lib(MSVCRT.dll) : error LNK2005: _free already defined in LIBC.lib(free.obj)</span></code></pre></td></tr></table></div></figure>
-
-<p>这是因为没有连接正确的wxWidgets库，譬如Unicode Debug版本的项目就需要连接Unicode+Debug版本的wxWidgets库（库名后缀为&#39;ud&#39;的lib文件），或者是wxWidgets库和程序使用的Runtime Library不同。</p>
-
-<p>3、运行时出现No Debugging Information对话框。</p>
-
-<p>将Project Properties -&gt; Linker -&gt; Debugging -&gt; Generate Debug Info的值改成Yes (/DEBUG)。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/editmask-useformat-property-of-column-control-on-datawindow/">数据窗口中Column控件的EditMask.UseFormat属性的作用</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2007-09-10T21:11:37+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>10</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>9:11 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>当数据窗口中的EditMask控件失去焦点时，如果EditMask.UseFormat为yes，则使用Format属性值格式化EditMask的内容，否则，使用EditMask.Mask属性值格式化控件的内容。当EditMask得到焦点时，使用EditMask.Mask格式化内容。</p>
-
-<p>根据此规则写的伪代码如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if (isFocused) {
-</span><span class='line'>    EditMask.Mask
-</span><span class='line'>} else if (loseFocus) {
-</span><span class='line'>    if (EditMask.UseFormat == "yes" && Format != "") {
-</span><span class='line'>        Format
-</span><span class='line'>    } else {
-</span><span class='line'>        EditMask.Mask
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>Painter: Use Format option</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/using-antlr-to-build-powerscript-parser-part3/">使用ANTLR构建PowerScript语法分析器（3）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2007-09-07T16:40:49+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>7</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>4:40 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><h3 id="转义字符（special-ascii-characters）">转义字符（Special ASCII Characters）</h3>
-
-<p>PowerScript中转义字符是以波浪号（~）开头。下图是PowerScript支持的完整的转义字符，#字符表示数字。Decimal由三个十进制数组成，范围是000-255；Hexadecimal由两个十六进制数组成，范围是00-FF；Octal由三个八进制数组成，范围是000-377。</p>
-
-<p><img src="/uploads/pb-spefial-char.png" title="pb-spefial-char" ></p>
-
-<p>注意：#表示数字是必须的。譬如，必须用~007这种样式来表示转义字符，而不能是~7这种。</p>
-
-<p>这里是转义字符的词法规则：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>fragment
-</span><span class='line'>Escape
-</span><span class='line'>    : '~' ('n'|'t'|'v'|'r'|'f'|'b'|'\"'|'\''|'~')
-</span><span class='line'>    | DecimalEscape
-</span><span class='line'>    | HexEscape
-</span><span class='line'>    | OctalEscape
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>fragment
-</span><span class='line'>DecimalEscape
-</span><span class='line'>    : '~' ('0'..'1') ('0'..'9') ('0'..'9')    // 000 - 199
-</span><span class='line'>    | '~' '2' ('0'..'5') ('0'..'5')           // 200 - 255
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>fragment
-</span><span class='line'>HexEscape
-</span><span class='line'>    : '~h' ('0'..'9'|'a'..'f'|'A'..'F') ('0'..'9'|'a'..'f'|'A'..'F')    // 00 - FF
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>fragment
-</span><span class='line'>OctalEscape
-</span><span class='line'>    : '~o' ('0'..'3') ('0'..'7') ('0'..'7')   // 000 - 377
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<h3 id="字符和字符串字面量（character-and-string-literals）">字符和字符串字面量（Character and String Literals）</h3>
-
-<p>PowerScript程序中字符和字符串字面量没有明显的区别。字符是指由单引号（&#39;）或双引号（&quot;）括起来的一个ASCII字符，例如：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>char c
-</span><span class='line'>c = 'T'
-</span><span class='line'>c = "T"</span></code></pre></td></tr></table></div></figure>
-
-<p>字符串字面量则是指由单引号或双引号括起来的不多于1024个的ASCII字符串，例如：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>string s
-</span><span class='line'>s = 'This is a string'
-</span><span class='line'>s = "This is a string"</span></code></pre></td></tr></table></div></figure>
-
-<p>由于两者没有明显区别，因此在词法分析时只能将两者都作为字符串字面量来处理。至于到底是字符还是字符串，只有到了语意分析阶段才能作出判断。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>STRING_LITERAL
-</span><span class='line'>    : ( '\'' (Escape|~('~'|'\r'|'\n'|'\''))* '\''
-</span><span class='line'>      | '\"' (Escape|~('~'|'\r'|'\n'|'\"'))* '\"'
-</span><span class='line'>      )
-</span><span class='line'>      {
-</span><span class='line'>          System.out.println("string&gt;" + getText());
-</span><span class='line'>      }
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<h3 id="数字和布尔字面量（numeric-and-boolean-literals）">数字和布尔字面量（Numeric and Boolean Literals）</h3>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>INTEGER_LITERAL
-</span><span class='line'>    : ('0'|'1'..'9' ('0'..'9')*)
-</span><span class='line'>      {
-</span><span class='line'>          System.out.println("integer&gt;" + getText());
-</span><span class='line'>      }
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>FLOAT_LITERAL
-</span><span class='line'>    : ( ('0'..'9')+ '.' ('0'..'9')* Exponent?
-</span><span class='line'>      | '.' ('0'..'9')+ Exponent?
-</span><span class='line'>      | ('0'..'9')+ Exponent?
-</span><span class='line'>      )
-</span><span class='line'>      {
-</span><span class='line'>          System.out.println("float&gt;" + getText());
-</span><span class='line'>      }
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>BOOLEAN_LITERAL
-</span><span class='line'>    : ('true'|'false')
-</span><span class='line'>      {
-</span><span class='line'>          System.out.println("boolean&gt;" + getText());
-</span><span class='line'>      }
-</span><span class='line'>
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>fragment
-</span><span class='line'>Exponent
-</span><span class='line'>    : ('e'|'E') ('+'|'-')? ('0'..'9')+
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<h3 id="标识符（identifier）">标识符（Identifier）</h3>
-
-<p>标识符规则可以参看<a href="/blog/powerscript-identifier/">PowerScript标识符</a>一文，以下是标识符的词法规则：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>IDENTIFIER
-</span><span class='line'>    : Letter (Letter|'0'..'9'|'$'|'#'|'%')*    // 暂时不支持短横线（-）
-</span><span class='line'>      {
-</span><span class='line'>          System.out.println("identifier&gt;" + getText());
-</span><span class='line'>      }
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>fragment
-</span><span class='line'>Letter
-</span><span class='line'>    : ('A'..'Z'|'a'..'z'|'_')
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/install-and-use-ruby-dbi/">Ruby DBI的安装和使用</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2007-09-04T22:35:15+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>4</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>10:35 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Ruby DBI是一个为Ruby程序访问数据库提供的与数据库无关的统一数据库编程接口。结构层次上可以分为两层：</p>
-
-<ol>
-<li>Database Interface 数据库接口层，与数据库无关，提供与数据库无关的标准接口</li>
-<li>Database Driver 数据库驱动，与数据库相关</li>
-</ol>
-
-<p>Ruby DBI模块可以从 <a href="http://ruby-dbi.sourceforge.net/">http://ruby-dbi.sourceforge.net/</a> 取得，下载后解压缩，配置，然后安装：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ruby setup.rb config --with=dbi,dbd_mysql
-</span><span class='line'>ruby setup.rb setup
-</span><span class='line'>ruby setup.rb install</span></code></pre></td></tr></table></div></figure>
-
-<p>注意：--with参数必须根据你所安装的数据库类型来选择。可以配置多个，但不能选择没有安装在你机器上的数据库类型。记得刚开始的时候我使用ruby setup.rb config来配置（我机器上只安装了MySQL和SQL Server），结果在ruby setup.rb setup时一直出现像下面这样的错误信息：</p>
-
-<p><img src="/uploads/ruby-dbi.png" title="ruby-dbi" ></p>
-
-<p>下面是一个完整的例子</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># dbitest.rb
-</span><span class='line'>require 'dbi'
-</span><span class='line'>
-</span><span class='line'># Connect to a database
-</span><span class='line'>dbh = DBI.connect('dbi:Mysql:rubydbi:localhost', 'root', '123456')
-</span><span class='line'>
-</span><span class='line'>dbh.do('DROP TABLE IF EXISTS people')
-</span><span class='line'>dbh.do('CREATE TABLE people (id int, name varchar(30))')
-</span><span class='line'>
-</span><span class='line'># Insert some rows, use placeholders
-</span><span class='line'>sql = 'INSERT INTO people VALUES (?, ?)'
-</span><span class='line'>dbh.prepare(sql) do |sth|
-</span><span class='line'>    sth.execute('100', 'Michael')
-</span><span class='line'>    sth.execute('200', 'John')
-</span><span class='line'>end
-</span><span class='line'>
-</span><span class='line'># Select all rows
-</span><span class='line'>sth = dbh.prepare('SELECT * FROM people')
-</span><span class='line'>sth.execute
-</span><span class='line'>
-</span><span class='line'># Print out each row
-</span><span class='line'>while row = sth.fetch do
-</span><span class='line'>    p row
-</span><span class='line'>end
-</span><span class='line'>
-</span><span class='line'># Close the statement handle when done
-</span><span class='line'>sth.finish
-</span><span class='line'>
-</span><span class='line'>dbh.do('DROP TABLE people')
-</span><span class='line'>
-</span><span class='line'># Finally, disconnect
-</span><span class='line'>dbh.disconnect</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/22">&larr; Older</a>
@@ -1281,11 +1527,11 @@
       </li>
     
       <li class="post">
-        <a href="/blog/books-not-recommended/">哪些书不要读</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part11/">ANTLR 4权威参考读书笔记（11）</a>
       </li>
     
       <li class="post">
-        <a href="/blog/economic-inequality-the-short-version/">贫富差距精简版</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part10/">ANTLR 4权威参考读书笔记（10）</a>
       </li>
     
   </ul>
@@ -1299,7 +1545,7 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 124%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 129%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 131%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
