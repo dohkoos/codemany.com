@@ -2860,62 +2860,6 @@ another runner in the night<br>
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part11/">ANTLR 4权威参考读书笔记（11）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-04-18T18:13:27+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:13 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"></div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part10/">ANTLR 4权威参考读书笔记（10）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-04-08T22:11:39+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>8</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>10:11 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"></div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
       <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part9/">ANTLR 4权威参考读书笔记（9）</a></h1>
     
     
@@ -2932,7 +2876,79 @@ another runner in the night<br>
   </header>
 
 
-  <div class="entry-content"></div>
+  <div class="entry-content"><ul>
+<li>predication 预测</li>
+<li>predict 预判</li>
+<li>lookahead 预读</li>
+</ul>
+
+<p>ANTLR工具根据语法规则，例如我们刚才看到的assign，生成递归下降语法分析器。递归下降语法分析器只是递归方法的一个集合，每个规则一个方法。下降这个术语指的是分析从语法分析树的根开始向着叶子进行（记号）。我们首先调用的规则，即prog符号，成为语法分析树的根。那也就意味着对<a href="/blog/reading-notes-the-definitive-antlr4-reference-part8/">ANTLR 4权威参考读书笔记（8）</a>中的语法分析树来说需要调用方法prog()。这类分析更通用的术语是自顶向下分析：递归下降语法分析器仅仅是自顶向下语法分析器实现的一种。</p>
+
+<p>要了解递归下降语法分析器是什么样子，这里是ANTLR为规则assign生成的方法（稍微整理）：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// assign : ID '=' expr ;
+</span><span class='line'>void assign() {    // 根据规则assign生成的方法
+</span><span class='line'>    match(ID);     // 比较ID和当前输入符号然后消费
+</span><span class='line'>    match('=');
+</span><span class='line'>    expr();        // 通过调用expr()匹配表达式
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>递归下降语法分析器最酷的部分是通过调用方法prog()、assign()和expr()跟踪出的调用关系图反映了内部的语法分析树节点。match()的调用对应语法分析树叶子。为了在一个手工构建的语法分析器中手动构建一颗语法分析树，我们需要在每个规则方法的开始处插入“添加新子树根”操作，以及给match()一个“添加新叶子节点”操作。</p>
+
+<p>方法assign()只是检查确保所有必要的记号存在且以正确的顺序。当语法分析器进入assign()时，它不必在多个选项之间进行选择。选项是规则定义右边的选择之一。例如，调用assign的prog规则可能有其它类型的语句。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>/** 匹配起始于当前输入位置的任何语句 */
+</span><span class='line'>prog
+</span><span class='line'>    : assign    // 第一个选项（'|'是选项分隔符）
+</span><span class='line'>    | ifstat    // 第二个选项
+</span><span class='line'>    | whilestat
+</span><span class='line'>    ...
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>prog的分析规则看起来像一条switch语句：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>void prog() {
+</span><span class='line'>    switch ( «current input token» ) {
+</span><span class='line'>        CASE ID : assign(); break;
+</span><span class='line'>        CASE IF : ifstat(); break;    // IF是关键字'if'的记号类型
+</span><span class='line'>        CASE WHILE : whilestat(); break;
+</span><span class='line'>        ...
+</span><span class='line'>        default : «raise no viable alternative exception»
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>方法prog()必须通过检查下一个输入记号作出分析决定或预测。分析决定预判哪一个选项将会成功。在本例中，当看到WHILE关键字时会预判是规则prog的第三个选项。规则方法prog()然后就会调用whilestat()。你以前可能听说过术语预读记号，那只是下一个输入记号。预读记号可以是语法分析器在匹配和消费它之前嗅探的任何记号。</p>
+
+<p>有时候，语法分析器需要一些预读记号去预判哪个选项会成功。它甚至必须考虑从当前位置直到文件结尾的所有的记号！ANTLR默默地为你处理所有的这些事情，但是对决策过程有个基本的了解是有帮助的，可以让调试生成的语法分析器更容易。</p>
+
+<p>为更好地理解分析决定，想象有个单一入口和单一出口的迷宫，有单词写在地板上。每个沿着从入口到出口路径的单词序列表示一个句子。迷宫的结构与定义一门语言的语法规则类似。为测试一个句子在一门语言中的成员身份，我们在穿越迷宫时把句子的单词和沿着地板的单词作比较。如果通过句子的单词我们能到达出口，那么句子是有效的。</p>
+
+<p>为了通过迷宫，我们必须在每个岔口选择一条有效路径，正如我们必须在语法分析器中选择选项。我们必须决定该走哪条路，通过把我们句子中下一个单词（们）和沿着来自每个岔口的每条路径上可见的单词比较。我们能从岔口看到的单词与预读记号类似。当每条路径以唯一的单词开始时决定是相当容易的。在规则prog中，每个选项从唯一的记号开始，因此prog()可以通过查看第一个预读记号识别选项。</p>
+
+<p>当单词从一个岔口重叠部分开始每条路径时，语法分析器需要继续往前看，扫描可以识别选项的单词。ANTLR根据需要为每个决定自动上下调节预读数量。如果预读的结果是多条同样的到出口的路径，即当前的输入短语有多种解释。解决这样的二义性将是我们的下一个主题。</p>
+</div>
   
   
 
@@ -3205,6 +3221,225 @@ another runner in the night<br>
 
     </article>
   
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-detect-and-prevent-spam-traffic-in-ga/">Google Analytics中如何检测并防止垃圾流量</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-02-27T18:38:18+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>27</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:38 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>使用Google Analytics网站分析工具对博客进行数据统计。在经过一段时间的数据收集后，发现总是会有大量的垃圾流量存在。这里的垃圾流量，指的是对网站毫无作用且会影响网站数据报表质量的流量。通常Google Analytics中的垃圾流量可以分为以下两大类：</p>
+
+<ul>
+<li>一类被称为ghost referral，这些流量事实上从来没有来过你的网站，也不会出现在你网站服务器的日志中，但你可以在数据报表中发现它们，它们影响了Google Analytics中的数据；</li>
+<li>另一类是爬虫流量，包括搜索引擎爬虫流量和非搜索引擎爬虫流量，这些流量会影响Google Analytics中各渠道流量占比及会话次数、跳出率、停留时间等关键指标。</li>
+</ul>
+
+<h3 id="垃圾流量检测方法">垃圾流量检测方法</h3>
+
+<p>打开报告 -&gt; 受众群体 -&gt; 技术 -&gt; 广告网络 -&gt; 主机名，统计报表如下图所示：</p>
+
+<p><img src="/uploads/report-with-spam.png" title="report-with-spam" ></p>
+
+<p>可以看到，只有181个会话的主机名是我的博客域名，即真实来到我博客的流量，也就是说有超过一半的流量属于垃圾流量。并且这些垃圾流量基本都出现了不同程度的数据异常，如新会话百分比为0%、新用户为0、跳出率为100%、平均会话时长为00:00:00。这些垃圾流量的主机名与博客域名无关，说明是第一类垃圾流量。出现这类数据的原因可能是：</p>
+
+<ul>
+<li>别的网站使用了和你网站相同的媒体资源ID，这种情况一般来说不可能，除非恶意为之；</li>
+<li>有人使用Google Analytics中的Measurement Protocol做机器生成的访问流量，而你的媒体资源ID不幸躺枪。</li>
+</ul>
+
+<h3 id="使用过滤器屏蔽垃圾流量">使用过滤器屏蔽垃圾流量</h3>
+
+<p>打开“管理”页面，在博客帐号的“所有过滤器”下添加新的过滤条件，使用预定义或自定义均可，基本配置如下所示：</p>
+
+<p><img src="/uploads/exclude-spam-filter.png" title="exclude-spam-filter" ></p>
+
+<p>然后把“可选择的数据视图”中的选项添加到“选定的数据视图”中，保存即可。</p>
+
+<p>过段时间后再回来查看报表，就会发现垃圾流量消失的干干净净了：</p>
+
+<p><img src="/uploads/report-without-spam.png" title="report-without-spam" ></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part6/">ANTLR 4权威参考读书笔记（6）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-02-14T16:16:37+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>14</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>4:16 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><ul>
+<li>action 操作</li>
+<li>clause 子句</li>
+</ul>
+
+<p>Listener和Visitor机制是极好的。大多数时候，我们可以用Listener或Visitor构建语言应用，它们让特定应用的代码置身于语法之外，使语法容易被阅读。</p>
+
+<p>但有时候我们需要额外的控制权和灵活性。为了达到这个目的，我们可以直接在语法中嵌入代码片段（这些嵌入的代码片段被称为操作）。这些操作会被注入到由ANTLR工具生成的分析器代码中。这些被注入的代码在分析期间执行，并且能像其它任意代码片段一样收集信息或生成输出。结合语义谓词，我们甚至可以在运行时让我们语法的某部分消失！例如，我们可能想打开或关闭Java语法中的enum关键词，分析语言的不同版本。没有语义谓词，我们就需要两个不同版本的语法。</p>
+
+<p>下面我们将实现一个简单的程序，读入数据行，然后打印出在特定列中找到的值。</p>
+
+<h3 id="在语法中嵌入任意的操作">在语法中嵌入任意的操作</h3>
+
+<p>如果我们不想付出构建语法分析树的开销，或者想要在分析期间动态地计算值或把东西打印出来，那么可以通过在语法中嵌入任意代码实现。它的比较困难的，因为我们必须明白在语法分析器上的操作的影响，以及在哪里放置这些操作。</p>
+
+<p>为了解释嵌入在语法中的操作，让我们先来看下文件rows.txt中的数据：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>parrt   Terence Parr    101
+</span><span class='line'>tombu   Tom Burns       020
+</span><span class='line'>bke     Kevin Edgar     008</span></code></pre></td></tr></table></div></figure>
+
+<p>这些列是由TAB分隔的，每一行用一个换行结束。匹配这种类型的输入在语法上还是相当简单的。下面是此语法文件Rows.g的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>file : (row NL)+ ;  // NL is newline token: '\r'? '\n'
+</span><span class='line'>row  : STUFF+ ;</span></code></pre></td></tr></table></div></figure>
+
+<p>我们需要创建一个构造器以便我们能传递我们想要的列号（从1开始计数），所以我们需要在规则中添加一些操作来做这些事情：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Rows;
+</span><span class='line'>
+</span><span class='line'>@parser::members {  // add members to generated RowsParser
+</span><span class='line'>    int col;
+</span><span class='line'>    public RowsParser(TokenStream input, int col) { // custom constructor
+</span><span class='line'>        this(input);
+</span><span class='line'>        this.col = col;
+</span><span class='line'>    }
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>file: (row NL)+ ;
+</span><span class='line'>
+</span><span class='line'>row
+</span><span class='line'>locals [int i=0]
+</span><span class='line'>    : ( STUFF
+</span><span class='line'>        {
+</span><span class='line'>        $i++;
+</span><span class='line'>        if ( $i == col ) System.out.println($STUFF.text);
+</span><span class='line'>        }
+</span><span class='line'>      )+
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>TAB  :  '\t' -&gt; skip ;  // match but don't pass to the parser
+</span><span class='line'>NL   :  '\r'? '\n' ;    // match and pass to the parser
+</span><span class='line'>STUFF:  ~[\t\r\n]+ ;    // match any chars except tab, newline</span></code></pre></td></tr></table></div></figure>
+
+<p>在上述语法中，操作是被花括号括起来的代码片段；members操作的代码将会被注入到生成的语法分析器类中的成员区；在规则row中的操作访问的$i是由locals子句定义的局部变量，该操作也用$STUFF.text获取最近匹配的STUFF记号的文本内容。STUFF词法规则匹配任何非TAB或换行的字符，这意味着在列中可以有空格字符。</p>
+
+<p>现在，是时候去思考如何使用定制的构造器传递一个列号给语法分析器，并且告诉语法分析器不要构建语法分析树了：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class Rows {
+</span><span class='line'>
+</span><span class='line'>    public static void main(String[] args) throws Exception {
+</span><span class='line'>        ANTLRInputStream input = new ANTLRInputStream(System.in);
+</span><span class='line'>        RowsLexer lexer = new RowsLexer(input);
+</span><span class='line'>        CommonTokenStream tokens = new CommonTokenStream(lexer);
+</span><span class='line'>        int col = Integer.valueOf(args[0]);
+</span><span class='line'>        RowsParser parser = new RowsParser(tokens, col);    // pass column number!
+</span><span class='line'>        parser.setBuildParseTree(false);    // don't waste time bulding a tree
+</span><span class='line'>        parser.file();
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>现在，让我们核实下我们的语法分析器能否正确匹配一些示例输入：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr -no-listener Rows.g  # don't need the listener
+</span><span class='line'>compile *.java
+</span><span class='line'>run Rows 1 &lt; rows.txt</span></code></pre></td></tr></table></div></figure>
+
+<p>这时你会看到rows.txt文件的第1列内容被输出：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>parrt
+</span><span class='line'>tombu
+</span><span class='line'>bke</span></code></pre></td></tr></table></div></figure>
+
+<p>如果将上面命令中的1换成2，你会看到rows.txt文件的第2列内容被输出；如果换成3，那么rows.txt文件的第3列内容将会被输出。</p>
+</div>
+  
+  
+
+
+    </article>
+  
   <div class="pagination">
     
       <a class="prev" href="/posts/2">&larr; Older</a>
@@ -3232,11 +3467,11 @@ another runner in the night<br>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part11/">ANTLR 4权威参考读书笔记（11）</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part9/">ANTLR 4权威参考读书笔记（9）</a>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part10/">ANTLR 4权威参考读书笔记（10）</a>
+        <a href="/blog/books-not-recommended/">哪些书不要读</a>
       </li>
     
   </ul>
@@ -3250,30 +3485,30 @@ another runner in the night<br>
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 129%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 122%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 131%" href="/tags/android/">Android</a>
+<a style="font-size: 132%" href="/tags/android/">Android</a>
+<a style="font-size: 92%" href="/tags/ant/">Ant</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
 <a style="font-size: 104%" href="/tags/css/">CSS</a>
 <a style="font-size: 110%" href="/tags/crack/">Crack</a>
 <a style="font-size: 107%" href="/tags/database/">Database</a>
 <a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
-<a style="font-size: 112%" href="/tags/git/">Git</a>
-<a style="font-size: 97%" href="/tags/html/">HTML</a>
+<a style="font-size: 113%" href="/tags/git/">Git</a>
 <a style="font-size: 104%" href="/tags/jbookshelf/">JBookShelf</a>
-<a style="font-size: 148%" href="/tags/java/">Java</a>
+<a style="font-size: 149%" href="/tags/java/">Java</a>
 <a style="font-size: 101%" href="/tags/javascript/">JavaScript</a>
 <a style="font-size: 97%" href="/tags/listview/">ListView</a>
 <a style="font-size: 104%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
-<a style="font-size: 124%" href="/tags/powerbuilder/">PowerBuilder</a>
-<a style="font-size: 110%" href="/tags/powerscript/">PowerScript</a>
+<a style="font-size: 119%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 101%" href="/tags/powerscript/">PowerScript</a>
 <a style="font-size: 117%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
 <a style="font-size: 119%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 97%" href="/tags/spring/">Spring</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 130%" href="/tags/translation/">Translation</a>
+<a style="font-size: 131%" href="/tags/translation/">Translation</a>
 <a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 107%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 107%" href="/tags/wxwidgets/">wxWidgets</a>
