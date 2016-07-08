@@ -9,8 +9,13 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="使用的Rails版本是2.3.5，所以在安装typus的时候需要加上-r 2-3-stable。 1
-script/plugin install git://github.com/fesplugas/typus.git -r 2-3-stable 在安装完后执行script/generate &hellip;">
+  <meta name="description" content="如果要使用用户名和email并行的登录方式，那么只要在models/user.rb中添加一行代码就可以了： 1
+2
+3
+4
+5
+6
+def self.authenticate(login, password) return nil if login.blank? || password.blank &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -74,6 +79,74 @@ script/plugin install git://github.com/fesplugas/typus.git -r 2-3-stable 在安�
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/restful-authentication-authenticate-with-email/">restful_authentication实现用email登录</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2011-03-07T20:02:36+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>7</span><span class='date-suffix'>th</span>, <span class='date-year'>2011</span></span> <span class='time'>8:02 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>如果要使用用户名和email并行的登录方式，那么只要在models/user.rb中添加一行代码就可以了：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def self.authenticate(login, password)
+</span><span class='line'>  return nil if login.blank? || password.blank?
+</span><span class='line'>  u = find_by_login(login.downcase)  # need to get the salt
+</span><span class='line'>  u ||= find_by_email(login.downcase)  # 有了这行代码就可以使用email登录了
+</span><span class='line'>  u && u.authenticated?(password) ? u : nil
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>假如要使只能用email登录，就要先移除models/user.rb中的下列代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>validates_presence_of :login
+</span><span class='line'>validates_length_of :login
+</span><span class='line'>validates_uniqueness_of :login</span></code></pre></td></tr></table></div></figure>
+
+<p>然后修改self.authenticate方法为：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def self.authenticate(email, password)
+</span><span class='line'>  return nil if email.blank? || password.blank?
+</span><span class='line'>  u = find_by_email(email.downcase)  # need to get the salt
+</span><span class='line'>  u && u.authenticated?(password) ? u : nil
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>接着将注册页面views/users/new.html.erb中的login块移除，还有就是要将相关邮件模板中的@user.login改为@user.email。</p>
+
+<p>经过这些修改后就实现了只能使用email登录的功能。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -730,229 +803,6 @@ script/plugin install git://github.com/fesplugas/typus.git -r 2-3-stable 在安�
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/using-rails-23-to-create-a-todolist-application/">用Rails 2.3打造todolist应用</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2010-10-04T12:27:38+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>4</span><span class='date-suffix'>th</span>, <span class='date-year'>2010</span></span> <span class='time'>12:27 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>首先生成项目骨架：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>rails todolist
-</span><span class='line'>cd todolist
-</span><span class='line'>script/generate scaffold todo title:string description:text done:boolean due_date:datetime
-</span><span class='line'>rake db:migrate</span></code></pre></td></tr></table></div></figure>
-
-<p><img src="/uploads/user-todo-association.png" title="user-todo-association" ></p>
-
-<p>安装认证和授权插件：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>script/plugin install git://github.com/technoweenie/restful-authentication.git restful_authentication
-</span><span class='line'>script/generate authenticated user sessions
-</span><span class='line'>
-</span><span class='line'>script/plugin install git://github.com/greenisus/forgot_password.git
-</span><span class='line'>script/generate forgot_password password user</span></code></pre></td></tr></table></div></figure>
-
-<p>然后将include AuthenticatedSystem移到ApplicationController中：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class ApplicationController &lt; ActionController::Base
-</span><span class='line'>  include AuthenticatedSystem</span></code></pre></td></tr></table></div></figure>
-
-<p>添加Todo和User的关联：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class Todo &lt; ActiveRecord::Base
-</span><span class='line'>  belongs_to :user
-</span><span class='line'>
-</span><span class='line'>class User &lt; ActiveRecord::Base
-</span><span class='line'>  has_many :todos</span></code></pre></td></tr></table></div></figure>
-
-<p>修改TodosController，将Todo和User绑定：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class TodosController &lt; ApplicationController
-</span><span class='line'>  before_filter :login_required
-</span><span class='line'>
-</span><span class='line'>  def index
-</span><span class='line'>    @todos = current_user.todos
-</span><span class='line'>
-</span><span class='line'>  def show
-</span><span class='line'>    @todo = current_user.todos.find(params[:id])
-</span><span class='line'>
-</span><span class='line'>  def new
-</span><span class='line'>    @todo = Todo.new
-</span><span class='line'>
-</span><span class='line'>  def edit
-</span><span class='line'>    @todo = current_user.todos.find(params[:id])
-</span><span class='line'>
-</span><span class='line'>  def create
-</span><span class='line'>    @todo = Todo.new(params[:todo])
-</span><span class='line'>    @todo.user = current_user
-</span><span class='line'>
-</span><span class='line'>  def update
-</span><span class='line'>    @todo = current_user.todos.find(params[:id])
-</span><span class='line'>
-</span><span class='line'>  def destroy
-</span><span class='line'>    @todo = current_user.todos.find(params[:id])</span></code></pre></td></tr></table></div></figure>
-
-<p>创建一个应用的首页：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>script/generate controller home index</span></code></pre></td></tr></table></div></figure>
-
-<p>为了可以访问到应用首页，需要删除public/index.html文件，并且在routes.rb中添加：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>map.root :controller =&gt; 'home'</span></code></pre></td></tr></table></div></figure>
-
-<p>将app/views/layouts下的todos.html.erb改名为application.html.erb，然后添加下面的代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;% if logged_in? -%&gt;
-</span><span class='line'>  &lt;div id="user-bar-greeting"&gt;
-</span><span class='line'>    Logged in as &lt;%= link_to_current_user :content_method =&gt; :login %&gt;
-</span><span class='line'>  &lt;/div&gt;
-</span><span class='line'>  &lt;div id="user-bar-action"&gt;
-</span><span class='line'>    (&lt;%= link_to "Log out", logout_path, { :title =&gt; "Log out" } %&gt;)
-</span><span class='line'>  &lt;/div&gt;
-</span><span class='line'>&lt;% else -%&gt;
-</span><span class='line'>  &lt;div id="user-bar-action"&gt;
-</span><span class='line'>    &lt;%= link_to "Log in", login_path, { :title =&gt; "Log in" } %&gt; /
-</span><span class='line'>     &lt;%= link_to "Sign up", signup_path, { :title =&gt; "Create an account" } %&gt;
-</span><span class='line'>  &lt;/div&gt;
-</span><span class='line'>&lt;% end -%&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>Todo模型的description字段是text类型，在页面上用textarea表示简单了一点，将它改成使用TinyMCE编辑器。可以使用<a href="https://github.com/trevorrowe/tinymce_hammer">tinymce_hammer</a>插件来集成。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>script/plugin install git://github.com/trevorrowe/tinymce_hammer.git</span></code></pre></td></tr></table></div></figure>
-
-<p>执行以下命令后，将会安装TinyMCE到public/javascript/tiny_mce目录：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>script/generate tinymce_installation</span></code></pre></td></tr></table></div></figure>
-
-<p>在layout下的模板中添加下面这条语句：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= init_tinymce_hammer_if_required %&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>将app/views/todos下new.html.erb和edit.html.erb中的</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= f.text_area :description %&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>修改为</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= f.tinymce :description, :rows =&gt; 10, :cols =&gt; 40 %&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>去除app/views/todos/index.html.erb中description字段的h方法：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;td&gt;&lt;%= todo.description %&gt;&lt;/td&gt;&lt;br /&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>还有就是删除某条Todo后记录就彻底地没了，不能恢复，需要给它加上一剂后悔药，使之可以重新被捞出，<a href="https://github.com/technoweenie/acts_as_paranoid">acts_as_paranoid</a>插件可以做到这点。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>script/plugin install git://github.com/technoweenie/acts_as_paranoid.git
-</span><span class='line'>script/generate migration add_deleted_at_to_todos deleted_at:datetime
-</span><span class='line'>rake db:migrate</span></code></pre></td></tr></table></div></figure>
-
-<p>添加acts_as_paranoid到模型中：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class Todo &lt; ActiveRecord::Base
-</span><span class='line'>  acts_as_paranoid</span></code></pre></td></tr></table></div></figure>
-
-<p>现在，调用这个模型的destroy方法将不会真正地删除记录，只会将记录从视图上移除，在deleted_at里记录删除的时间。<del>当然，你可以在find中使用with_deleted或only_deleted参数得到被隐藏的记录。</del>在Rails 3中在find中使用参数会报ArgumentError，显示如下错误：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Unknown key: only_deleted</span></code></pre></td></tr></table></div></figure>
-
-<p>解决办法是使用以下格式的代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>current_user.todos.only_deleted.find(:all)</span></code></pre></td></tr></table></div></figure>
-
-<p>至此，一个简单的todolist就算完成了。</p>
-
-<p>代码下载：<a href="https://github.com/dohkoos/todolist">https://github.com/dohkoos/todolist</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/13">&larr; Older</a>
@@ -982,11 +832,11 @@ script/plugin install git://github.com/fesplugas/typus.git -r 2-3-stable 在安�
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part9/">ANTLR 4权威参考读书笔记（9）</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part10/">ANTLR 4权威参考读书笔记（10）</a>
       </li>
     
       <li class="post">
-        <a href="/blog/books-not-recommended/">哪些书不要读</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part9/">ANTLR 4权威参考读书笔记（9）</a>
       </li>
     
   </ul>
@@ -1000,7 +850,7 @@ script/plugin install git://github.com/fesplugas/typus.git -r 2-3-stable 在安�
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 122%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 124%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 132%" href="/tags/android/">Android</a>
 <a style="font-size: 92%" href="/tags/ant/">Ant</a>
