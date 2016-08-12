@@ -4,7 +4,7 @@
   <title><![CDATA[乐者为王]]></title>
   <link href="http://codemany.com/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2016-08-09T20:07:08+08:00</updated>
+  <updated>2016-08-12T15:37:12+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -2735,6 +2735,138 @@ another runner in the night<br>
   </entry>
   
   <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（12）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part12/"/>
+    <updated>2016-04-26T10:20:44+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part12</id>
+    <content type="html"><![CDATA[<ul>
+<li>sentinel 哨兵</li>
+<li>tag 标签</li>
+</ul>
+
+<p>目前我们看到的输入文件都只包含一种语言，但在实际应用中我们会遇到有些包含多种语言的常用文件格式。例如，Java的文档注释，XML文件等。这些环绕着模板表达式的文本需要不同的处理方式，它们被称为孤岛语言。</p>
+
+<p>ANTLR有提供一个称之为“词法模型”的词法分析器特性，它让我们可以很容易地处理包含混合格式的文件。基本思路是：当词法分析器看到特殊的哨兵字符序列时，让它在模式之间来回切换。</p>
+
+<p>XML是一个很好例子，它通常会在同一个文件中包含不同的词法结构。一个XML语法分析器会把除标签和实体引用（例如&hearts;）之外的任何东西当作文本块。当词法分析器看到&lt;时，它切换到“inside”模式；当它看到&gt;或/&gt;时，就切换回默认模式。以下语法展示了该特性是如何工作的：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>lexer grammar XMLLexer;
+</span><span class='line'>
+</span><span class='line'>// Default "mode": Everything OUTSIDE of a tag
+</span><span class='line'>OPEN        :   '&lt;'                 -&gt; pushMode(INSIDE) ;
+</span><span class='line'>COMMENT     :   '&lt;!--' .*? '--&gt;'    -&gt; skip ;
+</span><span class='line'>EntityRef   :   '&' [a-z]+ ';' ;
+</span><span class='line'>TEXT        :   ~('&lt;'|'&')+ ;    // match any 16 bit char minus &lt; and &
+</span><span class='line'>
+</span><span class='line'>// ----------------- Everything INSIDE of a tag ---------------------
+</span><span class='line'>mode INSIDE;
+</span><span class='line'>
+</span><span class='line'>CLOSE       :   '&gt;'                 -&gt; popMode ;    // back to default mode
+</span><span class='line'>SLASH_CLOSE :   '/&gt;'                -&gt; popMode ;
+</span><span class='line'>EQUALS      :   '=' ;
+</span><span class='line'>STRING      :   '"' .*? '"' ;
+</span><span class='line'>SlashName   :   '/' Name ;
+</span><span class='line'>Name        :   ALPHA (ALPHA|DIGIT)* ;
+</span><span class='line'>S           :   [ \t\r\n]           -&gt; skip ;
+</span><span class='line'>
+</span><span class='line'>fragment
+</span><span class='line'>ALPHA       :   [a-zA-Z] ;
+</span><span class='line'>
+</span><span class='line'>fragment
+</span><span class='line'>DIGIT       :   [0-9] ;</span></code></pre></td></tr></table></div></figure>
+
+<p>把上述语法保存为XMLLexer.g文件，然后使用包含以下内容的t.xml文件作为输入来测试它：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;tools&gt;
+</span><span class='line'>  &lt;tool name="ANTLR"&gt;A parser generator&lt;/tool&gt;
+</span><span class='line'>&lt;/tools&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>以下是构建和运行测试的命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr XMLLexer.g
+</span><span class='line'>compile *.java
+</span><span class='line'>grun XML tokens -tokens t.xml</span></code></pre></td></tr></table></div></figure>
+
+<p>这里是输出的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>[@0,0:0='&lt;',&lt;1&gt;,1:0]
+</span><span class='line'>[@1,1:5='tools',&lt;10&gt;,1:1]
+</span><span class='line'>[@2,6:6='&gt;',&lt;5&gt;,1:6]
+</span><span class='line'>[@3,7:10='\r\n  ',&lt;4&gt;,1:7]
+</span><span class='line'>[@4,11:11='&lt;',&lt;1&gt;,2:2]
+</span><span class='line'>[@5,12:15='tool',&lt;10&gt;,2:3]
+</span><span class='line'>[@6,17:20='name',&lt;10&gt;,2:8]
+</span><span class='line'>[@7,21:21='=',&lt;7&gt;,2:12]
+</span><span class='line'>[@8,22:28='"ANTLR"',&lt;8&gt;,2:13]
+</span><span class='line'>[@9,29:29='&gt;',&lt;5&gt;,2:20]
+</span><span class='line'>[@10,30:47='A parser generator',&lt;4&gt;,2:21]
+</span><span class='line'>[@11,48:48='&lt;',&lt;1&gt;,2:39]
+</span><span class='line'>[@12,49:53='/tool',&lt;9&gt;,2:40]
+</span><span class='line'>[@13,54:54='&gt;',&lt;5&gt;,2:45]
+</span><span class='line'>[@14,55:56='\r\n',&lt;4&gt;,2:46]
+</span><span class='line'>[@15,57:57='&lt;',&lt;1&gt;,3:0]
+</span><span class='line'>[@16,58:63='/tools',&lt;9&gt;,3:1]
+</span><span class='line'>[@17,64:64='&gt;',&lt;5&gt;,3:7]
+</span><span class='line'>[@18,65:66='\r\n',&lt;4&gt;,3:8]
+</span><span class='line'>[@19,67:66='&lt;EOF&gt;',&lt;-1&gt;,4:0]</span></code></pre></td></tr></table></div></figure>
+
+<p>上面输出的每一行代表一个记号，包含记号索引、开始和结束字符、记号文本、记号类型，最后的行和字符位置则告诉我们词法分析器如何标记化输入。</p>
+
+<p>在命令行中，XML tokens序列处通常是一个语法名字后面跟着开始规则，但在这里，我们使用语法名字后面跟着特殊的规则名字tokens来告诉TestRig应该运行词法分析器而不是语法分析器。接着使用选项-tokens打印出匹配的记号列表。</p>
+]]></content>
+  </entry>
+  
+  <entry>
     <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（11）]]></title>
     <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part11/"/>
     <updated>2016-04-18T18:13:27+08:00</updated>
@@ -4702,107 +4834,6 @@ another runner in the night<br>
 <p>根据上面对PBL文件格式的解析，使用Ruby开发了一个小工具，用来输出PBL文件中存储的各种信息。源代码被放在Github上面，供大家参考。</p>
 
 <p>代码下载：<a href="https://github.com/dohkoos/pblanalyzer">https://github.com/dohkoos/pblanalyzer</a></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[带权随机函数]]></title>
-    <link href="http://codemany.com/blog/random-with-weight-function/"/>
-    <updated>2015-11-18T18:51:05+08:00</updated>
-    <id>http://codemany.com/blog/random-with-weight-function</id>
-    <content type="html"><![CDATA[<ul>
-<li>设计抽奖活动时，我们总是要控制抽奖物品出现的概率，让好的东西很难被抽到；</li>
-<li>设计游戏打怪时，我们要控制打怪时的命中概率，要控制宝物掉出的概率；</li>
-<li>网站的置顶广告，我们也要根据广告主的广告费用控制广告的出现时间；</li>
-<li>设计负载均衡算法时，我们要根据服务器的性能控制服务器被选中的可能。</li>
-</ul>
-
-<p>深入思考这些需求，你会发现它们都有相通的概念：每次从多个候选项中随机选取其中一项，要求每个候选项的出现都有一定的概率。</p>
-
-<p>假设有这样的候选项和对应概率：a:20%，b:25%，c:40%，d:15%。现在，把每个候选项的概率用一个称之为权重的正整数表示（最简单的方法是把百分符号去掉）。那么，</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>实际概率 = 候选项权重 / 权重总和 * 100%</span></code></pre></td></tr></table></div></figure>
-
-<p>事实上，权重的总和不一定要等于100，可以是任意大小。</p>
-
-<h3 id="算法描述">算法描述</h3>
-
-<p>依次将各候选项的权重从原点开始放在x轴坐标上首尾相连。这样，每个候选项对应一个取值区间，在总区间范围内随机选取一个值，该值所在区间就对应了选中的项。</p>
-
-<p><img src="http://codemany.com/uploads/random-with-weight.png" title="random-with-weight" ></p>
-
-<h3 id="ruby代码实现">Ruby代码实现</h3>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>def random(weight)
-</span><span class='line'>  # 获取所有候选项的权重总和
-</span><span class='line'>  total_weight = weight.inject { |r, e| r + e }
-</span><span class='line'>
-</span><span class='line'>  # 随机选取一个介于0到权重总和之间的整数
-</span><span class='line'>  rand_value = rand(total_weight)  # [0, total_weight)
-</span><span class='line'>
-</span><span class='line'>  # 扫描所有候选项，并且保留候选项权重的累积数。
-</span><span class='line'>  # 每当随机数小于累积数时，就停止并选出当前项。
-</span><span class='line'>  weight_barrier = 0
-</span><span class='line'>  weight.each_index do |i|
-</span><span class='line'>    weight_barrier += weight[i]
-</span><span class='line'>
-</span><span class='line'>    break i if rand_value &lt; weight_barrier
-</span><span class='line'>  end
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<p>该实现不能保证每个候选项都恰好按正确的比例被选中，但当次数足够多时，应该会十分接近预先设定的比例。</p>
-
-<h3 id="实际案例">实际案例</h3>
-
-<p>要求写int[] get_weight(int[] weight)函数，返回的是权重的索引。其中weight是权重的数字数组，最终的结果是要大概保证按照给定的比例。</p>
-
-<ul>
-<li>比如weight为[1, 2, 2]，那么权重比例为1:2:2，执行10次后，大概的输出是0 1 1 0 1 1 2 2 2 2；</li>
-<li>比如weight为[100, 0]，那么权重比例为100:0，执行10次后，大概的输出是0 0 0 0 0 0 0 0 0 0；</li>
-<li>比如weight为[1, 1]，那么权重比例为1:1，执行10次后，大概的输出是0 1 0 1 0 0 1 1 0 1。</li>
-</ul>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>def get_weight(weight)
-</span><span class='line'>  10.times.map { random(weight) }
-</span><span class='line'>end
-</span><span class='line'>
-</span><span class='line'>weight = [1, 2, 2]
-</span><span class='line'>puts get_weight(weight).join(' ')
-</span><span class='line'>
-</span><span class='line'>weight = [100, 0]
-</span><span class='line'>puts get_weight(weight).join(' ')
-</span><span class='line'>
-</span><span class='line'>weight = [1, 1]
-</span><span class='line'>puts get_weight(weight).join(' ')</span></code></pre></td></tr></table></div></figure>
 ]]></content>
   </entry>
   

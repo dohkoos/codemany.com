@@ -2860,6 +2860,158 @@ another runner in the night<br>
       
   <header>
     
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part12/">ANTLR 4权威参考读书笔记（12）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-04-26T10:20:44+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>10:20 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><ul>
+<li>sentinel 哨兵</li>
+<li>tag 标签</li>
+</ul>
+
+<p>目前我们看到的输入文件都只包含一种语言，但在实际应用中我们会遇到有些包含多种语言的常用文件格式。例如，Java的文档注释，XML文件等。这些环绕着模板表达式的文本需要不同的处理方式，它们被称为孤岛语言。</p>
+
+<p>ANTLR有提供一个称之为“词法模型”的词法分析器特性，它让我们可以很容易地处理包含混合格式的文件。基本思路是：当词法分析器看到特殊的哨兵字符序列时，让它在模式之间来回切换。</p>
+
+<p>XML是一个很好例子，它通常会在同一个文件中包含不同的词法结构。一个XML语法分析器会把除标签和实体引用（例如&hearts;）之外的任何东西当作文本块。当词法分析器看到&lt;时，它切换到“inside”模式；当它看到&gt;或/&gt;时，就切换回默认模式。以下语法展示了该特性是如何工作的：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>lexer grammar XMLLexer;
+</span><span class='line'>
+</span><span class='line'>// Default "mode": Everything OUTSIDE of a tag
+</span><span class='line'>OPEN        :   '&lt;'                 -&gt; pushMode(INSIDE) ;
+</span><span class='line'>COMMENT     :   '&lt;!--' .*? '--&gt;'    -&gt; skip ;
+</span><span class='line'>EntityRef   :   '&' [a-z]+ ';' ;
+</span><span class='line'>TEXT        :   ~('&lt;'|'&')+ ;    // match any 16 bit char minus &lt; and &
+</span><span class='line'>
+</span><span class='line'>// ----------------- Everything INSIDE of a tag ---------------------
+</span><span class='line'>mode INSIDE;
+</span><span class='line'>
+</span><span class='line'>CLOSE       :   '&gt;'                 -&gt; popMode ;    // back to default mode
+</span><span class='line'>SLASH_CLOSE :   '/&gt;'                -&gt; popMode ;
+</span><span class='line'>EQUALS      :   '=' ;
+</span><span class='line'>STRING      :   '"' .*? '"' ;
+</span><span class='line'>SlashName   :   '/' Name ;
+</span><span class='line'>Name        :   ALPHA (ALPHA|DIGIT)* ;
+</span><span class='line'>S           :   [ \t\r\n]           -&gt; skip ;
+</span><span class='line'>
+</span><span class='line'>fragment
+</span><span class='line'>ALPHA       :   [a-zA-Z] ;
+</span><span class='line'>
+</span><span class='line'>fragment
+</span><span class='line'>DIGIT       :   [0-9] ;</span></code></pre></td></tr></table></div></figure>
+
+<p>把上述语法保存为XMLLexer.g文件，然后使用包含以下内容的t.xml文件作为输入来测试它：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;tools&gt;
+</span><span class='line'>  &lt;tool name="ANTLR"&gt;A parser generator&lt;/tool&gt;
+</span><span class='line'>&lt;/tools&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>以下是构建和运行测试的命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr XMLLexer.g
+</span><span class='line'>compile *.java
+</span><span class='line'>grun XML tokens -tokens t.xml</span></code></pre></td></tr></table></div></figure>
+
+<p>这里是输出的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>[@0,0:0='&lt;',&lt;1&gt;,1:0]
+</span><span class='line'>[@1,1:5='tools',&lt;10&gt;,1:1]
+</span><span class='line'>[@2,6:6='&gt;',&lt;5&gt;,1:6]
+</span><span class='line'>[@3,7:10='\r\n  ',&lt;4&gt;,1:7]
+</span><span class='line'>[@4,11:11='&lt;',&lt;1&gt;,2:2]
+</span><span class='line'>[@5,12:15='tool',&lt;10&gt;,2:3]
+</span><span class='line'>[@6,17:20='name',&lt;10&gt;,2:8]
+</span><span class='line'>[@7,21:21='=',&lt;7&gt;,2:12]
+</span><span class='line'>[@8,22:28='"ANTLR"',&lt;8&gt;,2:13]
+</span><span class='line'>[@9,29:29='&gt;',&lt;5&gt;,2:20]
+</span><span class='line'>[@10,30:47='A parser generator',&lt;4&gt;,2:21]
+</span><span class='line'>[@11,48:48='&lt;',&lt;1&gt;,2:39]
+</span><span class='line'>[@12,49:53='/tool',&lt;9&gt;,2:40]
+</span><span class='line'>[@13,54:54='&gt;',&lt;5&gt;,2:45]
+</span><span class='line'>[@14,55:56='\r\n',&lt;4&gt;,2:46]
+</span><span class='line'>[@15,57:57='&lt;',&lt;1&gt;,3:0]
+</span><span class='line'>[@16,58:63='/tools',&lt;9&gt;,3:1]
+</span><span class='line'>[@17,64:64='&gt;',&lt;5&gt;,3:7]
+</span><span class='line'>[@18,65:66='\r\n',&lt;4&gt;,3:8]
+</span><span class='line'>[@19,67:66='&lt;EOF&gt;',&lt;-1&gt;,4:0]</span></code></pre></td></tr></table></div></figure>
+
+<p>上面输出的每一行代表一个记号，包含记号索引、开始和结束字符、记号文本、记号类型，最后的行和字符位置则告诉我们词法分析器如何标记化输入。</p>
+
+<p>在命令行中，XML tokens序列处通常是一个语法名字后面跟着开始规则，但在这里，我们使用语法名字后面跟着特殊的规则名字tokens来告诉TestRig应该运行词法分析器而不是语法分析器。接着使用选项-tokens打印出匹配的记号列表。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
       <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part11/">ANTLR 4权威参考读书笔记（11）</a></h1>
     
     
@@ -3263,97 +3415,6 @@ another runner in the night<br>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part7/">ANTLR 4权威参考读书笔记（7）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-03-11T16:42:08+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>11</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>4:42 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><ul>
-<li>sequence 序列</li>
-</ul>
-
-<p>在<a href="/blog/reading-notes-the-definitive-antlr4-reference-part6/">ANTLR 4权威参考读书笔记（6）</a>中的这些操作仅仅是提取和打印被语法分析器匹配的值，它们并没有改变语法分析器本身。</p>
-
-<p>实际上，操作还可以影响语法分析器如何识别输入短语。这类特殊的操作被称为语义谓词。下面我们会用一个简单的例子来展示语义谓词的强大能力：动态地打开和关闭语法的某个部分。</p>
-
-<h3 id="使用语义谓词改变语法分析">使用语义谓词改变语法分析</h3>
-
-<p>有一个读入整数序列的语法，它的玄机是由输入的部分指定有多少个整数组合在一起，所以我们必须等到运行时才能知道有多少整数被匹配。这里是示例输入文件idata.txt的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>2 9 10 3 1 2 3</span></code></pre></td></tr></table></div></figure>
-
-<p>第1个数字表示匹配后续两个数字9和10；紧跟10的数字3表示匹配接下来的三个数字。我们的目的是设计一个语法IData.g，把9和10组合在一起，把1、2和3组合在一起。在语法上执行以下命令后显示的语法分析树能够清楚地标识出整数的分组，就像下图显示的那样：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr -no-listener IData.g
-</span><span class='line'>compile *.java
-</span><span class='line'>grun IData file -gui idata.txt</span></code></pre></td></tr></table></div></figure>
-
-<p><img src="/uploads/idata-parse-tree.png" title="idata-parse-tree" ></p>
-
-<p>要达成这个目标，以下语法中的关键是一个被称为语义谓词的布尔值操作：{$i &lt; $n}?。当谓词计算结果为true时，语法分析器匹配整数直到超过序列规则参数n要求的数量；当计算结果为false时，谓词让相关的选项从生成的语法分析器中“消失”。
-在这个案例中，值为false的谓词让(...)*循环从规则序列里终止并返回。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grammar IData;
-</span><span class='line'>
-</span><span class='line'>file : group+ ;
-</span><span class='line'>
-</span><span class='line'>group: INT sequence[$INT.int] ;
-</span><span class='line'>
-</span><span class='line'>sequence[int n]
-</span><span class='line'>locals [int i = 1;]
-</span><span class='line'>     : ( {$i&lt;=$n}? INT {$i++;} )*  // match n integers
-</span><span class='line'>     ;
-</span><span class='line'>
-</span><span class='line'>INT  : [0-9]+ ;  // match integers
-</span><span class='line'>WS   : [ \t\n\r]+ -&gt; skip ;  // toss out all whitespace</span></code></pre></td></tr></table></div></figure>
-
-<p>被语法分析器使用的规则序列的内部语法表示看起来就像下图这样：</p>
-
-<p><img src="/uploads/idata-rule-sequence.png" title="idata-rule-sequence" ></p>
-
-<p>虚线表明谓词可以剪断那条路径，只给语法分析器留下一个选择：退出的路径。</p>
-
-<p>虽然大部分时间我们不需要这样的微管理，但它至少让我们知道我们有这样的武器可以处理病理分析问题。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/2">&larr; Older</a>
@@ -3381,11 +3442,11 @@ another runner in the night<br>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part11/">ANTLR 4权威参考读书笔记（11）</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part12/">ANTLR 4权威参考读书笔记（12）</a>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part10/">ANTLR 4权威参考读书笔记（10）</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part11/">ANTLR 4权威参考读书笔记（11）</a>
       </li>
     
   </ul>
@@ -3399,7 +3460,7 @@ another runner in the night<br>
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 125%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 127%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 132%" href="/tags/android/">Android</a>
 <a style="font-size: 92%" href="/tags/ant/">Ant</a>

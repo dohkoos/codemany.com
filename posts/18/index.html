@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="系统装好后首先要做的就是安装中文输入法。在网上找了一些中文输入法的资料，最常用的是Fcitx和SCIM输入法。不过好像SCIM的问题比较多，而且据说Fcitx的功能上也要比SCIM强得多，所以决定采用Fcitx输入法。 卸载SCIM 为了避免安装中出现一些问题， &hellip;">
+  <meta name="description" content="当使用Tab键切换时，想把光标定位在input[text]的首部。在网上找了一些光标定位的资料发现大多数都是用createTextRange来实现的，而且都出自一个实例。可惜的是在Firefox下createTextRange无效。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,108 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/cursor-positioning-about-input-text/">关于input[text]里的光标定位</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2008-11-30T18:09:25+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>30</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>6:09 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>当使用Tab键切换时，想把光标定位在input[text]的首部。在网上找了一些光标定位的资料发现大多数都是用createTextRange来实现的，而且都出自一个实例。可惜的是在Firefox下createTextRange无效。</p>
+
+<p>后来在Firefox的开发者站点上发现有个setSelectionRange方法可以实现这样的功能。使用格式：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>o.setSelectionRange(start, end);
+</span><span class='line'>
+</span><span class='line'>o：为文本输入框对象
+</span><span class='line'>start：为字符串的起始位置
+</span><span class='line'>end：为字符串的末位置</span></code></pre></td></tr></table></div></figure>
+
+<p>尝试后发现并不能定位到文本首位，总是全选所有的文本内容，在后面加上获的焦点的命令也不管用。最后还是在国外的一个站点上找到了解决的办法。</p>
+
+<p>下面的代码在Firefox下不能定位到首位，只能选中全部：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>function setCaretPosition(aCtrl, aPos) {
+</span><span class='line'>    if (aCtrl.setSelectionRange) {
+</span><span class='line'>        aCtrl.setSelectionRange(aPos, aPos);
+</span><span class='line'>        aCtrl.focus();
+</span><span class='line'>    } else if (aCtrl.createTextRange) {
+</span><span class='line'>        var rng = aCtrl.createTextRange();
+</span><span class='line'>        rng.collapse(true);
+</span><span class='line'>        rng.moveStart('character', aPos);
+</span><span class='line'>        rng.moveEnd('character', aPos);
+</span><span class='line'>        rng.select();
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>经过修改后的代码就可以适用于Firefox，IE，Opera的光标定位了：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>function setCaretPosition(aCtrl, aPos) {
+</span><span class='line'>    if (aCtrl.setSelectionRange) {
+</span><span class='line'>        setTimeout(function() {
+</span><span class='line'>            aCtrl.setSelectionRange(aPos, aPos);
+</span><span class='line'>            aCtrl.focus();
+</span><span class='line'>        }, 0);
+</span><span class='line'>    } else if (aCtrl.createTextRange) {
+</span><span class='line'>        var rng = aCtrl.createTextRange();
+</span><span class='line'>        rng.collapse(true);
+</span><span class='line'>        rng.moveStart('character', aPos);
+</span><span class='line'>        rng.moveEnd('character', aPos);
+</span><span class='line'>        rng.select();
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -797,49 +899,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-difference-of-date-calculation-between-java-and-javascript/">《Java和JavaScript关于日期计算上的差异》阅读笔记</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2008-05-23T13:30:00+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>23</span><span class='date-suffix'>rd</span>, <span class='date-year'>2008</span></span> <span class='time'>1:30 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>下面是<a href="http://wangchangjun.javaeye.com/blog/170049">Java和JavaScript关于日期计算上的差异</a>作者给出的结论：</p>
-
-<blockquote>
-<p>当进行日期计算的时候，当前日期的月份必须是大月，并且是在这个月的最后一天也就是31号，比如2008-3-31号，当给这个日期加上一个月，得到的日期是个小月就会出现这样的情况。比如在2008-3-31这天加上一月，那因该是4月份，4月就是小月，那Java就是4月30号，JavaScript 就是5月1号，相差一天。当加上2月后，就是5月，5月是大月，那么计算的结果都是5月31号。</p>
-</blockquote>
-
-<p>不过这样的结论还是不能让人明白Java和JavaScript计算日期时相差的一天是怎么来的。</p>
-
-<p>下面是我对Java和JavaScript日期计算差异的一些理解：</p>
-
-<p>2008-2-29加上12个月，那么就是2009-2-29，但2009年是非闰年，它的2月份只有28天，这样就多出来的一天。如何处理这多出来的一天呢？Java和JavaScript做出了不同的理解。Java认为，既然2009年的2月只有28天，那么那多出来的一天就是多余的，应该丢弃，所以Java的计算结果是2009-2-28；而JavaScript则认为这多出来的一天不能丢弃，应该也加上去。那么2009-2-28号加上一天就是2009-3-31号。</p>
-
-<p>同样的，2008-3-31加上一个月在Java中的结果是2008-4-30号，而在JavaScript中则是2008-5-1号。那如果加上的是两个月呢？2008-3-31加上两个月是2008-5-31号，是有效的日期，所以Java和JavaScript的计算结果都是2008-5-31号。</p>
-
-<p>结论是，当进行日期计算时，如果结果日期的date值超出了该月的最大天数值，那么在Java中就会将该date值设为该月的最大天数值；而JavaScript则不但会将该date值设为该月的最大天数值，还会再加上超出的天数值。例如：2009-1-31号加上一个月，Java的结果就是2009-2-28号，JavaScript的结果则是2009-3-3号，2009-2-28加多出来的3 = 31 - 28天。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/19">&larr; Older</a>
@@ -869,11 +928,11 @@
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part11/">ANTLR 4权威参考读书笔记（11）</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part12/">ANTLR 4权威参考读书笔记（12）</a>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part10/">ANTLR 4权威参考读书笔记（10）</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part11/">ANTLR 4权威参考读书笔记（11）</a>
       </li>
     
   </ul>
@@ -887,7 +946,7 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 125%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 127%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 132%" href="/tags/android/">Android</a>
 <a style="font-size: 92%" href="/tags/ant/">Ant</a>

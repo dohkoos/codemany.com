@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: ANTLR | 乐者为王]]></title>
   <link href="http://codemany.com/tags/antlr/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2016-08-09T20:07:08+08:00</updated>
+  <updated>2016-08-12T15:37:12+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,84 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（12）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part12/"/>
+    <updated>2016-04-26T10:20:44+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part12</id>
+    <content type="html"><![CDATA[<ul>
+<li>sentinel 哨兵</li>
+<li>tag 标签</li>
+</ul>
+
+<p>目前我们看到的输入文件都只包含一种语言，但在实际应用中我们会遇到有些包含多种语言的常用文件格式。例如，Java的文档注释，XML文件等。这些环绕着模板表达式的文本需要不同的处理方式，它们被称为孤岛语言。</p>
+
+<p>ANTLR有提供一个称之为“词法模型”的词法分析器特性，它让我们可以很容易地处理包含混合格式的文件。基本思路是：当词法分析器看到特殊的哨兵字符序列时，让它在模式之间来回切换。</p>
+
+<p>XML是一个很好例子，它通常会在同一个文件中包含不同的词法结构。一个XML语法分析器会把除标签和实体引用（例如&hearts;）之外的任何东西当作文本块。当词法分析器看到&lt;时，它切换到“inside”模式；当它看到&gt;或/&gt;时，就切换回默认模式。以下语法展示了该特性是如何工作的：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">lexer grammar XMLLexer;
+
+// Default &quot;mode&quot;: Everything OUTSIDE of a tag
+OPEN        :   &#39;&lt;&#39;                 -&gt; pushMode(INSIDE) ;
+COMMENT     :   &#39;&lt;!--&#39; .*? &#39;--&gt;&#39;    -&gt; skip ;
+EntityRef   :   &#39;&amp;&#39; [a-z]+ &#39;;&#39; ;
+TEXT        :   ~(&#39;&lt;&#39;|&#39;&amp;&#39;)+ ;    // match any 16 bit char minus &lt; and &amp;
+
+// ----------------- Everything INSIDE of a tag ---------------------
+mode INSIDE;
+
+CLOSE       :   &#39;&gt;&#39;                 -&gt; popMode ;    // back to default mode
+SLASH_CLOSE :   &#39;/&gt;&#39;                -&gt; popMode ;
+EQUALS      :   &#39;=&#39; ;
+STRING      :   &#39;&quot;&#39; .*? &#39;&quot;&#39; ;
+SlashName   :   &#39;/&#39; Name ;
+Name        :   ALPHA (ALPHA|DIGIT)* ;
+S           :   [ \t\r\n]           -&gt; skip ;
+
+fragment
+ALPHA       :   [a-zA-Z] ;
+
+fragment
+DIGIT       :   [0-9] ;
+</code></pre></div>
+<p>把上述语法保存为XMLLexer.g文件，然后使用包含以下内容的t.xml文件作为输入来测试它：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;tools&gt;
+  &lt;tool name=&quot;ANTLR&quot;&gt;A parser generator&lt;/tool&gt;
+&lt;/tools&gt;
+</code></pre></div>
+<p>以下是构建和运行测试的命令：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">antlr XMLLexer.g
+compile *.java
+grun XML tokens -tokens t.xml
+</code></pre></div>
+<p>这里是输出的内容：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">[@0,0:0=&#39;&lt;&#39;,&lt;1&gt;,1:0]
+[@1,1:5=&#39;tools&#39;,&lt;10&gt;,1:1]
+[@2,6:6=&#39;&gt;&#39;,&lt;5&gt;,1:6]
+[@3,7:10=&#39;\r\n  &#39;,&lt;4&gt;,1:7]
+[@4,11:11=&#39;&lt;&#39;,&lt;1&gt;,2:2]
+[@5,12:15=&#39;tool&#39;,&lt;10&gt;,2:3]
+[@6,17:20=&#39;name&#39;,&lt;10&gt;,2:8]
+[@7,21:21=&#39;=&#39;,&lt;7&gt;,2:12]
+[@8,22:28=&#39;&quot;ANTLR&quot;&#39;,&lt;8&gt;,2:13]
+[@9,29:29=&#39;&gt;&#39;,&lt;5&gt;,2:20]
+[@10,30:47=&#39;A parser generator&#39;,&lt;4&gt;,2:21]
+[@11,48:48=&#39;&lt;&#39;,&lt;1&gt;,2:39]
+[@12,49:53=&#39;/tool&#39;,&lt;9&gt;,2:40]
+[@13,54:54=&#39;&gt;&#39;,&lt;5&gt;,2:45]
+[@14,55:56=&#39;\r\n&#39;,&lt;4&gt;,2:46]
+[@15,57:57=&#39;&lt;&#39;,&lt;1&gt;,3:0]
+[@16,58:63=&#39;/tools&#39;,&lt;9&gt;,3:1]
+[@17,64:64=&#39;&gt;&#39;,&lt;5&gt;,3:7]
+[@18,65:66=&#39;\r\n&#39;,&lt;4&gt;,3:8]
+[@19,67:66=&#39;&lt;EOF&gt;&#39;,&lt;-1&gt;,4:0]
+</code></pre></div>
+<p>上面输出的每一行代表一个记号，包含记号索引、开始和结束字符、记号文本、记号类型，最后的行和字符位置则告诉我们词法分析器如何标记化输入。</p>
+
+<p>在命令行中，XML tokens序列处通常是一个语法名字后面跟着开始规则，但在这里，我们使用语法名字后面跟着特殊的规则名字tokens来告诉TestRig应该运行词法分析器而不是语法分析器。接着使用选项-tokens打印出匹配的记号列表。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（11）]]></title>
@@ -174,57 +252,6 @@ stat
 <div class="highlight"><pre><code class="language-text" data-lang="text">assign : ID &#39;=&#39; expr ;    // 匹配赋值语句像&quot;sp = 100&quot;
 </code></pre></div>
 <p>明白ANTLR如何把这些规则转换为人类可读的语法分析代码是使用和调试语法的基础，因此让我们深入地挖掘语法分析是如何工作的。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（7）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part7/"/>
-    <updated>2016-03-11T16:42:08+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part7</id>
-    <content type="html"><![CDATA[<ul>
-<li>sequence 序列</li>
-</ul>
-
-<p>在<a href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part6/">ANTLR 4权威参考读书笔记（6）</a>中的这些操作仅仅是提取和打印被语法分析器匹配的值，它们并没有改变语法分析器本身。</p>
-
-<p>实际上，操作还可以影响语法分析器如何识别输入短语。这类特殊的操作被称为语义谓词。下面我们会用一个简单的例子来展示语义谓词的强大能力：动态地打开和关闭语法的某个部分。</p>
-
-<h3 id="使用语义谓词改变语法分析">使用语义谓词改变语法分析</h3>
-
-<p>有一个读入整数序列的语法，它的玄机是由输入的部分指定有多少个整数组合在一起，所以我们必须等到运行时才能知道有多少整数被匹配。这里是示例输入文件idata.txt的内容：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">2 9 10 3 1 2 3
-</code></pre></div>
-<p>第1个数字表示匹配后续两个数字9和10；紧跟10的数字3表示匹配接下来的三个数字。我们的目的是设计一个语法IData.g，把9和10组合在一起，把1、2和3组合在一起。在语法上执行以下命令后显示的语法分析树能够清楚地标识出整数的分组，就像下图显示的那样：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">antlr -no-listener IData.g
-compile *.java
-grun IData file -gui idata.txt
-</code></pre></div>
-<p><img src="/uploads/idata-parse-tree.png" title="idata-parse-tree" ></p>
-
-<p>要达成这个目标，以下语法中的关键是一个被称为语义谓词的布尔值操作：{$i &lt; $n}?。当谓词计算结果为true时，语法分析器匹配整数直到超过序列规则参数n要求的数量；当计算结果为false时，谓词让相关的选项从生成的语法分析器中“消失”。
-在这个案例中，值为false的谓词让(...)*循环从规则序列里终止并返回。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">grammar IData;
-
-file : group+ ;
-
-group: INT sequence[$INT.int] ;
-
-sequence[int n]
-locals [int i = 1;]
-     : ( {$i&lt;=$n}? INT {$i++;} )*  // match n integers
-     ;
-
-INT  : [0-9]+ ;  // match integers
-WS   : [ \t\n\r]+ -&gt; skip ;  // toss out all whitespace
-</code></pre></div>
-<p>被语法分析器使用的规则序列的内部语法表示看起来就像下图这样：</p>
-
-<p><img src="/uploads/idata-rule-sequence.png" title="idata-rule-sequence" ></p>
-
-<p>虚线表明谓词可以剪断那条路径，只给语法分析器留下一个选择：退出的路径。</p>
-
-<p>虽然大部分时间我们不需要这样的微管理，但它至少让我们知道我们有这样的武器可以处理病理分析问题。</p>
 ]]></content>
   </entry>
   
