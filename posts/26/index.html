@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="在Eclipse中生成公钥和私钥 打开Eclipse，进入Window -&gt; Preferences -&gt; Team -&gt; CVS -&gt; SSH2 Connection Method -&gt; Key Management，点击“Generate RSA Key...”， &hellip;">
+  <meta name="description" content="首先，我们要了解一下ServletResponse.setContentLength(int len)的含义。setContentLength是设置返回内容体长度的方法，len是内容体的长度。由于网络上传输内容是以字节（byte）为单位的，所以len就是指内容体有多少个字节。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,137 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-solve-sitemesh-truncate-the-page-containing-chinese-character/">如何解决含有中文的页面末尾内容会被SiteMesh截掉的问题</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2005-07-22T14:33:59+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2005</span></span> <span class='time'>2:33 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>首先，我们要了解一下ServletResponse.setContentLength(int len)的含义。setContentLength是设置返回内容体长度的方法，len是内容体的长度。由于网络上传输内容是以字节（byte）为单位的，所以len就是指内容体有多少个字节。假设现在有长度为100个字节的数据，在输出数据到客户端前我们用setContentLength(90)设置内容体的长度为90个字节。那么在客户端接收到的数据长度就是90个字节而不是100。下面我们来做个试验：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class PageTruncateFilter implements Filter {
+</span><span class='line'>
+</span><span class='line'>    public void init(FilterConfig config) throws ServletException {
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
+</span><span class='line'>                        throws IOException, ServletException {
+</span><span class='line'>        HttpServletRequest request = (HttpServletRequest)req;
+</span><span class='line'>        HttpServletResponse response = (HttpServletResponse)res;
+</span><span class='line'>
+</span><span class='line'>        String content = "&lt;html&gt;&lt;head&gt;&lt;title&gt;Truncated Page&lt;/title&gt;&lt;/head&gt;";
+</span><span class='line'>               content += "&lt;body&gt;这个页面的内容will be truncated.&lt;/body&gt;&lt;/html&gt;";
+</span><span class='line'>        response.setCharacterEncoding("gbk");
+</span><span class='line'>        response.setContentLength(content.length());
+</span><span class='line'>        PrintWriter out = response.getWriter();
+</span><span class='line'>        out.println(content);
+</span><span class='line'>        out.close();
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public void destroy() {
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>由于content字符串含有两个中文字符，每一个中文字符又是由两个字节组成，所以content.length()的值比content的字节数要少2。在客户端显示的内容也会因此少2个字节，即缺少“l&gt;”这两个字符。</p>
+
+<p>现在我们来浏览SiteMesh的源代码找出问题的原因。首先从PageFilter.java的doFilter方法开始。由于页面没有在decorators.xml中注册修饰，所以writeOriginal方法会被调用。下面是writeOriginal方法的源代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>/** Write the original page data to the response. */
+</span><span class='line'>private void writeOriginal(HttpServletRequest request, HttpServletResponse response,
+</span><span class='line'>                          Page page) throws IOException {
+</span><span class='line'>    response.setContentLength(page.getContentLength());
+</span><span class='line'>
+</span><span class='line'>    if (request.getAttribute(USING_STREAM).equals(Boolean.TRUE)) {
+</span><span class='line'>        PrintWriter writer = new PrintWriter(response.getOutputStream());
+</span><span class='line'>        page.writePage(writer);
+</span><span class='line'>        // flush writer to underlying outputStream
+</span><span class='line'>        writer.flush();
+</span><span class='line'>        response.getOutputStream().flush();
+</span><span class='line'>    } else {
+</span><span class='line'>        page.writePage(response.getWriter());
+</span><span class='line'>        response.getWriter().flush();
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>首行代码就是设置内容体长度的，让我们追到page.getContentLength()里面去看看（Page接口的getContentLength方法是由AbstractPage.java实现的）：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public int getContentLength() {
+</span><span class='line'>    return pageData.length;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>它返回pageData数组的长度。但是pageData数组是char类型的，假如pageData中有中文内容时，设置的内容体长度就会小于pageData的字节数。这时就会出现输出到客户端的数据截掉的问题。所以只要修改getContentLength方法返回的值就可以了，下面是修改后的getContentLength方法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public int getContentLength() {
+</span><span class='line'>    String content = new String(pageData);
+</span><span class='line'>    return content.getBytes().length;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -924,89 +1055,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/problem-configuring-jpetstore-405-with-mysql/">JPetStore 4.0.5配置MySQL数据库时遇到的问题</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-03-09T16:33:39+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>9</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>4:33 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在配置JPetStore 4.0.5时出了一点问题，写此文章记录下解决方法，以便日后查找。</p>
-
-<p>按照教程配置好后运行Tomcat，在点击“Enter the Store”时出现了HTTP 500错误。从日志中的异常记录来看是没有找到MySQL的驱动程序。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>SimpleDataSource: Error while loading properties. Cause: java.lang.ClassNotFoundException: driver</span></code></pre></td></tr></table></div></figure>
-
-<p>可是我已经把驱动程序包放到WEB-INF/lib目录下了呀！</p>
-
-<p>查看sql-xml-config.xml文件中dataSource的属性，发现它们的值如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;transactionManager type="JDBC"&gt;
-</span><span class='line'>    &lt;dataSource type="SIMPLE"&gt;
-</span><span class='line'>        &lt;property value="${driver}" name="JDBC.Driver" /&gt;
-</span><span class='line'>        &lt;property value="${url}" name="JDBC.ConnectionURL" /&gt;
-</span><span class='line'>        &lt;property value="${username}" name="JDBC.Username" /&gt;
-</span><span class='line'>        &lt;property value="${password}" name="JDBC.Password" /&gt;
-</span><span class='line'>        &lt;property value="15" name="Pool.MaximumActiveConnections" /&gt;
-</span><span class='line'>        &lt;property value="15" name="Pool.MaximumIdleConnections" /&gt;
-</span><span class='line'>        &lt;property value="1000" name="Pool.MaximumWait" /&gt;
-</span><span class='line'>      &lt;/dataSource&gt;
-</span><span class='line'>&lt;/transactionManager&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>而在database.properties中的值分别是：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>SimpleDriver=org.gjt.mm.mysql.Driver
-</span><span class='line'>SimpleUrl=jdbc:mysql://localhost:3306/jpetstore
-</span><span class='line'>SimpleUsername=jpetstore
-</span><span class='line'>SimplePassword=ibatis</span></code></pre></td></tr></table></div></figure>
-
-<p>因为dataSource中的属性值是从database.properties文件中读取的，所以要将database.properties中的属性名改成和sql-xml-config.xml中的一致。这样就不会再出现找不到驱动的异常了。改写后的database.properties内容如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>driver=org.gjt.mm.mysql.Driver
-</span><span class='line'>url=jdbc:mysql://localhost:3306/jpetstore
-</span><span class='line'>username=jpetstore
-</span><span class='line'>password=ibatis</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/27">&larr; Older</a>
@@ -1036,11 +1084,11 @@
       </li>
     
       <li class="post">
-        <a href="/blog/developers-are-blinded-by-the-light/">开发者被灯光蒙蔽了双眼</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part13/">ANTLR 4权威参考读书笔记（13）</a>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part12/">ANTLR 4权威参考读书笔记（12）</a>
+        <a href="/blog/developers-are-blinded-by-the-light/">开发者被灯光蒙蔽了双眼</a>
       </li>
     
   </ul>
@@ -1054,7 +1102,7 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 128%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 129%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 131%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
