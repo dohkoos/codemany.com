@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="在Windows Server 2008下安装FreeMind后不能运行（0.8.1和0.9.0-RC4均是如此），使用的JRE是1.6.0_13。网上有的解决方法是在环境变量中添加jre\bin的路径。但是我不想这样做，想试试别的方法。 后来，从FreeMind的bug2750047中得到了启示 &hellip;">
+  <meta name="description" content="域名信息的查询原理非常简单，主要是基于RFC 954（RFC 812已被废弃）提供的WHOIS协议。WHOIS服务器是一个基于“查询/响应”的TCP事务服务器，用户程序通过访问WHOIS服务器，从WHOIS数据库中查询得到我们所需要的内容。其主要过程有以下三步： &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,143 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/using-whois-protocol-to-query-domain-information/">利用WHOIS协议查询域名信息</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2009-09-16T06:15:04+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>6:15 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>域名信息的查询原理非常简单，主要是基于RFC 954（RFC 812已被废弃）提供的WHOIS协议。WHOIS服务器是一个基于“查询/响应”的TCP事务服务器，用户程序通过访问WHOIS服务器，从WHOIS数据库中查询得到我们所需要的内容。其主要过程有以下三步：</p>
+
+<ol>
+<li>在TCP服务端口43连接WHOIS服务主机；</li>
+<li>发送一个命令，以回车换行符结尾；</li>
+<li>接受相应命令的返回信息，一旦输出结束，服务器将关闭连接。</li>
+</ol>
+
+<p>命令的格式非常简单。可以直接输入域名（例如example.com）查询相关域名信息；也可以使用help得到详细的帮助信息。以下是查询的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>wxString Whois::Lookup(wxString& host, wxString& szAddress)
+</span><span class='line'>{
+</span><span class='line'>    char szQuery[512];
+</span><span class='line'>    char szBuffer[512];
+</span><span class='line'>    wxString szResult;
+</span><span class='line'>
+</span><span class='line'>    strcpy(szQuery, szAddress);
+</span><span class='line'>    strcat(szQuery, "\r\n");
+</span><span class='line'>
+</span><span class='line'>    wxIPV4address addr;
+</span><span class='line'>    addr.Hostname(host);
+</span><span class='line'>    addr.Service(43);
+</span><span class='line'>
+</span><span class='line'>    wxSocketClient socket;
+</span><span class='line'>    socket.Connect(addr, false);
+</span><span class='line'>    socket.WaitOnConnect(30);
+</span><span class='line'>
+</span><span class='line'>    if (socket.IsConnected())
+</span><span class='line'>    {
+</span><span class='line'>        socket.Write(szQuery, strlen(szQuery));
+</span><span class='line'>        szResult = "";
+</span><span class='line'>        while (true)
+</span><span class='line'>        {
+</span><span class='line'>            // Clear buffer before each iteration
+</span><span class='line'>            memset(szBuffer, 0, 512);
+</span><span class='line'>
+</span><span class='line'>            // Try to receive some data
+</span><span class='line'>            socket.Read(szBuffer, 500);
+</span><span class='line'>            if (socket.LastCount() &lt;= 0)
+</span><span class='line'>            {
+</span><span class='line'>                break;
+</span><span class='line'>            }
+</span><span class='line'>            szResult += szBuffer;
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>    else
+</span><span class='line'>    {
+</span><span class='line'>        szResult = wxT("Failed! Unable to connect\n");
+</span><span class='line'>    }
+</span><span class='line'>    socket.Close();
+</span><span class='line'>
+</span><span class='line'>    return wxString::FromUTF8(szResult);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>常用的WHOIS服务器：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>.cn=whois.cnnic.net.cn
+</span><span class='line'>.com=whois.internic.com
+</span><span class='line'>.net=whois.internic.com
+</span><span class='line'>.name=www.whois.name
+</span><span class='line'>.cc=whois.nic.cc</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -534,74 +671,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/git-notes-reset/">Git笔记之reset</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2009-01-14T21:48:24+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>14</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>9:48 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>git reset的作用是重置当前HEAD到指定状态，它有三个选项：--soft、--mixed和--hard。</p>
-
-<ul>
-<li>--soft选项既不重置索引内容，也不改变工作目录中的任何内容，它仅仅是重置当前HEAD到指定commit。使用该选项后，git diff的返回信息不变，而git diff --cached和git diff HEAD的返回信息有变化。</li>
-<li>--mixed是git reset的默认选项，它的作用是重置索引内容，将其定位到指定的commit，但不改变工作目录中的任何内容。使用该选项后，git diff和git diff HEAD的返回信息有变化，而git diff --cached的返回信息不变。</li>
-<li>--hard选项会重置索引内容，将其定位到指定的commit，并且工作目录中的内容也会完全回退到指定commit时的状态。所以使用该选项后，git diff、git diff --cached和git diff HEAD的返回信息都为空。由于这个选项的杀伤力太大，使用时需要谨慎。</li>
-</ul>
-
-<p>以下是根据三个选项的特性制作的表格：</p>
-
-<table><thead>
-<tr>
-<th></th>
-<th style="text-align: center">是否重置索引</th>
-<th style="text-align: center">是否重置工作目录</th>
-</tr>
-</thead><tbody>
-<tr>
-<td>--soft</td>
-<td style="text-align: center">N</td>
-<td style="text-align: center">N</td>
-</tr>
-<tr>
-<td>--mixed</td>
-<td style="text-align: center">Y</td>
-<td style="text-align: center">N</td>
-</tr>
-<tr>
-<td>--hard</td>
-<td style="text-align: center">Y</td>
-<td style="text-align: center">Y</td>
-</tr>
-</tbody></table>
-
-<p>有时候你可能刚刚把一个文件添加到暂存区里，然后就发现这是错误的，接着你可能想从暂存区中删除该文件，这时你可以使用下面这个命令：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git reset &lt;file&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>它仅从索引中移除文件，但不会触及工作目录。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/18">&larr; Older</a>
@@ -623,6 +692,10 @@
       </li>
     
       <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part15/">ANTLR 4权威参考读书笔记（15）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part14/">ANTLR 4权威参考读书笔记（14）</a>
       </li>
     
@@ -632,10 +705,6 @@
     
       <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part13/">ANTLR 4权威参考读书笔记（13）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/developers-are-blinded-by-the-light/">开发者被灯光蒙蔽了双眼</a>
       </li>
     
   </ul>
@@ -649,7 +718,7 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 129%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 130%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 131%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>

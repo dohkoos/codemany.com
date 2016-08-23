@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: ANTLR | 乐者为王]]></title>
   <link href="http://codemany.com/tags/antlr/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2016-08-17T10:28:29+08:00</updated>
+  <updated>2016-08-23T19:42:18+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,47 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（15）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part15/"/>
+    <updated>2016-05-22T17:51:36+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part15</id>
+    <content type="html"><![CDATA[<p>在聚焦到具体的语法规则内部结构之前，我们要先讨论下语法的整体剖析以及如何形成一套初始的语法骨架。</p>
+
+<p>文法文件通常是由一个命名文法的头和一系列可以彼此调用的规则组成。就像下面的那样：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">grammar MyG;
+rule1 : «stuff» ;
+rule2 : «more stuff» ;
+...
+</code></pre></div>
+<p>设计语法就是要搞清楚«stuff»是什么？哪个规则是开始规则。这要求我们需要知道给定语言的一系列代表性的输入例子。当然，从语言参考手册或者其它语法分析器生成器格式而来的语法也是有帮助的。</p>
+
+<p>正确设计语法的方法是借鉴功能分解或者自顶向下的设计，从粗粒度级别到细粒度级别逐步定义语言结构并把它们编码为语法规则。所以，我们的第一个任务就是找到粗粒度语言结构的名字，同时它也是开始规则。在英语中我们使用sentence，对于XML文件来说它则是document。</p>
+
+<p>设计开始规则的内容是用英语伪代码描述整个输入格式的问题。例如，“a comma-separated-value (CSV) file is a sequence of rows terminated by newlines.”这段文字，在is a左边的至关重要的单词file是规则名字，在is a右边的所有内容则成为在规则定义右则的«stuff»的内容：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">file : «sequence of rows that are terminated by newlines» ;
+</code></pre></div>
+<p>然后我们通过描述在开始规则右侧被确定的元素来进行下一个粒度级别的设计。在规则右侧的名词通常是对记号或尚未定义的规则的引用，这些记号是那些我们在正常情况下视为单词、标点符号、运算符的元素。就像单词是英语句子中的原子成分那样，记号在语法规则中也是如此。规则引用则涉及到像row那样需要被分解为更详细部分的其它语言结构。</p>
+
+<p>进入细节的另外一层，我们可以说row是一系列被逗号分隔的field，而field则是一个数字或字符串。就像以下所示：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">row   : «sequence of fields separated by commas» ;
+field : «number or string» ;
+</code></pre></div>
+<p>当没有规则需要再定义时，我们就得到了语法的一个粗略的草图。</p>
+
+<p>如果有其它格式的语法作为参考的话设计语法会容易的多，但小心不要盲目地遵循它，否则你会误入歧途的。非ANTLR格式的语法只是让你知道别人是如何决定分解语言中的短语的，它最大的作用就是可以给我们一份规则名称的列表用作参考。</p>
+
+<p>不推荐从参考手册上复制粘贴语法到ANTLR，然后再通过细微的调整让它工作。把它当作一套指南而不是一段代码是更好的办法。为了清晰地描述语法，参考手册通常是相当松散的。这意味着语法能识别大量不在语言中的句子，或者语法可能不够明确，可以用多种方法匹配相同的输入序列。例如，语法可能会说表达式可以调用一个构建器或者访问一个函数，问题是像T(i)这样的输入可以同时匹配两者。理想情况下，在语法中是不能有这样的二义性的，每个输入句子我们只需要一种解释。</p>
+
+<p>在另一个极端，参考手册中的语法有时过于明确地说明了规则。有些约束是需要在分析完输入后实施的，而不是试图对语法结构实施约束。例如，W3C XML语法就显式地指定标签中什么地方必须要有空格以及什么地方的空格可以省略。但事实是我们可以简单地让词法分析器在把记号发送给语法分析器之前去除空格，不需要在语法中到处测试它。</p>
+
+<p>规格还说&lt;?xml ...&gt;标签可以有两个附加属性encoding和standalone。我们需要知道约束，但它是很容易去允许任何属性名字，然后在语法分析后检查语法分析树，以确保所有这些限制都满足的。
+归根结底，XML只是嵌在文本中的一对标签，因此它的语法结构是相当直白的。唯一的挑战是如何分别对待什么在标签内以及什么在标签外。</p>
+
+<p>识别语法规则并用伪代码表示它们的右侧部分最初是个挑战，但当你为更多的语言构建语法后它会变得越来越容易。一旦我们有了伪代码，我们就需要把它转换成ANTLR表示法，以便能得到一个可工作的语法。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（14）]]></title>
@@ -202,55 +243,6 @@ grun XML tokens -tokens t.xml
 <p>因为它们记录了我们知道的通过规则对短语识别的每件事，所以这些被称为上下文对象。每个上下文对象知道被识别短语的开始和结束记号以及提供对所有短语的元素的访问。例如，AssignContext提供方法ID()和expr()去访问标志符节点和表达式子树。</p>
 
 <p>给出了具体类型的描述，我们可以手工写代码去执行树的深度优先遍历。当我们发现和完成节点时我们可以执行任何我们想要的动作。典型的操作是诸如计算结果，更新数据结构，或者生成输出。相比每次为每个应用写同样的树遍历样板代码，我们可以使用ANTLR自动生成的树遍历机制。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（10）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part10/"/>
-    <updated>2016-04-08T22:11:39+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part10</id>
-    <content type="html"><![CDATA[<p>一个模棱两可的短语或句子通常是指它有不止一种解释。换句话说，短语或句子能适配不止一种语法结构。要解释或转换一个短语，程序必须要能唯一地确认它的含义，这意味着我们必须提供无歧义的语法，以便生成的语法分析器能用明确的一个方法匹配每个输入短语。</p>
-
-<p>在这里，让我们展示一些有歧义的语法以便让二义性的概念更具体。如果你以后在构建语法时陷入二义性，你可以参考本节的内容。</p>
-
-<p>一些明显有歧义的语法：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">assign
-    : ID &#39;=&#39; expr    // 匹配一个赋值语句，例如f()
-    | ID &#39;=&#39; expr    // 前面选项的精确复制
-    ;
-
-expr
-    : INT ;
-</code></pre></div>
-<p>大多数时候二义性是不明显的，如同以下的语法，它能通过规则stat的两个选项匹配函数调用：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">stat
-    : expr          // 表达式语句
-    | ID &#39;(&#39; &#39;)&#39;    // 函数调用语句
-    ;
-
-expr
-    : ID &#39;(&#39; &#39;)&#39;
-    | INT
-    ;
-</code></pre></div>
-<p>这里是两个输入f()的解释，从规则stat开始：</p>
-
-<p><img src="/uploads/fn-parse-tree.png" title="fn-parse-tree" ></p>
-
-<p>左边的语法分析树显示f()匹配规则expr。右边的语法分析树显示f()匹配规则stat的第二个选项。</p>
-
-<p>因为大部分语言它们的语法都被设计成无歧义的，有歧义的语法类似于编程缺陷。我们需要识别语法以便为每个输入短语提交单一选择给语法分析器。如果语法分析器发现一个有歧义的短语，它必须选一个可行的选项。ANTLR通过选择涉及决定的第一个选项解决二义性。在本例中，语法分析器将选择与左边的语法分析树有关的f()的解释。</p>
-
-<p>二义性可以发生在词法分析器中也能发生在语法分析器中，但ANTLR可以自动地解决它们。ANTLR通过使输入字符串和语法中第一个指定的规则匹配来解决词法二义性。为了明白这是如何工作的，让我们看看对大部分编程语言都很普遍的二义性：在关键字和标志符规则中的二义性。关键字begin（后面有个非字母）也是标志符，至少词法上，因此词法分析器可以匹配b-e-g-i-n到两者中的任何一个规则。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">BEGIN : &#39;begin&#39; ;    // 匹配b-e-g-i-n序列，即把二义性解析为BEGIN
-ID    : [a-z]+ ;     // 匹配一个或多个任意小写字母
-</code></pre></div>
-<p>注意，词法分析器会试着为每个记号尽可能匹配最长的字符串，这意味着输入beginner将仅匹配规则ID。词法分析器不会把beginner匹配成BEGIN随后ID匹配输入ner。</p>
-
-<p>有时候语言的语法就明显有歧义，没有任何的语法重组能改变这个事实。例如，算术表达式的自然语法可以用两种方式解释输入像1+2*3这样，要么执行运算符从左到右，要么像大部分语言那样按优先级顺序。</p>
-
-<p>C语言展示了另一种二义性，但我们可以使用上下文信息比如标志符如何被定义来解决它。考虑代码片段i*j;。在语法上，它看起来像是一个表达式，但它的含义或者语义依赖i是类型名还是变量。如果i是类型名，那么这个片段不是表达式，而是一个声明为指向类型i的指针变量j。</p>
 ]]></content>
   </entry>
   

@@ -4,7 +4,7 @@
   <title><![CDATA[乐者为王]]></title>
   <link href="http://codemany.com/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2016-08-17T10:28:29+08:00</updated>
+  <updated>2016-08-23T19:42:18+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -2172,6 +2172,57 @@
   </entry>
   
   <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（15）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part15/"/>
+    <updated>2016-05-22T17:51:36+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part15</id>
+    <content type="html"><![CDATA[<p>在聚焦到具体的语法规则内部结构之前，我们要先讨论下语法的整体剖析以及如何形成一套初始的语法骨架。</p>
+
+<p>文法文件通常是由一个命名文法的头和一系列可以彼此调用的规则组成。就像下面的那样：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar MyG;
+</span><span class='line'>rule1 : «stuff» ;
+</span><span class='line'>rule2 : «more stuff» ;
+</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
+
+<p>设计语法就是要搞清楚«stuff»是什么？哪个规则是开始规则。这要求我们需要知道给定语言的一系列代表性的输入例子。当然，从语言参考手册或者其它语法分析器生成器格式而来的语法也是有帮助的。</p>
+
+<p>正确设计语法的方法是借鉴功能分解或者自顶向下的设计，从粗粒度级别到细粒度级别逐步定义语言结构并把它们编码为语法规则。所以，我们的第一个任务就是找到粗粒度语言结构的名字，同时它也是开始规则。在英语中我们使用sentence，对于XML文件来说它则是document。</p>
+
+<p>设计开始规则的内容是用英语伪代码描述整个输入格式的问题。例如，“a comma-separated-value (CSV) file is a sequence of rows terminated by newlines.”这段文字，在is a左边的至关重要的单词file是规则名字，在is a右边的所有内容则成为在规则定义右则的«stuff»的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>file : «sequence of rows that are terminated by newlines» ;</span></code></pre></td></tr></table></div></figure>
+
+<p>然后我们通过描述在开始规则右侧被确定的元素来进行下一个粒度级别的设计。在规则右侧的名词通常是对记号或尚未定义的规则的引用，这些记号是那些我们在正常情况下视为单词、标点符号、运算符的元素。就像单词是英语句子中的原子成分那样，记号在语法规则中也是如此。规则引用则涉及到像row那样需要被分解为更详细部分的其它语言结构。</p>
+
+<p>进入细节的另外一层，我们可以说row是一系列被逗号分隔的field，而field则是一个数字或字符串。就像以下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>row   : «sequence of fields separated by commas» ;
+</span><span class='line'>field : «number or string» ;</span></code></pre></td></tr></table></div></figure>
+
+<p>当没有规则需要再定义时，我们就得到了语法的一个粗略的草图。</p>
+
+<p>如果有其它格式的语法作为参考的话设计语法会容易的多，但小心不要盲目地遵循它，否则你会误入歧途的。非ANTLR格式的语法只是让你知道别人是如何决定分解语言中的短语的，它最大的作用就是可以给我们一份规则名称的列表用作参考。</p>
+
+<p>不推荐从参考手册上复制粘贴语法到ANTLR，然后再通过细微的调整让它工作。把它当作一套指南而不是一段代码是更好的办法。为了清晰地描述语法，参考手册通常是相当松散的。这意味着语法能识别大量不在语言中的句子，或者语法可能不够明确，可以用多种方法匹配相同的输入序列。例如，语法可能会说表达式可以调用一个构建器或者访问一个函数，问题是像T(i)这样的输入可以同时匹配两者。理想情况下，在语法中是不能有这样的二义性的，每个输入句子我们只需要一种解释。</p>
+
+<p>在另一个极端，参考手册中的语法有时过于明确地说明了规则。有些约束是需要在分析完输入后实施的，而不是试图对语法结构实施约束。例如，W3C XML语法就显式地指定标签中什么地方必须要有空格以及什么地方的空格可以省略。但事实是我们可以简单地让词法分析器在把记号发送给语法分析器之前去除空格，不需要在语法中到处测试它。</p>
+
+<p>规格还说&lt;?xml ...&gt;标签可以有两个附加属性encoding和standalone。我们需要知道约束，但它是很容易去允许任何属性名字，然后在语法分析后检查语法分析树，以确保所有这些限制都满足的。
+归根结底，XML只是嵌在文本中的一对标签，因此它的语法结构是相当直白的。唯一的挑战是如何分别对待什么在标签内以及什么在标签外。</p>
+
+<p>识别语法规则并用伪代码表示它们的右侧部分最初是个挑战，但当你为更多的语言构建语法后它会变得越来越容易。一旦我们有了伪代码，我们就需要把它转换成ANTLR表示法，以便能得到一个可工作的语法。</p>
+]]></content>
+  </entry>
+  
+  <entry>
     <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（14）]]></title>
     <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part14/"/>
     <updated>2016-05-16T20:26:22+08:00</updated>
@@ -3279,6 +3330,7 @@ another runner in the night<br>
     <content type="html"><![CDATA[<ul>
 <li>syntax analyzer 语法分析器</li>
 <li>syntax tree 语法树</li>
+<li>sentence 句子</li>
 </ul>
 
 <p>一门语言由有效的句子组成，一个句子由短语组成，一个短语由子短语和词汇符号组成。要实现一门语言，我们必须构建一个能读取句子以及对发现的短语和输入符号作出适当反应的应用。</p>
@@ -4381,158 +4433,6 @@ another runner in the night<br>
 </span><span class='line'> (expr ( (expr (expr 1) + (expr 2)) )) * (expr 3))))</span></code></pre></td></tr></table></div></figure>
 
 <p>代码下载：<a href="https://github.com/dohkoos/antlr4-calculator">https://github.com/dohkoos/antlr4-calculator</a></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（2）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part2/"/>
-    <updated>2016-01-01T16:35:41+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part2</id>
-    <content type="html"><![CDATA[<ul>
-<li>token 记号</li>
-<li>ambiguity 二义性</li>
-</ul>
-
-<h3 id="安装antlr">安装ANTLR</h3>
-
-<p>ANTLR是由Java写成的，所以在安装ANTLR前必须保证已经安装有Java 1.6或以上版本。你可以到 <a href="http://www.antlr.org/download.html">http://www.antlr.org/download.html</a> 下载ANTLR的最新版本，或者也可使用命令行工具。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>curl -O http://www.antlr.org/download/antlr-4.5.1-complete.jar</span></code></pre></td></tr></table></div></figure>
-
-<p>antlr-4.5.1-complete.jar包含运行ANTLR工具的所有必要依赖，以及编译和执行由ANTLR生成的识别器所需的运行库。ANTLR工具将由语法文件描述的语法转换成识别程序，识别程序利用ANTLR运行库中的某些支持类识别输入的语句。该jar包还包含两个支持库：<a href="https://github.com/abego/treelayout">TreeLayout（一个复杂的树布局库）</a>和<a href="http://www.stringtemplate.org/">StringTemplate（一个用于生成代码和其它结构化文本的模板引擎）</a>。</p>
-
-<p>现在来测试下ANTLR工具是否工作正常：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>java -jar antlr-4.5.1-complete.jar  # 启动org.antlr.v4.Tool</span></code></pre></td></tr></table></div></figure>
-
-<p>如果正常会看到以下帮助信息：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ANTLR Parser Generator  Version 4.5.1
-</span><span class='line'> -o ___              specify output directory where all output is generated
-</span><span class='line'> -lib ___            specify location of grammars, tokens files
-</span><span class='line'> ...</span></code></pre></td></tr></table></div></figure>
-
-<p>每次运行ANTLR工具都要输入这么长的命令是否有些痛苦？写个脚本来解放我们的手指吧！</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>#!/bin/sh
-</span><span class='line'>java -cp .:./antlr-4.5.1-complete.jar:$CLASSPATH org.antlr.v4.Tool $*</span></code></pre></td></tr></table></div></figure>
-
-<p>把它保存为antlr.sh，以后就可以使用下列命令来运行ANTLR工具了：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr</span></code></pre></td></tr></table></div></figure>
-
-<h3 id="执行antlr和测试识别器">执行ANTLR和测试识别器</h3>
-
-<p>先看下面这段用于识别像hello world那样短语的简单语法：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Hello;               // 定义文法的名字
-</span><span class='line'>
-</span><span class='line'>s  : 'hello' ID ;            // 匹配关键字hello，后面跟着一个标志符
-</span><span class='line'>ID : [a-z]+ ;                // 匹配小写字母标志符
-</span><span class='line'>WS : [ \t\r\n]+ -&gt; skip ;    // 跳过空格、制表符、回车符和换行符</span></code></pre></td></tr></table></div></figure>
-
-<p>把以上语法保存为Hello.g，然后执行以下命令来生成识别器：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr Hello.g</span></code></pre></td></tr></table></div></figure>
-
-<p>该命令会在相同目录下生成后缀名为tokens和java的六个文件：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Hello.tokens        HelloLexer.java         HelloParser.java
-</span><span class='line'>HelloLexer.tokens   HelloBaseListener.java  HelloListener.java</span></code></pre></td></tr></table></div></figure>
-
-<p>现在开始准备编译由ANTLR生成的Java代码。先写个脚本把编译命令包装起来：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>#!/bin/sh
-</span><span class='line'>javac -cp .:./antlr-4.5.1-complete.jar:$CLASSPATH $*</span></code></pre></td></tr></table></div></figure>
-
-<p>把它保存为compile.sh文件，然后你就可以用以下命令编译代码了：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>compile *.java</span></code></pre></td></tr></table></div></figure>
-
-<p>到此，我们已经有了一个可以被HelloParser和HelloLexer利用的可执行的识别器，只缺一个主程序去触发语言识别了。</p>
-
-<p>ANTLR运行库有提供称之为TestRig的测试工具，可以让你不创建主程序就能测试语法。TestRig使用Java反射调用编译后的识别器，它能显示关于识别器如何匹配输入的大量信息。</p>
-
-<p>同样地，创建一个脚本grun.sh来简化以后的打字数：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>#!/bin/sh
-</span><span class='line'>java -cp .:./antlr-4.5.1-complete.jar:$CLASSPATH org.antlr.v4.gui.TestRig $*</span></code></pre></td></tr></table></div></figure>
-
-<p>现在，让我们来打印出识别期间创建的那些记号（记号是指像关键字hello和标识符world那样的词汇符号）：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grun Hello s -tokens</span></code></pre></td></tr></table></div></figure>
-
-<p>敲入上述命令并按回车，接着输入以下内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>hello world  # 输入并按回车
-</span><span class='line'>EOF          # Unix系统输入Ctrl+D或Windows系统输入Ctrl+Z并按回车</span></code></pre></td></tr></table></div></figure>
-
-<p>TestRig会打印出记号列表，每一行输出表示一个记号以及它的有关信息：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>[@0,0:4='hello',&lt;1&gt;,1:0]
-</span><span class='line'>[@1,6:10='world',&lt;2&gt;,1:6]
-</span><span class='line'>[@2,13:12='&lt;EOF&gt;',&lt;-1&gt;,2:0]</span></code></pre></td></tr></table></div></figure>
-
-<p>这里详细讲解下[@1,6:10=&#39;world&#39;,<2>,1:6]的意义。@1表示记号索引（从0开始）；6:10表示记号开始与结束的位置（从0开始）；<2>表示记号类型，具体数值和类型存储在后缀名为tokens的文件中；最后的1:6表示记号在第一行（从1开始），从第6个字符开始（从0开始，制表符作为单个字符计算）。</p>
-
-<p>除此之外，还可以以LISP风格的文本形式查看记号：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grun Hello s -tree</span></code></pre></td></tr></table></div></figure>
-
-<p>它会输出如下形式的记号：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>(s hello world)  # (root children)</span></code></pre></td></tr></table></div></figure>
-
-<p>你也可以以可视化的方式查看语法分析树：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grun Hello s -gui</span></code></pre></td></tr></table></div></figure>
-
-<p><img src="http://codemany.com/uploads/hello-parse-tree.png" title="hello-parse-tree" ></p>
-
-<p>以下是TestRig可用的所有参数：</p>
-
-<ul>
-<li>-tokens 打印出记号流。</li>
-<li>-tree 以LISP风格的文本形式打印出语法分析树。</li>
-<li>-gui 在对话框中可视化地显示语法分析树。</li>
-<li>-ps file.ps 在PostScript中生成一个可视化的语法分析树表示，并把它存储在file.ps文件中。</li>
-<li>-encoding encodingname 指定输入文件的编码。</li>
-<li>-trace 在进入/退出规则前打印规则名字和当前的记号。</li>
-<li>-diagnostics 分析时打开诊断消息。此生成消息仅用于异常情况，如二义性输入短语。</li>
-<li>-SLL 使用更快但稍弱的分析策略。</li>
-</ul>
 ]]></content>
   </entry>
   
