@@ -2257,6 +2257,137 @@
       
   <header>
     
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part16/">ANTLR 4权威参考读书笔记（16）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-06-02T10:16:21+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2016</span></span> <span class='time'>10:16 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><ul>
+<li>initializer 初始值设定项</li>
+</ul>
+
+<p>现在，我们已经有了一个自顶向下的草拟出语法的通用策略，下面我们要专注于一些常用的语言模式。尽管在过去几十年里有大量的语言被发明，但仍然只有较少的基本语言模式需要被处理。这是因为人们趋向于设计遵循自然语言约束的语言，语言也会因为设计者遵循数学上的常用表示法而趋向于相似。甚至在词法级别，语言趋向于重用一些相同的结构，例如标志符、整数、字符串等。这些单词顺序和依赖的约束来源于自然语言，并逐渐演化成为四种抽象的语言模式：</p>
+
+<h4 id="模式：序列">模式：序列</h4>
+
+<p>这是像数组初始值设定项中的值那样的一系列元素，也是在计算机语言中最常见的结构。例如，下面是登录到POP服务器时的序列：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>USER parrt
+</span><span class='line'>PASS secret
+</span><span class='line'>RETR 1</span></code></pre></td></tr></table></div></figure>
+
+<p>这些命令本身也是序列。大部分命令是一个关键词（保留标志符，例如USER和RETR）跟随一个运算元再跟随一个换行符。为了在语法中指定此类序列，我们可以按照顺序简单地列出各个元素。以下是检索命令的序列（其中INT表示整数记号类型）：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>retr : 'RETR' INT '\n' ;</span></code></pre></td></tr></table></div></figure>
+
+<p>我们可以给RETR序列打上retr规则的标签，这样在语法的其它地方，我们就能使用规则名字作为简写来引用RETR序列。</p>
+
+<p>对于任意长度的序列像矢量[1 2 3]这样的简单整数列表，虽然它是一个有限序列，但我们不可能通过像INT INT INT ...这样的规则片段来列出所有可能的整数列表。为了编码这样的一个或者多个元素，我们使用“+”子规则运算符。例如，{INT}+表示任意长度的整数序列，或者使用简写INT+也可以。至于可以为空的列表，我们则使用零个或者多个运算符“*”。</p>
+
+<p>这种模式的变体有带终结符的序列和带分隔符的序列，CSV文件就很好地示范了这两者。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>file : (row '\n')* ;           // 带一个“\n”终结符的序列
+</span><span class='line'>row  : field (',' field)* ;    // 带一个“,”分隔符的序列
+</span><span class='line'>field: INT ;                   // 假设字段只是整数</span></code></pre></td></tr></table></div></figure>
+
+<p>规则file使用带终结符模式的列表去匹配零个或者多个row &#39;\n&#39;序列，记号“\n”终结序列的每个元素。规则row使用带分隔符模式的列表去匹配一个field后面有零个或者多个&#39;,&#39; field序列，记号“,”分隔各个字段。</p>
+
+<p>最后，还有个特殊类型的零个或者一个序列，用“?”指定。可以使用它去表达可选的构造体。</p>
+
+<h4 id="模式：选择">模式：选择</h4>
+
+<p>这是一个在多个可供替代的短语之间的选择，比如在编程语言中不同种类的语句。为了在语言中表示选择的这个概念，我们使用“|”作为ANTLR中的“or”运算符去分隔被称为“选项”的语法选择。</p>
+
+<p>回到CVS语法，我们可以通过整数或者字符串的选择让规则field变得更灵活。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>field: INT | STRING ;</span></code></pre></td></tr></table></div></figure>
+
+<p>任何时候，如果你发现正在说“语言结构x可以是这个或者那个”，那么你就可以确定应该使用选择模式，在规则x中使用“|”。</p>
+
+<h4 id="模式：记号依赖">模式：记号依赖</h4>
+
+<p>记号依赖表示一个记号的存在需要在短语的其它地方有它的对等物的存在，比如匹配的左右括号。前面我们曾经使用INT+去表达在矢量[1 2 3]中的整数非空序列。为指定周围有方括号的矢量，我们需要一种方法去表达记号中的依赖。如果我们在句子中看到一个符号，那么我们必须在句子的其它地方找到它的对等物。为表达这种语法，我们必须使用同时指定对等符号的序列，它们通常包围或分组着其它元素。在这个案例中，我们这样指定矢量：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>vector : '[' INT+ ']' ;    // [1], [1 2], [1 2 3], ...</span></code></pre></td></tr></table></div></figure>
+
+<p>扫视任何有效的代码，你会看到必须成对出现的各种分组符号：(...)，[...]，{...}。但是要牢记，依赖符号并不是必须配对的，类C语言都有的a ? b : c三元运算符就指定了当看到“?”符号时需要在接下来的短语中看到“:”符号。</p>
+
+<h4 id="模式：嵌套短语">模式：嵌套短语</h4>
+
+<p>嵌套短语有一个自相似的语言结构，它的子短语也遵循相同的结构。表达式是典型的自相似语言结构，由被运算符分隔的嵌套子表达式组成。类似地，while的代码块是嵌套在外部代码块内的一个代码块。我们在语法中使用递归规则表达自相似的语言结构。因此，如果规则的伪代码引用它自身，我们将需要一个递归的自引用规则。</p>
+
+<p>让我们来看下代码块的嵌套是如何工作的。while语句是关键词while跟随一个在括号中的条件表达式再跟随一个语句。我们也可以把多条语句包裹在花括号里当作一个单块语句。表达语法如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>stat: 'while' '(' expr ')' stat    // 匹配WHILE语句
+</span><span class='line'>    | '{' stat* '}'                // 匹配在括号中的语句块
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>这里的stat可以是单条语句或者被花括号括起来的一组语句。规则stat是直接递归的，因为它在两个选项中直接引用它自身。如果我们把第二个选项移到它自己的规则中，规则stat和block将是双向间接递归的。语法如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>stat: 'while' '(' expr ')' stat    // 匹配WHILE语句
+</span><span class='line'>    | '{' stat* '}'                // 匹配语句块
+</span><span class='line'>    ;
+</span><span class='line'>block: '{' stat* '}' ;             // 匹配在括号中的语句块</span></code></pre></td></tr></table></div></figure>
+
+<p>看下面仅有3类表达式（索引数组引用、括号表达式和整数）的简单语言的语法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>expr: ID '[' expr ']'    // a[1], a[b[1]], a[(2*b[1])]
+</span><span class='line'>    | '(' expr ')'       // (1), (a[1]), (((1))), (2*a[1])
+</span><span class='line'>    | INT                // 1, 94117
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>注意递归是如何自然地发生的。数组索引表达式的索引组件是表达式本身，因此我们只需要在选项中引用expr即可。</p>
+
+<p>下图是关于两个例子输入的语法分析树：</p>
+
+<p><img src="/uploads/expr-parse-tree.png" title="expr-parse-tree" ></p>
+
+<p>分析树中的内部树节点是规则引用，叶子是记号引用。从树根到任何节点的路径表示元素的规则调用栈（或者ANTLR生成的递归下降语法分析器调用栈）。路径代表递归嵌套的子树有多个相同规则的引用。规则节点是其下方子树的标签。根节点是expr，所以整棵树是一个表达式。在1之前的那棵expr子树会把整数当作一个表达式。</p>
+
+<p>为实现这些模式，我们只需要由选项、记号引用、规则引用组成的语法规则即可。我们还可以把这些元素组成子规则，子规则是裹在括号内的行内规则。我们也可以将子规则标记为“?”或“*”或“+”循环去识别被包围的语法片段多次。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
       <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part15/">ANTLR 4权威参考读书笔记（15）</a></h1>
     
     
@@ -3407,106 +3538,6 @@ another runner in the night<br>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part9/">ANTLR 4权威参考读书笔记（9）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-03-27T07:10:05+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>27</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>7:10 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><ul>
-<li>predication 预测</li>
-<li>predict 预判</li>
-<li>lookahead 预读</li>
-</ul>
-
-<p>ANTLR工具根据语法规则，例如我们刚才看到的assign，生成递归下降语法分析器。递归下降语法分析器只是递归方法的一个集合，每个规则一个方法。下降这个术语指的是分析从语法分析树的根开始向着叶子进行（记号）。我们首先调用的规则，即stat符号，成为语法分析树的根。那也就意味着对<a href="/blog/reading-notes-the-definitive-antlr4-reference-part8/">ANTLR 4权威参考读书笔记（8）</a>中的语法分析树来说需要调用方法stat()。这类分析更通用的术语是自顶向下分析：递归下降语法分析器仅仅是自顶向下语法分析器实现的一种。</p>
-
-<p>要了解递归下降语法分析器是什么样子，这里是ANTLR为规则assign生成的方法（稍微整理）：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>// assign : ID '=' expr ;
-</span><span class='line'>void assign() {    // 根据规则assign生成的方法
-</span><span class='line'>    match(ID);     // 比较ID和当前输入符号然后消费
-</span><span class='line'>    match('=');
-</span><span class='line'>    expr();        // 通过调用expr()匹配表达式
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>递归下降语法分析器最酷的部分是通过调用方法stat()、assign()和expr()跟踪出的调用关系图反映了内部的语法分析树节点。match()的调用对应语法分析树叶子。为了在一个手工构建的语法分析器中手动构建一颗语法分析树，我们需要在每个规则方法的开始处插入“添加新子树根”操作，以及给match()一个“添加新叶子节点”操作。</p>
-
-<p>方法assign()只是检查确保所有必要的记号存在且以正确的顺序。当语法分析器进入assign()时，它不必在多个选项之间进行选择。选项是规则定义右边的选择之一。例如，调用assign的stat规则可能有其它类型的语句。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>/** 匹配起始于当前输入位置的任何语句 */
-</span><span class='line'>stat
-</span><span class='line'>    : assign    // 第一个选项（'|'是选项分隔符）
-</span><span class='line'>    | ifstat    // 第二个选项
-</span><span class='line'>    | whilestat
-</span><span class='line'>    ...
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<p>stat的分析规则看起来像一条switch语句：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>void stat() {
-</span><span class='line'>    switch ( «current input token» ) {
-</span><span class='line'>        CASE ID : assign(); break;
-</span><span class='line'>        CASE IF : ifstat(); break;    // IF是关键字'if'的记号类型
-</span><span class='line'>        CASE WHILE : whilestat(); break;
-</span><span class='line'>        ...
-</span><span class='line'>        default : «raise no viable alternative exception»
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>方法stat()必须通过检查下一个输入记号作出分析决定或预测。分析决定预判哪一个选项将会成功。在本例中，当看到WHILE关键字时会预判是规则stat的第三个选项。规则方法stat()然后就会调用whilestat()。你以前可能听说过术语预读记号，那只是下一个输入记号。预读记号可以是语法分析器在匹配和消费它之前嗅探的任何记号。</p>
-
-<p>有时候，语法分析器需要一些预读记号去预判哪个选项会成功。它甚至必须考虑从当前位置直到文件结尾的所有的记号。ANTLR默默地为你处理所有的这些事情，但是对决策过程有个基本的了解是有帮助的，可以让调试生成的语法分析器更容易。</p>
-
-<p>为更好地理解分析决定，想象有个单一入口和单一出口的迷宫，有单词写在地板上。每个沿着从入口到出口路径的单词序列表示一个句子。迷宫的结构与定义一门语言的语法规则类似。为测试一个句子在一门语言中的成员身份，我们在穿越迷宫时把句子的单词和沿着地板的单词作比较。如果通过句子的单词我们能到达出口，那么句子是有效的。</p>
-
-<p>为了通过迷宫，我们必须在每个岔口选择一条有效路径，正如我们必须在语法分析器中选择选项。我们必须决定该走哪条路，通过把我们句子中下一个单词（们）和沿着来自每个岔口的每条路径上可见的单词比较。我们能从岔口看到的单词与预读记号类似。当每条路径以唯一的单词开始时决定是相当容易的。在规则stat中，每个选项从唯一的记号开始，因此stat()可以通过查看第一个预读记号识别选项。</p>
-
-<p>当单词从一个岔口重叠部分开始每条路径时，语法分析器需要继续往前看，扫描可以识别选项的单词。ANTLR根据需要为每个决定自动上下调节预读数量。如果预读的结果是多条同样的到出口的路径，即当前的输入短语有多种解释。解决这样的二义性将是我们的下一个主题。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/2">&larr; Older</a>
@@ -3526,6 +3557,10 @@ another runner in the night<br>
       </li>
     
       <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part16/">ANTLR 4权威参考读书笔记（16）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part15/">ANTLR 4权威参考读书笔记（15）</a>
       </li>
     
@@ -3535,10 +3570,6 @@ another runner in the night<br>
     
       <li class="post">
         <a href="/blog/logic-problems-who-owns-the-fish/">逻辑题-谁养鱼</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part13/">ANTLR 4权威参考读书笔记（13）</a>
       </li>
     
   </ul>
@@ -3552,7 +3583,7 @@ another runner in the night<br>
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 130%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 131%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 131%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>

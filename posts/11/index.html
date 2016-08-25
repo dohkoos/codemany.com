@@ -9,8 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="可以通过ApplicationInfo类中sourceDir取得应用的文件路径，再使用File类读取文件的相关属性实现。不过这可能导致: 无法获取原始的创建时间，可能很早就被创建了，之后被替换了；
-如果这个应用在一个私有的位置，比如app-private目录（ &hellip;">
+  <meta name="description" content="这事本该N久前就该干了（09年末把手机从Nokia 6670换到HTC Hero G3），却一直拖着没有做，今天终于把这事作了一个了结。 Nokia下导出的短信是如Messages_Nokia 6670_20091215.xml这样的一个XML文件，文件内容的编码是unicode，格式就像下面这样 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -74,6 +73,291 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/transfer-sms-from-nokia-6670-to-htc-hero-g3/">将Nokia 6670的短信导入HTC Hero G3</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2011-06-21T08:43:10+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>21</span><span class='date-suffix'>st</span>, <span class='date-year'>2011</span></span> <span class='time'>8:43 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>这事本该N久前就该干了（09年末把手机从Nokia 6670换到HTC Hero G3），却一直拖着没有做，今天终于把这事作了一个了结。</p>
+
+<p>Nokia下导出的短信是如Messages_Nokia 6670_20091215.xml这样的一个XML文件，文件内容的编码是unicode，格式就像下面这样：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="unicode"?&gt;
+</span><span class='line'>&lt;SMS PhoneModel="Nokia 6670"&gt;
+</span><span class='line'>  &lt;Message DateTime="2011-06-21 10:10:10"&gt;
+</span><span class='line'>    &lt;Sender&gt;路人甲&lt;/Sender&gt;
+</span><span class='line'>    &lt;PhoneNumber&gt;+8613988888888&lt;/PhoneNumber&gt;
+</span><span class='line'>    &lt;Location&gt;Inbox&lt;/Location&gt;
+</span><span class='line'>    &lt;Text&gt;我是路人甲&lt;/Text&gt;
+</span><span class='line'>  &lt;/Message&gt;
+</span><span class='line'>
+</span><span class='line'>  &lt;Message DateTime="2011-06-21 11:11:11"&gt;
+</span><span class='line'>    &lt;Sender&gt;路人乙&lt;/Sender&gt;
+</span><span class='line'>    &lt;PhoneNumber&gt;+8613966666666&lt;/PhoneNumber&gt;
+</span><span class='line'>    &lt;Location&gt;Outbox&lt;/Location&gt;
+</span><span class='line'>    &lt;Text&gt;我是路人乙&lt;/Text&gt;
+</span><span class='line'>  &lt;/Message&gt;
+</span><span class='line'>&lt;/SMS&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>本来是想写个Android应用来直接导入这些备份短信的，不过在实现的过程中发现了SMS Backup&amp;Restore应用导出的备份文件和Nokia的备份文件类似，产生了做个将Nokia备份文件转换成SMS Backup&amp;Restore备份文件的念头，又在网上发现了nicholashan的<a href="http://bbs.hiapk.com/thread-140564-1-1.html">将Nokia的短信导入Hero（可能适用所有Android机型）</a>，坚定了我的这个想法。</p>
+
+<p>分析了一下SMS Backup&amp;Restore备份文件的格式，文件内容的编码是utf-8的：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version='1.0' encoding='utf-8' standalone='yes' ?&gt;
+</span><span class='line'>&lt;smses count="3"&gt;
+</span><span class='line'>  &lt;sms protocol="0" address="10658658" date="1308629532000"
+</span><span class='line'>    type="1" subject="null" body="我是内容" toa="null"
+</span><span class='line'>    sc_toa="null" service_center="null" read="1"
+</span><span class='line'>    status="-1" locked="0" /&gt;
+</span><span class='line'>  &lt;sms protocol="0" address="13566666666" date="1308633733000"
+</span><span class='line'>    type="2" subject="null" body="我也是内容" toa="null"
+</span><span class='line'>    sc_toa="null" service_center="null" read="1"
+</span><span class='line'>    status="-1" locked="0" /&gt;
+</span><span class='line'>  &lt;sms protocol="0" address="+8613588888888" date="1308641377000"
+</span><span class='line'>    type="1" subject="null" body="我还是内容" toa="null"
+</span><span class='line'>    sc_toa="null" service_center="null" read="1"
+</span><span class='line'>    status="-1" locked="0" /&gt;
+</span><span class='line'>&lt;/smses&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>与转换相关的就address、date、type和body四个属性。address是发信人的号码；date是短信发送日期的timestamp。这点nicholashan的确说错了，后面不需要加什么0的（实际上nicholashan自己也怀疑自己的说法）；type等于1表示别人发给你的短信，如果是2的话就是你发给其他人的短信；body就是短信内容了。</p>
+
+<p>将Nokia中的时间转换到SMS Backup&amp;Restore的时间可以使用下面的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>DateFormat dt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+</span><span class='line'>long value = 1355296332000L;    // 2012-12-12 12:12:12
+</span><span class='line'>Element e = (Element)iter.next();
+</span><span class='line'>Attribute attr = e.attribute("DateTime");
+</span><span class='line'>try {
+</span><span class='line'>    value = dt.parse(attr.getValue()).getTime();
+</span><span class='line'>} catch (ParseException ex) {
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>完整的代码如下（使用dom4j实现XML解析）：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+<span class='line-number'>72</span>
+<span class='line-number'>73</span>
+<span class='line-number'>74</span>
+<span class='line-number'>75</span>
+<span class='line-number'>76</span>
+<span class='line-number'>77</span>
+<span class='line-number'>78</span>
+<span class='line-number'>79</span>
+<span class='line-number'>80</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>import java.io.File;
+</span><span class='line'>import java.io.FileWriter;
+</span><span class='line'>import java.io.IOException;
+</span><span class='line'>import java.text.DateFormat;
+</span><span class='line'>import java.text.ParseException;
+</span><span class='line'>import java.text.SimpleDateFormat;
+</span><span class='line'>import java.util.Iterator;
+</span><span class='line'>import java.util.List;
+</span><span class='line'>
+</span><span class='line'>import org.dom4j.Attribute;
+</span><span class='line'>import org.dom4j.Document;
+</span><span class='line'>import org.dom4j.DocumentException;
+</span><span class='line'>import org.dom4j.DocumentHelper;
+</span><span class='line'>import org.dom4j.Element;
+</span><span class='line'>import org.dom4j.Node;
+</span><span class='line'>import org.dom4j.io.SAXReader;
+</span><span class='line'>import org.dom4j.io.XMLWriter;
+</span><span class='line'>
+</span><span class='line'>public class Main {
+</span><span class='line'>
+</span><span class='line'>    public static void main(String[] args) {
+</span><span class='line'>        try {
+</span><span class='line'>            SAXReader sr = new SAXReader();
+</span><span class='line'>            Document doc = sr.read(new File(args[0]));
+</span><span class='line'>
+</span><span class='line'>            generateDocument(doc);
+</span><span class='line'>        } catch (DocumentException e) {
+</span><span class='line'>            e.printStackTrace();
+</span><span class='line'>        } catch (IOException e) {
+</span><span class='line'>            e.printStackTrace();
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    private static void generateDocument(Document doc) {
+</span><span class='line'>        List list = doc.selectNodes("//Message");
+</span><span class='line'>
+</span><span class='line'>        Document document = DocumentHelper.createDocument();
+</span><span class='line'>        Element smses = document.addElement("smses");
+</span><span class='line'>        smses.addAttribute("count", String.valueOf(list.size()));
+</span><span class='line'>
+</span><span class='line'>        DateFormat dt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+</span><span class='line'>        long value = 1355296332000L;    // 2012-12-12 12:12:12
+</span><span class='line'>        Iterator iter = list.iterator();
+</span><span class='line'>        while (iter.hasNext()) {
+</span><span class='line'>            Element e = (Element)iter.next();
+</span><span class='line'>            Attribute attr = e.attribute("DateTime");
+</span><span class='line'>            try {
+</span><span class='line'>                value = dt.parse(attr.getValue()).getTime();
+</span><span class='line'>            } catch (ParseException e) {
+</span><span class='line'>                System.out.println(e.getMessage());
+</span><span class='line'>            }
+</span><span class='line'>            Node phone = e.selectSingleNode("PhoneNumber");
+</span><span class='line'>            Node location = e.selectSingleNode("Location");
+</span><span class='line'>            Node text = e.selectSingleNode("Text");
+</span><span class='line'>
+</span><span class='line'>            Element sms = smses.addElement("sms");
+</span><span class='line'>            sms.addAttribute("protocol", "0");
+</span><span class='line'>            sms.addAttribute("address", phone.getText());
+</span><span class='line'>            sms.addAttribute("date", String.valueOf(value));
+</span><span class='line'>            if ("Inbox".equals(location.getText())) {
+</span><span class='line'>                sms.addAttribute("type", "1");
+</span><span class='line'>            } else if ("Outbox".equals(location.getText())) {
+</span><span class='line'>                sms.addAttribute("type", "2");
+</span><span class='line'>            }
+</span><span class='line'>            sms.addAttribute("subject", "null");
+</span><span class='line'>            sms.addAttribute("body", text.getText());
+</span><span class='line'>            sms.addAttribute("toa", "null");
+</span><span class='line'>            sms.addAttribute("sc_toa", "null");
+</span><span class='line'>            sms.addAttribute("service_center", "null");
+</span><span class='line'>            sms.addAttribute("read", "1");
+</span><span class='line'>            sms.addAttribute("status", "-1");
+</span><span class='line'>            sms.addAttribute("locked", "0");
+</span><span class='line'>        }
+</span><span class='line'>
+</span><span class='line'>        File f = new File("output.xml");
+</span><span class='line'>        XMLWriter output = new XMLWriter(new FileWriter(f));
+</span><span class='line'>        output.write(document);
+</span><span class='line'>        output.close();
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>代码下载：<a href="https://github.com/dohkoos/N6670Conv">https://github.com/dohkoos/N6670Conv</a></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1812,186 +2096,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/upload-multiple-images-with-paperclip-rails-23-improved/">Rails 2.3和Paperclip实现多图片上传（改进版）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2011-04-28T06:48:00+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>28</span><span class='date-suffix'>th</span>, <span class='date-year'>2011</span></span> <span class='time'>6:48 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>从Rails 2.3开始，有了新的方法来处理多模型表单，这就是accepts_nested_attributes_for，它允许直接赋值到子对象上，对于标准的属性使用相同的哈希格式。</p>
-
-<p>例如，一个parent有多个children，包含所有类的POST数据将会是下面这样：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>params =&gt;
-</span><span class='line'>  action =&gt; update
-</span><span class='line'>  id =&gt; 1
-</span><span class='line'>  controller =&gt; parents
-</span><span class='line'>  parent =&gt;
-</span><span class='line'>    first_name =&gt; John
-</span><span class='line'>    last_name =&gt; Doe
-</span><span class='line'>    age =&gt; 40
-</span><span class='line'>    children_attributes =&gt;
-</span><span class='line'>      1 =&gt; { id =&gt; 16, :name =&gt; Jack }
-</span><span class='line'>      2 =&gt; { id =&gt; 18, :name =&gt; Mary }</span></code></pre></td></tr></table></div></figure>
-
-<p>注意，那个children_attributes元素在parent的元素中。fields_for会为这些子元素生成必要的POST数据，这些数据会被转换成方便accepts_nested_attributes_for解释的哈希。children_attributes不是数组而是哈希，它的键是一个简单的索引（不是模型的ID），被用来从一个单一的实体聚合属性。</p>
-
-<p>不用ID的理由是简单的：正在被编辑的模型可能不会被保存，发送到了客户端，这时它的ID为nil。因此为每个被显示的children的id关联一个隐藏字段是个好的实践。</p>
-
-<p>下面我们就用accepts_nested_attributes_for来改写上传多图片的代码。</p>
-
-<p>修改albums_controller.rb中的new方法，删除下面的这句代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>1.upto(3) { @album.photos.build }</span></code></pre></td></tr></table></div></figure>
-
-<p>将album.rb中的</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>def photo_attributes=(photo_attributes)
-</span><span class='line'>  photo_attributes.each do |attributes|
-</span><span class='line'>    photos.build(attributes)
-</span><span class='line'>  end
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<p>代码改成</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>accepts_nested_attributes_for :photos</span></code></pre></td></tr></table></div></figure>
-
-<p>修改_form.html.erb中的</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div id="photos"&gt;
-</span><span class='line'>  &lt;% if @album.new_record? %&gt;
-</span><span class='line'>    &lt;%= render :partial =&gt; 'photo', :collection =&gt; @album.photos %&gt;
-</span><span class='line'>  &lt;% end %&gt;
-</span><span class='line'>&lt;/div&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;%= link_to_function "Add Photo" do |page| page.insert_html :bottom, :photos, :partial =&gt; 'photo', :object =&gt; Photo.new end %&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>为下面的代码</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div id="photos"&gt;
-</span><span class='line'>  &lt;% if @album.new_record? %&gt;
-</span><span class='line'>    &lt;%= render :partial =&gt; 'photo', :locals =&gt; { :form =&gt; f, :photo =&gt; @album.photos.build } %&gt;
-</span><span class='line'>  &lt;% end %&gt;
-</span><span class='line'>&lt;/div&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;%= add_object_link("Add Photo", f, @album.photos.build, "photo", "#photos") %&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>再将_photo.html.erb中的</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;% fields_for "album[photo_attributes][]", photo do |p| %&gt;
-</span><span class='line'>  &lt;%= p.label :photo %&gt;&lt;br /&gt;
-</span><span class='line'>  &lt;%= p.file_field :data, :index =&gt; nil %&gt;
-</span><span class='line'>  &lt;%= link_to_function "delete", "remove_field($(this), ('.photo'))" %&gt;
-</span><span class='line'>&lt;% end %&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>改为</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;% form.fields_for :photos, photo, :child_index =&gt; (photo.new_record? ? "index_to_replace_with_js" : nil) do |p| %&gt;
-</span><span class='line'>  &lt;%= p.label :photo %&gt;&lt;br /&gt;
-</span><span class='line'>  &lt;%= p.file_field :data %&gt;
-</span><span class='line'>  &lt;%= link_to_function "delete", "remove_field($(this), ('.photo'))" %&gt;
-</span><span class='line'>&lt;% end %&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>在albums_helper中添加两个方法：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>def add_object_link(name, form, object, partial, where)
-</span><span class='line'>  html = render(:partial =&gt; partial, :locals =&gt; { :form =&gt; form }, :object =&gt; object)
-</span><span class='line'>  link_to_function name, %{
-</span><span class='line'>    var new_object_id = new Date().getTime();
-</span><span class='line'>    var html = jQuery(#{js html}.replace(/index_to_replace_with_js/g, new_object_id)).hide();
-</span><span class='line'>    html.appendTo(jQuery("#{where}")).slideDown('slow');
-</span><span class='line'>  }
-</span><span class='line'>end
-</span><span class='line'>
-</span><span class='line'>def js(data)
-</span><span class='line'>  if data.respond_to? :to_json
-</span><span class='line'>    data.to_json
-</span><span class='line'>  else
-</span><span class='line'>    data.inspect.to_json
-</span><span class='line'>  end
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<p>到这里就修改完成了。试试看，是不是和原来的效果一样。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/12">&larr; Older</a>
@@ -2013,6 +2117,10 @@
       </li>
     
       <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part16/">ANTLR 4权威参考读书笔记（16）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part15/">ANTLR 4权威参考读书笔记（15）</a>
       </li>
     
@@ -2022,10 +2130,6 @@
     
       <li class="post">
         <a href="/blog/logic-problems-who-owns-the-fish/">逻辑题-谁养鱼</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part13/">ANTLR 4权威参考读书笔记（13）</a>
       </li>
     
   </ul>
@@ -2039,7 +2143,7 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 130%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 131%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 131%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
