@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: ANTLR | 乐者为王]]></title>
   <link href="http://codemany.com/tags/antlr/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2016-08-25T09:11:03+08:00</updated>
+  <updated>2016-08-26T09:15:11+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,51 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（17）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part17/"/>
+    <updated>2016-06-07T13:09:54+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part17</id>
+    <content type="html"><![CDATA[<p>用自顶向下的语法指定和通过手工的递归下降语法分析器识别表达式一直是个麻烦。首先是因为大部分自然语法是模糊的，其次是因为大部分自然语法规格使用一种被称为左递归的特殊类型递归。所以自顶向下的语法和语法分析器不能处理传统形式上的左递归。</p>
+
+<p>为了阐明这个问题，设想一个算术表达式语言，它只有乘法和加法运算符以及整数。表达式是自相似的。也就是说，一个乘法表达式是由“*”运算符连接的两个子表达式。同样的，一个加法表达式是由“+”运算符连接的两个子表达式。我们也可以把整数看作表达式。整个语法规则看起来就像以下显示的那样：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">expr : expr &#39;*&#39; expr    // 匹配由“*”运算符连接的子表达式
+     | expr &#39;+&#39; expr    // 匹配由“+”运算符连接的子表达式
+     | INT              // 匹配简单整数
+     ;
+</code></pre></div>
+<p>问题是上述规则对于某些输入短语来说是模棱两可的。换句话说，这个规则能用多种方法匹配单个输入流。对于简单的整数和像1+2和1*2这样的单运算符表达式是没问题的，因为只有一种方法能去匹配它们。例如，规则可以仅用第二个选项匹配1+2。就像下图左边所示的那样：</p>
+
+<p><img src="/uploads/ambiguity-parse-tree.png" title="ambiguity-parse-tree" ></p>
+
+<p>问题是指定的规则可以像中间和右边语法分析树描绘的那样用两种方法解释1+2*3这样的输入。两者的解释是不同的，因为中间的树说加1到2乘3的结果上，而右边的树说3乘以1加2的结果。这是一个运算符优先级的问题，但常规语法根本没有指定优先级的方法。大部分语法工具使用额外的符号来指定运算符优先级。</p>
+
+<p>与之相反的是，ANTLR解决二义性有利于首先给出的选项，隐式地允许我们指定运算符优先级。规则expr有一个乘法选项在加法选项之前，因此，ANTLR解决1+2*3的运算符二义性有利于乘法。</p>
+
+<p>默认情况下，ANTLR从左到右结合运算符，然而某些像指数群这样的运算符则是从右到左。因此，我们必须使用选项assoc手动指定运算符记号上的相关性。这里是一个能正确地把输入<code>2^3^4</code>解释成<code>2^(3^4)</code>的表达式规则：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">expr : expr &#39;^&#39;&lt;assoc=right&gt; expr    // 运算符是右结合的
+     | INT
+     ;
+</code></pre></div>
+<p>下图中的语法分析树阐明了运算符左右结合版本的不同。右边的语法分析树是惯常的解释：</p>
+
+<p><img src="/uploads/power-parse-tree.png" title="power-parse-tree" ></p>
+
+<p>为了把所有这三个运算符合并成一条规则，我们把指数表达式选项放在其它表达式选项之前，因为它的运算符比乘法和加法都有更高的优先级。合并后的语法如下所示：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">expr : expr &#39;^&#39;&lt;assoc=right&gt; expr    // 运算符是右结合的
+     | expr &#39;*&#39; expr                 // 匹配由“*”运算符连接的子表达式
+     | expr &#39;+&#39; expr                 // 匹配由“+”运算符连接的子表达式
+     | INT                           // 匹配简单整数
+     ;
+</code></pre></div>
+<p>不像其它常规的语法分析器生成器那样，ANTLR v4是可以处理直接左递归的。左递归规则是指直接或者间接调用在选项左边缘的自身的规则。规则expr是直接左递归的，因为除INT选项外的其它所有选项都开始于规则expr自身的引用。如果规则expr的引用处在某些选项的右边缘，那么它就是右递归的。虽然ANTLR v4可以处理直接左递归，但它不能处理间接左递归。这意味着我们不能把expr因子化为语法等效规则。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">expr : expo ;    // 通过expo左递归地间接调用expr
+expo : expr &#39;^&#39;&lt;assoc=right&gt; expr ;
+</code></pre></div>
+<p>ANTLR v4可以简化直接左递归的表达式规则的工作。这种新的机制不仅更有效率，而且表达式规则也更小和更容易理解。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（16）]]></title>
@@ -225,84 +270,6 @@ After Rewriting
 3123
 </code></pre></div>
 <p>仅用几行代码，我们就能够没有任何烦恼地对某些内容做轻微的调整。这种策略对于源代码检测或重构这类一般性的问题是非常有效的。TokenStreamRewriter是一个非常强大且有效的操作记号流的方法。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（12）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part12/"/>
-    <updated>2016-04-26T10:20:44+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part12</id>
-    <content type="html"><![CDATA[<ul>
-<li>sentinel 哨兵</li>
-<li>tag 标签</li>
-</ul>
-
-<p>目前我们看到的输入文件都只包含一种语言，但在实际应用中我们会遇到有些包含多种语言的常用文件格式。例如，Java的文档注释，XML文件等。这些环绕着模板表达式的文本需要不同的处理方式，它们被称为孤岛语言。</p>
-
-<p>ANTLR有提供一个称之为“词法模型”的词法分析器特性，它让我们可以很容易地处理包含混合格式的文件。基本思路是：当词法分析器看到特殊的哨兵字符序列时，让它在模式之间来回切换。</p>
-
-<p>XML是一个很好例子，它通常会在同一个文件中包含不同的词法结构。一个XML语法分析器会把除标签和实体引用（例如&hearts;）之外的任何东西当作文本块。当词法分析器看到<code>&lt;</code>时，它切换到“inside”模式；当它看到<code>&gt;</code>或<code>/&gt;</code>时，就切换回默认模式。以下语法展示了该特性是如何工作的：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">lexer grammar XMLLexer;
-
-// Default &quot;mode&quot;: Everything OUTSIDE of a tag
-OPEN        :   &#39;&lt;&#39;                 -&gt; pushMode(INSIDE) ;
-COMMENT     :   &#39;&lt;!--&#39; .*? &#39;--&gt;&#39;    -&gt; skip ;
-EntityRef   :   &#39;&amp;&#39; [a-z]+ &#39;;&#39; ;
-TEXT        :   ~(&#39;&lt;&#39;|&#39;&amp;&#39;)+ ;    // match any 16 bit char minus &lt; and &amp;
-
-// ----------------- Everything INSIDE of a tag ---------------------
-mode INSIDE;
-
-CLOSE       :   &#39;&gt;&#39;                 -&gt; popMode ;    // back to default mode
-SLASH_CLOSE :   &#39;/&gt;&#39;                -&gt; popMode ;
-EQUALS      :   &#39;=&#39; ;
-STRING      :   &#39;&quot;&#39; .*? &#39;&quot;&#39; ;
-SlashName   :   &#39;/&#39; Name ;
-Name        :   ALPHA (ALPHA|DIGIT)* ;
-S           :   [ \t\r\n]           -&gt; skip ;
-
-fragment
-ALPHA       :   [a-zA-Z] ;
-
-fragment
-DIGIT       :   [0-9] ;
-</code></pre></div>
-<p>把上述语法保存为XMLLexer.g文件，然后使用包含以下内容的t.xml文件作为输入来测试它：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;tools&gt;
-  &lt;tool name=&quot;ANTLR&quot;&gt;A parser generator&lt;/tool&gt;
-&lt;/tools&gt;
-</code></pre></div>
-<p>以下是构建和运行测试的命令：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">antlr XMLLexer.g
-compile *.java
-grun XML tokens -tokens t.xml
-</code></pre></div>
-<p>这里是输出的内容：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">[@0,0:0=&#39;&lt;&#39;,&lt;1&gt;,1:0]
-[@1,1:5=&#39;tools&#39;,&lt;10&gt;,1:1]
-[@2,6:6=&#39;&gt;&#39;,&lt;5&gt;,1:6]
-[@3,7:10=&#39;\r\n  &#39;,&lt;4&gt;,1:7]
-[@4,11:11=&#39;&lt;&#39;,&lt;1&gt;,2:2]
-[@5,12:15=&#39;tool&#39;,&lt;10&gt;,2:3]
-[@6,17:20=&#39;name&#39;,&lt;10&gt;,2:8]
-[@7,21:21=&#39;=&#39;,&lt;7&gt;,2:12]
-[@8,22:28=&#39;&quot;ANTLR&quot;&#39;,&lt;8&gt;,2:13]
-[@9,29:29=&#39;&gt;&#39;,&lt;5&gt;,2:20]
-[@10,30:47=&#39;A parser generator&#39;,&lt;4&gt;,2:21]
-[@11,48:48=&#39;&lt;&#39;,&lt;1&gt;,2:39]
-[@12,49:53=&#39;/tool&#39;,&lt;9&gt;,2:40]
-[@13,54:54=&#39;&gt;&#39;,&lt;5&gt;,2:45]
-[@14,55:56=&#39;\r\n&#39;,&lt;4&gt;,2:46]
-[@15,57:57=&#39;&lt;&#39;,&lt;1&gt;,3:0]
-[@16,58:63=&#39;/tools&#39;,&lt;9&gt;,3:1]
-[@17,64:64=&#39;&gt;&#39;,&lt;5&gt;,3:7]
-[@18,65:66=&#39;\r\n&#39;,&lt;4&gt;,3:8]
-[@19,67:66=&#39;&lt;EOF&gt;&#39;,&lt;-1&gt;,4:0]
-</code></pre></div>
-<p>上面输出的每一行代表一个记号，包含记号索引、开始和结束字符、记号文本、记号类型，最后的行和字符位置则告诉我们词法分析器如何标记化输入。</p>
-
-<p>在命令行中，XML tokens序列处通常是一个语法名字后面跟着开始规则，但在这里，我们使用语法名字后面跟着特殊的规则名字tokens来告诉TestRig应该运行词法分析器而不是语法分析器。接着使用选项-tokens打印出匹配的记号列表。</p>
 ]]></content>
   </entry>
   
