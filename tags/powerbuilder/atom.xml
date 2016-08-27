@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: PowerBuilder | 乐者为王]]></title>
   <link href="http://codemany.com/tags/powerbuilder/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2016-08-26T09:15:11+08:00</updated>
+  <updated>2016-08-27T18:57:46+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -495,261 +495,233 @@ dw_1.InsertRow()
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[如何设置数据窗口中某行某列的背景颜色]]></title>
-    <link href="http://codemany.com/blog/how-to-setup-background-color-of-cell-on-datawindow/"/>
-    <updated>2008-10-18T20:25:59+08:00</updated>
-    <id>http://codemany.com/blog/how-to-setup-background-color-of-cell-on-datawindow</id>
-    <content type="html"><![CDATA[<p>假设数据窗口有多行数据，在修改某个Cell的数据后希望能将该Cell的背景色变成红色，代码该如何写呢？</p>
+    <title type="html"><![CDATA[使用ANTLR构建PowerScript语法分析器（9）]]></title>
+    <link href="http://codemany.com/blog/using-antlr-to-build-powerscript-parser-part9/"/>
+    <updated>2009-04-09T19:30:37+08:00</updated>
+    <id>http://codemany.com/blog/using-antlr-to-build-powerscript-parser-part9</id>
+    <content type="html"><![CDATA[<p>续行符和分隔符</p>
 
-<p>要对某行某列的属性进行更改，可以使用modify函数。在对某行某列的属性进行改变时，你需要先判断当前行是否是被修改数据的那行，如果知道行号的话（例如在itemchanged事件中），你可以使用下面的代码：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">dw_main.modify(ls_colname + &quot;background.color = &#39;0~tIf(getrow() = &quot; + string(row) + &quot;, 255, 16777215)&#39;&quot;)
+<h3 id="续行（statement-continuation）">续行（Statement Continuation）</h3>
+
+<p>通常情况下，PowerScript的一条语句书写在一行上，语句书写完毕后，按Enter键转到下一行，开始下一条语句。有时候，为了阅读方便等原因，需要把一条语句书写在几行上，这时就需要使用续行符了。PowerScript的续行符是“&amp;”字符，它放在一行的末尾指示下一行是当前行的继续，并且续行符必须是一行的最后一个字符。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">LINE_CONTINUATION
+    : &#39;&amp;&#39; NEWLINE
+    ;
 </code></pre></div>
-<p>当然，你也可以这么写：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">dw_main.modify(ls_colname + &quot;background.color = &#39;0~tIf(getrow() = currentrow(), 255, 16777215)&#39;&quot;)
+<ol>
+<li>注释中的续行符不起作用，会被认为是注释的一部分；</li>
+<li>字符串字面量支持续行符；</li>
+<li>SQL语句中的续行符被认作是SQL语句的一部分，导致在运行时引起错误；</li>
+<li>续行符的作用是连接语句，所以在标识符中使用会导致不能通过编译；</li>
+</ol>
+
+<p>PowerScript是否支持变量名的续行？</p>
+
+<blockquote>
+<p>Do not split a line by inserting the continuation character within a variable name. This causes an error and the statement fails.</p>
+</blockquote>
+
+<p>经过实际测试V9.0 Build 5507、V9.0.1 Build 7171和V8.0.3 Build 9704都不支持变量名的续行。</p>
+
+<h3 id="续行符-amp-的处理">续行符(&amp;)的处理</h3>
+
+<p>经过这段时间的学习，发现在语法分析中处理续行是个非常麻烦的事，譬如在if语句中，if和then后都可以有续行符，</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">&#39;if&#39; LINE_CONTINUATION expression &#39;then&#39; LINE_CONTINUATION statement
+</code></pre></div>
+<p>这样写既麻烦又影响可读性
+是否可以将续行符(&amp;\r\n)当作WS处理</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">WS
+    :   &#39; &#39;
+    |   &#39;&amp;&#39; &#39;\r&#39; &#39;\n&#39;
+    {
+        &lt;&lt;action&gt;&gt;
+    }
+    ;
+</code></pre></div>
+<p>在词法分析器之前，把续行符(&#39;&amp;\r\n&#39;)转化为空格</p>
+
+<p>在PowerScript中语句通常以分隔符结束。PowerScript语句可以以行结束符(\r\n)及分号(;)结束；嵌入SQL语句必须以“;”结束。</p>
+
+<p>PowerScript是以行为单位的语言</p>
+
+<p>在PB中，逗号(,)和分号(;)被当作分隔符</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">&gt;&gt; Statement separation
+semicolon(;)
+Statement1; statement2
+
+Delimiters
+The following tokens are used as delimiters.
+( ) [ ] { } &lt; &gt; : , ;
+
+
+&gt;&gt; Detecting statement terminator
+It is common for statements to be optionally terminated by a new line or a semicolon.
+(Python, VisualBasic, Bash, etc.)
+
+There is also a distinction between physical source lines and logical source
+lines. A backslash acts as a logical line continuation character. A physical line
+ending in a backslash will be joined with the next physical line to represent a
+single logical line. Logical line continuations also exist for content between the
+delimiter pairs (), {} and []. The following code example is treated as a single
+logical line.
+a = [1;
+     2]
+The NEWLINE token represents the end of a logical line. The example above
+therefore consists of the following tokens a = [ 1 ; 2 ] NEWLINE.
+
+&amp; ampersand [&#39;æmpərsænd]
+; semicolon
 </code></pre></div>]]></content>
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[使用ANTLR构建PowerScript语法分析器（6）]]></title>
-    <link href="http://codemany.com/blog/using-antlr-to-build-powerscript-parser-part6/"/>
-    <updated>2008-05-03T19:07:10+08:00</updated>
-    <id>http://codemany.com/blog/using-antlr-to-build-powerscript-parser-part6</id>
-    <content type="html"><![CDATA[<p>构建完表达式的语法规则后就可以开始分析语句（statement）的语法规则。不过在这之前还需要先修复两个小缺陷：没有识别日期、时间和内建常量的词法规则。</p>
-
-<p>在PowerScript中，日期的格式是0000-00-00，年份是4位数从1000到3000，月份从01到12，天数从01到31；时间是24小时格式00:00:00:000000，秒的小数部分可有可无，最多能有6位数字，所以时间范围是从00:00:00到23:59:59:999999。内建常量则以字母开头，字母数字组合，以“!”符号结束的字符串。</p>
-
-<p>根据这些描述我们可以得到日期、时间和内建常量的词法规则：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">DATE_LITERAL    // 1996-09-26
-    : &#39;1&#39;..&#39;3&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;-&#39; &#39;0&#39;..&#39;1&#39; &#39;0&#39;..&#39;9&#39; &#39;-&#39; &#39;0&#39;..&#39;3&#39; &#39;0&#39;..&#39;9&#39;
-      {
-          System.out.println(&quot;date&gt;&quot; + getText());
-      }
-    ;
-
-TIME_LITERAL    // 00:00:00:000000
-    : &#39;0&#39;..&#39;2&#39; &#39;0&#39;..&#39;9&#39; &#39;:&#39; &#39;0&#39;..&#39;5&#39; &#39;0&#39;..&#39;9&#39; &#39;:&#39; &#39;0&#39;..&#39;5&#39; &#39;0&#39;..&#39;9&#39;
-      ( &#39;.&#39; &#39;0&#39;..&#39;9&#39;
-      | &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39;
-      | &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39;
-      | &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39;
-      | &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39;
-      | &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39; &#39;0&#39;..&#39;9&#39;
-      )?
-      {
-          System.out.println(&quot;time&gt;&quot; + getText());
-      }
-    ;
-
-ENUM_LITERAL
-    : Letter (Letter|&#39;0&#39;..&#39;9&#39;)* &#39;!&#39;
-      {
-          System.out.println(&quot;enum&gt;&quot; + getText());
-      }
-    ;
-</code></pre></div>]]></content>
+    <title type="html"><![CDATA[使用ANTLR构建PowerScript语法分析器（8）]]></title>
+    <link href="http://codemany.com/blog/using-antlr-to-build-powerscript-parser-part8/"/>
+    <updated>2009-03-25T21:26:42+08:00</updated>
+    <id>http://codemany.com/blog/using-antlr-to-build-powerscript-parser-part8</id>
+    <content type="html"><![CDATA[<p>申明和定义</p>
+]]></content>
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[使用ANTLR构建PowerScript语法分析器（5）]]></title>
-    <link href="http://codemany.com/blog/using-antlr-to-build-powerscript-parser-part5/"/>
-    <updated>2008-05-02T19:27:12+08:00</updated>
-    <id>http://codemany.com/blog/using-antlr-to-build-powerscript-parser-part5</id>
-    <content type="html"><![CDATA[<p>基本表达式的语法规则构建完毕，那么表达式的语法规则构建就颇为简单了。<a href="http://codemany.com/blog/using-antlr-to-build-powerscript-parser-part4/">使用ANTLR构建PowerScript语法分析器（4）</a>中已经说过表达式是由运算元和运算符复合组成。所以在编写表达式语法规则前先要分析下PowerScript的运算符以及它们的优先级。</p>
+    <title type="html"><![CDATA[使用ANTLR构建PowerScript语法分析器（7）]]></title>
+    <link href="http://codemany.com/blog/using-antlr-to-build-powerscript-parser-part7/"/>
+    <updated>2009-02-13T17:59:25+08:00</updated>
+    <id>http://codemany.com/blog/using-antlr-to-build-powerscript-parser-part7</id>
+    <content type="html"><![CDATA[<p>耽搁这么长的时间，现在终于要开始分析语句了。</p>
 
-<p>PowerScript支持四种类型的运算符，分别是：</p>
+<p>语句通常出现在命令式语言中，主要是用来告诉计算机执行某些操作。语句不像表达式，它通常没有返回值，所以语句只能一条接一条的纵向结合。</p>
 
-<ul>
-<li>针对数字数据类型的算术运算符，执行算术计算；</li>
-<li>针对所有类型的关系运算符，比较数字，文本和布尔值；</li>
-<li>针对布尔类型的逻辑运算符，执行布尔值上的关系运算符</li>
-<li>针对字符串类型连接运算符，连接字符串和二进制大对象。</li>
-</ul>
+<p>在PowerScript中，赋值被当作语句来处理。例如A=B=0，因为B=0必须要有返回值，所以它不是赋值语句，而是关系表达式，它其实相当于A=(B==0)。PowerScript也没有表达式语句（expression statement）这个说法，纯粹的表达式后跟分隔符会报语法错误，函数调用是个例外。</p>
 
-<h3 id="算术运算符">算术运算符</h3>
+<p>语句不同于声明，声明不会让计算机做任何事，但会去学习一些事情。</p>
 
-<table><thead>
-<tr>
-<th>Operator</th>
-<th>Meaning</th>
-</tr>
-</thead><tbody>
-<tr>
-<td>+</td>
-<td>Addition</td>
-</tr>
-<tr>
-<td>-</td>
-<td>Subtraction</td>
-</tr>
-<tr>
-<td>*</td>
-<td>Multiplication</td>
-</tr>
-<tr>
-<td>/</td>
-<td>Division</td>
-</tr>
-<tr>
-<td>^</td>
-<td>Exponentiation</td>
-</tr>
-</tbody></table>
+<p>赋值语句左值分析</p>
 
-<h3 id="关系运算符">关系运算符</h3>
+<p>如何处理赋值运算符(=)和关系运算符(=)使用同一个字符(=)的问题</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">f(x)[g(y)] = answer = 42
 
-<table><thead>
-<tr>
-<th>Operator</th>
-<th>Meaning</th>
-</tr>
-</thead><tbody>
-<tr>
-<td>=</td>
-<td>Equals</td>
-</tr>
-<tr>
-<td>&gt;</td>
-<td>Greater than</td>
-</tr>
-<tr>
-<td>&lt;</td>
-<td>Less than</td>
-</tr>
-<tr>
-<td>&lt;&gt;</td>
-<td>Not equal</td>
-</tr>
-<tr>
-<td>&gt;=</td>
-<td>Greater than or equal</td>
-</tr>
-<tr>
-<td>&lt;=</td>
-<td>Less than or equal</td>
-</tr>
-</tbody></table>
+simple_assign: (simple_assign_expr ASSIGN)+ expr;
+simple_assign_expr: (variable_name)
+    | (STAR variable_name)
+    | (variable_name &#39;(&#39; (variable_name | integer_constant) &#39;)&#39; );
 
-<h3 id="逻辑运算符">逻辑运算符</h3>
-
-<table><thead>
-<tr>
-<th>Operator</th>
-<th>Meaning</th>
-</tr>
-</thead><tbody>
-<tr>
-<td>NOT</td>
-<td>Logical negation</td>
-</tr>
-<tr>
-<td>AND</td>
-<td>Logical and</td>
-</tr>
-<tr>
-<td>OR</td>
-<td>Logical or</td>
-</tr>
-</tbody></table>
-
-<h3 id="连接运算符">连接运算符</h3>
-
-<table><thead>
-<tr>
-<th>Operator</th>
-<th>Meaning</th>
-</tr>
-</thead><tbody>
-<tr>
-<td>+</td>
-<td>Concatenate</td>
-</tr>
-</tbody></table>
-
-<h3 id="运算符优先级">运算符优先级</h3>
-
-<table><thead>
-<tr>
-<th>Operator</th>
-<th>Purpose</th>
-</tr>
-</thead><tbody>
-<tr>
-<td>( )</td>
-<td>Grouping (see note below on overriding)</td>
-</tr>
-<tr>
-<td>+, -</td>
-<td>Unary plus and unary minus (indicates positive or negative number)</td>
-</tr>
-<tr>
-<td>^</td>
-<td>Exponentiation</td>
-</tr>
-<tr>
-<td>*, /</td>
-<td>Multiplication and division</td>
-</tr>
-<tr>
-<td>+, -</td>
-<td>Addition and subtraction; string concatenation</td>
-</tr>
-<tr>
-<td>=, &gt;, &lt;, &lt;=, &gt;=, &lt;&gt;</td>
-<td>Relational operators</td>
-</tr>
-<tr>
-<td>NOT</td>
-<td>Negation</td>
-</tr>
-<tr>
-<td>AND</td>
-<td>Logical and</td>
-</tr>
-<tr>
-<td>OR</td>
-<td>Logical or</td>
-</tr>
-</tbody></table>
-
-<p>清楚运算符和优先级后，该如何表示这些表达式的语法关系呢？有个标准的分析表达式的递归定义可以套用，大部分表达式都遵循这个模式：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">thisLevelExpression
-    : nextHigherPrecedenceExpression (OPERATOR nextHigherPrecedenceExpression)*
+I constantly got errors when replacing the code between the LBRACKET and RBRACKET with an generic expression.
+or
+simple_assign: expr (ASSIGN expr)+;
 </code></pre></div>
-<p>现在我们就可以根据PowerScript的运算符优先级写出表达式的语法规则了：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">expression
-    : logical_or_expression
+<p>PowerScript支持如下的几种语句：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">Assignment
+CALL
+CHOOSE CASE
+CONTINUE
+CREATE
+DESTROY
+DO...LOOP
+EXIT
+FOR...NEXT
+GOTO
+HALT
+IF...THEN
+RETURN
+THROW
+THROWS
+TRY CATCH FINALLY END TRY
+</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">halt [close]    // 遇到不包含CLOSE参数的HALT语句时，应用程序立即终止。
+                // 遇到包含CLOSE的时候，应用先执行CLOSE事件所对应的处理程序，然后再终止应用程序
+
+&#39;create&#39; &#39;using&#39;? (STRING_LITERAL|IDENTIFIER)
+&#39;destroy&#39; IDENTIFIER
+
+call w_ancestor::event ue_process()
+call ancestorobject {`controlname}::event
+call w_response::create
+m_bud_master`m_file
+</code></pre></div>
+<p>完整的语法定义如下：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">// S t a t e m e n t
+compound_statement
+    :   (declaration|statement)*
+//    |   statement*
+    ;
+call_statement
+    :   &#39;call&#39; expression &#39;;&#39;
+//    |   &#39;call&#39; &#39;super&#39; &#39;::&#39; IDENTIFIER
+//    |   &#39;call&#39; IDENTIFIER (&#39;`&#39; IDENTIFIER)* &#39;::&#39; call_type? IDENTIFIER arguments?
     ;
 
-logical_or_expression
-    : logical_and_expression (&#39;or&#39; logical_and_expression)*
+statement_list
+    :   statement (SEMICOLON? statement)* SEMICOLON?
     ;
 
-logical_and_expression
-    : logical_not_expression (&#39;and&#39; logical_not_expression)*
+labeled_statement
+    :   IDENTIFIER &#39;:&#39; statement
     ;
 
-logical_not_expression
-    : &#39;not&#39;? relational_expression
+selection_statement
+// 形式：1, 2, 3 或 1 to 9 或 IS &gt; 9 或 6, 6 to 16, IS &gt; 36
+    :   &#39;if&#39; expression &#39;then&#39; statement (&#39;else&#39; statement)?
+    |   &#39;if&#39; expression &#39;then&#39;
+            statement* /*compound_statement*/
+        (&#39;elseif&#39; expression &#39;then&#39;
+            statement/*compound_statement*/)*
+        (&#39;else&#39;
+            statement/*compound_statement*/)?
+        &#39;end&#39; &#39;if&#39;
+    | &#39;choose&#39; &#39;case&#39; expression
+          (&#39;case&#39; expression_list /*expression*/
+                statement* /*compound_statement*/)+
+            (&#39;case&#39; &#39;else&#39;
+                statement* /*compound_statement*/)?
+      &#39;end&#39; &#39;choose&#39;
     ;
 
-relational_expression
-    : additive_expression ((&#39;=&#39;|&#39;&gt;&#39;|&#39;&lt;&#39;|&#39;&lt;&gt;&#39;|&#39;&gt;=&#39;|&#39;&lt;=&#39;) additive_expression)*
+iteration_statement
+    :   &#39;for&#39; IDENTIFIER &#39;=&#39; expression &#39;to&#39; expression (&#39;step&#39; expression)?
+//    :   &#39;for&#39; IDENTIFIER &#39;=&#39; range_expression (&#39;step&#39; expression)?
+            statement* /*compound_statement*/
+        &#39;next&#39;
+    |   &#39;do&#39; (&#39;until&#39;|&#39;while&#39;) expression /*boolean_expression*/
+            statement* /*compound_statement*/
+        &#39;loop&#39;
+    |   &#39;do&#39;
+            statement* /*compound_statement*/
+        &#39;loop&#39; (&#39;until&#39;|&#39;while&#39;) expression /*boolean_expression*/
     ;
 
-additive_expression
-    : multiplicative_expression ((&#39;+&#39;|&#39;-&#39;) multiplicative_expression)*
+jump_statement
+    :   &#39;goto&#39; IDENTIFIER
+    |   &#39;continue&#39;
+    |   &#39;exit&#39;
+    |   &#39;return&#39; expression?
+    |   &#39;halt&#39; &#39;close&#39;?
     ;
 
-multiplicative_expression
-    : exponentive_expression ((&#39;*&#39;|&#39;/&#39;) exponentive_expression)*
+exception_statement
+    :   &#39;try&#39;
+            statement*
+        (&#39;catch&#39; &#39;(&#39; IDENTIFIER IDENTIFIER &#39;)&#39;
+            statement*)*
+        (&#39;finally&#39;
+            statement*)?
+        &#39;end&#39; &#39;try&#39;
     ;
 
-exponentive_expression
-    : unary_expression (&#39;^&#39; unary_expression)*
+if_statement
+    :   &#39;if&#39; expression &#39;then&#39;
+            statement
+        (elseif_statement)?
+        &#39;end&#39; &#39;if&#39;
     ;
 
-unary_expression
-    : (&#39;+&#39;|&#39;-&#39;)? primary_expression
+elseif_statement
+    :   &#39;elseif&#39; expression &#39;then&#39;
+            statement
+        (elseif_statement|else_statement)?
+    ;
+
+else_statement
+    :   &#39;else&#39; statement
     ;
 </code></pre></div>]]></content>
   </entry>
