@@ -9,7 +9,17 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="看到Don&#39;t Store Data in the Application Object讲，在Application对象中存储共享数据会引起NullPointerException。顿时心里就咯噔了一下，用了四分之三秒，想起自己有个业余项目就干了这样的事。赶紧地测试看看。 打开应用， &hellip;">
+  <meta name="description" content="在以前写的博文部署应用到Heroku时的问题里有这么一段话： 股票功能需要导入交割单文件，因为导入后的文本文件不再使用，可以把上传路径由public/uploads改为tmp，这样就避免了Heroku不能写文件的问题。 下面是那时候写的导入代码： 1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -79,7 +89,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/trap-for-storing-data-in-the-application-object/">在Application对象里存储数据的陷阱</a></h1>
+      <h1 class="entry-title"><a href="/blog/refactoring-rails-code/">重构Rails代码</a></h1>
     
     
       <p class="meta">
@@ -88,643 +98,20 @@
 
 
 
-<time class='entry-date' datetime='2015-10-27T20:57:41+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>27</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>8:57 pm</span></time>
+<time class='entry-date' datetime='2014-11-18T19:42:59+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>7:42 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>看到<a href="http://www.developerphil.com/dont-store-data-in-the-application-object/">Don&#39;t Store Data in the Application Object</a>讲，在Application对象中存储共享数据会引起NullPointerException。顿时心里就咯噔了一下，用了四分之三秒，想起自己有个业余项目就干了这样的事。赶紧地测试看看。</p>
-
-<p>打开应用，从MainActivity进入TxtViewerActivity界面（这里MainActivity主要是读取目录数据，然后保存在继承自Application的MainApp中，供TxtViewerActivity调用）。按手机Home键退出应用，这时你按菜单键可以看到该应用的缩图。然后在Eclipse中打开Window -&gt; Show View -&gt; Other -&gt; Android -&gt; Devices视图，双击窗口内的设备，然后点击设备下对应的进程，点击右上方红色的“Stop Process”图标。</p>
-
-<p><img src="/uploads/android-devices.png" title="android-devices" ></p>
-
-<p>重新按菜单键打开应用，然后……然后果然在LogCat中看到了有NullPointerException的大段红色警告文字。</p>
-
-<h3 id="为什么会crash的？">为什么会Crash的？</h3>
-
-<p>根本原因在于：当应用被kill掉后，通过菜单键重新打开时，应用不会开始重新启动。Android系统会新建一个Application对象，然后启动上次离开时的TxtViewerActivity以造成这个应用从来没有被kill掉的假象。因为没有经过MainActivity的数据读取，所以在TxtViewerActivity中读取数据当然要抛出异常了。</p>
-
-<h3 id="有没有替代方法呢？">有没有替代方法呢？</h3>
-
-<ul>
-<li>直接将数据通过Intent传递给TxtViewerActivity？当然也会碰到上述同样的问题。</li>
-<li>使用SharedPreferences？可惜只能存储boolean、int、long、float和String五种数据类型，不支持List的存储；</li>
-<li>使用持久化存储？也不支持List的存储，而且太笨重了；</li>
-<li>使用Singleton对象保存共享数据，然后通过Intent传递呢？这个想法不错，还可以将读取assets资源等操作移到该对象中，做到单一职责原则，改善设计。不过这样一来Singleton对象会对MainActivity的context有长期引用，容易造成内存泄露。如果不把读取操作放进去……那根本就不可能，你能让一个追求完美的程序猿忍受糟糕的代码设计吗！</li>
-</ul>
-
-<p>幸好早就有人总结出来经验了：使用Application的context代替Activity的context。</p>
-
-<p>创建Singleton对象，在Application对该对象保持引用，把原来存储在Application中共享的数据全部移到Singleton对象中，将Activity中读取assets资源等操作也放入该对象，Activity中原来对Application对象的访问改成通过Application对象对Singleton对象的访问。</p>
-
-<p>这样修改后，不光解决了应用的崩溃，还预防了内存泄漏，更改进代码的设计。</p>
-
-<p>代码下载：<a href="https://github.com/dohkoos/txtReader">https://github.com/dohkoos/txtReader</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/writing-great-oo-code-day-one/">一开始就编写优质的OO代码</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2015-10-23T13:50:44+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>23</span><span class='date-suffix'>rd</span>, <span class='date-year'>2015</span></span> <span class='time'>1:50 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="https://weblogs.java.net/blog/2008/10/03/writing-great-oo-code-day-one">https://weblogs.java.net/blog/2008/10/03/writing-great-oo-code-day-one</a></p>
-
-<p>没有获取经验的捷径。编写良好的面向对象代码需要经验。尽管如此，这里有三个实践可以帮助你一开始就有个良好的开端：</p>
-
-<ol>
-<li>使用测试驱动开发（TDD）编写你所有的代码</li>
-<li>遵循<a href="http://xp.c2.com/XpSimplicityRules.html">简单的规则</a></li>
-<li>命令代替询问（Tell Don&#39;t Ask）</li>
-</ol>
-
-<h3 id="使用tdd编写你所有的代码">使用TDD编写你所有的代码</h3>
-
-<p><a href="http://ponderingobjectorienteddesign.blogspot.com/2008/09/tdd-is-design-activity.html">测试先行</a>编写的代码和测试后行编写的代码是非常非常不同的代码。测试先行编写的代码是松耦合和高内聚的。测试后行编写的代码往往会破坏封装，当一些属性或私有方法需要被暴露给测试的时候，因为这些类没有被设计成要被测试的。如果你编写的代码测试先行，代码的依赖性会更好，你的代码将是松耦合和高内聚的。稍后详细讨论测试如何帮助你设计更好的代码。</p>
-
-<h3 id="遵循简单的规则">遵循简单的规则</h3>
-
-<p>代码是简洁的，当它：</p>
-
-<ol>
-<li>通过所有的测试</li>
-<li>不包含重复代码</li>
-<li>表达了所有的意图</li>
-<li>使用了最少的类和方法</li>
-</ol>
-
-<p>重要的是注意到我使用了一个有序列表。顺序很重要。带有单一main()方法的单一GodClass并不简单。它可以通过所有的测试，但在比“Hello, world!”更复杂的任何程序里它一定会包含重复代码和没有表达所有的意图。</p>
-
-<p>我与简单的规则的斗争重点围绕在<a href="http://ponderingobjectorienteddesign.blogspot.com/2008/09/if-bugs.html">If Bug</a> 。我不明白遵循简单的规则如何阻止某人编写大量的if代码。有人会说，我试过了，大量的if代码不会表达意图。但是，当你读到这样的代码</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if (mobile.getType() == MobileTypes.STANDARD) {
-</span><span class='line'>    alert();
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>它实在是太容易看出意图了。无论该代码是在哪个方法的上下文中，如果mobile是STANDARD类型，那么警报。你还需要多少意图？</p>
-
-<p>然后我灵光小闪。如果有那样的代码，那么在代码的其它地方肯定还有更多。可能是这样的代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if (mobile.getType() == MobileTypes.GAS) {
-</span><span class='line'>    registerGasReading();
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>和</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if (mobile.getType() == MobileTypes.TEXT) {
-</span><span class='line'>    sendTextMessage();
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>和</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if (mobile.getType() == MobileTypes.LOCATION) {
-</span><span class='line'>    notifyLocation();
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>你看见了吗？我当然知道。违反规则2。许多许多违反规则2。并且是违反规则2的最糟糕的那种。重复代码在许多不同的代码片段中。重复代码将非常非常难被找到。所以为了帮助防止这个，我列出来了。</p>
-
-<h3 id="命令代替询问">命令代替询问</h3>
-
-<p>命令代替询问意味着不要询问一个对象的状态然后做些什么。应该命令那个对象去做些什么。这意味着所有这些if例子变成了：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mobile.alert();</span></code></pre></td></tr></table></div></figure>
-
-<p>和</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mobile.registerGasReading();</span></code></pre></td></tr></table></div></figure>
-
-<p>和</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mobile.sendTextMessage();</span></code></pre></td></tr></table></div></figure>
-
-<p>和</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mobile.notifyLocation();</span></code></pre></td></tr></table></div></figure>
-
-<p>现在假设有一些if子句散落在有重复实现的整个代码中。在那个大量if代码的版本中，它们将非常难被找到，但在命令代替询问版本中，所有的实现都在Mobile类中。所有的都在一个地方寻找和消除。</p>
-
-<p>聆听你的测试也将帮助你保持代码简单。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public interface Alarm {
-</span><span class='line'>    void alert(Mobile mobile);
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>public class Siren implements Alarm {
-</span><span class='line'>    public void alert(Mobile mobile) {
-</span><span class='line'>    if (mobile.getType == MobileTypes.STANDARD) {
-</span><span class='line'>        soundSiren();
-</span><span class='line'>    }
-</span><span class='line'>  }
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>public class SirenTest extends TestCase {
-</span><span class='line'>    public void testAlert() {
-</span><span class='line'>        LocationMobile mobile = new LocationMobile();
-</span><span class='line'>        Siren siren = new Siren();
-</span><span class='line'>        siren.alert(mobile);
-</span><span class='line'>        assert(sirenSounded());
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>如果你仔细聆听你的测试，它会问你，“你为什么需要LocationMobile去测试Siren？”是呀，为什么呢？似乎Siren甚至不应该知道LocationMobile。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class LocationMobile {
-</span><span class='line'>    private Alarm alarm;
-</span><span class='line'>    public LocationMobile(Alarm alarm) {
-</span><span class='line'>        this.alarm = alarm;
-</span><span class='line'>    }
-</span><span class='line'>    public void alert() {
-</span><span class='line'>        alarm.alert();    // alert on Alarm no longer needs a mobile
-</span><span class='line'>    }
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>public class LocationMobileTest extends TestCase {
-</span><span class='line'>    public void testAlert() {
-</span><span class='line'>        Alarm alarm = EasyMock.createMock(Alarm.class);
-</span><span class='line'>        alarm.alert();
-</span><span class='line'>        EasyMock.replay(alarm);
-</span><span class='line'>        Mobile mobile = new LocationMobile(alarm);
-</span><span class='line'>        mobile.alert();
-</span><span class='line'>        EasyMock.verify(alarm);
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>看上去我仅仅互换了依赖。作为Alarm依赖Mobile的替换，现在有了Mobile依赖Alarm。如果你仔细看第一个测试，真正的依赖是Siren知道LocationMobile。一个具体类依赖于另一个具体类。这违反了<a href="http://c2.com/cgi/wiki?DependencyInversionPrinciple">依赖倒置原则 （DIP）</a>。第二个例子是LocationMobile依赖接口Alarm。一个具体类依赖一个抽象。这满足了DIP。</p>
-
-<p>如果你使用TDD编写你所有的代码，遵循简单的规则，以及命令代替询问，那么你会在那条成为一个更好的OO程序员的路上。良好的OO代码容易阅读和维护，但是可能难于编写。至少开始是这样。你写得越多，你将会变得更好，你将得到的经验也越多。与此同时，这些实践会让你在你的路上走得更好。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/ruby-debugger-overview/">Ruby调试工具概览</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2015-10-19T10:50:09+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>19</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>10:50 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>调试Ruby代码最简单的方式就是使用puts或p方法。当有很多变量需要查看时，到处添加puts或p方法就可能变的不那么实际。幸好，Ruby社区提供了许多强大的调试工具。</p>
-
-<h3 id="ruby-1-8-时代">Ruby 1.8+时代</h3>
-
-<p>调试Ruby代码使用<a href="https://github.com/ruby-debug/ruby-debug">ruby-debug</a>。调试Rails代码则是<a href="https://github.com/nixme/pry-nav">pry-nav</a>。不过在Ruby 1.9出来后ruby-debug就有问题了，于是就有了<a href="https://github.com/mark-moseley/ruby-debug">ruby-debug19</a>，一个针对Ruby 1.9的ruby-debug移植版本。</p>
-
-<h3 id="ruby-1-9-2-时代">Ruby 1.9.2+时代</h3>
-
-<p>等到Ruby 1.9.2发布，ruby-debug彻底歇菜，然后<a href="https://github.com/cldwalker/debugger">debugger</a>就出现了。pry-nav也不好使了，还好有<a href="https://github.com/nixme/pry-debugger">pry-debugger</a>。</p>
-
-<h3 id="ruby-2-时代">Ruby 2+时代</h3>
-
-<p>新的Ruby调试工具<a href="https://github.com/deivid-rodriguez/byebug">byebug</a>来了。虽然byebug也能调试Rails应用，但它不提供语法高亮，所以使用<a href="https://github.com/deivid-rodriguez/pry-byebug">pry-byebug</a>是个更好的选择。</p>
-
-<table><thead>
-<tr>
-<th></th>
-<th>Ruby 1.8+</th>
-<th>Ruby 1.9</th>
-<th>Ruby 1.9.2+</th>
-<th>Ruby 2+</th>
-</tr>
-</thead><tbody>
-<tr>
-<td>Ruby</td>
-<td>ruby-debug</td>
-<td>ruby-debug19</td>
-<td>debugger</td>
-<td>byebug</td>
-</tr>
-<tr>
-<td>Rails</td>
-<td>pry-nav</td>
-<td>pry-nav</td>
-<td>pry-debugger</td>
-<td>pry-byebug</td>
-</tr>
-</tbody></table>
-
-<h3 id="其它">其它</h3>
-
-<p><a href="https://github.com/pry/pry">Pry</a>其实不是纯粹的调试工具，它只是IRB的替代品，所以缺乏必要的调试指令。pry-nav、pry-debugger和pry-byebug做的只是分别把ruby-debug、debugger和byebug中的step、next、continue等指令添加到Pry中。</p>
-
-<ul>
-<li>pry-nav = Pry + ruby-debug</li>
-<li>pry-debugger = Pry + debugger</li>
-<li>pry-byebug = Pry + byebug</li>
-</ul>
-
-<p>如果要调试view怎么办？可以使用<a href="https://github.com/rails/web-console">Web Console</a>。在view里面加上&lt;%= console %&gt;，当view出现异常时，就会在异常界面下方，出现一个网页版的IRB，方便调试。Web Console默认只接受localhost的请求，假如需要让别的IP也能访问的话，可以这样做：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class Application &lt; Rails::Application
-</span><span class='line'>  config.web_console.whitelisted_ips = '192.168.0.100'
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-to-detect-java-memory-leak-using-visualvm/">如何使用VisualVM检测Java内存泄漏</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2015-10-12T13:08:19+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>1:08 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Java的一个重要优点是通过垃圾收集器（Garbage Collection）自动管理内存的回收，程序员不需要关注它。程序员真的不需要关注内存管理吗？只要你碰到过OutOfMemoryError你就知道它不是真的。</p>
-
-<p>这里我会展示如何使用VisualVM快速定位内存泄漏。先看下面这段代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>import java.util.List;
-</span><span class='line'>import java.util.ArrayList;
-</span><span class='line'>
-</span><span class='line'>public class MemoryLeakDemo {
-</span><span class='line'>    public static void main(String[] args) {
-</span><span class='line'>        new Thread(new MemoryLeak(), "MemoryLeak").start();
-</span><span class='line'>    }
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>class MemoryLeak implements Runnable {
-</span><span class='line'>    public static List&lt;Integer&gt; leakList = new ArrayList&lt;Integer&gt;();
-</span><span class='line'>
-</span><span class='line'>    public void run() {
-</span><span class='line'>        int count = 0;
-</span><span class='line'>        while (true) {
-</span><span class='line'>            try {
-</span><span class='line'>                Thread.sleep(3);
-</span><span class='line'>            } catch (InterruptedException e) {
-</span><span class='line'>            }
-</span><span class='line'>            count++;
-</span><span class='line'>            Integer i = new Integer(count);
-</span><span class='line'>            leakList.add(i);
-</span><span class='line'>        }
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>执行下列命令：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>java -verbose:gc -XX:+PrintGCDetails -Xmx20m MemoryLeakDemo</span></code></pre></td></tr></table></div></figure>
-
-<p>等待一段时间后，你会看到：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Exception in thread "MemoryLeak" java.lang.OutOfMemoryError: Java heap space
-</span><span class='line'>        at java.util.Arrays.copyOf(Arrays.java:3181)
-</span><span class='line'>        at java.util.ArrayList.grow(ArrayList.java:261)
-</span><span class='line'>        at java.util.ArrayList.ensureExplicitCapacity(ArrayList.java:235)
-</span><span class='line'>        at java.util.ArrayList.ensureCapacityInternal(ArrayList.java:227)
-</span><span class='line'>        at java.util.ArrayList.add(ArrayList.java:458)
-</span><span class='line'>        at MemoryLeak.run(MemoryLeakDemo.java:22)
-</span><span class='line'>        at java.lang.Thread.run(Thread.java:745)
-</span><span class='line'>Heap
-</span><span class='line'> PSYoungGen      total 3584K, used 298K [0x00000000ff980000, 0x00000000ffe80000, 0x0000000100000000)
-</span><span class='line'>  eden space 3072K, 9% used [0x00000000ff980000,0x00000000ff9ca908,0x00000000ffc80000)
-</span><span class='line'>  from space 512K, 0% used [0x00000000ffc80000,0x00000000ffc80000,0x00000000ffd00000)
-</span><span class='line'>  to   space 512K, 0% used [0x00000000ffe00000,0x00000000ffe00000,0x00000000ffe80000)
-</span><span class='line'> ParOldGen       total 13824K, used 12156K [0x00000000fec00000, 0x00000000ff980000, 0x00000000ff980000)
-</span><span class='line'>  object space 13824K, 87% used [0x00000000fec00000,0x00000000ff7df3e8,0x00000000ff980000)
-</span><span class='line'> Metaspace       used 7993K, capacity 8164K, committed 8448K, reserved 1056768K
-</span><span class='line'>  class space    used 912K, capacity 954K, committed 1024K, reserved 1048576K</span></code></pre></td></tr></table></div></figure>
-
-<p>打开VisualVM开始监测MemoryLeakDemo，在Monitor标签页我们可以看到实时的程序内存堆的使用情况：</p>
-
-<p><img src="/uploads/visualvm-heap.png" title="visualvm-heap" ></p>
-
-<p>波峰到波谷处是执行了GC的，明显可以看到执行GC后内存曲线仍旧呈上扬趋势，也就是说，内存占用是只升不降。到底是什么原因导致的呢？</p>
-
-<p>打开Sampler标签页，点击Memory按钮启动一个内存分析会话，VisualVM会定期获取所有执行线程的转储，分析栈跟踪信息，实时显示成堆直方图。通过堆直方图，我们就可以知道哪个对象占用了较多的内存，以便做进一步的优化。</p>
-
-<p><img src="/uploads/visualvm-sampler.png" title="visualvm-sampler" ></p>
-
-<p>如上图所示，第1行的Integer对象占用内存最大，已经有41万多实例了，并且还在持续增加中。很显然，罪魁祸首就是它了！</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/fighting-perfection/">对抗完美</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2015-10-11T07:43:24+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>11</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>7:43 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="http://usabilitypost.com/2008/10/08/fighting-perfection/">http://usabilitypost.com/2008/10/08/fighting-perfection/</a></p>
-
-<p>如果你像我一样，你可能经常会发现自己从来没有完全满意你的工作——总是做出调整和修改，总是找到你不太喜欢的事情然后改进他们。这适用于很多创造性的努力——或许你正在为你的博客加工一篇文章，整理一份报告或者写一封重要的电子邮件。</p>
-
-<p>问题是，即使在作出修改后，仍然有一些事情你可以调整，事情仍然不是相当完美。</p>
-
-<p>这当然是很好的，你给自己设置了一个高标准。如果你不满意你的工作，那么为什么你的访客或客户就要满意呢？</p>
-
-<h3 id="追求完美是件好事">追求完美是件好事</h3>
+  <div class="entry-content"><p>在以前写的博文<a href="/blog/problem-when-deploying-application-to-heroku/">部署应用到Heroku时的问题</a>里有这么一段话：</p>
 
 <blockquote>
-<p>一个建筑师拥有的两个最重要的工具是绘图室的橡皮擦和工地的大铁锤。</p>
-
-<p>Frank Lloyd Wright</p>
+<p>股票功能需要导入交割单文件，因为导入后的文本文件不再使用，可以把上传路径由public/uploads改为tmp，这样就避免了Heroku不能写文件的问题。</p>
 </blockquote>
 
-<p>Steve Jobs不满意iPhone的第一个版本。他做了一个艰难的决定去放弃最初的设计，因为他不喜欢它；他觉得这不是Apple能做到的最好的。这引起了很多问题给开发团队，因为他们必须在很短的时间范围内整理出一份全新的设计。</p>
-
-<p>新版本获得了成功，要是他没有做出这个艰难的决定，iPhone将不会成为手机行业的大标志，这在一定程度上要归功于它的标志性设计。</p>
-
-<p>但是……</p>
-
-<h3 id="完美是困难的和费时的">完美是困难的和费时的</h3>
-
-<p>完美可以是危险的和误导的。什么时候足够好？什么时候你可以前进，释放你应用的新版本或发布你的新文章？完美是太高的一个目标，因为它简直太难和太费时去实现。</p>
-
-<p>如果你成了完美的奴隶，你会发现你所有的时间被耗尽。你会不停地做修改调整调整修改——事情却没有按时做完。</p>
-
-<h3 id="如何对抗完美">如何对抗完美?</h3>
-
-<p>考虑优先级——什么是真正要紧的事？对于一个非常大的公司，类似iPhone的东西是一个关键的产品；如果你搞砸了，它能造成严重损失。把产品做正确是至关重要的。设定一个非常高的标准在这里将是一个不错的主意。</p>
-
-<p>那么更小的事情像是博客的设计呢？最终，它通常并不重要，除非这个博客是你的主要业务。在这里简单是你的盟友。简单的东西很难被搞砸，因此创建简单的事情然后把工作做完。</p>
-
-<p>你最宝贵的资源是你的时间。为了对抗完美你必须将时间排出优先次序，并专注于那些要紧的事情。如果你正在做的和改进的事情没有那么重要，那么这些事情就不应该去做。</p>
-
-<h3 id="把事情做完">把事情做完</h3>
-
-<blockquote>
-<p>做完。开始把它当作一个咒语。当你去做完它时意味着某些事情已经被完成。决定已经做出，你可以继续前进。做完意味着你正在累积动力。</p>
-
-<p>37signals, <a href="http://gettingreal.37signals.com/ch06_Done.php">Getting Real</a></p>
-</blockquote>
-
-<p>执行比想法更重要。把足够好的东西释放出来比做完美但从未完成的东西更好。不要在你做的每件事情上寻求完美——除了那些真正要紧的事情。驯服完美——更快地做完其它的每件事情，把节省下来的时间用在你最重要的项目上。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-many-programming-technologies-can-you-really-master/">你能真正地掌握多少编程技术？</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2015-09-26T22:44:07+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>10:44 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="http://thecodist.com/article/how-many-programming-technologies-can-you-really-master">http://thecodist.com/article/how-many-programming-technologies-can-you-really-master</a></p>
-
-<p>我总是看见公司或者它们的招聘人员广告他们正在寻找的人：“有从零开始开发iOS和Android应用的丰富经验，必须掌握现代移动和Web技术，包括Java、HTML5、CSS3、JavaScript、JSON和AJAX”。</p>
-
-<p>没有这样的人。你可以掌握一门技术但在其它方面平平；你可以掌握一门技术然后转向另一门技术但是会忘记很多先前的技术；你可以简单地欺骗足够多的人让他们认为你能做到，然后期望你恰巧能够搞定它。</p>
-
-<p>在今天，任何主要领域的编程都是高度复杂的，不断变化的，并且通常是带着很大时间压力完成的。所有这些都不允许你投入大量非编程时间去学习即使是最新的变化，更不用说从零开始掌握一切。你只能通过做真实的项目了解新环境，有多少人能够在同一时间同时编写所有大型的本地Android、本地iOS和响应式Web客户端呢？</p>
-
-<p>在我作为程序员的34年里，我很少工作在超过一个主要领域。我的第一份工作是在一台supermini上，然后Apple上的6502汇编和在一台PC上的Pascal，我的两个创业公司都是用C为Mac开发，我更多地为其他人（包括Apple）工作，用C为Mac开发，一点点C++，接着从Objective-C/WebObjects转换到用Java开发Web客户端和服务端（尽管两者都很少），一些JavaScript，然后在Mac和Windows上进行C++游戏编程，最后是Objective-C和iOS。每次转换都是匆匆忙忙地大量学习，接着是年复一年的掌握所有新的东西。</p>
-
-<p>如果由于某种原因，有人确实能做Android和iOS两者——更不用说Web——以一个真正的大师水平，他们应该能赚比大多数公司愿意支付的更多的钱。公司想要的是雇几个能做所有事情的人，并且以他们能够得到的最低的工资水平。然而我无法理解有人能够同时在这么多事情上成为一个专家，以及他们如何能够用多种技术编写多个应用并且坚持下去。我认识一些极其聪明的人，但我不记得有人棒到确实能在同一时间兼顾不相关的技术并且产出技艺精湛的应用。</p>
-
-<p>也许会有例外。但我仍然认为大多数人做不到。人们当然可以掌握一件事情然后转向掌握另一件事情，但在这个过程中你不可避免地会忘记前者的细节。去年，我在等待裁员且没有什么事情要做的几个月里（我是最后无缘无故裁员中的一个，因为在品牌的最终出售之前我们所有的技术已经被换掉了），我花了一个月的时间在C++上，然后Node.js，最后Swift。今年继续这些语言（因为我的新工作做的是Objective-C）我发现我已经忘了大部分我所学过的。如果你不经常使用某样东西，记忆似乎丢到了脑后。在用PHP重写这个博客引擎的过程中我在我脑中把所有这些语言都搞混了。</p>
-
-<p>如果你是在iOS上从Objective-C转到Swift，那至少还有些重叠。但Android和iOS不仅是不同的语言，一切都不同，从工具到如何布局去支持多个主要的OS发行和24,000多种不同的设备。仅仅是跟上所有这些年在六月WWDC的新变化就要花费大量的精力；雪上加霜的是Apple释放的示例代码在最新beta版的XCode里已经不能编译。就算你不写代码整天只是观看视频和阅读文档与示例代码，你怎么能一本正经的说你是一个专家呢？</p>
-
-<p>给两个不同的移动OS环境添加复杂混乱的是现代Web开发，特别是那些某一天出现然后第二天消失的JavaScript框架。你需要三个脑袋才能跟上它。和我一起工作的JavaScript程序员也就够跟上一个（在这里是AngularJS）。</p>
-
-<p>因此找一个能用JavaScript写iOS、Android和移动/桌面Web的人，使用现代的API并且仍然可以支持旧的OS版本，明白不同设计和UI方法的优缺点，特别是所有不同浏览器和Android设备中的微妙之处，并且在创纪录的时间内交付无bug的结果，是幻想。哦对，还要以低于市场的价格为你工作。</p>
-
-<p>当我开始编程时，一切都极其原始，我只需要知道一门语言和一种OS，根本没有框架。甚至在我的两个创业公司里我只需要掌握C，通晓Macintosh和一些偶尔的68K汇编。今时不同以往。然而我们仍然只有一个大脑，并且大脑不服从摩尔定律，它们不能升级。</p>
-
-<p>因此，如果你能（诚实地）同时做Android、iOS和移动Web，并且交付技艺精湛的结果，我向您致敬！但我真的希望你也能赚3倍的钱。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/elasticsearch-restful-api/">Elasticsearch的RESTful API</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2015-02-14T09:31:14+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>14</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>9:31 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>CURD的URL格式：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>http://localhost:9200/&lt;index&gt;/&lt;type&gt;/[&lt;id&gt;]</span></code></pre></td></tr></table></div></figure>
-
-<p>id是可选的，不提供的话Elasticsearch会自动生成。index和type将信息进行分层，便于管理。可以将index理解为数据库，type理解为数据表。</p>
-
-<p>创建</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># 使用自动生成ID的方式新建纪录
-</span><span class='line'>curl -XPOST localhost:9200/&lt;index&gt;/&lt;type&gt; -d '{ "tag" : "bad" }'
-</span><span class='line'>
-</span><span class='line'># 使用指定的ID新建记录
-</span><span class='line'>curl -XPOST localhost:9200/&lt;index&gt;/&lt;type&gt;/3 -d '{ "tag" : "bad" }'</span></code></pre></td></tr></table></div></figure>
-
-<p>查询</p>
+<p>下面是那时候写的导入代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -752,103 +139,50 @@
 <span class='line-number'>24</span>
 <span class='line-number'>25</span>
 <span class='line-number'>26</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># 查询所有的index和type的记录
-</span><span class='line'>curl -XGET localhost:9200/_search?pretty
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class StocksController &lt; ApplicationController
+</span><span class='line'>  UPLOADS_DIRECTORY = File.join("#{Rails.root}", "public/uploads")
 </span><span class='line'>
-</span><span class='line'># 查询某个index下所有type的记录
-</span><span class='line'>curl -XGET localhost:9200/&lt;index&gt;/_search?pretty
+</span><span class='line'>  def import
+</span><span class='line'>    filename = upload_file(params[:file])
+</span><span class='line'>    lines = File.readlines("#{UPLOADS_DIRECTORY}/#{filename}")
+</span><span class='line'>    lines.each do |line|
+</span><span class='line'>      # do something
+</span><span class='line'>    end
+</span><span class='line'>    redirect_to stocks_url
+</span><span class='line'>  end
 </span><span class='line'>
-</span><span class='line'># 查询某个index下某个type下所有的记录
-</span><span class='line'>curl -XGET localhost:9200/&lt;index&gt;/&lt;type&gt;/_search?pretty
+</span><span class='line'>  protected
+</span><span class='line'>    def upload_file(file)
+</span><span class='line'>      if !file.original_filename.empty?
+</span><span class='line'>        @filename = get_file_name(file.original_filename)
+</span><span class='line'>        Dir.mkdir("#{UPLOADS_DIRECTORY}") unless Dir.exist?("#{UPLOADS_DIRECTORY}")
+</span><span class='line'>        File.open("#{UPLOADS_DIRECTORY}/#{@filename}", "wb") do |f|
+</span><span class='line'>          f.write(file.read)
+</span><span class='line'>        end
+</span><span class='line'>        return @filename
+</span><span class='line'>      end
+</span><span class='line'>    end
 </span><span class='line'>
-</span><span class='line'># 使用参数查询所有的记录
-</span><span class='line'>curl -XGET localhost:9200/_search?q=tag:bad&pretty
-</span><span class='line'>
-</span><span class='line'># 使用参数查询某个index下的所有记录
-</span><span class='line'>curl -XGET localhost:9200/&lt;index&gt;/_search?q=tag:bad&pretty
-</span><span class='line'>
-</span><span class='line'># 使用参数查询某个index下某个type下所有的记录
-</span><span class='line'>curl -XGET localhost:9200/&lt;index&gt;/&lt;type&gt;/_search?q=tag:bad&pretty
-</span><span class='line'>
-</span><span class='line'># 使用JSON参数查询所有的记录，-d代表一个JSON格式的对象
-</span><span class='line'>curl -XGET localhost:9200/_search?pretty -d '{ "query" : { "term" : { "tag" : "bad" } } }'
-</span><span class='line'>
-</span><span class='line'># 使用JSON参数查询某个index下的所有记录
-</span><span class='line'>curl -XGET localhost:9200/&lt;index&gt;/_search?pretty -d '{ "query" : { "term" : { "tag" : "bad" } } }'
-</span><span class='line'>
-</span><span class='line'># 使用JSON参数查询某个index下某个type下所有的记录
-</span><span class='line'>curl -XGET localhost:9200/&lt;index&gt;/&lt;type&gt;/_search?pretty -d '{ "query" : { "term" : { "tag" : "bad" } } }'</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>    def get_file_name(filename)
+</span><span class='line'>      if !filename.nil?
+</span><span class='line'>        # does not support chinese filename?
+</span><span class='line'>        Time.now.strftime("%Y%m%d%H%M%S") + '.txt'
+</span><span class='line'>      end
+</span><span class='line'>    end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
 
-<p>更新</p>
+<p>这里的实现方法是先将上传文件保存到服务器上应用的public/uploads目录中，然后再读取和处理。</p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>curl -XPUT localhost:9200/&lt;index&gt;/&lt;type&gt;/3 -d '{ "tag" : "good" }'</span></code></pre></td></tr></table></div></figure>
+<p>其实根本不需要写的这么复杂，因为导入的文件被读取一次后就不再使用了。所以在当时写代码的时候一直有这样的想法，如果能直接获得上传文件的数据，那么就不需要再另外去写保存和读取文件的代码了。</p>
 
-<p>删除</p>
+<p>事实也是如此。通过表单提交的file数据会首先在服务器上形成临时文件，这时其实可以通过临时文件的路径来读取上传文件的数据。</p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>curl -XDELETE localhost:9200/&lt;index&gt;</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/elasticsearch-installation/">Elasticsearch安装</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2015-02-10T23:50:34+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>10</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>11:50 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p><a href="http://elastic.co/">Elasticsearch</a>是一款基于<a href="http://lucene.apache.org/">Lucene</a>构建的开源分布式全文检索服务器。提供RESTful API，采用多shard的方式保证数据安全，提供自动resharding的功能，能够很轻松地进行大规模的横向扩展，以支撑PB级的结构化和非结构化海量数据的处理。</p>
-
-<p>安装Java 1.7</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mkdir /usr/java
-</span><span class='line'>cd /usr/java
-</span><span class='line'>wget --no-check-certificate --no-cookies --header "Cookie: oraclelicense=accept-securebackup-cookie" http://download.oracle.com/otn-pub/java/jdk/7u67-b01/jdk-7u67-linux-x64.rpm
-</span><span class='line'>rpm -ivh jdk-7u67-linux-x64.rpm
-</span><span class='line'>java -version
-</span><span class='line'>echo $JAVA_HOME</span></code></pre></td></tr></table></div></figure>
-
-<p>安装Elasticsearch 1.4.1</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mkdir /usr/elasticsearch
-</span><span class='line'>cd /usr/elasticsearch
-</span><span class='line'>wget https://download.elastic.co/elasticsearch/elasticsearch/elasticsearch-1.4.1.tar.gz
-</span><span class='line'>tar -xvf elasticsearch-1.4.1.tar.gz
-</span><span class='line'>cd elasticsearch-1.4.1
-</span><span class='line'>./bin/elasticsearch</span></code></pre></td></tr></table></div></figure>
-
-<p>然后访问<code>http://localhost:9200/?pretty</code>就可以看到类似下面的返回：</p>
+<p>根据该想法重构后的代码如下：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -858,195 +192,18 @@
 <span class='line-number'>6</span>
 <span class='line-number'>7</span>
 <span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>{
-</span><span class='line'>  "status" : 200,
-</span><span class='line'>  "name" : "Powerpax",
-</span><span class='line'>  "cluster_name" : "elasticsearch",
-</span><span class='line'>  "version" : {
-</span><span class='line'>    "number" : "1.4.1",
-</span><span class='line'>    "lucene_version" : "4.10.2"
-</span><span class='line'>  },
-</span><span class='line'>  "tagline" : "You Know, for Search"
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class StocksController &lt; ApplicationController
+</span><span class='line'>  def import
+</span><span class='line'>    lines = File.readlines(params[:file].tempfile.to_path.to_s)
+</span><span class='line'>    lines.each do |line|
+</span><span class='line'>      # do something
+</span><span class='line'>    end
+</span><span class='line'>    redirect_to stocks_url
+</span><span class='line'>  end</span></code></pre></td></tr></table></div></figure>
 
-<p>只是运行起来是不够的，通常我们需要将Elasticsearch安装成服务，设置成开机自启动什么的。这要用到<a href="https://github.com/elasticsearch/elasticsearch-servicewrapper">elasticsearch-servicewrapper</a>了。下载解压后把service文件夹拷贝到elasticsearch-1.4.1/bin目录下。</p>
+<p>重构后的代码果然清爽多了，不过还是有改进的空间。</p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>./bin/service/elasticsearch install  # 安装服务
-</span><span class='line'>./bin/service/elasticsearch start  # 运行服务</span></code></pre></td></tr></table></div></figure>
-
-<p>其它选项：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>console 以前台方式运行Elasticsearch
-</span><span class='line'>stop 停止Elasticsearch
-</span><span class='line'>remove 移除系统启动中的Elasticsearch服务（init.d/service）</span></code></pre></td></tr></table></div></figure>
-
-<p>需要注意的是，在小内存机器上运行时，需要限制下内存大小，否则服务会无法启动，出现如下警告信息：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Starting Elasticsearch...
-</span><span class='line'>Waiting for Elasticsearch......................
-</span><span class='line'>WARNING: Elasticsearch may have failed to start.</span></code></pre></td></tr></table></div></figure>
-
-<p>打开bin/service/elasticsearch.conf文件，设置Elasticsearch能够分配的JVM内存大小。一般情况下，设置成总内存的50%比较好。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>set.default.ES_HEAP_SIZE=512</span></code></pre></td></tr></table></div></figure>
-
-<p>如果要限制ES_MIN_MEM和ES_MAX_MEM，建议设置成一样大，避免出现频繁的内存分配。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/why-we-cant-estimate-software-project-the-same-way-we-estimate-houses/">为什么我们不能用估算房屋同样的方法估算软件项目</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2015-01-10T09:33:48+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>10</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>9:33 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="http://www.summa-tech.com/blog/2009/01/28/why-we-cant-estimate-software-project-the-same-way-we-estimate-houses">http://www.summa-tech.com/blog/2009/01/28/why-we-cant-estimate-software-project-the-same-way-we-estimate-houses</a></p>
-
-<p>把构造软件类比成建造房屋是非常有用的，但也有缺陷。</p>
-
-<p>尽管软件建设和住宅建设都是工程实践，但比起软件，我们在估算建造房屋的成本和精力方面更成功。</p>
-
-<h3 id="词汇障碍">词汇障碍</h3>
-
-<p>因为我们大多数人一生都住在房子里，我们开发了一套定义良好的、可以理解的、几乎通用的词汇来描述和讨论关于我们称之为家的地方。当被问及我们的房子是什么样子的，我们可以很容易地回答。当计划一所新房子时，我们可以极其肯定地讨论我们想要什么，并确信建筑师和工程师会明白我们谈论的，反之亦然。我们可能不明白水管设施和电气细节，但我们知道电源插座要放在哪里，知道房间的大小，知道要有多少车库门。</p>
-
-<p>当我们谈论软件时，就不是那么有效了。有太多来自业务和技术方面的新术语，我们需要依赖于现实世界中的类比去解释他们。不仅发生在业务和技术人员之间，甚至还发生在业务人员和业务人员，技术人员和技术人员之间。我们不习惯于去描述软件需求因为所有软件的抽象，在估算时沟通经常受到噪音、误解、缺乏眼界的影响，增加了真正需要构建的不确定性。</p>
-
-<h3 id="物理">物理</h3>
-
-<p>现实世界有非常强大和稳定的规则，比如重力，这些规则会在盖房子的时候施加约束。我们知道我们必须在构建二楼前先完成地下室。我们不能在地基完成后增加层的数量。在水管设施铺设后更改浴室的位置将会是非常非常昂贵的。</p>
-
-<p>在软件项目中，我们生活在一个较少规则的世界里，就像《黑客帝国》。从技术上讲，我们可以在同一时间构造所有的应用层。它可以被设计成使用不同的数据库，运行在不同的服务器，或支持不同的语言。它可以通过浏览器、手机、或其它无线设备访问。选项几乎是无穷无尽的。</p>
-
-<p>正是这种自由和灵活性，在过去的40年里驱动了软件的巨大的进步，但在同时，它也是无数软件项目失败的原因。至关重要的是需求要面对现实，让它们遵守一些基本规则，即使它们不受宇宙物理规律的约束。</p>
-
-<h3 id="程序">程序</h3>
-
-<p>物理和几千年建设的结合已经带来了如何去建造一座房子的一套可靠的程序，虽然总是会有新的材料和改进的技术，核心概念都是相同的。油漆房子的过程几百年来几乎没有变化。</p>
-
-<p>我们仍然处于软件工程的早期阶段。大量的“直觉”仍在估算软件时使用，实际情况是直觉还没有被证明非常有效。</p>
-
-<h3 id="材料和标准">材料和标准</h3>
-
-<p>只有数量有限的材料能被实际地用在建造房屋上。从技术上来讲，可能有成千上百的选项去建造一堵墙：夹板、混凝土、钢铁、沙子、玻璃，但在家具建材零售店里这些选项是非常有限的。涂料的类型，门窗的模型很多但有限。当购买一个水槽时，它很容易兼容已有的水管设施的几率非常高。电器有着相同的电压，灯泡也是兼容的。计划建造一所房子的一切都是兼容的，材料更是普及的，把不确定性降低到了非常小的水平，提高了估算的准确性。</p>
-
-<p>软件行业确实有一些标准，但是它们处于层的最低水平，例如网络协议和文件系统。服务器和产品的集成仍处于布线阶段，XML和Web Service还有很长的路要走，在它们和建筑业达到相同级别的兼容性前，如果这是可能的。</p>
-
-<p>各种各样连接到数据库和构建软件的选项和方法增加了复杂性，提高了每个人参与软件构建工作的学习曲线。我不是说所有这些选项都是不好的，但它确实给估算阶段增加了不确定性，所以产生了复杂性。</p>
-
-<h3 id="角色">角色</h3>
-
-<p>每次我路过建筑工地，都会看到很多帽子，一些在积极工作，一些在等待时机采取行动。但最好的部分是我从来没有见过有人同时戴两顶帽子。角色界定的很明确，工人们专业从事于非常具体的领域。</p>
-
-<p>在大型软件项目中也有一些角色被定义，但还远远没有达到建筑业相同级别的专业化。通常团队成员需要戴上很多帽子，结果是，有时候他们会执行那些他们不是专家的任务，这就增加了他们提供的估算的不确定性。</p>
-
-<p>“很多帽子”现象的一个很好例子是“Webmaster”，该角色用于描述那个做网页设计、创建动画图片、编写HTML和Perl代码、配置数据库、管理网络和邮件服务器的家伙。幸运的是现在Webmaster是个很少使用的术语，因为所有这些活动现在都分配给了不同的角色，像网页设计师、DBA，程序员和系统管理员。我们确实在走向专业化，但还是有很长的路要走。</p>
-
-<p>我并不是建议我们停止使用“让我们像建造房屋那样构造软件”的类比，但我们必须意识到这个比喻的局限性。一旦我们知道局限性我们将能更好地定位讨论这一差异，以及提供建议如何解决它们。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/tabactivity-is-deprecated/">TabActivity is deprecated</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2014-12-05T19:29:10+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>5</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>7:29 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>最近在整理<a href="/blog/summary-of-android-tab-navigation/">Android Tab导航总结</a>的代码时发现
-TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类，能尽量满足最小修改的要求。发现可以使用FragmentActivity来替代，Fragment组件作为标签页添加。</p>
-
-<p>Fragment是Android 3.0引入的一个新概念，主要是为了适应各种不同的屏幕大小，它非常类似于Activity，可以像Activity一样包含布局，但是不能单独存在，只能存在于Activity中。下图是Fragment在不同屏幕上的显示以及Fragment与所在Activity的关系：</p>
-
-<p><img src="/uploads/android-fragments.png" title="android-fragments" ></p>
-
-<p>重构前的布局：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>MainActivity extends TabActivity
-</span><span class='line'>    TabHost - tabhost
-</span><span class='line'>        LinearLayout
-</span><span class='line'>            TabWidget - tabs
-</span><span class='line'>            FrameLayout - tabcontent
-</span><span class='line'>                TabSpec (Activity)
-</span><span class='line'>                ...
-</span><span class='line'>                TabSpec (Activity)</span></code></pre></td></tr></table></div></figure>
-
-<p>重构后的布局：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>MainActivity extends FragmentActivity
-</span><span class='line'>    TabHost - tabhost
-</span><span class='line'>        LinearLayout
-</span><span class='line'>            TabWidget - tabs
-</span><span class='line'>            FrameLayout - tabcontent
-</span><span class='line'>                TabSpec (Fragment)
-</span><span class='line'>                ...
-</span><span class='line'>                TabSpec (Fragment)</span></code></pre></td></tr></table></div></figure>
-
-<p>把TabLeftActivity和TabRightActivity分别改成LeftFragment和RightFragment：</p>
+<p>作为控制器，controller只是负责接收request，并返回response。而具体的业务逻辑，则应该交由model去完成。下面是依照该理念再次重构后的代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1062,22 +219,298 @@ TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类
 <span class='line-number'>12</span>
 <span class='line-number'>13</span>
 <span class='line-number'>14</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class LeftFragment extends Fragment {
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class StocksController &lt; ApplicationController
+</span><span class='line'>  def import
+</span><span class='line'>    Stock.import(params[:file])
+</span><span class='line'>    redirect_to stocks_url
+</span><span class='line'>  end
+</span><span class='line'>end
 </span><span class='line'>
-</span><span class='line'>    @Override
-</span><span class='line'>    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-</span><span class='line'>            Bundle savedInstanceState) {
-</span><span class='line'>        rootView = inflater.inflate(R.layout.tab_left, container, false);
-</span><span class='line'>
-</span><span class='line'>        // do something
-</span><span class='line'>        // 不能直接使用findViewById()方法，必须加上rootView前缀
-</span><span class='line'>        // 如果要引用当前绑定的Activity实例，使用getActivity()方法
-</span><span class='line'>
-</span><span class='line'>        return rootView;
-</span><span class='line'>    }
+</span><span class='line'>class Stock &lt; ActiveRecord::Base
+</span><span class='line'>  def self.import(file)
+</span><span class='line'>    lines = File.readlines(file.tempfile.to_path.to_s)
+</span><span class='line'>    lines.each do |line|
+</span><span class='line'>      # do something
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/multipart-misspelling-cause-bug/">打错multipart引发的血案</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2014-11-13T09:27:17+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>13</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>9:27 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>浪费几个小时，杀死无数脑细胞，最终发现是单词打错了。不过错有错招，这个问题也让我重新温习了一遍关于form数据编码的知识。</p>
+
+<p>在做上传表单时，一直报告如下错误：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>undefined method 'original_filename' for "example.csv":String</span></code></pre></td></tr></table></div></figure>
+
+<p>在 <a href="http://guides.rubyonrails.org/form_helpers.html#what-gets-uploaded">http://guides.rubyonrails.org/form_helpers.html#what-gets-uploaded</a> 有这样一段文字：</p>
+
+<blockquote>
+<p>The object in the params hash is an instance of a subclass of IO. Depending on the size of the uploaded file it may in fact be a StringIO or an instance of File backed by a temporary file. In both cases the object will have an original_filename attribute containing the name the file had on the user&#39;s computer and a content_type attribute containing the MIME type of the uploaded file.</p>
+</blockquote>
+
+<p>说明example.csv应该是IO类型的，这里怎么显示是String呢？</p>
+
+<p>表单代码为</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= form_tag import_stocks_path, mutlipart: true do %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>或</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= form_tag import_stocks_path, method: :post, mutlipart: true do %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>生成后的HTML代码都是：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;form action="/stocks/import" method="post" mutlipart="true"&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>正确的HTML代码应该是：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;form action="/stocks/import" method="post" enctype="multipart/form-data"&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>使用HttpFox工具抓取表单提交信息如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>POST /stocks/import HTTP/1.1
+</span><span class='line'>Host localhost:3000
+</span><span class='line'>Referer   http://localhost:3000/stocks/import
+</span><span class='line'>Connection keep-alive
+</span><span class='line'>Content-Type application/x-www-form-urlencoded
+</span><span class='line'>Content-Length 112</span></code></pre></td></tr></table></div></figure>
+
+<p>什么是application/x-www-form-urlencoded？含有file类型字段的表单编码不应该是multipart/form-data吗。</p>
+
+<p>form的enctype属性通常有两种：application/x-www-form-urlencoded和multipart/form-data，默认为前者。当method=get时，浏览器用application/x-www-form-urlencoded编码方式把form数据转换成一个字串（name1=value1&amp;name2=value2...），然后把这个字串附加到url后面，用?分割。当method=post的时候，浏览器把form数据封装到post-body中。如果没有type=file的控件，就用默认的application/x-www-form-urlencoded编码。但是如果有type=file的话，就要用到multipart/form-data了。浏览器会把整个表单以控件为单位分割，并为每个部分加上Content-Disposition（form-data或者file），Content-Type（默认为text/plain），name等信息，并加上分割边界（boundary）。</p>
+
+<p>这时才发现原来是把multipart打错成mutlipart了，真是惨痛的教训啊！</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-disable-virtualbox-time-sync-between-host-and-guest/">如何禁止VirtualBox虚拟机和物理机之间的时间同步</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2014-11-02T10:03:29+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2014</span></span> <span class='time'>10:03 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>主机是Windows Server 2008，虚拟机Windows XP，VirtualBox的版本为4.3.6。</p>
+
+<p>因为某种原因，需要修改XP系统的时间设置。但在设置后不到10秒钟就又和主机的时间自动同步了。</p>
+
+<p>实时同步时间功能是由Guest Additions提供的，把它卸载就可以修改时间，不过这不是好的解决方法。</p>
+
+<p>翻阅<a href="http://www.virtualbox.org/manual/">VirtualBox User Manual</a>，找到“Disabling the Guest Additions time synchronization”章节，说明如何能把时间同步给禁止掉。在主机环境执行以下命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>VBoxManage setextradata "YOUR_VM_NAME" "VBoxInternal/Devices/VMMDev/0/Config/GetHostTimeDisabled" 1</span></code></pre></td></tr></table></div></figure>
+
+<p>YOUR_VM_NAME是你的虚拟机名字，可以通过VBoxManage list vms命令查询到。</p>
+
+<p>还有种方法是修改虚拟机的注册表，把HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\VBoxService项下ImagePath值改为system32\VBoxService.exe --disable-timesync，禁止Guest Additions启动时间同步。修改好后重启虚拟机就可以了。</p>
+
+<p>另外就是虚拟机冷启动时都会和主机时间同步先，这意味着关机再开机的话上次的时间修改就失效了，必须再次手动调整。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/git-notes-rebase-onto/">Git笔记之rebase --onto</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2014-10-26T13:41:19+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>1:41 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>有的时候，可能需要修改某个已提交commit。如果是修改最近提交的commit，可以使用git commit --amend命令；如果是修改更早提交的commit，可以使用git rebase -i HEAD~n。不过这个命令有个缺陷，就是不能修改最早提交的那个commit。假设有如下提交历史：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>C1--C2--C3--C4</span></code></pre></td></tr></table></div></figure>
+
+<p>要修改C4可以使用git commit --amend；要修改C2、C3或C4可以使用git rebase -i HEAD~n；但是如果要修改C1呢？这就需要rebase --onto出场了。下面就来实例讲解如何使用rebase --onto命令。</p>
+
+<p>因为要修改C1这个commit，所以先在它之上创建临时分支tb：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>git checkout -b tb C1</span></code></pre></td></tr></table></div></figure>
+
+<p>然后就可以在tb分支上做想要的修改，改完之后用下面的命令提交更改的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>git commit -a --amend</span></code></pre></td></tr></table></div></figure>
+
+<p>这时查看tb分支的提交历史，可以发现SHA1值已经发生了变化（master分支的SHA1值仍然不变）：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>C1'</span></code></pre></td></tr></table></div></figure>
+
+<p>接着可以把修改后的内容和master分支合并：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>git rebase --onto tb C1 master</span></code></pre></td></tr></table></div></figure>
+
+<p>表示把master分支上从C1之后的所有commit重新apply到tb分支最新的commit之后。</p>
+
+<p>这里有两点要注意：一个是C1处的开闭问题，rebase --onto的机制是左开右闭，也就是说上述命令只会apply三个提交C2、C3和C4；第二个是rebase --onto之后tb分支的提交历史没有改变，还是只有一个提交C1’，当前分支也切换到了master，并且所有commit的SHA1值都发生了改变。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>C1'--C2'--C3'--C4'</span></code></pre></td></tr></table></div></figure>
+
+<p>最后就是正常的rebase --continue流程了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/read-binary-file-give-wrong-size-in-ruby/">Ruby中读二进制文件时大小错误</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2014-10-09T23:37:59+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>9</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>11:37 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>经常会遇到这类场景，要把文件内容一次性全部读取出来。使用IO.read(&#39;example.bin&#39;)读取二进制文件时，发现读出来的大小与实际结果不符合。原来默认不加参数时仅限于读文本文件，需要指定mode为b。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>IO.read('example.bin', { mode: 'rb' })</span></code></pre></td></tr></table></div></figure>
+
+<p>还有种简洁的读取方式是：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>File.open('example.bin', 'rb').readlines.join</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/tricks-and-tips-for-octopress/">Octopress 2.0使用技巧</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2014-09-15T13:16:30+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>15</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>1:16 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Octopress 2.0带的RDiscount支持表格等Markdown扩展语法了。具体语法看 <a href="https://michelf.ca/projects/php-markdown/extra/#table">https://michelf.ca/projects/php-markdown/extra/#table</a> 。不过默认表格是不具有边框的，在显示数据时会很难看。<a href="http://programus.github.io/blog/2012/03/07/add-table-data-css-for-octopress/">http://programus.github.io/blog/2012/03/07/add-table-data-css-for-octopress/</a> 修复了这个问题，只是它的修改有些复杂，其实只要把data-table.css的内容粘贴到sass/custom/_styles.scss里就出效果了。</p>
+
+<p>还有就是Octopress中的列表项应该是右移的，实际左移了。可以在sass/custom/_styles.scss添加以下代码解决：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>article {
+</span><span class='line'>  ol, ul {
+</span><span class='line'>    padding-left: 3em;
+</span><span class='line'>  }
 </span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>然后在main.xml中的FrameLayout里添加两个Fragment组件：</p>
+<p>更简单的办法是把sass/custom/_layout.scss中被注释的这行代码打开：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>//$indented-lists: true;</span></code></pre></td></tr></table></div></figure>
+
+<p>列表、表格前要有空行，例如</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1088,24 +521,391 @@ TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类
 <span class='line-number'>7</span>
 <span class='line-number'>8</span>
 <span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;fragment android:name="com.example.fragments.LeftFragment"
-</span><span class='line'>    android:id="@+id/fragment_left"
-</span><span class='line'>    android:layout_width="match_parent"
-</span><span class='line'>    android:layout_height="match_parent" /&gt;
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>List
+</span><span class='line'>* item
+</span><span class='line'>* item
+</span><span class='line'>* item
 </span><span class='line'>
-</span><span class='line'>&lt;fragment android:name="com.example.fragments.RightFragment"
-</span><span class='line'>    android:id="@+id/fragment_right"
-</span><span class='line'>    android:layout_width="match_parent"
-</span><span class='line'>    android:layout_height="match_parent" /&gt;</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>Table
+</span><span class='line'>column | column
+</span><span class='line'>------ | ------
+</span><span class='line'>value  | value
+</span><span class='line'>value  | value</span></code></pre></td></tr></table></div></figure>
 
-<p>把MainActivity改成从FragmentActivity继承。这里不能像TabActivity一样直接用getTabHost()，需要改成如下代码：</p>
+<p>不会正常显示，必须在List和Table后空一行才行。就像下面这样：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>TabHost tabHost = (TabHost)findViewById(android.R.id.tabhost);
-</span><span class='line'>tabHost.setup();</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>List
+</span><span class='line'>
+</span><span class='line'>* item
+</span><span class='line'>* item
+</span><span class='line'>* item
+</span><span class='line'>
+</span><span class='line'>Table
+</span><span class='line'>
+</span><span class='line'>column | column
+</span><span class='line'>------ | ------
+</span><span class='line'>value  | value
+</span><span class='line'>value  | value</span></code></pre></td></tr></table></div></figure>
 
-<p>到这边就已经完成了，其它tabHost.addTab的使用方式一模一样。</p>
+<p>如果你已经发表了许多的文章，Octopress站点的生成速度将会非常之慢，解决方式是使用：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rake isolate['title']</span></code></pre></td></tr></table></div></figure>
+
+<p>隔离你所工作的文章（使用此命令前请确保该文章已经存在）。</p>
+
+<p>现在使用以下命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rake generate
+</span><span class='line'>rake preview</span></code></pre></td></tr></table></div></figure>
+
+<p>将会仅工作在被隔离的文章上。</p>
+
+<p>解除文章的隔离可以使用以下命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rake integrate</span></code></pre></td></tr></table></div></figure>
+
+<p>如果想在rake new_post/page后使用指定编辑器自动打开生成的文件，可以编辑Rakefile，在Misc Configs段中添加以下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>editor="open"
+</span><span class='line'># open，使用系统默认编辑器
+</span><span class='line'># open -a Mou，使用Mou打开
+</span><span class='line'># open -a Byword，使用Byword打开
+</span><span class='line'># subl，使用Sublime Text2打开</span></code></pre></td></tr></table></div></figure>
+
+<p>然后在task :new_post和task :new_page的末尾添加如下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if #{editor}
+</span><span class='line'>  system "sleep 1; #{editor} #{filename}"
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>在rake preview后自动打开浏览器，也可以编辑Rakefile，在task :preview任务中添加：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>system "sleep 2; open http://localhost:#{server_port}/"</span></code></pre></td></tr></table></div></figure>
+
+<p>如果日后Octopress有新版本发布，可以使用以下指令升级：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>git remote add octopress git://github.com/imathis/octopress.git
+</span><span class='line'>git pull octopress master  # Get the latest Octopress
+</span><span class='line'>bundle install             # Keep gems updated
+</span><span class='line'>rake update_source         # update the template's source
+</span><span class='line'>rake update_style          # update the template's style</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/migrating-wordpress-to-octopress/">Wordpress迁移到Octopress</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2014-08-05T19:15:03+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>5</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>7:15 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>GitHub Pages提供免费的静态站点托管服务，有两种类型：User/Organization Pages和Project Pages。前者是用户/组织的主页，一个用户/组织仅有一个；后者是每个项目的主页。</p>
+
+<p>安装Octopress时，rake setup_github_pages会要求输入GitHub Pages项目的URL，根据URL判断是哪种服务。如果是前者，会在新建的<code>_deploy</code>目录上创建master分支，用于存放发布的静态文件，并把原master分支改为source分支；后者则仅在<code>_deploy</code>目录上创建gh-pages分支。</p>
+
+<p>Octopress默认的permalink是/blog/:year/:month/:day/:title/，想把它改成/:title/这种格式。修改后，发现生成的文章都跑到了public目录下，默认应该是在public/blog目录里的。为保持目录的简洁，把它改成了/blog/:title/，这样虽然生成的文章没有按年月日分目录，但是用户在访问系列文章时就可以只修改相应数字，不然必须得记住几乎不可能知道的文章的发布年月日。</p>
+
+<p>至于评论的迁移，不想费过多的手脚，直接使用Octopress自带的Disqus。在Wordpress中安装好Disqus插件，通过插件设置将现有的评论内容导入Disqus。不过Disqus处理导入数据的时间有点长，需要等待一段时间，可以在 <a href="http://import.disqus.com">http://import.disqus.com</a> 查看导入进度。导入完成后，把Wordpress文章的permalink改成和Octopress相同，登录Disqus后台，找到Migrate Threads栏目，在Domain Migration Wizard里把旧域名改成新域名，然后一路Next就大功告成了。</p>
+
+<p>不过在实践中碰到了问题，打开某篇有评论的文章，发现只有评论框，没有评论。搞不明白是怎么回事。后来受到 <a href="http://www.ducea.com/2012/11/12/disqus-comments-not-visible-in-octopress/">http://www.ducea.com/2012/11/12/disqus-comments-not-visible-in-octopress/</a> 的启发，原来是<code>_config.yml</code>中的URL还是生成项目时的，与CNAME中配置的域名不一致，修改后就没问题了。</p>
+
+<p>在侧边栏显示最新评论也很简单，添加recent_comments.html到source/_includes/custom/asides目录下，在<code>_config.yml</code>的default_asides做好配置，最新评论内容就会出现在侧边栏中了：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;section&gt;
+</span><span class='line'>  &lt;h1&gt;Recent Comments&lt;/h1&gt;
+</span><span class='line'>  &lt;div class="dsq-widget"&gt;
+</span><span class='line'>    &lt;script type="text/javascript" src="http://codemany.disqus.com/recent_comments_widget.js"&gt;&lt;/script&gt;
+</span><span class='line'>  &lt;/div&gt;
+</span><span class='line'>&lt;/section&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>在侧边栏显示Tag Cloud参照了 <a href="http://codemacro.com/2012/07/18/add-tag-to-octopress/">http://codemacro.com/2012/07/18/add-tag-to-octopress/</a> 教程，没几分钟就搞定了。</p>
+
+<p>分享使用的是JiaThis，只要把source/_includes/post/sharing.html中的代码替换成以下代码就可以：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div id="jiathis_style_32x32"&gt;
+</span><span class='line'>  &lt;a class="jiathis_button_qzone"&gt;&lt;/a&gt;
+</span><span class='line'>  &lt;a class="jiathis_button_tsina"&gt;&lt;/a&gt;
+</span><span class='line'>  &lt;a class="jiathis_button_tqq"&gt;&lt;/a&gt;
+</span><span class='line'>  &lt;a class="jiathis_button_weixin"&gt;&lt;/a&gt;
+</span><span class='line'>  &lt;a class="jiathis_button_renren"&gt;&lt;/a&gt;
+</span><span class='line'>  &lt;a href="http://www.jiathis.com/share/" class="jiathis jiathis_txt jtico jtico_jiathis" target="_blank"&gt;&lt;/a&gt;
+</span><span class='line'>  &lt;a class="jiathis_counter_style"&gt;&lt;/a&gt;
+</span><span class='line'>&lt;/div&gt;
+</span><span class='line'>&lt;script type="text/javascript" src="http://v2.jiathis.com/code/jia.js" charset="utf-8"&gt;&lt;/script&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>相关文章本想用Octopress自带的lsi模块实现，只是当文章较多时生成速度实在是巨慢，按照推荐安装gsl模块，结果在Windows Server 2008系统上死活装不上，采用手动编译方式也总是死在rb-gsl的安装上。失望之余找到 <a href="https://github.com/LawrenceWoodman/related_posts-jekyll_plugin">https://github.com/LawrenceWoodman/related_posts-jekyll_plugin</a> 这个插件，它使用起来非常简单，只需将related_posts.rb放到自己的plugins文件夹中，然后在source/<u>includes/post中新建related</u>posts.html文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>{ % if site.related_posts % }
+</span><span class='line'>  &lt;h3&gt;Related posts&lt;/h3&gt;
+</span><span class='line'>  &lt;ul class="posts"&gt;
+</span><span class='line'>  { % for post in site.related_posts limit:3 % }
+</span><span class='line'>    &lt;li class="related"&gt;
+</span><span class='line'>      &lt;a href=""&gt;&lt;/a&gt;
+</span><span class='line'>    &lt;/li&gt;
+</span><span class='line'>  { % endfor % }
+</span><span class='line'>  &lt;/ul&gt;
+</span><span class='line'>{ % endif % }</span></code></pre></td></tr></table></div></figure>
+
+<p>修改source/_layouts/post.html，在</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>{ % include post/author.html % }
+</span><span class='line'>{ % include post/date.html % }{ % if updated % }{ % else % }{ % endif % }
+</span><span class='line'>{ % include post/categories.html % }</span></code></pre></td></tr></table></div></figure>
+
+<p>后面添加</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>{ % include post/related_posts.html % }</span></code></pre></td></tr></table></div></figure>
+
+<p>就可以了。使用这个插件会有个小问题，就是它和Jekyll 2.1不兼容，rake generate时会报错，可以使用jumanji27提供的<a href="https://github.com/jumanji27/related_posts-jekyll_plugin">fork版本</a>。</p>
+
+<p>在Wordpress的Tools/Export页面选择导出文章内容，保存为wordpress.xml文件。然后使用工具把它转换成markdown格式。这里使用了YORKXIN的<a href="https://gist.github.com/chitsaou/1394128" title="wordpressdotcom.rb">修改版本</a>，将脚本和wordpress.xml放到Octopress根目录下，然后运行：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ruby -r ./wordpressdotcom.rb -e Jekyll::WordpressDotCom.process</span></code></pre></td></tr></table></div></figure>
+
+<p>会把转换好的文章都放到source/_posts目录下，文件后缀名是html，直接改成markdown就是。</p>
+
+<p>最后就是苦力活：修改文中的站内链接、上传的图片路径以及代码高亮语法等。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/problem-with-nokogiri-when-url-containing-chinese-character/">Nokogiri抓取页面URL含有中文参数的问题</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2014-07-17T22:48:00+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>17</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>10:48 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>使用Nokogiri抓取某网站的长江现货数据，被抓取页面的URL中含有中文参数，使用以下的代码抓取数据失败：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>url = 'http://example.com/search.asp?type=长江有色&sort=asc'
+</span><span class='line'>doc = Nokogiri::HTML(open(url))</span></code></pre></td></tr></table></div></figure>
+
+<p>据 <a href="http://dingr.iteye.com/blog/647244">http://dingr.iteye.com/blog/647244</a> 讲是因为浏览器给服务器发送参数的时候是经过编码的，按照该文的意思试着也给URL里的中文编了下码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>url = 'http://example.com/search.asp?type=长江有色&sort=asc'
+</span><span class='line'>url = URI.escape(url)
+</span><span class='line'>doc = Nokogiri::HTML(open(url))</span></code></pre></td></tr></table></div></figure>
+
+<p>结果还是抓取失败。查看URL的编码信息：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>puts url.encoding  # 输出utf-8</span></code></pre></td></tr></table></div></figure>
+
+<p>网站页面采用的是GB2132编码，猜测网站后台处理数据时很有可能也是采用的GB2132。做个实验就清楚了，将URL转成GB2132后再编码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>url = 'http://example.com/search.asp?type=长江有色&sort=asc'
+</span><span class='line'>url = url.encode('gbk', 'utf-8')
+</span><span class='line'>url = URI.escape(url)
+</span><span class='line'>doc = Nokogiri::HTML(open(url))</span></code></pre></td></tr></table></div></figure>
+
+<p>发现果然OK了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/logic-problems-how-many-sick-dogs/">逻辑题-几条病狗</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2014-07-09T19:35:00+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>9</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>7:35 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>村子中有50个人，每人有一条狗，在这50条狗中有病狗（这种病不会传染），于是人们就要找出病狗，每个人可以观察其他49条狗，以判断它们是否生病，只有自己的狗不能看。观察后得到的结果不得交流，也不能通知病狗的主人。主人一旦推算出自己家的是病狗就要枪毙自己的狗，而且每个人只有权利枪毙自己的狗，没有权利打死其他人的狗。第一天，第二天都没有枪响，到了第三天传来一阵枪响，问有几条病狗？</p>
+
+<p>推论：</p>
+
+<p>A、假设有1条病狗，病狗的主人会看到其他狗都没有病，那么就知道自己的狗有病，所以第一天晚上就会有枪响。因为没有枪响，说明病狗数大于1。</p>
+
+<p>B、假设有2条病狗，病狗的主人会看到有1条病狗，因为第一天没有听到枪响，是病狗数大于1，所以病狗的主人会知道自己的狗是病狗，因而第二天会有枪响。既然第二天也没有枪响，说明病狗数大于2。</p>
+
+<p>由此推理，如果第三天枪响，则有3条病狗，第n天枪响，则有n条病狗。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/debugging-rails-application-with-pry/">使用Pry调试Rails应用</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2014-07-07T23:26:08+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>7</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>11:26 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>调试Rails程序有更好的工具了，这就是<a href="https://github.com/pry/pry">Pry</a>，它是一套全新的IRB替代方案，最闪亮点是它的语法高亮功能。</p>
+
+<p>首先，在Gemfile中添加以下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>gem 'pry', group: :development</span></code></pre></td></tr></table></div></figure>
+
+<p>然后执行</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>bundle install</span></code></pre></td></tr></table></div></figure>
+
+<p>在需要设置断点的地方添加binding.pry，当程序运行到这行代码时会打开一个窗口，可以在这里操作当前代码的上下文变量。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def index
+</span><span class='line'>  @articles = Article.all
+</span><span class='line'>  binding.pry
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>退出调试用exit-all，但如果在循环中会遭遇失败，这时可以使用exit-program无条件地退出。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>(1..100).each do |i|
+</span><span class='line'>  binding.pry
+</span><span class='line'>  puts i
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>Pry默认是没有调试中经常用到的上一步，下一步等命令的，可以安装<a href="https://github.com/nixme/pry-nav">pry-nav</a>，然后就可以使用step, next, continue跳来跳去了。</p>
 </div>
   
   
@@ -1130,23 +930,23 @@ TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part18/">ANTLR 4权威参考读书笔记（18）</a>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part28/">ANTLR 4权威参考读书笔记（28）</a>
+        <a href="/blog/how-to-build-a-news-website-layout-with-flexbox/">如何使用Flexbox构建新闻站点布局</a>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part27/">ANTLR 4权威参考读书笔记（27）</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part17/">ANTLR 4权威参考读书笔记（17）</a>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part26/">ANTLR 4权威参考读书笔记（26）</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part16/">ANTLR 4权威参考读书笔记（16）</a>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part25/">ANTLR 4权威参考读书笔记（25）</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part15/">ANTLR 4权威参考读书笔记（15）</a>
       </li>
     
   </ul>
@@ -1160,11 +960,11 @@ TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 144%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 134%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 131%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
-<a style="font-size: 107%" href="/tags/css/">CSS</a>
+<a style="font-size: 104%" href="/tags/css/">CSS</a>
 <a style="font-size: 110%" href="/tags/crack/">Crack</a>
 <a style="font-size: 107%" href="/tags/database/">Database</a>
 <a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
@@ -1176,14 +976,14 @@ TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类
 <a style="font-size: 97%" href="/tags/listview/">ListView</a>
 <a style="font-size: 104%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
-<a style="font-size: 124%" href="/tags/powerbuilder/">PowerBuilder</a>
-<a style="font-size: 110%" href="/tags/powerscript/">PowerScript</a>
+<a style="font-size: 119%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 101%" href="/tags/powerscript/">PowerScript</a>
 <a style="font-size: 117%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
 <a style="font-size: 119%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 97%" href="/tags/spring/">Spring</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 133%" href="/tags/translation/">Translation</a>
+<a style="font-size: 130%" href="/tags/translation/">Translation</a>
 <a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 107%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 107%" href="/tags/wxwidgets/">wxWidgets</a>

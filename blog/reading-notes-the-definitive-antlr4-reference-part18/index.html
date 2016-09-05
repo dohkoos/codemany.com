@@ -180,7 +180,57 @@
 
 <h4 id="匹配字符串字面量">匹配字符串字面量</h4>
 
+<p>计算机语言中共同具有的下一个常用记号是字符串字面量，例如&quot;hello&quot;。大部分使用双引号作分隔符，有些使用单引号或两者都使用。以双引号为分隔符而言，在语法伪代码中，一个字符串就是在双引号中的任意字符序列：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>STRING : '"' .*? '"' ;    // 匹配在双引号中的任意字符</span></code></pre></td></tr></table></div></figure>
+
+<p>语法中的点是通配符运算符，它可以匹配任意单个字符。因此，“<code>.*</code>”是一个能够匹配任意零个或多个字符的序列的循环。当然，它也将消费字符直到文件结尾，所以不是很有用。幸运的是，ANTLR通过正则表达式表示法（?后缀）提供对非贪婪模式规则的支持。非贪婪模式意味着“直到看见在词法规则中跟在子规则后的字符时才停止吃掉字符”。更确切地说，非贪婪模式规则匹配最小数量的字符，同时仍然允许整个周围的规则被匹配。相反，“<code>.*</code>”被认为是贪婪模式，因为它贪婪地消费能够匹配循环内部的所有字符。</p>
+
+<p>以上的STRING规则还做得不够好，因为它不允许字符串中有双引号。为了做到这点，大部分语言定义了以反斜杠开始的转义字符。在字符串中的双引号我们可以使用“\&quot;”。为支持常用的转义字符，我们需要使用以下规则：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>STRING: '"' (ESC|.)*? '"' ;
+</span><span class='line'>
+</span><span class='line'>fragment
+</span><span class='line'>ESC : '\\"' | '\\\\' ;    // 匹配字符\"和\\</span></code></pre></td></tr></table></div></figure>
+
+<p>ANTLR自身也需要避开转义字符，所以这里我们需要用“\”去指定反斜杠字符。</p>
+
+<p>现在，在STRING规则中的循环既可以通过调用fragment规则RULE去匹配转义字符序列，也可以通过点通配符去匹配任意字符。当看到一个非转义双引号字符时“<code>*?</code>”子规则运算符终止“<code>(ESC|.)*?</code>”循环。</p>
+
 <h4 id="匹配注释和空格">匹配注释和空格</h4>
+
+<p>词法分析器会把匹配到的记号通过记号流传递给语法分析器，然后语法分析器检查流的语法结构。但我们希望当词法分析器匹配到注释和空格时能把它们扔掉。那样，语法分析器就不必为匹配无处不在的可选的注释和空格担心。例如，当WS是一个空格的词法规则时以下的语法规则就非常尴尬和容易出错：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>assign : ID (WS|COMMENT)? '=' (WS|COMMENT)? expr (WS|COMMENT)? ;</span></code></pre></td></tr></table></div></figure>
+
+<p>定义这些被丢弃的记号和定义非丢弃的记号一样，我们只需要使用skip指令去表明词法分析器应该扔掉它们。以下是匹配那些衍生自C的语言的单行和多行注释的语法规则：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>LINE_COMMENT : '//' .*? '\r'? '\n' -&gt; skip ;    // 匹配"//" stuff '\n'
+</span><span class='line'>COMMENT      : '/*' .*? '*/'       -&gt; skip ;    // 匹配"/*" stuff "*/"</span></code></pre></td></tr></table></div></figure>
+
+<p>在COMMENT中，“<code>.*?</code>”消费在“<code>/*</code>”和“<code>*/</code>”之间的任意字符。在LINE_COMMENT中，“<code>.*?</code>”消费“//”之后的任意字符，直到它看到一个换行符。</p>
+
+<p>词法分析器接受若干跟随在-&gt;运算符后的指令，skip只是它们中的一个。例如，我们可以通过使用channel指令把传递给语法分析器的记号放进隐藏通道。</p>
+
+<p>最后，让我们处理空格这个常用记号。大部分编程语言都把空格当作记号分隔符，但某些像Python这样的语言则把空格用作特殊语法目的。以下是告诉ANTLR如何扔掉空格的语法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>WS : (' '|'\t'|'\r'|'\n')+ -&gt; skip ;    // 匹配一个或多个空格但丢弃</span></code></pre></td></tr></table></div></figure>
+
+<p>或者</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>WS : [ \t\r\n]+ -&gt; skip ;    // 匹配一个或多个空格但丢弃</span></code></pre></td></tr></table></div></figure>
+
+<p>当换行既是要被忽略的空格又是命令终结符时，就会有个问题。换行是上下文有关的，在语法上下文中，我们需要扔掉换行，但在其它地方，我们需要把它传递给语法分析器以便让它知道某个命令已经结束。该问题以及它的具体解决方案我们将在以后讨论。</p>
 </div>
 
 
@@ -215,23 +265,23 @@
   <ul class="posts">
   
     <li class="related">
-      <a href="/blog/reading-notes-the-definitive-antlr4-reference-part28/">ANTLR 4权威参考读书笔记（28）</a>
+      <a href="/blog/reading-notes-the-definitive-antlr4-reference-part17/">ANTLR 4权威参考读书笔记（17）</a>
     </li>
   
     <li class="related">
-      <a href="/blog/reading-notes-the-definitive-antlr4-reference-part27/">ANTLR 4权威参考读书笔记（27）</a>
+      <a href="/blog/reading-notes-the-definitive-antlr4-reference-part16/">ANTLR 4权威参考读书笔记（16）</a>
     </li>
   
     <li class="related">
-      <a href="/blog/reading-notes-the-definitive-antlr4-reference-part26/">ANTLR 4权威参考读书笔记（26）</a>
+      <a href="/blog/reading-notes-the-definitive-antlr4-reference-part15/">ANTLR 4权威参考读书笔记（15）</a>
     </li>
   
     <li class="related">
-      <a href="/blog/reading-notes-the-definitive-antlr4-reference-part25/">ANTLR 4权威参考读书笔记（25）</a>
+      <a href="/blog/reading-notes-the-definitive-antlr4-reference-part14/">ANTLR 4权威参考读书笔记（14）</a>
     </li>
   
     <li class="related">
-      <a href="/blog/reading-notes-the-definitive-antlr4-reference-part24/">ANTLR 4权威参考读书笔记（24）</a>
+      <a href="/blog/reading-notes-the-definitive-antlr4-reference-part13/">ANTLR 4权威参考读书笔记（13）</a>
     </li>
   
   </ul>
@@ -255,8 +305,6 @@
         <a class="basic-alignment left" href="/blog/how-to-build-a-news-website-layout-with-flexbox/" title="Previous Post: 如何使用Flexbox构建新闻站点布局">&laquo; 如何使用Flexbox构建新闻站点布局</a>
       
       
-        <a class="basic-alignment right" href="/blog/reading-notes-the-definitive-antlr4-reference-part19/" title="Next Post: ANTLR 4权威参考读书笔记（19）">ANTLR 4权威参考读书笔记（19） &raquo;</a>
-      
     </p>
   </footer>
 </article>
@@ -276,23 +324,23 @@
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part18/">ANTLR 4权威参考读书笔记（18）</a>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part28/">ANTLR 4权威参考读书笔记（28）</a>
+        <a href="/blog/how-to-build-a-news-website-layout-with-flexbox/">如何使用Flexbox构建新闻站点布局</a>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part27/">ANTLR 4权威参考读书笔记（27）</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part17/">ANTLR 4权威参考读书笔记（17）</a>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part26/">ANTLR 4权威参考读书笔记（26）</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part16/">ANTLR 4权威参考读书笔记（16）</a>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part25/">ANTLR 4权威参考读书笔记（25）</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part15/">ANTLR 4权威参考读书笔记（15）</a>
       </li>
     
   </ul>
@@ -306,11 +354,11 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 144%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 134%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 131%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
-<a style="font-size: 107%" href="/tags/css/">CSS</a>
+<a style="font-size: 104%" href="/tags/css/">CSS</a>
 <a style="font-size: 110%" href="/tags/crack/">Crack</a>
 <a style="font-size: 107%" href="/tags/database/">Database</a>
 <a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
@@ -322,14 +370,14 @@
 <a style="font-size: 97%" href="/tags/listview/">ListView</a>
 <a style="font-size: 104%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
-<a style="font-size: 124%" href="/tags/powerbuilder/">PowerBuilder</a>
-<a style="font-size: 110%" href="/tags/powerscript/">PowerScript</a>
+<a style="font-size: 119%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 101%" href="/tags/powerscript/">PowerScript</a>
 <a style="font-size: 117%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
 <a style="font-size: 119%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 97%" href="/tags/spring/">Spring</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 133%" href="/tags/translation/">Translation</a>
+<a style="font-size: 130%" href="/tags/translation/">Translation</a>
 <a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 107%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 107%" href="/tags/wxwidgets/">wxWidgets</a>

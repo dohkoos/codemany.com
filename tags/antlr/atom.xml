@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: ANTLR | 乐者为王]]></title>
   <link href="http://codemany.com/tags/antlr/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2016-08-27T18:57:46+08:00</updated>
+  <updated>2016-09-05T22:59:27+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -14,43 +14,293 @@
 
   
   <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（28）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part28/"/>
-    <updated>2016-08-19T18:09:05+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part28</id>
-    <content type="html"><![CDATA[]]></content>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（18）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part18/"/>
+    <updated>2016-06-14T11:56:18+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part18</id>
+    <content type="html"><![CDATA[<p>编程语言在词法上看起来惊人地相似，无论是函数式、过程式、声明式还是面向对象语言，看起来几乎都是一样的。这很棒，因为我们只需要学习一次如何描述标志符和整数，没有太大的变化，就可以把它们应用到大多数编程语言上。正如语法分析器以及词法分析器使用规则去描述各种语言构造体一样，我们要使用基本相同的表示法。唯一的区别是语法分析器识别在记号流中的语法结构，而词法分析器识别在字符流中的语法结构。</p>
+
+<p>因为词法分析和语法分析有相似的结构，ANTLR允许我们把两者合并在单个语法文件中。但是因为词法分析和语法分析是语言识别的两个不同阶段，我们必须告诉ANTLR每个规则是和哪个阶段相关联的。我们能够通过以大写字母开始的词法规则名字和以小写字母开始的语法规则名字做到这点。例如，ID是一个词法规则名字，expr则是一个语法规则名字。</p>
+
+<p>当开始构建一个新的语法时，对于那些常用的词法构造体：标志符、数字、字符串、注释以及空格等，我们可以从已经存在的语法中拷贝粘贴规则。然后，通过一些细微的调整，就可以让它运行起来。几乎所有的语言，甚至像JSON和XML这样的非编程语言，都有这些记号的变体。例如，C语言的词法分析器完全可以标记化以下的JSON代码：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">{
+  &quot;title&quot;:&quot;Cat wrestling&quot;,
+  &quot;chapters&quot;:[ {&quot;Intro&quot;:&quot;...&quot;}, ... ]
+}
+</code></pre></div>
+<p>另一个例子就是块注释。在C语言中，它们是被/* ... */括起来的。而在XML里，注释是被&lt;!-- ... --&gt;括起来。但它们除了开始和结束符号之外，或多或少都有相同的词法构造。</p>
+
+<p>对于关键词、运算符和标点符号，我们不需要词法规则，因为我们可以在语法分析器规则中直接引用它们，用单引号括起来，就像<code>&#39;while&#39;</code>、<code>&#39;*&#39;</code>、<code>&#39;++&#39;</code>这样。有些开发者更喜欢使用像MUL而不是字面量<code>&#39;*&#39;</code>这样的词法规则引用，这些都没问题，因为它们都有相同的记号类型。</p>
+
+<p>为了阐明词法规则看起来像什么，让我们从标志符开始构建一个常用记号的简单版本。</p>
+
+<h4 id="匹配标志符">匹配标志符</h4>
+
+<p>在语法伪代码中，一个基本的标志符是一个大写和小写字母的非空序列。根据已经学习到的知识，我们知道需要用(...)+表示法来表示这样的序列模式。因为序列元素可以是大写或小写字母，所以在子规则中我们需要使用选择运算符：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">ID : (&#39;a&#39;..&#39;z&#39;|&#39;A&#39;..&#39;Z&#39;)+ ;    // 匹配一个或多个大小写字母
+</code></pre></div>
+<p>唯一的新ANTLR表示法是范围运算符：&#39;a&#39;..&#39;z&#39;代表从a到z的任意字符。或者你也可以使用Unicode代码点字面量&#39;\uXXXX&#39;，这里的XXXX是Unicode字符代码点值的十六进制值。</p>
+
+<p>作为字符集的一个简写，ANTLR支持我们使用更熟悉的正则表达式集合表示法：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">ID : [a-zA-Z]+ ;    // 匹配一个或多个大小写字母
+</code></pre></div>
+<p>有时候我们会发现像下面的语法貌似存在冲突的现象：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">enumDef : &#39;enum&#39; &#39;{&#39; ... &#39;}&#39; ;
+FOR : &#39;for&#39; ;
+ID : [a-zA-Z]+ ;    // 不匹配&#39;enum&#39;或者&#39;for&#39;
+</code></pre></div>
+<p>规则ID也可以同时匹配enum和for这样的关键词，这意味着同样的字符串能被多个规则匹配。但事实上，ANTLR处理这种混合语法时会把字符串字面量以及词法规则与语法规则分隔开，像enum这样的字面量就变成了词法规则并紧随在语法规则之后和在显式的词法规则之前。</p>
+
+<p>ANTLR词法分析器通过偏爱首先指定的规则来解决词法规则间的二义性，这意味着ID规则应该定义在所有的关键词规则之后。ANTLR把隐式的为字面量生成的词法规则放在显式的词法规则之前，因此它们总是有更高的优先级。在这里，&#39;enum&#39;被自动赋予比ID高的优先级。</p>
+
+<p>因为ANTLR会重新排序词法规则并让它在语法规则之后发生。所以上面的语法与下面的变体是相同的：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">FOR : &#39;for&#39; ;
+ID : [a-zA-Z]+ ;    // 不匹配&#39;enum&#39;或者&#39;for&#39;
+enumDef : &#39;enum&#39; &#39;{&#39; ... &#39;}&#39; ;
+</code></pre></div>
+<h4 id="匹配数字">匹配数字</h4>
+
+<p>描述像10这样的整型数字非常容易，因为它只是一个数字序列。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">INT : &#39;0&#39;..&#39;9&#39;+ ;    // 匹配一个或多个数字
+</code></pre></div>
+<p>或者</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">INT : [0..9]+ ;    // 匹配一个或多个数字
+</code></pre></div>
+<p>浮点数要复杂的多，但如果我们忽略指数的话，可以很容易地制作一个简化版本。浮点数是数字序列后面跟着一个句点和一个可选的小数部分；或者以一个句点开始，然后是数字序列。单独一个句点是不合法的。因此我们的浮点规则使用一个选择和一些序列模式：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">FLOAT: DIGIT+ &#39;.&#39; DIGIT*    // 匹配1. 39. 3.14159等等
+     | &#39;.&#39; DIGIT+           // 匹配.1 .14159
+     ;
+
+fragment
+DIGIT: [0-9] ;              // 匹配单个数字
+</code></pre></div>
+<p>这里我们使用了一个帮助规则DIGIT，因此我们不必到处去写[0-9]。通过在规则前面加上fragment前缀，我们让ANTLR知道该规则仅被其它词法规则使用。它本身不是一个记号，这意味着我们不能在语法规则中引用它。</p>
+
+<h4 id="匹配字符串字面量">匹配字符串字面量</h4>
+
+<p>计算机语言中共同具有的下一个常用记号是字符串字面量，例如&quot;hello&quot;。大部分使用双引号作分隔符，有些使用单引号或两者都使用。以双引号为分隔符而言，在语法伪代码中，一个字符串就是在双引号中的任意字符序列：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">STRING : &#39;&quot;&#39; .*? &#39;&quot;&#39; ;    // 匹配在双引号中的任意字符
+</code></pre></div>
+<p>语法中的点是通配符运算符，它可以匹配任意单个字符。因此，“<code>.*</code>”是一个能够匹配任意零个或多个字符的序列的循环。当然，它也将消费字符直到文件结尾，所以不是很有用。幸运的是，ANTLR通过正则表达式表示法（?后缀）提供对非贪婪模式规则的支持。非贪婪模式意味着“直到看见在词法规则中跟在子规则后的字符时才停止吃掉字符”。更确切地说，非贪婪模式规则匹配最小数量的字符，同时仍然允许整个周围的规则被匹配。相反，“<code>.*</code>”被认为是贪婪模式，因为它贪婪地消费能够匹配循环内部的所有字符。</p>
+
+<p>以上的STRING规则还做得不够好，因为它不允许字符串中有双引号。为了做到这点，大部分语言定义了以反斜杠开始的转义字符。在字符串中的双引号我们可以使用“\&quot;”。为支持常用的转义字符，我们需要使用以下规则：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">STRING: &#39;&quot;&#39; (ESC|.)*? &#39;&quot;&#39; ;
+
+fragment
+ESC : &#39;\\&quot;&#39; | &#39;\\\\&#39; ;    // 匹配字符\&quot;和\\
+</code></pre></div>
+<p>ANTLR自身也需要避开转义字符，所以这里我们需要用“\”去指定反斜杠字符。</p>
+
+<p>现在，在STRING规则中的循环既可以通过调用fragment规则RULE去匹配转义字符序列，也可以通过点通配符去匹配任意字符。当看到一个非转义双引号字符时“<code>*?</code>”子规则运算符终止“<code>(ESC|.)*?</code>”循环。</p>
+
+<h4 id="匹配注释和空格">匹配注释和空格</h4>
+
+<p>词法分析器会把匹配到的记号通过记号流传递给语法分析器，然后语法分析器检查流的语法结构。但我们希望当词法分析器匹配到注释和空格时能把它们扔掉。那样，语法分析器就不必为匹配无处不在的可选的注释和空格担心。例如，当WS是一个空格的词法规则时以下的语法规则就非常尴尬和容易出错：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">assign : ID (WS|COMMENT)? &#39;=&#39; (WS|COMMENT)? expr (WS|COMMENT)? ;
+</code></pre></div>
+<p>定义这些被丢弃的记号和定义非丢弃的记号一样，我们只需要使用skip指令去表明词法分析器应该扔掉它们。以下是匹配那些衍生自C的语言的单行和多行注释的语法规则：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">LINE_COMMENT : &#39;//&#39; .*? &#39;\r&#39;? &#39;\n&#39; -&gt; skip ;    // 匹配&quot;//&quot; stuff &#39;\n&#39;
+COMMENT      : &#39;/*&#39; .*? &#39;*/&#39;       -&gt; skip ;    // 匹配&quot;/*&quot; stuff &quot;*/&quot;
+</code></pre></div>
+<p>在COMMENT中，“<code>.*?</code>”消费在“<code>/*</code>”和“<code>*/</code>”之间的任意字符。在LINE_COMMENT中，“<code>.*?</code>”消费“//”之后的任意字符，直到它看到一个换行符。</p>
+
+<p>词法分析器接受若干跟随在-&gt;运算符后的指令，skip只是它们中的一个。例如，我们可以通过使用channel指令把传递给语法分析器的记号放进隐藏通道。</p>
+
+<p>最后，让我们处理空格这个常用记号。大部分编程语言都把空格当作记号分隔符，但某些像Python这样的语言则把空格用作特殊语法目的。以下是告诉ANTLR如何扔掉空格的语法：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">WS : (&#39; &#39;|&#39;\t&#39;|&#39;\r&#39;|&#39;\n&#39;)+ -&gt; skip ;    // 匹配一个或多个空格但丢弃
+</code></pre></div>
+<p>或者</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">WS : [ \t\r\n]+ -&gt; skip ;    // 匹配一个或多个空格但丢弃
+</code></pre></div>
+<p>当换行既是要被忽略的空格又是命令终结符时，就会有个问题。换行是上下文有关的，在语法上下文中，我们需要扔掉换行，但在其它地方，我们需要把它传递给语法分析器以便让它知道某个命令已经结束。该问题以及它的具体解决方案我们将在以后讨论。</p>
+]]></content>
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（27）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part27/"/>
-    <updated>2016-08-14T10:50:50+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part27</id>
-    <content type="html"><![CDATA[]]></content>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（17）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part17/"/>
+    <updated>2016-06-07T13:09:54+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part17</id>
+    <content type="html"><![CDATA[<p>用自顶向下的语法指定和通过手工的递归下降语法分析器识别表达式一直是个麻烦。首先是因为大部分自然语法是模糊的，其次是因为大部分自然语法规格使用一种被称为左递归的特殊类型递归。所以自顶向下的语法和语法分析器不能处理传统形式上的左递归。</p>
+
+<p>为了阐明这个问题，设想一个算术表达式语言，它只有乘法和加法运算符以及整数。表达式是自相似的。也就是说，一个乘法表达式是由“*”运算符连接的两个子表达式。同样的，一个加法表达式是由“+”运算符连接的两个子表达式。我们也可以把整数看作表达式。整个语法规则看起来就像以下显示的那样：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">expr : expr &#39;*&#39; expr    // 匹配由“*”运算符连接的子表达式
+     | expr &#39;+&#39; expr    // 匹配由“+”运算符连接的子表达式
+     | INT              // 匹配简单整数
+     ;
+</code></pre></div>
+<p>问题是上述规则对于某些输入短语来说是模棱两可的。换句话说，这个规则能用多种方法匹配单个输入流。对于简单的整数和像1+2和1*2这样的单运算符表达式是没问题的，因为只有一种方法能去匹配它们。例如，规则可以仅用第二个选项匹配1+2。就像下图左边所示的那样：</p>
+
+<p><img src="/uploads/ambiguity-parse-tree.png" title="ambiguity-parse-tree" ></p>
+
+<p>问题是指定的规则可以像中间和右边语法分析树描绘的那样用两种方法解释1+2*3这样的输入。两者的解释是不同的，因为中间的树说加1到2乘3的结果上，而右边的树说3乘以1加2的结果。这是一个运算符优先级的问题，但常规语法根本没有指定优先级的方法。大部分语法工具使用额外的符号来指定运算符优先级。</p>
+
+<p>与之相反的是，ANTLR解决二义性有利于首先给出的选项，隐式地允许我们指定运算符优先级。规则expr有一个乘法选项在加法选项之前，因此，ANTLR解决1+2*3的运算符二义性有利于乘法。</p>
+
+<p>默认情况下，ANTLR从左到右结合运算符，然而某些像指数群这样的运算符则是从右到左。因此，我们必须使用选项assoc手动指定运算符记号上的相关性。这里是一个能正确地把输入<code>2^3^4</code>解释成<code>2^(3^4)</code>的表达式规则：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">expr : expr &#39;^&#39;&lt;assoc=right&gt; expr    // 运算符是右结合的
+     | INT
+     ;
+</code></pre></div>
+<p>下图中的语法分析树阐明了运算符左右结合版本的不同。右边的语法分析树是惯常的解释：</p>
+
+<p><img src="/uploads/power-parse-tree.png" title="power-parse-tree" ></p>
+
+<p>为了把所有这三个运算符合并成一条规则，我们把指数表达式选项放在其它表达式选项之前，因为它的运算符比乘法和加法都有更高的优先级。合并后的语法如下所示：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">expr : expr &#39;^&#39;&lt;assoc=right&gt; expr    // 运算符是右结合的
+     | expr &#39;*&#39; expr                 // 匹配由“*”运算符连接的子表达式
+     | expr &#39;+&#39; expr                 // 匹配由“+”运算符连接的子表达式
+     | INT                           // 匹配简单整数
+     ;
+</code></pre></div>
+<p>不像其它常规的语法分析器生成器那样，ANTLR v4是可以处理直接左递归的。左递归规则是指直接或者间接调用在选项左边缘的自身的规则。规则expr是直接左递归的，因为除INT选项外的其它所有选项都开始于规则expr自身的引用。如果规则expr的引用处在某些选项的右边缘，那么它就是右递归的。虽然ANTLR v4可以处理直接左递归，但它不能处理间接左递归。这意味着我们不能把expr因子化为语法等效规则。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">expr : expo ;    // 通过expo左递归地间接调用expr
+expo : expr &#39;^&#39;&lt;assoc=right&gt; expr ;
+</code></pre></div>
+<p>ANTLR v4可以简化直接左递归的表达式规则的工作。这种新的机制不仅更有效率，而且表达式规则也更小和更容易理解。</p>
+]]></content>
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（26）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part26/"/>
-    <updated>2016-08-06T12:43:17+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part26</id>
-    <content type="html"><![CDATA[]]></content>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（16）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part16/"/>
+    <updated>2016-06-02T10:16:21+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part16</id>
+    <content type="html"><![CDATA[<ul>
+<li>initializer 初始值设定项</li>
+<li>construct 构造体</li>
+</ul>
+
+<p>现在，我们已经有了一个自顶向下的草拟出语法的通用策略，下面我们要专注于一些常用的语言模式。尽管在过去几十年里有大量的语言被发明，但仍然只有较少的基本语言模式需要被处理。这是因为人们趋向于设计遵循自然语言约束的语言，语言也会因为设计者遵循数学上的常用表示法而趋向于相似。甚至在词法级别，语言趋向于重用一些相同的结构，例如标志符、整数、字符串等。这些单词顺序和依赖的约束来源于自然语言，并逐渐演化成为四种抽象的语言模式：</p>
+
+<h4 id="模式：序列">模式：序列</h4>
+
+<p>这是像数组初始值设定项中的值那样的元素序列，也是在计算机语言中最常见的结构。例如，下面是登录到POP服务器时的序列：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">USER parrt
+PASS secret
+RETR 1
+</code></pre></div>
+<p>这些命令本身也是序列。大部分命令是一个关键词（保留标志符，例如USER和RETR）跟随一个运算元再跟随一个换行符。为了在语法中指定此类序列，我们可以按照顺序简单地列出各个元素。以下是检索命令的序列（其中INT表示整数记号类型）：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">retr : &#39;RETR&#39; INT &#39;\n&#39; ;
+</code></pre></div>
+<p>我们可以给RETR序列打上retr规则的标签，这样在语法的其它地方，我们就能使用规则名字作为简写来引用RETR序列。</p>
+
+<p>对于任意长度的序列像矢量[1 2 3]这样的简单整数列表，虽然它是一个有限序列，但我们不可能通过像INT INT INT ...这样的规则片段来列出所有可能的整数列表。为了编码这样的一个或者多个元素，我们使用“+”子规则运算符。例如，{INT}+表示任意长度的整数序列，或者使用简写INT+也可以。至于可以为空的列表，我们则使用零个或者多个运算符“*”。</p>
+
+<p>这种模式的变体有带终结符的序列和带分隔符的序列，CSV文件就很好地示范了这两者。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">file : (row &#39;\n&#39;)* ;           // 带一个“\n”终结符的序列
+row  : field (&#39;,&#39; field)* ;    // 带一个“,”分隔符的序列
+field: INT ;                   // 假设字段只是整数
+</code></pre></div>
+<p>规则file使用带终结符模式的列表去匹配零个或者多个row &#39;\n&#39;序列，记号“\n”终结序列的每个元素。规则row使用带分隔符模式的列表去匹配一个field后面有零个或者多个&#39;,&#39; field序列，记号“,”分隔各个字段。</p>
+
+<p>最后，还有个特殊类型的零个或者一个序列，用“?”指定。可以使用它去表达可选的构造体。</p>
+
+<h4 id="模式：选择">模式：选择</h4>
+
+<p>这是一个在多个可供替代的短语之间的选择，比如在编程语言中不同种类的语句。为了在语言中表示选择的这个概念，我们使用“|”作为ANTLR中的“or”运算符去分隔被称为“选项”的语法选择。</p>
+
+<p>回到CVS语法，我们可以通过整数或者字符串的选择让规则field变得更灵活。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">field: INT | STRING ;
+</code></pre></div>
+<p>任何时候，如果你发现正在说“语言结构x可以是这个或者那个”，那么你就可以确定应该使用选择模式，在规则x中使用“|”。</p>
+
+<h4 id="模式：记号依赖">模式：记号依赖</h4>
+
+<p>记号依赖表示一个记号的存在需要在短语的其它地方有它的对等物的存在，比如匹配的左右括号。前面我们曾经使用INT+去表达在矢量[1 2 3]中的整数非空序列。为指定周围有方括号的矢量，我们需要一种方法去表达记号中的依赖。如果我们在句子中看到一个符号，那么我们必须在句子的其它地方找到它的对等物。为表达这种语法，我们必须使用同时指定对等符号的序列，它们通常包围或分组着其它元素。在这个案例中，我们这样指定矢量：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">vector : &#39;[&#39; INT+ &#39;]&#39; ;    // [1], [1 2], [1 2 3], ...
+</code></pre></div>
+<p>扫视任何有效的代码，你会看到必须成对出现的各种分组符号：(...)，[...]，{...}。但是要牢记，依赖符号并不是必须配对的，类C语言都有的a ? b : c三元运算符就指定了当看到“?”符号时需要在接下来的短语中看到“:”符号。</p>
+
+<h4 id="模式：嵌套短语">模式：嵌套短语</h4>
+
+<p>嵌套短语有一个自相似的语言结构，它的子短语也遵循相同的结构。表达式是典型的自相似语言结构，由被运算符分隔的嵌套子表达式组成。类似地，while的代码块是嵌套在外部代码块内的一个代码块。我们在语法中使用递归规则表达自相似的语言结构。因此，如果规则的伪代码引用它自身，我们将需要一个递归的自引用规则。</p>
+
+<p>让我们来看下代码块的嵌套是如何工作的。while语句是关键词while跟随一个在括号中的条件表达式再跟随一个语句。我们也可以把多条语句包裹在花括号里当作一个单块语句。表达语法如下所示：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">stat: &#39;while&#39; &#39;(&#39; expr &#39;)&#39; stat    // 匹配WHILE语句
+    | &#39;{&#39; stat* &#39;}&#39;                // 匹配在括号中的语句块
+    ;
+</code></pre></div>
+<p>这里的stat可以是单条语句或者被花括号括起来的一组语句。规则stat是直接递归的，因为它在两个选项中直接引用它自身。如果我们把第二个选项移到它自己的规则中，规则stat和block将是双向间接递归的。语法如下所示：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">stat: &#39;while&#39; &#39;(&#39; expr &#39;)&#39; stat    // 匹配WHILE语句
+    | &#39;{&#39; stat* &#39;}&#39;                // 匹配语句块
+    ;
+block: &#39;{&#39; stat* &#39;}&#39; ;             // 匹配在括号中的语句块
+</code></pre></div>
+<p>看下面仅有3类表达式（索引数组引用、括号表达式和整数）的简单语言的语法：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">expr: ID &#39;[&#39; expr &#39;]&#39;    // a[1], a[b[1]], a[(2*b[1])]
+    | &#39;(&#39; expr &#39;)&#39;       // (1), (a[1]), (((1))), (2*a[1])
+    | INT                // 1, 94117
+    ;
+</code></pre></div>
+<p>注意递归是如何自然地发生的。数组索引表达式的索引组件是表达式本身，因此我们只需要在选项中引用expr即可。</p>
+
+<p>下图是关于两个例子输入的语法分析树：</p>
+
+<p><img src="/uploads/expr-parse-tree.png" title="expr-parse-tree" ></p>
+
+<p>分析树中的内部树节点是规则引用，叶子是记号引用。从树根到任何节点的路径表示元素的规则调用栈（或者ANTLR生成的递归下降语法分析器调用栈）。路径代表递归嵌套的子树有多个相同规则的引用。规则节点是其下方子树的标签。根节点是expr，所以整棵树是一个表达式。在1之前的那棵expr子树会把整数当作一个表达式。</p>
+
+<p>为实现这些模式，我们只需要由选项、记号引用、规则引用组成的语法规则即可。我们还可以把这些元素组成子规则，子规则是裹在括号内的行内规则。我们也可以将子规则标记为“?”或“*”或“+”循环去识别被包围的语法片段多次。</p>
+]]></content>
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（25）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part25/"/>
-    <updated>2016-07-31T16:45:44+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part25</id>
-    <content type="html"><![CDATA[]]></content>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（15）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part15/"/>
+    <updated>2016-05-22T17:51:36+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part15</id>
+    <content type="html"><![CDATA[<p>在聚焦到具体的语法规则内部结构之前，我们要先讨论下语法的整体剖析以及如何形成一套初始的语法骨架。</p>
+
+<p>语法文件通常是由一个命名语法的头和一系列可以彼此调用的规则组成。就像下面的那样：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">grammar MyG;
+rule1 : «stuff» ;
+rule2 : «more stuff» ;
+...
+</code></pre></div>
+<p>设计语法就是要搞清楚«stuff»是什么？哪个规则是开始规则。这要求我们需要知道给定语言的一系列代表性的输入例子。当然，从语言参考手册或者其它语法分析器生成器格式而来的语法也是有帮助的。</p>
+
+<p>正确设计语法的方法是借鉴功能分解或者自顶向下的设计，从粗粒度级别到细粒度级别逐步定义语言结构并把它们编码为语法规则。所以，我们的第一个任务就是找到粗粒度语言结构的名字，同时它也是开始规则。在英语中我们使用sentence，对于XML文件来说它则是document。</p>
+
+<p>设计开始规则的内容是用英语伪代码描述整个输入格式的问题。例如，“a comma-separated-value (CSV) file is a sequence of rows terminated by newlines.”这段文字，在is a左边的至关重要的单词file是规则名字，在is a右边的所有内容则成为在规则定义右则的«stuff»的内容：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">file : «sequence of rows that are terminated by newlines» ;
+</code></pre></div>
+<p>然后我们通过描述在开始规则右侧被确定的元素来进行下一个粒度级别的设计。在规则右侧的名词通常是对记号或尚未定义的规则的引用，这些记号是那些我们在正常情况下视为单词、标点符号、运算符的元素。就像单词是英语句子中的原子成分那样，记号在语法规则中也是如此。规则引用则涉及到像row那样需要被分解为更详细部分的其它语言结构。</p>
+
+<p>进入细节的另外一层，我们可以说row是一系列被逗号分隔的field，而field则是一个数字或字符串。就像以下所示：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">row   : «sequence of fields separated by commas» ;
+field : «number or string» ;
+</code></pre></div>
+<p>当没有规则需要再定义时，我们就得到了语法的一个粗略的草图。</p>
+
+<p>如果有其它格式的语法作为参考的话设计语法会容易的多，但小心不要盲目地遵循它，否则你会误入歧途的。非ANTLR格式的语法只是让你知道别人是如何决定分解语言中的短语的，它最大的作用就是可以给我们一份规则名称的列表用作参考。</p>
+
+<p>不推荐从参考手册上复制粘贴语法到ANTLR，然后再通过细微的调整让它工作。把它当作一套指南而不是一段代码是更好的办法。为了清晰地描述语法，参考手册通常是相当松散的。这意味着语法能识别大量不在语言中的句子，或者语法可能不够明确，可以用多种方法匹配相同的输入序列。例如，语法可能会说表达式可以调用一个构建器或者访问一个函数，问题是像T(i)这样的输入可以同时匹配两者。理想情况下，在语法中是不能有这样的二义性的，每个输入句子我们只需要一种解释。</p>
+
+<p>在另一个极端，参考手册中的语法有时过于明确地说明了规则。有些约束是需要在分析完输入后实施的，而不是试图对语法结构实施约束。例如，W3C XML语法就显式地指定标签中什么地方必须要有空格以及什么地方的空格可以省略。但事实是我们可以简单地让词法分析器在把记号发送给语法分析器之前去除空格，不需要在语法中到处测试它。</p>
+
+<p>规格还说&lt;?xml ...&gt;标签可以有两个附加属性encoding和standalone。我们需要知道约束，但它是很容易去允许任何属性名字，然后在语法分析后检查语法分析树，以确保所有这些限制都满足的。
+归根结底，XML只是嵌在文本中的一对标签，因此它的语法结构是相当直白的。唯一的挑战是如何分别对待什么在标签内以及什么在标签外。</p>
+
+<p>识别语法规则并用伪代码表示它们的右侧部分最初是个挑战，但当你为更多的语言构建语法后它会变得越来越容易。一旦我们有了伪代码，我们就需要把它转换成ANTLR表示法，以便能得到一个可工作的语法。</p>
+]]></content>
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（24）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part24/"/>
-    <updated>2016-07-24T21:40:28+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part24</id>
-    <content type="html"><![CDATA[]]></content>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（14）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part14/"/>
+    <updated>2016-05-16T20:26:22+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part14</id>
+    <content type="html"><![CDATA[<p>对于大多数语法，注释和空格都是语法分析器可以忽略的东西。如果我们不想让注释和空格在语法中到处都是，那么就需要让词法分析器把它们扔掉。不幸的是，这意味着任何后续处理步骤都不能再访问注释和空格。安全地忽略掉注释和空格的方法是把这些发送给语法分析器的记号放到一个“隐藏通道”中，语法分析器仅需要调协到单个通道即可。我们可以把任何我们想要的东西传递到其它通道中。这里是如何实现的语法：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">COMMENT
+    : &#39;/*&#39; .*? &#39;*/&#39; -&gt; channel(HIDDEN)    // match anything between /* and */
+    ;
+
+WS  : [ \r\t\n]+    -&gt; channel(HIDDEN)
+    ;
+</code></pre></div>
+<p>就像我们前面讨论过的<code>-&gt; skip</code>那样，<code>-&gt; channel(HIDDEN)</code>也是一个的词法分析器指令。在这里，它设置那些记号的通道号码以便这些记号可以被语法分析器忽略。记号流仍然维护着原始的记号序列，但在喂食给语法分析器时则略过离线通道中的记号。</p>
+]]></content>
   </entry>
   
 </feed>
