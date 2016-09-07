@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: ANTLR | 乐者为王]]></title>
   <link href="http://codemany.com/tags/antlr/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2016-09-05T22:59:27+08:00</updated>
+  <updated>2016-09-07T16:54:56+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,57 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（19）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part19/"/>
+    <updated>2016-06-21T21:12:40+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part19</id>
+    <content type="html"><![CDATA[<p>因为词法规则可以使用递归，所以词法解析器在技术上和语法解析器一样强大。那意味着我们甚至可以在词法分析器中匹配语法结构。或者，在另一个极端，我们可以把字符当作记号，使用语法分析器去把语法结构应用到字符流（这种被称为无扫描语法分析器）。这导致什么在词法分析器中匹配和什么在语法分析器中匹配的界限在哪里并不是很明显。幸运的是，有几条经验法则可以让我们做出判断：</p>
+
+<ul>
+<li>在词法分析器中匹配和丢弃任何语法分析器根本不需要见到的东西。例如，在词法分析器中识别和扔掉像空格和注释这些东西。否则，语法分析器必须经常查看是否有空格或注释在记号间。</li>
+<li>在词法分析器中匹配诸如标志符、关键字、字符串和数字这样的常用记号。语法分析器比词法分析器有更多的开销，因此我们不必让语法分析器承受把数字放在一起识别成整数的负担。</li>
+<li>把那些语法分析器不需要去辨别的词法结构合并成一个单独的记号类型。例如，如果我们的应用把整数和浮点数当作同一事物对待，然后把它们合并成记号类型NUMBER，那么就没必要向语法分析器发送单独的记号类型。</li>
+<li>合并能被语法分析器视为一个单独实体的任何东西。例如，如果语法分析器不在乎XML标签里的内容，词法分析器可以把尖括号中的任何东西合并成一个单独的被称为TAG的记号类型。</li>
+<li>如果语法分析器需要先分开一小块文本后才能去处理它，那么词法分析器应该传递独立的构件作为记号给语法分析器。例如，如果语法分析器需要处理一个IP地址的元素，词法分析器应该发送IP构件（整数和点）的独立的记号。</li>
+</ul>
+
+<p>想象下现在需要处理Web服务器上的日志文件，每一行表示一条记录。让我们假设每条记录都有一个请求IP地址、HTTP协议命令和结果代码。这里是一个日志条目的示例：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">192.168.209.85 &quot;GET /download/foo.html HTTP/1.0&quot; 200
+</code></pre></div>
+<p>如果想要统计文件中有多少行，那么我们可以忽略掉任何东西除了换行字符的序列：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">file  : NL+ ;               // 匹配换行（NL）序列的语法规则
+STUFF : ~&#39;\n&#39;+ -&gt; skip ;    // 匹配和丢弃除&#39;\n&#39;外的任何东西
+NL    : &#39;\n&#39; ;              // 返回NL给语法分析器或调用代码
+</code></pre></div>
+<p>词法分析器不必识别太多的结构，语法分析器会匹配换行记号的序列。</p>
+
+<p>接下来，我们需要从日志文件中收集一系列的IP地址。这意味着我们需要一条规则去识别IP地址的词法结构。并且我们也可以提供其它记录元素的词法规则：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">IP    : INT &#39;.&#39; INT &#39;.&#39; INT &#39;.&#39; INT ;    // 192.168.209.85
+INT   : [0-9]+ ;                         // 匹配IP八位组或者HTTP结果代码
+STRING: &#39;&quot;&#39; .*? &#39;&quot;&#39; ;                    // 匹配HTTP协议命令
+NL    : &#39;\n&#39; ;                           // 匹配日志文件记录终结符
+WS    : &#39; &#39; -&gt; skip ;                    // 忽略空格
+</code></pre></div>
+<p>拥有一套完整的记号后，我们可以让语法规则匹配日志文件中的记录：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">file  : row+ ;                // 匹配日志文件中行的语法规则
+row   : IP STRING INT NL ;    // 匹配日志文件记录
+</code></pre></div>
+<p>更进一步，我们需要把文本IP地址转换成32位的数字。使用便利的库函数split(&#39;.&#39;)，我们可以把IP地址作为字符串传递给语法分析器让它去处理。但是，更好的做法是让词法分析器匹配IP地址的词法结构，然后把匹配出的构件作为记号传递给语法分析器。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">file  : row+ ;                           // 匹配日志文件中行的语法规则
+row   : ip STRING INT NL ;               // 匹配日志文件记录
+ip    : INT &#39;.&#39; INT &#39;.&#39; INT &#39;.&#39; INT ;    // 在语法分析器中匹配IP地址
+INT   : [0-9]+ ;                         // 匹配IP八位组或者HTTP结果代码
+STRING: &#39;&quot;&#39; .*? &#39;&quot;&#39; ;                    // 匹配HTTP协议命令
+NL    : &#39;\n&#39; ;                           // 匹配日志文件记录终结符
+WS    : &#39; &#39; -&gt; skip ;                    // 忽略空格
+</code></pre></div>
+<p>把词法规则IP切换成语法规则ip显示了我们可以多么轻易地移动这条分界线。</p>
+
+<p>如果要求处理HTTP协议命令字符串的内容，我们可以遵循相同的思考过程。如果不需要检查字符串的部分，那么词法分析器可以把整个字符串作为一个单独的记号传递给语法分析器。如果我们需要抽出各种不同的部分，最好就是让词法分析器去识别那些部分后再把这些匹配出的构件传递给语法分析器。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（18）]]></title>
@@ -283,23 +334,6 @@ field : «number or string» ;
 归根结底，XML只是嵌在文本中的一对标签，因此它的语法结构是相当直白的。唯一的挑战是如何分别对待什么在标签内以及什么在标签外。</p>
 
 <p>识别语法规则并用伪代码表示它们的右侧部分最初是个挑战，但当你为更多的语言构建语法后它会变得越来越容易。一旦我们有了伪代码，我们就需要把它转换成ANTLR表示法，以便能得到一个可工作的语法。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（14）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part14/"/>
-    <updated>2016-05-16T20:26:22+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part14</id>
-    <content type="html"><![CDATA[<p>对于大多数语法，注释和空格都是语法分析器可以忽略的东西。如果我们不想让注释和空格在语法中到处都是，那么就需要让词法分析器把它们扔掉。不幸的是，这意味着任何后续处理步骤都不能再访问注释和空格。安全地忽略掉注释和空格的方法是把这些发送给语法分析器的记号放到一个“隐藏通道”中，语法分析器仅需要调协到单个通道即可。我们可以把任何我们想要的东西传递到其它通道中。这里是如何实现的语法：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">COMMENT
-    : &#39;/*&#39; .*? &#39;*/&#39; -&gt; channel(HIDDEN)    // match anything between /* and */
-    ;
-
-WS  : [ \r\t\n]+    -&gt; channel(HIDDEN)
-    ;
-</code></pre></div>
-<p>就像我们前面讨论过的<code>-&gt; skip</code>那样，<code>-&gt; channel(HIDDEN)</code>也是一个的词法分析器指令。在这里，它设置那些记号的通道号码以便这些记号可以被语法分析器忽略。记号流仍然维护着原始的记号序列，但在喂食给语法分析器时则略过离线通道中的记号。</p>
 ]]></content>
   </entry>
   

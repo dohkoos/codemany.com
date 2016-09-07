@@ -4,7 +4,7 @@
   <title><![CDATA[乐者为王]]></title>
   <link href="http://codemany.com/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2016-09-05T22:59:27+08:00</updated>
+  <updated>2016-09-07T16:54:56+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,80 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（19）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part19/"/>
+    <updated>2016-06-21T21:12:40+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part19</id>
+    <content type="html"><![CDATA[<p>因为词法规则可以使用递归，所以词法解析器在技术上和语法解析器一样强大。那意味着我们甚至可以在词法分析器中匹配语法结构。或者，在另一个极端，我们可以把字符当作记号，使用语法分析器去把语法结构应用到字符流（这种被称为无扫描语法分析器）。这导致什么在词法分析器中匹配和什么在语法分析器中匹配的界限在哪里并不是很明显。幸运的是，有几条经验法则可以让我们做出判断：</p>
+
+<ul>
+<li>在词法分析器中匹配和丢弃任何语法分析器根本不需要见到的东西。例如，在词法分析器中识别和扔掉像空格和注释这些东西。否则，语法分析器必须经常查看是否有空格或注释在记号间。</li>
+<li>在词法分析器中匹配诸如标志符、关键字、字符串和数字这样的常用记号。语法分析器比词法分析器有更多的开销，因此我们不必让语法分析器承受把数字放在一起识别成整数的负担。</li>
+<li>把那些语法分析器不需要去辨别的词法结构合并成一个单独的记号类型。例如，如果我们的应用把整数和浮点数当作同一事物对待，然后把它们合并成记号类型NUMBER，那么就没必要向语法分析器发送单独的记号类型。</li>
+<li>合并能被语法分析器视为一个单独实体的任何东西。例如，如果语法分析器不在乎XML标签里的内容，词法分析器可以把尖括号中的任何东西合并成一个单独的被称为TAG的记号类型。</li>
+<li>如果语法分析器需要先分开一小块文本后才能去处理它，那么词法分析器应该传递独立的构件作为记号给语法分析器。例如，如果语法分析器需要处理一个IP地址的元素，词法分析器应该发送IP构件（整数和点）的独立的记号。</li>
+</ul>
+
+<p>想象下现在需要处理Web服务器上的日志文件，每一行表示一条记录。让我们假设每条记录都有一个请求IP地址、HTTP协议命令和结果代码。这里是一个日志条目的示例：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>192.168.209.85 "GET /download/foo.html HTTP/1.0" 200</span></code></pre></td></tr></table></div></figure>
+
+<p>如果想要统计文件中有多少行，那么我们可以忽略掉任何东西除了换行字符的序列：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>file  : NL+ ;               // 匹配换行（NL）序列的语法规则
+</span><span class='line'>STUFF : ~'\n'+ -&gt; skip ;    // 匹配和丢弃除'\n'外的任何东西
+</span><span class='line'>NL    : '\n' ;              // 返回NL给语法分析器或调用代码</span></code></pre></td></tr></table></div></figure>
+
+<p>词法分析器不必识别太多的结构，语法分析器会匹配换行记号的序列。</p>
+
+<p>接下来，我们需要从日志文件中收集一系列的IP地址。这意味着我们需要一条规则去识别IP地址的词法结构。并且我们也可以提供其它记录元素的词法规则：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>IP    : INT '.' INT '.' INT '.' INT ;    // 192.168.209.85
+</span><span class='line'>INT   : [0-9]+ ;                         // 匹配IP八位组或者HTTP结果代码
+</span><span class='line'>STRING: '"' .*? '"' ;                    // 匹配HTTP协议命令
+</span><span class='line'>NL    : '\n' ;                           // 匹配日志文件记录终结符
+</span><span class='line'>WS    : ' ' -&gt; skip ;                    // 忽略空格</span></code></pre></td></tr></table></div></figure>
+
+<p>拥有一套完整的记号后，我们可以让语法规则匹配日志文件中的记录：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>file  : row+ ;                // 匹配日志文件中行的语法规则
+</span><span class='line'>row   : IP STRING INT NL ;    // 匹配日志文件记录</span></code></pre></td></tr></table></div></figure>
+
+<p>更进一步，我们需要把文本IP地址转换成32位的数字。使用便利的库函数split(&#39;.&#39;)，我们可以把IP地址作为字符串传递给语法分析器让它去处理。但是，更好的做法是让词法分析器匹配IP地址的词法结构，然后把匹配出的构件作为记号传递给语法分析器。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>file  : row+ ;                           // 匹配日志文件中行的语法规则
+</span><span class='line'>row   : ip STRING INT NL ;               // 匹配日志文件记录
+</span><span class='line'>ip    : INT '.' INT '.' INT '.' INT ;    // 在语法分析器中匹配IP地址
+</span><span class='line'>INT   : [0-9]+ ;                         // 匹配IP八位组或者HTTP结果代码
+</span><span class='line'>STRING: '"' .*? '"' ;                    // 匹配HTTP协议命令
+</span><span class='line'>NL    : '\n' ;                           // 匹配日志文件记录终结符
+</span><span class='line'>WS    : ' ' -&gt; skip ;                    // 忽略空格</span></code></pre></td></tr></table></div></figure>
+
+<p>把词法规则IP切换成语法规则ip显示了我们可以多么轻易地移动这条分界线。</p>
+
+<p>如果要求处理HTTP协议命令字符串的内容，我们可以遵循相同的思考过程。如果不需要检查字符串的部分，那么词法分析器可以把整个字符串作为一个单独的记号传递给语法分析器。如果我们需要抽出各种不同的部分，最好就是让词法分析器去识别那些部分后再把这些匹配出的构件传递给语法分析器。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（18）]]></title>
@@ -3931,65 +4005,6 @@ another runner in the night<br>
 </span><span class='line'>bke</span></code></pre></td></tr></table></div></figure>
 
 <p>如果将上面命令中的1换成2，你会看到rows.txt文件的第2列内容被输出；如果换成3，那么rows.txt文件的第3列内容将会被输出。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[一夜成名：这需要好几年时间]]></title>
-    <link href="http://codemany.com/blog/overnight-success-it-takes-years/"/>
-    <updated>2016-01-23T09:36:05+08:00</updated>
-    <id>http://codemany.com/blog/overnight-success-it-takes-years</id>
-    <content type="html"><![CDATA[<p>英文原文：<a href="http://blog.codinghorror.com/overnight-success-it-takes-years/">http://blog.codinghorror.com/overnight-success-it-takes-years/</a></p>
-
-<p>Gmail的原首席开发者Paul Buchheit说过<a href="http://paulbuchheit.blogspot.com/2009/01/overnight-success-takes-long-time.html">Gmail的成功花了很长时间</a>：</p>
-
-<blockquote>
-<p>我们在2001年8月开始开发Gmail。很长一段时间里，几乎每个人都不喜欢它。有些人使用它因为搜索，但他们有着无尽地抱怨。很多人认为我们应该杀死这个项目，又或者重启它作为一个有本地客户端软件的企业产品，而不是这个疯狂的JavaScript东西。甚至在2004年4月1日当我们到达发布它的那个点时——在开始开发它两年半之后——Google内部的很多人都在预测它的死亡。他们觉得这个产品太怪异了，并且没有人想去更换电子邮件服务。我被告知我们永远不会得到100万用户。</p>
-
-<p>但在我们发布后，除了因为各种原因讨厌它的人，反响出人意外地好。尽管如此，它还是经常被描述为“小众产品（niche）”和“不会被硅谷之外的人使用”。</p>
-
-<p>现在，在我们开始开发Gmail差不多七年半后，我看到一篇<a href="http://www.ft.com/cms/s/0/18cdabec-d8fb-11dd-ab5f-000077b07658.html">文章</a>叙述Gmail如何在去年增长40%，相比Yahoo的2%和Hotmail的-7%。</p>
-</blockquote>
-
-<p>Paul已经离开Google，现在在从事他自己的创业公司FriendFeed（译者注：FriendFeed已于2015年4月9日关闭）。许多业内人士对待FriendFeed不太友善。Stowe Boyd甚至竟然称FriendFeed就是个失败（译者注：Stowe Boyd评论FriendFeed的文章已经被删除了）。Paul从容应对批评：</p>
-
-<blockquote>
-<p>创建一个重要的新产品通常需要时间。FriendFeed需要继续追求创新，就像Gmail六年以前做的那样。FriendFeed显示了很好的前景，但它仍然是一个“在制品”。</p>
-
-<p>我的预期是很大的成功需要好几年时间，没有许多反例（除了YouTube，但现在它其实还没有到达挣成堆钱的那个点）。Facebook成长非常快，但它此时已经五岁了。Larry和Sergey 开始开发Google在1996年——当我开始在那里是1999年，几乎没人听说过它。</p>
-
-<p>一夜成名的观念非常具有误导性，而且相当有害。如果你开始新的东西，那会是一次长途旅行。没有借口去行动缓慢。相反，你必须行动的非常快，否则你将不会到达，因为它是一次长途旅行！这也是为什么节俭是重要的——你不想<a href="http://paulbuchheit.blogspot.com/2008/03/ideas-vs-judgment-and-execution_9197.html">饿死在半山腰上</a>。</p>
-</blockquote>
-
-<p>Stowe Boyd用一张Twitter和FriendFeed的流量对比图说明他关于FriendFeed的观点。这里请允许我把我自己的数据也加到Boyd先生的图上：</p>
-
-<p><img src="http://codemany.com/uploads/three-traffic-comparison.png" title="three-traffic-comparison" ></p>
-
-<p>我觉得Paul的态度令人耳目一新，因为对于我们的创业公司<a href="http://stackoverflow.com/">Stack Overflow</a>我也采用同样的态度。我没有期望或甚至渴望一夜成名。我计划的是花上几年的时间去打磨，持续地、稳步地提升。</p>
-
-<p>这项商业计划和我的职业生涯发展计划没有太多区别：成功需要好几年时间。当我说年的时候，我是认真的！不是在说像“更聪明地工作，而不是更努力地工作”那样的陈词滥调。我是在说真正的日历年。你知道的，12个月的，365天的那种。你必须花上你生命的多年时间孜孜不倦地钻研这些东西，每天醒来后一遍又一遍地做它。每天练习和收集反馈去不断变得更好。有时它可能是不愉快的，甚至偶尔是很无趣的，但它是必需的。</p>
-
-<p>这几乎不是唯一的或有趣的建议。Peter Norvig的经典<a href="http://www.norvig.com/21-days.html">用十年自学编程</a>也谈到过这个话题，而且讲得比我更好。</p>
-
-<blockquote>
-<p>研究人员发现在任何领域都需要大约10年时间才能培养出专业技能，包括国际象棋、音乐作曲、电报操作、绘画、钢琴演奏、游泳、网球、以及神经心理学和拓扑学的研究。关键是刻意（deliberative）练习：不仅仅是一次又一次地做它，而是用略微超出你当前能力的任务来挑战自己，尝试它，在做时和做后分析你的表现，并且纠正所有错误。然后重复。再重复。</p>
-
-<p>似乎没有真正的捷径：即使是莫扎特，4岁的音乐天才，在他开始创作世界级音乐前也花了超过13年。甲壳虫乐队似乎横空出世以一连串的冠军歌曲（a string of #1 hits），并且在1964年出现在《埃德·沙利文秀》。但其实自1957年以来他们就已经在利物浦和汉堡的小俱乐部里演出了，虽然他们在早期有广泛的吸引力，但他们最最成功的《Sgt. Pepper&#39;s Lonely Hearts Club Band》发布在1967年。</p>
-</blockquote>
-
-<p>老实说，我期待着有一天醒来，从现在起的2年或3年之后，做着和今天我在做的完全相同的事：为Stack Overflow编写代码，增加另一个微小的改进或有用的功能。很明显我们想要成功。但在某种程度上，成功是无关紧要的，因为这个过程本身是令人满意的。每天醒来做你喜欢的事情——甚至更好的是，周围社区的人也喜欢它——这本身就是一种奖赏。尽管有着成吨的工作要做。</p>
-
-<p>博客也不例外。我经常给有抱负的博客作者<a href="http://blog.codinghorror.com/how-to-achieve-ultimate-blog-success-in-one-easy-step/">这个很重要的建议</a>：如果你开始你的博客，在六个月内别指望有人来读它。如果你这样做，我可以保证你将会非常失望。 可是，如果你能坚持发布计划并且每周写1篇或2篇高质量的博文一整年……然后，也只有到那个时候，你才可以看到稀稀落落的读者。我开始这个博客于2004年，花了整整3年的时间，每周写3到5篇博文，才使得它在软件开发社区内流行开来。</p>
-
-<p>我非常期望在这个博客上一直写，以一种形式或另一种，用我的余生。它是我是谁的一部分。至于那种戏剧性的成名方式，我不抱有任何幻想：归根结底，<a href="http://www.gocomics.com/pearlsbeforeswine/2008/11/16">我只是在网上写博客的那个人</a>。</p>
-
-<p><img src="http://codemany.com/uploads/pearls-before-swine.png" title="pearls-before-swine" ></p>
-
-<p>那样挺好的对我来说。我从来没有说过我是聪明的。</p>
-
-<p>不管你最终获得多少读者，或页面浏览量，或任何我们这周正在度量的<a href="http://blog.codinghorror.com/the-high-score-table/">高分排行榜</a> ，请记住，你正在做的事情是值得去做的，因为——嗯——你正在做的事情是值得去做的。</p>
-
-<p>如果你一直这样坚持下去，谁知道会发生什么？很有可能某一天你醒来，发现自己一夜成名了。</p>
 ]]></content>
   </entry>
   

@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="编程语言在词法上看起来惊人地相似，无论是函数式、过程式、声明式还是面向对象语言，看起来几乎都是一样的。这很棒，因为我们只需要学习一次如何描述标志符和整数，没有太大的变化，就可以把它们应用到大多数编程语言上。正如语法分析器以及词法分析器使用规则去描述各种语言构造体一样，我们要使用基本相同的表示法。 &hellip;">
+  <meta name="description" content="因为词法规则可以使用递归，所以词法解析器在技术上和语法解析器一样强大。那意味着我们甚至可以在词法分析器中匹配语法结构。或者，在另一个极端，我们可以把字符当作记号，使用语法分析器去把语法结构应用到字符流（这种被称为无扫描语法分析器）。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,100 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part19/">ANTLR 4权威参考读书笔记（19）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-06-21T21:12:40+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>21</span><span class='date-suffix'>st</span>, <span class='date-year'>2016</span></span> <span class='time'>9:12 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>因为词法规则可以使用递归，所以词法解析器在技术上和语法解析器一样强大。那意味着我们甚至可以在词法分析器中匹配语法结构。或者，在另一个极端，我们可以把字符当作记号，使用语法分析器去把语法结构应用到字符流（这种被称为无扫描语法分析器）。这导致什么在词法分析器中匹配和什么在语法分析器中匹配的界限在哪里并不是很明显。幸运的是，有几条经验法则可以让我们做出判断：</p>
+
+<ul>
+<li>在词法分析器中匹配和丢弃任何语法分析器根本不需要见到的东西。例如，在词法分析器中识别和扔掉像空格和注释这些东西。否则，语法分析器必须经常查看是否有空格或注释在记号间。</li>
+<li>在词法分析器中匹配诸如标志符、关键字、字符串和数字这样的常用记号。语法分析器比词法分析器有更多的开销，因此我们不必让语法分析器承受把数字放在一起识别成整数的负担。</li>
+<li>把那些语法分析器不需要去辨别的词法结构合并成一个单独的记号类型。例如，如果我们的应用把整数和浮点数当作同一事物对待，然后把它们合并成记号类型NUMBER，那么就没必要向语法分析器发送单独的记号类型。</li>
+<li>合并能被语法分析器视为一个单独实体的任何东西。例如，如果语法分析器不在乎XML标签里的内容，词法分析器可以把尖括号中的任何东西合并成一个单独的被称为TAG的记号类型。</li>
+<li>如果语法分析器需要先分开一小块文本后才能去处理它，那么词法分析器应该传递独立的构件作为记号给语法分析器。例如，如果语法分析器需要处理一个IP地址的元素，词法分析器应该发送IP构件（整数和点）的独立的记号。</li>
+</ul>
+
+<p>想象下现在需要处理Web服务器上的日志文件，每一行表示一条记录。让我们假设每条记录都有一个请求IP地址、HTTP协议命令和结果代码。这里是一个日志条目的示例：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>192.168.209.85 "GET /download/foo.html HTTP/1.0" 200</span></code></pre></td></tr></table></div></figure>
+
+<p>如果想要统计文件中有多少行，那么我们可以忽略掉任何东西除了换行字符的序列：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>file  : NL+ ;               // 匹配换行（NL）序列的语法规则
+</span><span class='line'>STUFF : ~'\n'+ -&gt; skip ;    // 匹配和丢弃除'\n'外的任何东西
+</span><span class='line'>NL    : '\n' ;              // 返回NL给语法分析器或调用代码</span></code></pre></td></tr></table></div></figure>
+
+<p>词法分析器不必识别太多的结构，语法分析器会匹配换行记号的序列。</p>
+
+<p>接下来，我们需要从日志文件中收集一系列的IP地址。这意味着我们需要一条规则去识别IP地址的词法结构。并且我们也可以提供其它记录元素的词法规则：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>IP    : INT '.' INT '.' INT '.' INT ;    // 192.168.209.85
+</span><span class='line'>INT   : [0-9]+ ;                         // 匹配IP八位组或者HTTP结果代码
+</span><span class='line'>STRING: '"' .*? '"' ;                    // 匹配HTTP协议命令
+</span><span class='line'>NL    : '\n' ;                           // 匹配日志文件记录终结符
+</span><span class='line'>WS    : ' ' -&gt; skip ;                    // 忽略空格</span></code></pre></td></tr></table></div></figure>
+
+<p>拥有一套完整的记号后，我们可以让语法规则匹配日志文件中的记录：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>file  : row+ ;                // 匹配日志文件中行的语法规则
+</span><span class='line'>row   : IP STRING INT NL ;    // 匹配日志文件记录</span></code></pre></td></tr></table></div></figure>
+
+<p>更进一步，我们需要把文本IP地址转换成32位的数字。使用便利的库函数split(&#39;.&#39;)，我们可以把IP地址作为字符串传递给语法分析器让它去处理。但是，更好的做法是让词法分析器匹配IP地址的词法结构，然后把匹配出的构件作为记号传递给语法分析器。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>file  : row+ ;                           // 匹配日志文件中行的语法规则
+</span><span class='line'>row   : ip STRING INT NL ;               // 匹配日志文件记录
+</span><span class='line'>ip    : INT '.' INT '.' INT '.' INT ;    // 在语法分析器中匹配IP地址
+</span><span class='line'>INT   : [0-9]+ ;                         // 匹配IP八位组或者HTTP结果代码
+</span><span class='line'>STRING: '"' .*? '"' ;                    // 匹配HTTP协议命令
+</span><span class='line'>NL    : '\n' ;                           // 匹配日志文件记录终结符
+</span><span class='line'>WS    : ' ' -&gt; skip ;                    // 忽略空格</span></code></pre></td></tr></table></div></figure>
+
+<p>把词法规则IP切换成语法规则ip显示了我们可以多么轻易地移动这条分界线。</p>
+
+<p>如果要求处理HTTP协议命令字符串的内容，我们可以遵循相同的思考过程。如果不需要检查字符串的部分，那么词法分析器可以把整个字符串作为一个单独的记号传递给语法分析器。如果我们需要抽出各种不同的部分，最好就是让词法分析器去识别那些部分后再把这些匹配出的构件传递给语法分析器。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -3504,158 +3598,6 @@ another runner in the night<br>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part12/">ANTLR 4权威参考读书笔记（12）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-04-26T10:20:44+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>10:20 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><ul>
-<li>sentinel 哨兵</li>
-<li>tag 标签</li>
-</ul>
-
-<p>目前我们看到的输入文件都只包含一种语言，但在实际应用中我们会遇到有些包含多种语言的常用文件格式。例如，Java的文档注释，XML文件等。这些环绕着模板表达式的文本需要不同的处理方式，它们被称为孤岛语言。</p>
-
-<p>ANTLR有提供一个称之为“词法模型”的词法分析器特性，它让我们可以很容易地处理包含混合格式的文件。基本思路是：当词法分析器看到特殊的哨兵字符序列时，让它在模式之间来回切换。</p>
-
-<p>XML是一个很好例子，它通常会在同一个文件中包含不同的词法结构。一个XML语法分析器会把除标签和实体引用（例如&hearts;）之外的任何东西当作文本块。当词法分析器看到<code>&lt;</code>时，它切换到“inside”模式；当它看到<code>&gt;</code>或<code>/&gt;</code>时，就切换回默认模式。以下语法展示了该特性是如何工作的：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>lexer grammar XMLLexer;
-</span><span class='line'>
-</span><span class='line'>// Default "mode": Everything OUTSIDE of a tag
-</span><span class='line'>OPEN        :   '&lt;'                 -&gt; pushMode(INSIDE) ;
-</span><span class='line'>COMMENT     :   '&lt;!--' .*? '--&gt;'    -&gt; skip ;
-</span><span class='line'>EntityRef   :   '&' [a-z]+ ';' ;
-</span><span class='line'>TEXT        :   ~('&lt;'|'&')+ ;    // match any 16 bit char minus &lt; and &
-</span><span class='line'>
-</span><span class='line'>// ----------------- Everything INSIDE of a tag ---------------------
-</span><span class='line'>mode INSIDE;
-</span><span class='line'>
-</span><span class='line'>CLOSE       :   '&gt;'                 -&gt; popMode ;    // back to default mode
-</span><span class='line'>SLASH_CLOSE :   '/&gt;'                -&gt; popMode ;
-</span><span class='line'>EQUALS      :   '=' ;
-</span><span class='line'>STRING      :   '"' .*? '"' ;
-</span><span class='line'>SlashName   :   '/' Name ;
-</span><span class='line'>Name        :   ALPHA (ALPHA|DIGIT)* ;
-</span><span class='line'>S           :   [ \t\r\n]           -&gt; skip ;
-</span><span class='line'>
-</span><span class='line'>fragment
-</span><span class='line'>ALPHA       :   [a-zA-Z] ;
-</span><span class='line'>
-</span><span class='line'>fragment
-</span><span class='line'>DIGIT       :   [0-9] ;</span></code></pre></td></tr></table></div></figure>
-
-<p>把上述语法保存为XMLLexer.g文件，然后使用包含以下内容的t.xml文件作为输入来测试它：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;tools&gt;
-</span><span class='line'>  &lt;tool name="ANTLR"&gt;A parser generator&lt;/tool&gt;
-</span><span class='line'>&lt;/tools&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>以下是构建和运行测试的命令：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr XMLLexer.g
-</span><span class='line'>compile *.java
-</span><span class='line'>grun XML tokens -tokens t.xml</span></code></pre></td></tr></table></div></figure>
-
-<p>这里是输出的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>[@0,0:0='&lt;',&lt;1&gt;,1:0]
-</span><span class='line'>[@1,1:5='tools',&lt;10&gt;,1:1]
-</span><span class='line'>[@2,6:6='&gt;',&lt;5&gt;,1:6]
-</span><span class='line'>[@3,7:10='\r\n  ',&lt;4&gt;,1:7]
-</span><span class='line'>[@4,11:11='&lt;',&lt;1&gt;,2:2]
-</span><span class='line'>[@5,12:15='tool',&lt;10&gt;,2:3]
-</span><span class='line'>[@6,17:20='name',&lt;10&gt;,2:8]
-</span><span class='line'>[@7,21:21='=',&lt;7&gt;,2:12]
-</span><span class='line'>[@8,22:28='"ANTLR"',&lt;8&gt;,2:13]
-</span><span class='line'>[@9,29:29='&gt;',&lt;5&gt;,2:20]
-</span><span class='line'>[@10,30:47='A parser generator',&lt;4&gt;,2:21]
-</span><span class='line'>[@11,48:48='&lt;',&lt;1&gt;,2:39]
-</span><span class='line'>[@12,49:53='/tool',&lt;9&gt;,2:40]
-</span><span class='line'>[@13,54:54='&gt;',&lt;5&gt;,2:45]
-</span><span class='line'>[@14,55:56='\r\n',&lt;4&gt;,2:46]
-</span><span class='line'>[@15,57:57='&lt;',&lt;1&gt;,3:0]
-</span><span class='line'>[@16,58:63='/tools',&lt;9&gt;,3:1]
-</span><span class='line'>[@17,64:64='&gt;',&lt;5&gt;,3:7]
-</span><span class='line'>[@18,65:66='\r\n',&lt;4&gt;,3:8]
-</span><span class='line'>[@19,67:66='&lt;EOF&gt;',&lt;-1&gt;,4:0]</span></code></pre></td></tr></table></div></figure>
-
-<p>上面输出的每一行代表一个记号，包含记号索引、开始和结束字符、记号文本、记号类型，最后的行和字符位置则告诉我们词法分析器如何标记化输入。</p>
-
-<p>在命令行中，XML tokens序列处通常是一个语法名字后面跟着开始规则，但在这里，我们使用语法名字后面跟着特殊的规则名字tokens来告诉TestRig应该运行词法分析器而不是语法分析器。接着使用选项-tokens打印出匹配的记号列表。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/2">&larr; Older</a>
@@ -3669,6 +3611,10 @@ another runner in the night<br>
     <section>
   <h1>Recent Posts</h1>
   <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part19/">ANTLR 4权威参考读书笔记（19）</a>
+      </li>
     
       <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part18/">ANTLR 4权威参考读书笔记（18）</a>
@@ -3686,10 +3632,6 @@ another runner in the night<br>
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part16/">ANTLR 4权威参考读书笔记（16）</a>
       </li>
     
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part15/">ANTLR 4权威参考读书笔记（15）</a>
-      </li>
-    
   </ul>
 </section>
 <section>
@@ -3701,11 +3643,11 @@ another runner in the night<br>
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 134%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 135%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 131%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
-<a style="font-size: 104%" href="/tags/css/">CSS</a>
+<a style="font-size: 107%" href="/tags/css/">CSS</a>
 <a style="font-size: 110%" href="/tags/crack/">Crack</a>
 <a style="font-size: 107%" href="/tags/database/">Database</a>
 <a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
@@ -3724,7 +3666,7 @@ another runner in the night<br>
 <a style="font-size: 119%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 97%" href="/tags/spring/">Spring</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 130%" href="/tags/translation/">Translation</a>
+<a style="font-size: 131%" href="/tags/translation/">Translation</a>
 <a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 107%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 107%" href="/tags/wxwidgets/">wxWidgets</a>
