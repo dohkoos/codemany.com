@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Tag: Progress Bar | 乐者为王]]></title>
+  <link href="http://codemany.com/tags/progress-bar/atom.xml" rel="self"/>
+  <link href="http://codemany.com/"/>
+  <updated>2016-09-10T08:15:33+08:00</updated>
+  <id>http://codemany.com/</id>
+  <author>
+    <name><![CDATA[dohkoos]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[使用showDialog()创建的ProgressDialog再次打开时进度条不变化]]></title>
+    <link href="http://codemany.com/blog/progress-bar-does-not-work-when-reopen-progressdialog-using-showdialog/"/>
+    <updated>2012-04-15T13:15:24+08:00</updated>
+    <id>http://codemany.com/blog/progress-bar-does-not-work-when-reopen-progressdialog-using-showdialog</id>
+    <content type="html"><![CDATA[<p>先来看段代码：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
+&lt;LinearLayout xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;
+    android:layout_width=&quot;fill_parent&quot;
+    android:layout_height=&quot;fill_parent&quot;
+    android:orientation=&quot;vertical&quot;&gt;
+    &lt;Button
+        android:layout_width=&quot;fill_parent&quot;
+        android:layout_height=&quot;wrap_content&quot;
+        android:text=&quot;Copy Contacts&quot;
+        android:onClick=&quot;copyContacts&quot; /&gt;
+&lt;/LinearLayout&gt;
+</code></pre></div><div class="highlight"><pre><code class="language-text" data-lang="text">import android.app.Activity;
+import android.app.Dialog;
+import android.app.ProgressDialog;
+import android.os.AsyncTask;
+import android.os.Bundle;
+import android.view.View;
+
+public class DialogActivity extends Activity {
+    private static final int COPY_CONTACTS = 0;
+
+    private ProgressDialog mProgressDialog;
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.main);
+    }
+
+    public void copyContacts(View target) {
+        showDialog(COPY_CONTACTS);
+    }
+
+    @Override
+    protected Dialog onCreateDialog(int id) {
+        switch (id) {
+        case COPY_CONTACTS:
+            mProgressDialog = new ProgressDialog(this);
+            mProgressDialog.setTitle(&quot;Copy contacts&quot;);
+            mProgressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+            mProgressDialog.setMax(100);
+            new AsyncCopyContactsTask().execute();
+            break;
+        }
+        return mProgressDialog;
+    }
+
+    private class AsyncCopyContactsTask extends AsyncTask&lt;Void, Void, Integer&gt; {
+        @Override
+        protected Integer doInBackground(Void... params) {
+            for (int i = 0; i &lt; 100; i++) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                }
+                publishProgress();
+            }
+            return 0;
+        }
+
+        protected void onProgressUpdate(Void... progress) {
+            mProgressDialog.incrementProgressBy(1);
+        }
+
+        protected void onPostExecute(Integer result) {
+            mProgressDialog.dismiss();
+        }
+    }
+}
+</code></pre></div>
+<p>第一次点击按钮会显示一个进度条，上面的数字处于变动当中，到达最大值后进度条会消失不见；再次点击按钮后，就会发现进度条上的数值和消失前相同，并且不再变化，而且进度条也不会消失。这是为什么呢？</p>
+
+<p>Activity中有三个和对话框显示有关的方法：showDialog()，dismissDialog()和removeDialog()。其中showDialog()用于显示一个对话框；dismissDialog()使对话框消失，但仍然处于内存中，只是不显示而已，如果再次调用showDialog()方法，则缓存在内存中的对话框会重新显示，而不需要重新创建。removeDialog()使对话框消失，并从内存中将对话框清除，如果再次调用showDialog()来显示它，则在显示之前需要重新创建对话框。</p>
+
+<p>在一个对话框的声明周期内，onCreateDialog()仅被调用一次，但onPrepareDialog()方法会每次被调用。比如，第一次调用 showDialog()方法显示某个对话框时，会先触发onCreateDialog()的执行，然后再触发onPrepareDialog()方法；如果将某个对话框 removeDialog()后再showDialog()，也会先触发onCreateDialog()，接着触发onPrepareDialog()方法；如果某个对话框是被dismiss()掉的，再调用 showDialog()方法来显示它时就不会触发onCreateDialog()方法的执行，只会触发onPrepareDialog()方法。</p>
+
+<p>这是因为第一次调用showDialog()时，Android从你的Activity中调用onCreateDialog()方法，得到返回的Dialog对象。把当前Activity设置为该对话框的所有者，从而把对话框挂靠到Activity上，让Activity自动管理该对话框的状态。这样，下次调用showDialog()时就不用重新创建Dialog对象，而是复用旧的。</p>
+
+<p>所以，解决再次打开ProgressDialog时进度条不变化的最好方法就是将mProgressDialog.dismiss()改成removeDialog(COPY_CONTACTS)。</p>
+
+<p>注意：如果你决定在onCreateDialog()方法之外创建一个对话框，它将不会被附着到活动上。不过，你可以通过setOwnerActivity()把它附着到一个Activity上。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[进度条的再思考]]></title>
+    <link href="http://codemany.com/blog/rethinking-the-progress-bar/"/>
+    <updated>2007-11-08T20:26:41+08:00</updated>
+    <id>http://codemany.com/blog/rethinking-the-progress-bar</id>
+    <content type="html"><![CDATA[<p>英文原文：<a href="http://chrisharrison.net/projects/progressbars/ProgBarHarrison.pdf">http://chrisharrison.net/projects/progressbars/ProgBarHarrison.pdf</a></p>
+
+<h3 id="摘要">摘要</h3>
+
+<p>进度条在现代用户界面中是普遍存在的。通常，线性函数的使用使得条的进度和已经完成多少工作成正比。然而，许多因素会导致进度条以非线性的速率前进。此外，人类以一种非线性的方式感知时间。这篇论文探讨各种进度条行为在用户感知过程持续时间上的影响。结果被用来提出一些设计考量——可以使进度条看起来更快，最终改善用户的计算体验。</p>
+
+<h3 id="简介">简介</h3>
+
+<p>大多数软件包使用进度条显示一个持续过程的状态。用户依靠进度条来验证操作进展顺利，以及估算它的完成时间。通常，线性函数的应用使得进度条的前进和已经完成工作的数量成正比。然而，为复杂的或多阶段的过程估算进度可能是困难的。不同的磁盘，内存，处理器，带宽和其它因素使这个问题进一步复杂化。因而，进度条经常表现出非线性的行为，例如加速、减速和停顿。</p>
+
+<p>再者，人类不以线性的方式感知时间的流逝。再加上进度条的不规则行为，导致人类感知过程持续时间的不同。了解哪些行为感知缩短或延长过程持续时间可以被用来改变进度条让它看起来更快，尽管实际的持续时间保持不变。这篇论文描述一个实验，它试图识别在用户感知进度条行为中的模式。结果然后被分析去划分感知加速或减速过程执行的行为。我们得出一些设计建议，它们可以被应用于使用进度条的应用，有助于一种总体上反应更灵敏、令人愉悦的和以人为中心的计算体验。</p>
+
+<h3 id="相关工作">相关工作</h3>
+
+<p>Myers研究了图形用户界面中进度指示器对用户体验的影响。他得出用户在长期的任务过程中对进度指示器有着强烈的偏好，并且，总的来说，发现它们是有用的。Conn在《Time Affordances: The Time Factor in Diagnostic Usability Heuristics》一文中探讨了时间可见性的概念，文中还列举了一系列理想的进度条的属性。范例给用户提供了一个准确易懂的方法以帮助测量交互系统中的进度。Conn也定义了其它概念——时间容忍窗口，它是用户在判定任务没有取得足够进展前愿意等待的时间长度。Conn接着描述了可以被应用于设置用户期望进行更长等待的预测算法，以非线性方法基本上报告进度来增强用户体验。</p>
+
+<p>Fredrickson等人提出持续时间对于情感体验在多大程度上令人满意的评估影响不大（持续时间忽视）。相反，在体验期间和在体验结束时（峰端效应）感知受到显著特征（好的和坏的）的影响最严重。出现这种情况是因为人类不能以一种一致的和线性的方式记住体验，而是有选择地和带着各种偏见地回忆事件。持续时间忽视（duration neglect）和峰端效应（peak-and-end effects）可以在各种各样的领域中看到，包括医学、经济学、广告和人机交互。</p>
+
+<h3 id="实验">实验</h3>
+
+<p>我们识别并开发了八个非线性函数，它们体现了不同的进度行为。包含一个线性函数作为比较的基线。Table 1和Figure 1描述了每个进度函数的行为。为测试这些函数的人类感知，开发了一个实验应用，它同时给用户提供像Figure 2这样的两个进度条。这些进度条逐次运行：当第一个进度条完成时第二个进度条自动开始。每个进度条充当控件的持续时间保持在一个恒定的5.5秒。界面提供三个响应按钮，允许用户选择是否第一个或第二个进度条显示更快些或者它们在持续时间上是相等的。另一个按钮允许用户在继续随后的一对进度条之前重放每个尝试。一旦提供了答案，下一个尝试就会被启动。响应和重放按钮可以在任何时候被按下。</p>
+
+<p><img src="/uploads/progress-function-table.png" title="progress-function-table" ></p>
+
+<p>The  java-based  application  ran  on  an  Apple  laptop  with  a<br>
+12”  display  running  at  1024x768.  The  progress  bars  were<br>
+custom  made  using  Java  Graphics2D  primitives  and  were<br>
+600x50  pixels  in  size  (approximately  1.2cm  x  14.3cm).  A<br>
+coloration  and  naming  scheme  was  applied  to  better  visu-
+ally  inform  the  user:  a  running  progress  bar  was  shown  in<br>
+blue  and  titled  “running”,  while  completed  progress  bars<br>
+were  colored  green  and  titled  “finished.”  Users  interacted<br>
+with the interface via a touchpad with an integrated, single 
+mouse button. </p>
+
+<p>Comparing all distinct ordered pairs of the 9 progress func-
+tions  would  have  required  81  trials.  Initial  pilot  testing<br>
+showed that users found the task to be fairly tedious and 
+began  to  lose  interest  after  approximately  50  sets  of  pro-
+gress bars. To maintain subject attention and ensure a high 
+level of response integrity, we decided to present all unique 
+pairings  of  the  nine  progress  functions  (36  trials)  along<br>
+with  the  functions  paired  with  themselves  (9  trials)  for  a<br>
+total of 45 trials per user. This kept the total task time under 
+15 minutes. The order of presentation was counterbalanced 
+in  two  ways.  First,  a  sequence  of  45  trials  was  randomly<br>
+selected for each pair of users. Second, within each pair of 
+users,  the  order  of  presentation  was  reversed  for  each  trial<br>
+(i.e.,  if  the  first  user  of  the  pair  saw  linear/power,  the  sec-
+ond would see power/linear).  </p>
+
+<p><img src="/uploads/progress-function-figure.png" title="progress-function-figure" ></p>
+
+<p>We  recruited  22  participants  from  two  large  computer  re-
+search  labs  (14  male,  8  female)  with  a  mean  age  of  ap-
+proximately  37.  The  experiment  took  place  in  the  partici-
+pants’  offices.  A  brief  verbal  explanation  of  the  simple<br>
+comparison interface was given. Participants were told that 
+progress  bars  may  proceed  at  different  rates  and  that  they<br>
+should select the one that they perceived as fastest or equal 
+if they appeared to be the same.  </p>
+
+<p><img src="/uploads/experiment-interface-figure.png" title="experiment-interface-figure" ></p>
+
+<h3 id="分析结果">分析结果</h3>
+
+<p>Participants   tended   to   prefer   (i.e.,   perceive   as   faster)<br>
+whichever  function  they  saw  first.  Of  the  990  paired  com-
+parisons,  the  first  function  was  preferred  376  times  (38%),<br>
+the  second  262  times  (26%),  with  no  preference  352  times<br>
+(36%).  This  finding  is  supported  by  the  results  of  a  chi-
+square test, discussed subsequently.  </p>
+
+<p>Participants  had  strong  preferences  among  the  nine  func-
+tions. For any paired comparison of functions, we assigned 
+a preference score of +1 if the first function was preferred, 
+-1 if the second function was preferred, and 0 if the partici-
+pant  had  no  preference.  Table  2  shows  mean  preference<br>
+scores for each of the 36 function pairs. For example, in 22 
+comparisons  of  Slow  Wavy  with  Fast  Wavy  (with  each<br>
+occurring  first  11  times),  10  participants  preferred  Fast<br>
+Wavy, 5 preferred Slow Wavy, and 7 rated the functions as 
+equal. Consequently, the mean preference score is (10 – 5) / 
+22 = 0.23. The rows and columns of the table are ordered in 
+terms of increasing overall preference. Bold values indicate 
+statistical  significance  from  0  at  the  0.05  level  using  a  2-
+sided sign test of the null hypothesis that 
+each function was 
+equally likely to be preferred.  </p>
+
+<p>Using the mean preferences scores in Table 2, we generated 
+a rough ordering of preferences for the nine progress func-
+tions, shown in Figure 3.  </p>
+
+<p>To combine information efficiently across cells, while con-
+trolling  for  presentation  order,  we  fit  a  logistic  regression<br>
+model  [8]  to  the  638  cases  where  a  preference  was  given.<br>
+The probability of preferring Function i  to Function j  given that Function  i  was seen first was modeled as </p>
+
+<p>Error processing input, expected syntax: {% img [class name(s)] [http[s]:/]/path/to/image [width [height]] [title text | "title text" ["alt text"]] %}</p>
+
+<h3 id="参考文献">参考文献</h3>
+]]></content>
+  </entry>
+  
+</feed>
