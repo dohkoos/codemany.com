@@ -9,10 +9,8 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="安装will_paginate插件： 1
-script/plugin install git://github.com/mislav/will_paginate.git 安裝好插件后，在action中將本來的find方法： 1
-@contacts = Contact.all 改为 1
-@ &hellip;">
+  <meta name="description" content="使用Ruby 1.8.7和Rails 2.3.5，每次执行script/plugin install命令都出现： 1
+Plugin not found: [...] 无论使用何种协议，或是在末尾添加斜杠都不起作用。 出现这个问题的原因是因为Ruby 1.8.7是用mingw32编译的， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -76,6 +74,70 @@ script/plugin install git://github.com/mislav/will_paginate.git 安裝好插件�
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/plugin-not-found/">Plugin not found</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2010-09-17T19:24:50+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>17</span><span class='date-suffix'>th</span>, <span class='date-year'>2010</span></span> <span class='time'>7:24 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>使用Ruby 1.8.7和Rails 2.3.5，每次执行script/plugin install命令都出现：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Plugin not found: [...]</span></code></pre></td></tr></table></div></figure>
+
+<p>无论使用何种协议，或是在末尾添加斜杠都不起作用。</p>
+
+<p>出现这个问题的原因是因为Ruby 1.8.7是用mingw32编译的，可以通过ruby -v查看：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ruby 1.8.7 (2010-08-16 patchlevel 302) [i386-mingw32]</span></code></pre></td></tr></table></div></figure>
+
+<p>RUBY_PLATFORM的值是i386-mingw32-{version}，而许多库在判断当前操作系统时是这么做的：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>file.open(RUBY_PLATFORM.match(/mswin/) ? 'NUL', '/dev/null')</span></code></pre></td></tr></table></div></figure>
+
+<p>这些库只判断了RUBY_PLATFORM里是否含有mswin，如果没有就认为是*nix平台，从而使用/dev/null，结果可想而知，文件必然打开失败，于是就会出现上述错误。</p>
+
+<p>解决方式（推荐使用第4种方式）:</p>
+
+<p>方法1：打开script/plugin文件加入一行RUBY_PLATFORM = &#39;mswin&#39;，运行时会打印一条警告说常量重新赋值，不过不影响使用。</p>
+
+<p>方法2：卸载掉1.8.7，重新安装Ruby 1.8.6-p26，这个版本是使用VC6编译的，RUBY_PLATFORM的值是mswin，不会出现平台判断错误。</p>
+
+<p>方法3：使用VC自己编译Ruby 1.8.7，确保RUBY_PLATFORM的值是mswin即可。</p>
+
+<p>方法4：打开RUBY_GEMS/activesupport-2.3.5/lib/active_support/core_ext/kernel/reporting.rb，找到</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>stream.reopen(RUBY_PLATFORM =~ /mswin/ ? 'NUL:' : '/dev/null')</span></code></pre></td></tr></table></div></figure>
+
+<p>将之修改以下代码即可</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>stream.reopen(RUBY_PLATFORM =~ /mswin|mingw/ ? 'NUL:' : '/dev/null')</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -850,81 +912,6 @@ script/plugin install git://github.com/mislav/will_paginate.git 安裝好插件�
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/sqlite3-ruby-and-uninitialized-constant-encoding/">sqlite3-ruby和uninitialized constant Encoding</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2010-03-30T12:58:13+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>30</span><span class='date-suffix'>th</span>, <span class='date-year'>2010</span></span> <span class='time'>12:58 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Ruby 1.8.6 + Rails 2.3.5</p>
-
-<p>创建项目后在运行rake db:migrate时出现了以下错误：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>** Invoke db:migrate (first_time)
-</span><span class='line'>** Invoke environment (first_time)
-</span><span class='line'>** Execute environment
-</span><span class='line'>** Execute db:migrate
-</span><span class='line'>rake aborted!
-</span><span class='line'>uninitialized constant Encoding</span></code></pre></td></tr></table></div></figure>
-
-<p>具体错误信息如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>/active_support/dependencies.rb:443:in 'load_missing_constant'
-</span><span class='line'>/active_support/dependencies.rb:80:in 'const_missing'
-</span><span class='line'>/active_support/dependencies.rb:92:in 'const_missing'
-</span><span class='line'>/sqlite3-0.0.8/lib/sqlite3/encoding.rb:9:in 'find'
-</span><span class='line'>/sqlite3-0.0.8/lib/sqlite3/database.rb:66:in 'initialize'
-</span><span class='line'>/active_record/connection_adapters/sqlite3_adapter.rb:13:in 'new'
-</span><span class='line'>/active_record/connection_adapters/sqlite3_adapter.rb:13:in 'sqlite3_connection'
-</span><span class='line'>/active_record/connection_adapters/abstract/connection_pool.rb:223:in 'send'
-</span><span class='line'>/active_record/connection_adapters/abstract/connection_pool.rb:223:in 'new_connection'
-</span><span class='line'>/active_record/connection_adapters/abstract/connection_pool.rb:245:in 'checkout_new_connection'
-</span><span class='line'>/active_record/connection_adapters/abstract/connection_pool.rb:188:in 'checkout'
-</span><span class='line'>/active_record/connection_adapters/abstract/connection_pool.rb:184:in 'loop'
-</span><span class='line'>/active_record/connection_adapters/abstract/connection_pool.rb:184:in 'checkout'</span></code></pre></td></tr></table></div></figure>
-
-<p>从 <a href="http://stackoverflow.com/questions/1797199/uninitialized-constant-encoding-with-sqlite3-ruby-on-windows">http://stackoverflow.com/questions/1797199/uninitialized-constant-encoding-with-sqlite3-ruby-on-windows</a> 查到原因说是因为安装了非sqlite3-ruby包所导致。记起安装SQLite时使用的命令是gem install sqlite3，而实际上sqlite3包仅是针对ruby 1.9版本，在1.8.6上需要使用sqlite3-ruby包。用gem list查看发现果然安装的是sqlite3包。gem uninstall sqlite3把它卸载掉，然后装上sqlite3-ruby包，再次运行rake db:migrate，可以了，不再出现错误信息了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/15">&larr; Older</a>
@@ -942,6 +929,10 @@ script/plugin install git://github.com/mislav/will_paginate.git 安裝好插件�
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/the-power-of-protocol-analyzers/">协议分析器的威力</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part19/">ANTLR 4权威参考读书笔记（19）</a>
       </li>
     
@@ -955,10 +946,6 @@ script/plugin install git://github.com/mislav/will_paginate.git 安裝好插件�
     
       <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part17/">ANTLR 4权威参考读书笔记（17）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part16/">ANTLR 4权威参考读书笔记（16）</a>
       </li>
     
   </ul>
@@ -995,7 +982,7 @@ script/plugin install git://github.com/mislav/will_paginate.git 安裝好插件�
 <a style="font-size: 119%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 97%" href="/tags/spring/">Spring</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 133%" href="/tags/translation/">Translation</a>
+<a style="font-size: 134%" href="/tags/translation/">Translation</a>
 <a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 107%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 107%" href="/tags/wxwidgets/">wxWidgets</a>
