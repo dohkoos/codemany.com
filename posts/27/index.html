@@ -9,7 +9,8 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="首先，我们要了解一下ServletResponse.setContentLength(int len)的含义。setContentLength是设置返回内容体长度的方法，len是内容体的长度。由于网络上传输内容是以字节（byte）为单位的，所以len就是指内容体有多少个字节。 &hellip;">
+  <meta name="description" content="EMMA是一个coverage工具，有on-the-fly和offline两种使用方式，在Ant里通常采用offline方式。 到sourceforge下载了2.0版本的EMMA下来，由于将EMMA的生成文件做了重定向，因此遇到了些问题，比如出现以下错误： 1
+nothing to do: no &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -79,7 +80,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/how-to-solve-sitemesh-truncate-the-page-containing-chinese-character/">如何解决含有中文的页面末尾内容会被SiteMesh截掉的问题</a></h1>
+      <h1 class="entry-title"><a href="/blog/ant-series-problem-using-emma-measure-test-coverage/">Ant系列之用EMMA测量测试覆盖率的问题</a></h1>
     
     
       <p class="meta">
@@ -88,14 +89,36 @@
 
 
 
-<time class='entry-date' datetime='2005-07-22T14:33:59+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2005</span></span> <span class='time'>2:33 pm</span></time>
+<time class='entry-date' datetime='2006-01-16T09:12:26+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2006</span></span> <span class='time'>9:12 am</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>首先，我们要了解一下ServletResponse.setContentLength(int len)的含义。setContentLength是设置返回内容体长度的方法，len是内容体的长度。由于网络上传输内容是以字节（byte）为单位的，所以len就是指内容体有多少个字节。假设现在有长度为100个字节的数据，在输出数据到客户端前我们用setContentLength(90)设置内容体的长度为90个字节。那么在客户端接收到的数据长度就是90个字节而不是100。下面我们来做个试验：</p>
+  <div class="entry-content"><p>EMMA是一个coverage工具，有on-the-fly和offline两种使用方式，在Ant里通常采用offline方式。</p>
+
+<p>到sourceforge下载了2.0版本的EMMA下来，由于将EMMA的生成文件做了重定向，因此遇到了些问题，比如出现以下错误：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>nothing to do: no runtime coverage data found in any of the data files</span></code></pre></td></tr></table></div></figure>
+
+<p>查找EMMA的FAQ 3.7节，只是告诉你可能少了metadata和runtime coverate date（对Ant用户来说一般是少了runtime coveraget date，它的后缀名默认是ec）。</p>
+
+<p>由FAQ 3.15节可以知道runtime coverage data文件默认是生成在user.dir目录下的（即build.xml中的basedir目录下），而由instr指令生成的metadata文件（后缀名默认为em）则已经被重定向到另外的目录（用来生成coverage report的地方），所以必须重新设置coverage.out.file的值，用来重定向生成的runtime coverage data。因为runtime coverage data是在junit任务执行时产生的，所以我们可以在junit任务中添加一行代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;sysproperty key="emma.coverage.out.file" value="${coverage.dir}/coverage.emma" /&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>注意：</p>
+
+<ol>
+<li>metadata和runtime文件的后缀名最好设置相同；</li>
+<li>一定要将junit任务的fork属性设置为true，这是因为EMMA 2.0的runtime coverage data是在JVM退出后生成的；</li>
+<li>instrumented classes必须是第一个被JVM执行的，所以instrumented classes目录必须处在junit任务的classpath的第一行，具体原因不明，如果谁知道还请告知下。</li>
+</ol>
+
+<p>其实EMMA附带的examples目录下的build-offline.xml里已经说明的很详细了，只不过下载后没有仔细看，才遇到了一些问题。下面是build.xml的部分代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -119,32 +142,115 @@
 <span class='line-number'>20</span>
 <span class='line-number'>21</span>
 <span class='line-number'>22</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class PageTruncateFilter implements Filter {
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;path id="classpath"&gt;
+</span><span class='line'>  &lt;pathelement location="${instrumentedclasses}" /&gt;
+</span><span class='line'>  &lt;pathelement location="${classes}" /&gt;
+</span><span class='line'>  &lt;pathelement location="${testclasses}" /&gt;
+</span><span class='line'>  &lt;fileset dir="${lib}" includes="**/*.jar" /&gt;
+</span><span class='line'>&lt;/path&gt;
 </span><span class='line'>
-</span><span class='line'>    public void init(FilterConfig config) throws ServletException {
-</span><span class='line'>    }
+</span><span class='line'>&lt;target name="compile" depends="prepare"&gt;
+</span><span class='line'>  &lt;javac srcdir="${src}" destdir="${classes}" debug="on"&gt;
+</span><span class='line'>    &lt;classpath refid="classpath" /&gt;
+</span><span class='line'>  &lt;/javac&gt;
+</span><span class='line'>  &lt;javac srcdir="${test}" destdir="${testclasses}" debug="on"&gt;
+</span><span class='line'>    &lt;classpath refid="classpath" /&gt;
+</span><span class='line'>  &lt;/javac&gt;
+</span><span class='line'>&lt;/target&gt;
 </span><span class='line'>
-</span><span class='line'>    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
-</span><span class='line'>                        throws IOException, ServletException {
-</span><span class='line'>        HttpServletRequest request = (HttpServletRequest)req;
-</span><span class='line'>        HttpServletResponse response = (HttpServletResponse)res;
+</span><span class='line'>&lt;target name="coverage.instrument" depends="compile"&gt;
+</span><span class='line'>  &lt;emma enabled="yes"&gt;
+</span><span class='line'>    &lt;instr instrpath="${classes}" destdir="${instrumentedclasses}"
+</span><span class='line'>        metadatafile="{coveragereports}/metadata.emma" merge="true"&gt;
+</span><span class='line'>    &lt;/instr&gt;
+</span><span class='line'>  &lt;/emma&gt;
+</span><span class='line'>&lt;/target&gt;
 </span><span class='line'>
-</span><span class='line'>        String content = "&lt;html&gt;&lt;head&gt;&lt;title&gt;Truncated Page&lt;/title&gt;&lt;/head&gt;";
-</span><span class='line'>               content += "&lt;body&gt;这个页面的内容will be truncated.&lt;/body&gt;&lt;/html&gt;";
-</span><span class='line'>        response.setCharacterEncoding("gbk");
-</span><span class='line'>        response.setContentLength(content.length());
-</span><span class='line'>        PrintWriter out = response.getWriter();
-</span><span class='line'>        out.println(content);
-</span><span class='line'>        out.close();
-</span><span class='line'>    }
+</span><span class='line'>&lt;target name="junit" depends="coverage.instrument"&gt;
+</span><span class='line'>  &lt;junit printsummary="yes" haltonfailure="no" fork="true"&gt;
+</span><span class='line'>    &lt;sysproperty key="emma.coverage.out.file" value="${coveragereports}/coverage.emma" /&gt;
+</span><span class='line'>    &lt;classpath refid="classpath" /&gt;
 </span><span class='line'>
-</span><span class='line'>    public void destroy() {
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>    &lt;formatter type="xml" /&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;batchtest fork="yes" todir="${junitreports}"&gt;
+</span><span class='line'>      &lt;fileset dir="${test}"&gt;
+</span><span class='line'>        &lt;include name="**/*Test*.java" /&gt;
+</span><span class='line'>      &lt;/fileset&gt;
+</span><span class='line'>    &lt;/batchtest&gt;
+</span><span class='line'>  &lt;/junit&gt;
+</span><span class='line'>&lt;/target&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;target name="coverage.report" depends="test"&gt;
+</span><span class='line'>  &lt;emma enabled="yes"&gt;
+</span><span class='line'>    &lt;report sourcepath="${src}"&gt;
+</span><span class='line'>      &lt;fileset dir="${coveragereports}"&gt;
+</span><span class='line'>        &lt;include name="*.emma" /&gt;
+</span><span class='line'>      &lt;/fileset&gt;
+</span><span class='line'>
+</span><span class='line'>      &lt;html outfile="${coveragereports}/coverage.html" depth="method" /&gt;
+</span><span class='line'>    &lt;/report&gt;
+</span><span class='line'>  &lt;/emma&gt;
+</span><span class='line'>&lt;/target&gt;</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
 
-<p>由于content字符串含有两个中文字符，每一个中文字符又是由两个字节组成，所以content.length()的值比content的字节数要少2。在客户端显示的内容也会因此少2个字节，即缺少“l&gt;”这两个字符。</p>
 
-<p>现在我们来浏览SiteMesh的源代码找出问题的原因。首先从PageFilter.java的doFilter方法开始。由于页面没有在decorators.xml中注册修饰，所以writeOriginal方法会被调用。下面是writeOriginal方法的源代码：</p>
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/fix-problem-incorrect-file-count-in-summary-section-of-checkstyle-report/">修复CheckStyle报告中Summary部分文件数目错误问题</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2005-12-30T22:22:44+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>30</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>10:22 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在使用CheckStyle时用了它提供的checkstyle-frames.xsl作为样式文件，不过checkstyle-frames.xsl生成报告时有些问题，主要是统计数据有点问题，Summary中报告的文件数目比真实的多，所以对xsl文件的summary模板作了小小的一些修改，解决了这个问题，且添加了一个统计有错误的文件个数的功能。</p>
+
+<p>原来的xsl内容：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -162,105 +268,74 @@
 <span class='line-number'>14</span>
 <span class='line-number'>15</span>
 <span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>/** Write the original page data to the response. */
-</span><span class='line'>private void writeOriginal(HttpServletRequest request, HttpServletResponse response,
-</span><span class='line'>                          Page page) throws IOException {
-</span><span class='line'>    response.setContentLength(page.getContentLength());
-</span><span class='line'>
-</span><span class='line'>    if (request.getAttribute(USING_STREAM).equals(Boolean.TRUE)) {
-</span><span class='line'>        PrintWriter writer = new PrintWriter(response.getOutputStream());
-</span><span class='line'>        page.writePage(writer);
-</span><span class='line'>        // flush writer to underlying outputStream
-</span><span class='line'>        writer.flush();
-</span><span class='line'>        response.getOutputStream().flush();
-</span><span class='line'>    } else {
-</span><span class='line'>        page.writePage(response.getWriter());
-</span><span class='line'>        response.getWriter().flush();
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;xsl:template match="checkstyle" mode="summary"&gt;
+</span><span class='line'>    &lt;h3&gt;Summary&lt;/h3&gt;
+</span><span class='line'>    &lt;xsl:variable name="fileCount" select="count(file)"/&gt;
+</span><span class='line'>    &lt;xsl:variable name="errorCount" select="count(file/error)"/&gt;
+</span><span class='line'>    &lt;table class="log" border="0" cellpadding="5" cellspacing="2" width="100%"&gt;
+</span><span class='line'>        &lt;tr&gt;
+</span><span class='line'>            &lt;th&gt;Files&lt;/th&gt;
+</span><span class='line'>            &lt;th&gt;Errors&lt;/th&gt;
+</span><span class='line'>        &lt;/tr&gt;
+</span><span class='line'>        &lt;tr&gt;
+</span><span class='line'>            &lt;xsl:call-template name="alternated-row"/&gt;
+</span><span class='line'>            &lt;td&gt;&lt;xsl:value-of select="$fileCount"/&gt;&lt;/td&gt;
+</span><span class='line'>            &lt;td&gt;&lt;xsl:value-of select="$errorCount"/&gt;&lt;/td&gt;
+</span><span class='line'>        &lt;/tr&gt;
+</span><span class='line'>    &lt;/table&gt;
+</span><span class='line'>&lt;/xsl:template&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p>首行代码就是设置内容体长度的，让我们追到page.getContentLength()里面去看看（Page接口的getContentLength方法是由AbstractPage.java实现的）：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public int getContentLength() {
-</span><span class='line'>    return pageData.length;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>它返回pageData数组的长度。但是pageData数组是char类型的，假如pageData中有中文内容时，设置的内容体长度就会小于pageData的字节数。这时就会出现输出到客户端的数据截掉的问题。所以只要修改getContentLength方法返回的值就可以了，下面是修改后的getContentLength方法：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public int getContentLength() {
-</span><span class='line'>    String content = new String(pageData);
-</span><span class='line'>    return content.getBytes().length;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/using-ssh2-to-access-gro-clinux-org-cvs-server-in-eclipse3/">在Eclipse 3中使用SSH2访问gro.clinux.org的CVS服务器</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-07-07T19:48:08+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>7</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>7:48 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在Eclipse中生成公钥和私钥</p>
-
-<p>打开Eclipse，进入Window -&gt; Preferences -&gt; Team -&gt; CVS -&gt; SSH2 Connection Method -&gt; Key Management，点击“Generate RSA Key...”，然后填写Passphrase和Confirm Passphrase，接着点击“Save Private Key...”保存公钥和私钥（公钥和私钥文件保存在~/.ssh/目录下，id_rsa是私钥文件，id_rsa.pub 是公钥文件）。</p>
-
-<p>将公钥上传至gro.clinux.org服务器</p>
-
-<p>登陆gro服务器，进入[帐号维护]，在页面底部你可以看到如下信息：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Shell帐号信息
-</span><span class='line'>
-</span><span class='line'>Shell box：
-</span><span class='line'>CVS/SSH 共享认证Key：0 [编辑Keys]</span></code></pre></td></tr></table></div></figure>
-
-<p>点击[编辑Keys]，然后把刚才生成的文件id_rsa.pub中的内容粘贴到文本框中（看看是不是符合它上面的要求，千万要仔细看看），如果没有问题的话，就更新吧。大约6个小时后Cron会自动更新，在服务器上你的目录下会自动添加文件夹/.ssh/，里面包含了名为authorized_keys2的文件，你的公钥就保存在这里。</p>
-
-<p>在Eclipse中建立CVS连接</p>
-
-<p>打开CVS Repository Exploring Perspective，进入New -&gt; Repository Location，填入以下内容：</p>
+<p>修改后的内容：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Host：cvs.unixname.gro.clinux.org
-</span><span class='line'>Repository Path：/cvsroot/unixname
-</span><span class='line'>User：你在gro.clinux.org上注册的帐户
-</span><span class='line'>Password：先前保存公钥和私钥时输入的Passphrase
-</span><span class='line'>Connection Type：extssh</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;xsl:template match="checkstyle" mode="summary"&gt;
+</span><span class='line'>    &lt;h3&gt;Summary&lt;/h3&gt;
+</span><span class='line'>    &lt;xsl:variable name="fileCount"&gt;
+</span><span class='line'>        &lt;xsl:value-of select="count(file[not(./@name = preceding-sibling::file/@name)])" /&gt;
+</span><span class='line'>    &lt;/xsl:variable&gt;
+</span><span class='line'>    &lt;xsl:variable name="fileErrorCount" select="count(file[count(error) &gt; 0])" /&gt;
+</span><span class='line'>    &lt;xsl:variable name="errorCount" select="count(file/error)" /&gt;
+</span><span class='line'>    &lt;table class="log" border="0" cellpadding="5" cellspacing="2" width="100%"&gt;
+</span><span class='line'>        &lt;tr&gt;
+</span><span class='line'>            &lt;th&gt;Total Files&lt;/th&gt;
+</span><span class='line'>            &lt;th&gt;Files With Errors&lt;/th&gt;
+</span><span class='line'>            &lt;th&gt;Errors&lt;/th&gt;
+</span><span class='line'>        &lt;/tr&gt;
+</span><span class='line'>        &lt;tr&gt;
+</span><span class='line'>            &lt;xsl:call-template name="alternated-row" /&gt;
+</span><span class='line'>            &lt;td&gt;&lt;xsl:value-of select="$fileCount" /&gt;&lt;/td&gt;
+</span><span class='line'>            &lt;td&gt;&lt;xsl:value-of select="$fileErrorCount" /&gt;&lt;/td&gt;
+</span><span class='line'>            &lt;td&gt;&lt;xsl:value-of select="$errorCount" /&gt;&lt;/td&gt;
+</span><span class='line'>        &lt;/tr&gt;
+</span><span class='line'>    &lt;/table&gt;
+</span><span class='line'>&lt;/xsl:template&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p>点击Finish。如果你是第一次登录的话，将会弹出一个对话框，不用看那么仔细，直接点击OK就好了。</p>
+<ul>
+<li>following-sibling 按文档顺序选择文档中此后出现的当前节点的所有兄弟节点。</li>
+<li>preceding-silbling 按与文档顺序相反的方向选择文档中此前出现的当前节点的所有兄弟节点。</li>
+<li>following 除当前节点的所有后代节点外，按顺序选择文档中当前节点之后出现的所有节点，不包括属性节点或名称空间节点。</li>
+<li>preceding 按与文档方向顺序相反的方向选择文档中在当前节点之前出现的所有节点。</li>
+</ul>
 </div>
   
   
@@ -273,7 +348,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/how-to-generate-executable-jar-file/">如何生成可执行的jar文件</a></h1>
+      <h1 class="entry-title"><a href="/blog/ant-series-problem-using-jdepend-generate-package-dependency-metrics/">Ant系列之用JDepend生成包依赖性度量的问题</a></h1>
     
     
       <p class="meta">
@@ -282,14 +357,105 @@
 
 
 
-<time class='entry-date' datetime='2005-06-21T21:16:56+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>21</span><span class='date-suffix'>st</span>, <span class='date-year'>2005</span></span> <span class='time'>9:16 pm</span></time>
+<time class='entry-date' datetime='2005-12-29T18:04:59+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>29</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>6:04 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>首先用jar cvf executable.jar *.class命令生成jar文件，然后编辑jar文件中META-INF目录下的MAINFEST文件。在其尾部加上main-class: main-class-name就可以让它变成可执行的了。</p>
+  <div class="entry-content"><p>首先获取JDepend的最新jar文件jdepend-2.9.jar，把它添加到ANT_HOME/lib目录里。</p>
+
+<p>在build.xml中添加：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;target name="jdepend" description="Generate dependency metrics for each package"&gt;
+</span><span class='line'>    &lt;jdepend format="xml" outputfile="${jdepend.dir}/jdepend-report.xml"&gt;
+</span><span class='line'>        &lt;classpath&gt;
+</span><span class='line'>            &lt;pathelement path="classes" /&gt;
+</span><span class='line'>        &lt;/classpath&gt;
+</span><span class='line'>    &lt;/jdepend&gt;
+</span><span class='line'>&lt;/target&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>运行任务后出现如下的错误：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>BUILD FAILED
+</span><span class='line'>build.xml:59: Missing classespath required argument
+</span><span class='line'>    at org.apache.tools.ant.taskdefs.optional.jdepend.JDependTask.execute(JDependTask.java:397)
+</span><span class='line'>    at org.apache.tools.ant.UnknownElement.execute(UnknownElement.java:275)
+</span><span class='line'>    at org.apache.tools.ant.Task.perform(Task.java:364)
+</span><span class='line'>    at org.apache.tools.ant.Target.execute(Target.java:341)
+</span><span class='line'>    at org.apache.tools.ant.Target.performTasks(Target.java:369)
+</span><span class='line'>    at org.apache.tools.ant.Project.executeSortedTargets(Project.java:1216)
+</span><span class='line'>    at org.apache.tools.ant.Project.executeTarget(Project.java:1185)
+</span><span class='line'>    at org.apache.tools.ant.helper.DefaultExecutor.executeTargets(DefaultExecutor.java:40)
+</span><span class='line'>    at org.eclipse.ant.internal.ui.antsupport.EclipseDefaultExecutor.executeTargets(EclipseDefaultExecutor.java:32)
+</span><span class='line'>    at org.apache.tools.ant.Project.executeTargets(Project.java:1068)
+</span><span class='line'>    at org.eclipse.ant.internal.ui.antsupport.InternalAntRunner.run(InternalAntRunner.java:423)
+</span><span class='line'>    at org.eclipse.ant.internal.ui.antsupport.InternalAntRunner.main(InternalAntRunner.java:137)</span></code></pre></td></tr></table></div></figure>
+
+<p>查看JDependTask.java文件的397行：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if (getSourcespath() == null && getClassespath() == null) {
+</span><span class='line'>    throw new BuildException("Missing classespath required argument");
+</span><span class='line'>} else if (getClassespath() == null) {
+</span><span class='line'>    String msg = "sourcespath is deprecated in JDepend &gt;= 2.5 - please convert to classespath";
+</span><span class='line'>    log(msg);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>发现是getClassespath() == null了，跳到221行：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public Path getClassespath() {
+</span><span class='line'>    return classesPath;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>不是写了classpath吗？怎么classesPath的值会等于null呢？结果发现在247行有：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void setClasspath(Path classpath) {
+</span><span class='line'>    if (compileClasspath == null) {
+</span><span class='line'>        compileClasspath = classpath;
+</span><span class='line'>    } else {
+</span><span class='line'>        compileClasspath.append(classpath);
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>原来是在build.xml中把classespath错写成classpath了，那样当然有问题啦。改过来，再运行就可以了。</p>
 </div>
   
   
@@ -302,7 +468,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/why-should-software-modeling/">为什么要软件建模</a></h1>
+      <h1 class="entry-title"><a href="/blog/ant-series-problem-using-checkstyle-check-code-style/">Ant系列之用Checkstyle检查代码规范的问题</a></h1>
     
     
       <p class="meta">
@@ -311,178 +477,382 @@
 
 
 
-<time class='entry-date' datetime='2005-05-16T06:23:07+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>6:23 am</span></time>
+<time class='entry-date' datetime='2005-12-17T20:33:54+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>17</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>8:33 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>模型是对现实的简化。需要进行建模的原因有以下几点：</p>
+  <div class="entry-content"><p>首先将checkstyle-all-4.1.jar文件拷贝到项目的lib目录下，并建立CheckStyle配置文件。</p>
+
+<p>然后在build.xml文件中声明CheckStyle任务:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;taskdef resource="checkstyletask.properties" classpath="${lib.dir}/checkstyle-all-4.1.jar" /&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>接着是建立CheckStyle任务：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;target name="checkstyle" description="Generates a report of code convention violations."&gt;
+</span><span class='line'>    &lt;checkstyle config="${docs.dir}/checkstyle_checks.xml" failOnViolation="false"&gt;
+</span><span class='line'>        &lt;fileset dir="${src.dir}" includes="**/*.java" /&gt;
+</span><span class='line'>        &lt;formatter type="xml" toFile="${checkstyle.dir}/checkstyle_report.xml" /&gt;
+</span><span class='line'>    &lt;/checkstyle&gt;
+</span><span class='line'>    &lt;xslt basedir="${checkstyle.dir}" destdir="${checkstyle.dir}/html" extension=".html"
+</span><span class='line'>            style="${docs.dir}/checkstyle-frames.xsl"&gt;
+</span><span class='line'>        &lt;param name="output.dir" expression="${checkstyle.dir}/html" /&gt;
+</span><span class='line'>    &lt;/xslt&gt;
+</span><span class='line'>&lt;/target&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>其中output.dir是checkstyle-frames.xsl中的参数：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;xsl:param name="output.dir" /&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>在运行任务时可能会出现如下异常：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>javax.xml.transform.TransformerException: java.lang.RuntimeException: Unrecognized XSLTC extension 'org.apache.xalan.xslt.extensions.Redirect:write'</span></code></pre></td></tr></table></div></figure>
+
+<p>可以将checkstyle-frames.xsl中的：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>xmlns:redirect="org.apache.xalan.xslt.extensions.Redirect"</span></code></pre></td></tr></table></div></figure>
+
+<p>改成下面的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>xmlns:redirect="http://xml.apache.org/xalan/redirect"</span></code></pre></td></tr></table></div></figure>
+
+<p>如果出现这样的异常：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Got an exception - java.lang.RuntimeException: Unable to get class information for</span></code></pre></td></tr></table></div></figure>
+
+<p>可以修改对抛出异常的限制：允许抛出Unchecked异常和抛出另一个已声明异常的子类。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;module name="RedundantThrows"&gt;
+</span><span class='line'>    &lt;property name="allowUnchecked" value="true" /&gt;
+</span><span class='line'>    &lt;property name="allowSubclasses" value="true" /&gt;
+</span><span class='line'>&lt;/module&gt;</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-implement-i18n-in-webwork/">WebWork中如何实现i18n</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2005-11-17T13:57:14+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>17</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>1:57 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>ognl-2.6.5.jar + oscore-2.2.4.jar + webwork-2.1.7.jar + xwork-1.0.5.jar</p>
+
+<p>web.xml配置文件的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;!DOCTYPE web-app PUBLIC
+</span><span class='line'>    "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN"
+</span><span class='line'>    "http://java.sun.com/dtd/web-app_2_3.dtd"&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;web-app&gt;
+</span><span class='line'>    &lt;display-name&gt;i18n&lt;/display-name&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;servlet&gt;
+</span><span class='line'>        &lt;servlet-name&gt;action&lt;/servlet-name&gt;
+</span><span class='line'>        &lt;servlet-class&gt;com.opensymphony.webwork.dispatcher.ServletDispatcher&lt;/servlet-class&gt;
+</span><span class='line'>        &lt;load-on-startup&gt;1&lt;/load-on-startup&gt;
+</span><span class='line'>    &lt;/servlet&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;servlet-mapping&gt;
+</span><span class='line'>        &lt;servlet-name&gt;action&lt;/servlet-name&gt;
+</span><span class='line'>        &lt;url-pattern&gt;*.html&lt;/url-pattern&gt;
+</span><span class='line'>    &lt;/servlet-mapping&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;taglib&gt;
+</span><span class='line'>        &lt;taglib-uri&gt;webwork&lt;/taglib-uri&gt;
+</span><span class='line'>        &lt;taglib-location&gt;/WEB-INF/webwork.tld&lt;/taglib-location&gt;
+</span><span class='line'>    &lt;/taglib&gt;
+</span><span class='line'>&lt;/web-app&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>webwork.properties配置文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>### This can be used to set your locale and encoding scheme
+</span><span class='line'>#webwork.locale=en_US    &lt;- 这行一定要注释掉，因为WebWork首先判断webwork.locale有没有被设置，
+</span><span class='line'>                            如有则始终以该locale为准，忽略浏览器的locale
+</span><span class='line'>webwork.i18n.encoding=utf-8
+</span><span class='line'>
+</span><span class='line'>### Load custom default resource bundles
+</span><span class='line'>webwork.custom.i18n.resources=ApplicationResources</span></code></pre></td></tr></table></div></figure>
+
+<p>xwork.xml配置文件的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;!DOCTYPE xwork PUBLIC
+</span><span class='line'>    "-//OpenSymphony Group//XWork 1.0//EN"
+</span><span class='line'>    "http://www.opensymphony.com/xwork/xwork-1.0.dtd"&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;xwork&gt;
+</span><span class='line'>    &lt;include file="webwork-default.xml" /&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;package name="default" extends="webwork-default"&gt;
+</span><span class='line'>        &lt;action name="hello" class="com.codemany.i18n.action.HelloAction"&gt;
+</span><span class='line'>            &lt;result name="success" type="dispatcher"&gt;/i18n.jsp&lt;/result&gt;
+</span><span class='line'>        &lt;/action&gt;
+</span><span class='line'>    &lt;/package&gt;
+</span><span class='line'>&lt;/xwork&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>HelloAction.java实现代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>import com.opensymphony.xwork.ActionSupport;
+</span><span class='line'>
+</span><span class='line'>public class HelloAction extends ActionSupport {
+</span><span class='line'>
+</span><span class='line'>    public String execute() throws Exception {
+</span><span class='line'>        return SUCCESS;
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>i18n.jsp的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%@ page pageEncoding="utf-8" contentType="text/html; charset=utf-8" %&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;%@ taglib uri="webwork" prefix="ww" %&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;html&gt;
+</span><span class='line'>&lt;head&gt;
+</span><span class='line'>    &lt;meta http-equiv="Content-Type" content="text/html; charset=utf-8" /&gt;
+</span><span class='line'>&lt;/head&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;body&gt;
+</span><span class='line'>    &lt;ww:property value="getText('i18n.value')" /&gt;
+</span><span class='line'>&lt;/body&gt;
+</span><span class='line'>&lt;/html&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>ApplicationResources_zh_CN.properties的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>i18n.value=国际化</span></code></pre></td></tr></table></div></figure>
+
+<p>ApplicationResources_en_US.properties的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>i18n.value=internationalization</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/learn-to-crack-cosh-crackme2/">练习破解'Crackme2 - by CoSH'</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2005-11-13T16:57:45+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>13</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>4:57 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p><a href="/uploads/crackme2.zip" title="crackme2.zip">Crackme2程序</a></p>
 
 <ol>
-<li>人们对复杂问题的理解能力是有限的；</li>
-<li>我们要开发的软件系统是复杂的；</li>
-<li>对系统的完整的理解有助于正确地实施工作（但不一定能使开发工作进展的更快）；</li>
-<li>我们不能完整的理解一个复杂的系统，为了能够更好地理解正在开发的系统，因此要对它进行建模。</li>
-</ol>
-
-<p>那么，是不是任何情况下都要建模呢？未必尽然。是否要进行软件建模是由系统的复杂程度决定的。如果系统的复杂性在我们的控制范围之内，那么就不需要建模。不过，有一个自然趋势：随着时间的推移，几乎所有的应用系统变得越来越复杂。因此要记住的是：狗窝总有一天会膨胀成大厦，并且因为不堪承受其自身的重量而倒塌。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/anemic-domain-model/">贫血领域模型</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-05-12T08:33:42+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>8:33 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="http://martinfowler.com/bliki/AnemicDomainModel.html">http://martinfowler.com/bliki/AnemicDomainModel.html</a></p>
-
-<p>贫血领域模型是那些已近存在了相当长时间的反模式中的一份子，然而目前似乎有一个特定的高潮。我和Eric Evans聊过这个，并且我们都注意到它们似乎越来越流行。作为真正的<a href="http://martinfowler.com/eaaCatalog/domainModel.html">领域模型</a>支持者，这不是一件好事。</p>
-
-<p>贫血领域模型的基本症状是乍一看它就像真的领域模型一样。这些对象大多以领域空间中的名词命名，并且它们被真正的领域模型拥有的丰富的关系和结构连接。当你观察行为时问题来了，你意识到这些对象几乎没有任何行为，仅仅只是封装了getter和setter方法。这些模型的设计规则往往说不要把任何领域逻辑放到领域对象里。取而代之的是一组服务对象捕获了所有的领域逻辑。这些在领域对象上层的服务把领域对象当数据使用。</p>
-
-<p>这种反模式最根本的恐怖在于它和面向对象设计的基本理念完全相反，它只是把数据和处理结合在一起。贫血领域模型其实只是一种过程式风格的设计，正是那种像我（和Eric）自Smalltalk早期以来一直在与之作斗争的顽固者。更糟糕的是，许多人认为贫血对象是真正的对象，因此完全没有抓住面向对象设计是怎么回事的要领。</p>
-
-<p>现在面向对象的纯粹主义当然很好，但我意识到我需要更多的基本论据来反对这种贫血症。本质上贫血领域模型的问题是它们承担了领域模型所有的成本，没有产生任何的好处。主要成本是映射到数据库的笨拙，它通常会导致一整层的O/R映射。在而且只有在你使用强大的面向对象技术去组织复杂的逻辑时这才值得。通过把所有的行为拉取到服务中，不管用什么方法，基本上你最后得到的都是<a href="http://martinfowler.com/eaaCatalog/transactionScript.html">事务脚本</a>，从而失去领域模型能带来的优势。正如我在<a href="http://martinfowler.com/books/eaa.html">《企业应用架构模式》</a>中讨论过的，领域模型并不总是最好的工具。</p>
-
-<p>值得强调的是，把行为放进领域对象不应违背利用分层将领域逻辑从诸如持久和表现责任中分离的坚实方法。在领域对象中的逻辑应该是领域逻辑——验证、计算、业务规则——无论你喜欢叫它什么。（某些情况下，你会产生把数据源和表现逻辑放到领域对象里的争论，但它和我对贫血症的看法无关。）</p>
-
-<p>这一切混乱的来源是许多OO专家强烈推荐在领域模型顶部放一层过程式服务，来形成一个<a href="http://martinfowler.com/eaaCatalog/serviceLayer.html">服务层</a>。但这不是让领域模型完全没有行为的一个论据，其实服务层主张服务层要和行为丰富的领域模型一起使用。</p>
-
-<p>Eric Evans的精彩书籍<a href="http://domaindrivendesign.org/books/">《领域驱动设计》</a>有如下的文字谈及这些层：</p>
-
-<blockquote>
-<p>应用层【他对服务层的命名】：定义软件可以完成的工作，并且指挥具有丰富含义的领域对象来解决问题。这个层所负责的任务对业务影响深远，对跟其它系统的应用层进行交互非常必要。这个层要保持简练。它不包括处理业务规则或知识，只是给下一层中相互协作的领域对象协调任务、委托工作。在这个层次中不反映业务情况的状态，但反映用户或程序的任务进度的状态。</p>
-
-<p>领域层（或者模型层）：负责表示业务概念、业务状况的信息以及业务规则。并且保持这些内容的技术细节由基础结构层来完成，反映业务状况的状态在该层中被控制和使用。这一层是业务软件的核心。</p>
-</blockquote>
-
-<p>这里的关键点是服务层是瘦的——所有的关键逻辑存在于领域层。他在服务模式中重申了这个观点：</p>
-
-<blockquote>
-<p>现在，最常犯的错误就是太轻易地放弃把这种行为配置到合适的对象上，逐渐地滑向过程式编程。</p>
-</blockquote>
-
-<p>我不知道为什么这个反模式如此常见。我猜想它是因为大多数人还没有真正地和正确的领域模型工作过，特别是如果他们有数据背景。有些技术鼓励正确的领域模型，例如J2EE的实体Bean，它是我偏爱<a href="http://martinfowler.com/bliki/POJO.html">POJO</a>领域模型的理由之一。</p>
-
-<p>总之，你在服务中发现越多的行为，你就越难体会到领域模型的好处。如果你所有的逻辑都在服务中，那你将得不到任何好处。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/learn-to-crack-andrnalin-crackme/">练习破解Andrnalin的Crackme</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-04-05T21:32:19+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>5</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>9:32 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>拿到这个程序，用PEiD查看这个程序，发现是用Microsoft Visual Basic 5.0编写的且没有加过壳，所以用W32Dasm反汇编。通过Functions/Imports查看它调用的函数，能够看见MSVBVM50!__vbaStrCmp字样。</p>
-
-<ol>
-<li>启动SoftICE，然后运行Crackme程序；</li>
-<li>在文本框中输入12345678；</li>
-<li>Ctrl+D来到SoftICE中，输入bpx __vbaStrCmp，按回车后用Ctrl+D命令返回Crackme；</li>
-<li>点击OK，程序被SoftICE中断；</li>
-<li>按F12回到调用__vbaStrCmp的地方；</li>
-<li>按F6切换到代码窗口，移动光标，直到代码窗口中出现如下程序段：</li>
+<li>用PEiD查看，程序没有加壳；</li>
+<li>首先找到注册错误提示信息“One of the Details you entered was wrong”；</li>
+<li>用W32Dasm反汇编，利用String Data References找到上述字符串，双击它，看到以下程序：</li>
 </ol>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>001B:00401D70                MOV ECX, [EBP-28]
-</span><span class='line'>001B:00401D73                PUSH ECX
-</span><span class='line'>001B:00401D74                PUSH 00401A54
-</span><span class='line'>001B:00401D79                CALL [MSVBVM50!__vbaStrCmp]</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>* Reference To: MFC42.Ordinal:0F24, Ord:0F24h
+</span><span class='line'>|
+</span><span class='line'>:004014EB E85A030000              call 0040184A
+</span><span class='line'>:004014F0 83F805                  cmp eax, 00000005                 -&gt; 比较Name的长度是否不大于5
+</span><span class='line'>:004014F3 7E41                    jle 00401536                      -&gt; 如果是就跳到出错信息处
+</span><span class='line'>:004014F5 8D86E0000000            lea eax, dword ptr [esi+000000E0] -&gt; Name字符串的地址
+</span><span class='line'>:004014FB 8BCF                    mov ecx, edi
+</span><span class='line'>:004014FD 50                      push eax
+</span><span class='line'>
+</span><span class='line'>* Reference To: MFC42.Ordinal:0F22, Ord:0F22h
+</span><span class='line'>|
+</span><span class='line'>:004014FE E841030000              call 00401844
+</span><span class='line'>:00401503 8DBEE4000000            lea edi, dword ptr [esi+000000E4] -&gt; Serial字符串的地址
+</span><span class='line'>:00401509 8BCD                    mov ecx, ebp
+</span><span class='line'>:0040150B 57                      push edi</span></code></pre></td></tr></table></div></figure>
 
-<p>因此可以知道__vbaStrCmp比较的是ECX和00401A54所指向的字符串。记下00401A54这个值，然后重复步骤1、2、3、4。接着查看ECX和00401a54指向的内容就可以知道正确的key了。</p>
-
-<p>d ecx的显示如下：</p>
+<p>从004014F0到004014F3可以知道Name必须大于5个字符，且和Serial无关。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>0023:0013CC1C 31 00 32 00 33 00 34 00-35 00 36 00 37 00 38 00 1.2.3.4.5.6.7.8.
-</span><span class='line'>0023:0013CC2C 00 00 72 00 61 00 6D 00-46 00 69 00 79 00 05 00 ..r.a.m.F.i.y...</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>* Reference To: MFC42.Ordinal:0F22, Ord:0F22h
+</span><span class='line'>|
+</span><span class='line'>:0040150C E833030000              call 00401844
+</span><span class='line'>:00401511 8B07                    mov eax, dword ptr [edi]
+</span><span class='line'>:00401513 803836                  cmp byte ptr [eax], 36
+</span><span class='line'>:00401516 751E                    jne 00401536                      -&gt; 跳到出错信息处
+</span><span class='line'>:00401518 80780132                cmp byte ptr [eax+01], 32
+</span><span class='line'>:0040151C 7518                    jne 00401536                      -&gt; 跳到出错信息处
+</span><span class='line'>:0040151E 80780238                cmp byte ptr [eax+02], 38
+</span><span class='line'>:00401522 7512                    jne 00401536                      -&gt; 跳到出错信息处
+</span><span class='line'>:00401524 80780337                cmp byte ptr [eax+03], 37
+</span><span class='line'>:00401528 750C                    jne 00401536                      -&gt; 跳到出错信息处
+</span><span class='line'>:0040152A 8078042D                cmp byte ptr [eax+04], 2D
+</span><span class='line'>:0040152E 7506                    jne 00401536                      -&gt; 跳到出错信息处
+</span><span class='line'>:00401530 80780541                cmp byte ptr [eax+05], 41
+</span><span class='line'>:00401534 7417                    je 0040154D                       -&gt; 跳到正确信息处</span></code></pre></td></tr></table></div></figure>
 
-<p>d 401a54的显示如下：</p>
+<p>由上面的比较代码可以得到：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>0023:00401A54 53 00 79 00 6E 00 54 00-61 00 58 00 20 00 32 00 S.y.n.T.a.X. .2.
-</span><span class='line'>0023:00401A64 6F 00 6F 00 31 00 00 00-4C 00 00 00 52 00 69 00 o.o.1...L...R.i.</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>36(hex) = 6
+</span><span class='line'>32(hex) = 2
+</span><span class='line'>38(hex) = 8
+</span><span class='line'>37(hex) = 7
+</span><span class='line'>2D(hex) = -
+</span><span class='line'>41(hex) = A</span></code></pre></td></tr></table></div></figure>
 
-<p>12345678是我们输入的key，所以正确的key是SynTaX 2oo1（注意中间的空格）。</p>
-
-<p>注意：如果你是在破解VB6程序，你应该在断点前加上msvbvm60!。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/create-system-tray-program-with-win32/">使用Win32实现系统托盘程序</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-03-30T12:36:00+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>30</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>12:36 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>废话不多说，直接上代码：</p>
+<p>所以Serial是：6287-A</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -538,248 +908,64 @@
 <span class='line-number'>52</span>
 <span class='line-number'>53</span>
 <span class='line-number'>54</span>
-<span class='line-number'>55</span>
-<span class='line-number'>56</span>
-<span class='line-number'>57</span>
-<span class='line-number'>58</span>
-<span class='line-number'>59</span>
-<span class='line-number'>60</span>
-<span class='line-number'>61</span>
-<span class='line-number'>62</span>
-<span class='line-number'>63</span>
-<span class='line-number'>64</span>
-<span class='line-number'>65</span>
-<span class='line-number'>66</span>
-<span class='line-number'>67</span>
-<span class='line-number'>68</span>
-<span class='line-number'>69</span>
-<span class='line-number'>70</span>
-<span class='line-number'>71</span>
-<span class='line-number'>72</span>
-<span class='line-number'>73</span>
-<span class='line-number'>74</span>
-<span class='line-number'>75</span>
-<span class='line-number'>76</span>
-<span class='line-number'>77</span>
-<span class='line-number'>78</span>
-<span class='line-number'>79</span>
-<span class='line-number'>80</span>
-<span class='line-number'>81</span>
-<span class='line-number'>82</span>
-<span class='line-number'>83</span>
-<span class='line-number'>84</span>
-<span class='line-number'>85</span>
-<span class='line-number'>86</span>
-<span class='line-number'>87</span>
-<span class='line-number'>88</span>
-<span class='line-number'>89</span>
-<span class='line-number'>90</span>
-<span class='line-number'>91</span>
-<span class='line-number'>92</span>
-<span class='line-number'>93</span>
-<span class='line-number'>94</span>
-<span class='line-number'>95</span>
-<span class='line-number'>96</span>
-<span class='line-number'>97</span>
-<span class='line-number'>98</span>
-<span class='line-number'>99</span>
-<span class='line-number'>100</span>
-<span class='line-number'>101</span>
-<span class='line-number'>102</span>
-<span class='line-number'>103</span>
-<span class='line-number'>104</span>
-<span class='line-number'>105</span>
-<span class='line-number'>106</span>
-<span class='line-number'>107</span>
-<span class='line-number'>108</span>
-<span class='line-number'>109</span>
-<span class='line-number'>110</span>
-<span class='line-number'>111</span>
-<span class='line-number'>112</span>
-<span class='line-number'>113</span>
-<span class='line-number'>114</span>
-<span class='line-number'>115</span>
-<span class='line-number'>116</span>
-<span class='line-number'>117</span>
-<span class='line-number'>118</span>
-<span class='line-number'>119</span>
-<span class='line-number'>120</span>
-<span class='line-number'>121</span>
-<span class='line-number'>122</span>
-<span class='line-number'>123</span>
-<span class='line-number'>124</span>
-<span class='line-number'>125</span>
-<span class='line-number'>126</span>
-<span class='line-number'>127</span>
-<span class='line-number'>128</span>
-<span class='line-number'>129</span>
-<span class='line-number'>130</span>
-<span class='line-number'>131</span>
-<span class='line-number'>132</span>
-<span class='line-number'>133</span>
-<span class='line-number'>134</span>
-<span class='line-number'>135</span>
-<span class='line-number'>136</span>
-<span class='line-number'>137</span>
-<span class='line-number'>138</span>
-<span class='line-number'>139</span>
-<span class='line-number'>140</span>
-<span class='line-number'>141</span>
-<span class='line-number'>142</span>
-<span class='line-number'>143</span>
-<span class='line-number'>144</span>
-<span class='line-number'>145</span>
-<span class='line-number'>146</span>
-<span class='line-number'>147</span>
-<span class='line-number'>148</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>#include &lt;windows.h&gt;
-</span><span class='line'>#include "resource.h"
+</pre></td><td class='code'><pre><code class=''><span class='line'>* Referenced by a (U)nconditional or (C)onditional Jump at Addresses:
+</span><span class='line'>|:004014E4(C), :004014F3(C), :00401516(C), :0040151C(C), :00401522(C)
+</span><span class='line'>|:00401528(C), :0040152E(C)
+</span><span class='line'>|
+</span><span class='line'>:00401536 6A00                    push 00000000
 </span><span class='line'>
-</span><span class='line'>static LPCTSTR szAppName = TEXT("TrayHelper");
-</span><span class='line'>static LPCTSTR szCaption = TEXT("TrayIcon");
+</span><span class='line'>* Possible StringData Ref from Data Obj -&gt;"ERROR"
+</span><span class='line'>|
+</span><span class='line'>:00401538 6864304000              push 00403064
 </span><span class='line'>
-</span><span class='line'>LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-</span><span class='line'>{
-</span><span class='line'>    static HMENU hMenu;
-</span><span class='line'>    static UINT WM_TASKBARCREATED;
+</span><span class='line'>* Possible StringData Ref from Data Obj -&gt;"One of the Details you entered was wrong"
+</span><span class='line'>|
+</span><span class='line'>:0040153D 6838304000              push 00403038
+</span><span class='line'>:00401542 8BCE                    mov ecx, esi
 </span><span class='line'>
-</span><span class='line'>    POINT point;
-</span><span class='line'>    HINSTANCE hInstance;
-</span><span class='line'>    NOTIFYICONDATA nid;
+</span><span class='line'>* Reference To: MFC42.Ordinal:1080, Ord:1080h
+</span><span class='line'>|
+</span><span class='line'>:00401544 E8F5020000              Call 0040183E
+</span><span class='line'>:00401549 6A00                    push 00000000
+</span><span class='line'>:0040154B FFD3                    call ebx
 </span><span class='line'>
-</span><span class='line'>    switch (message)
-</span><span class='line'>    {
-</span><span class='line'>    case WM_CREATE:
-</span><span class='line'>        // 不要修改TaskbarCreated字符串，这是系统任务栏自定义的消息
-</span><span class='line'>        WM_TASKBARCREATED = RegisterWindowMessage(TEXT("TaskbarCreated"));
+</span><span class='line'>* Referenced by a (U)nconditional or (C)onditional Jump at Address:
+</span><span class='line'>|:00401534(C)
+</span><span class='line'>|
+</span><span class='line'>:0040154D 8D8EE0000000            lea ecx, dword ptr [esi+000000E0]
+</span><span class='line'>:00401553 8D542414                lea edx, dword ptr [esp+14]
+</span><span class='line'>:00401557 51                      push ecx
 </span><span class='line'>
-</span><span class='line'>        hInstance = ((LPCREATESTRUCT)lParam)-&gt;hInstance;
+</span><span class='line'>* Possible StringData Ref from Data Obj -&gt;"Well done,"
+</span><span class='line'>|
+</span><span class='line'>:00401558 682C304000              push 0040302C
+</span><span class='line'>:0040155D 52                      push edx
 </span><span class='line'>
-</span><span class='line'>        hMenu = LoadMenu(hInstance, MAKEINTRESOURCE(IDR_TRAYMENU));
-</span><span class='line'>        hMenu = GetSubMenu(hMenu, 0);
+</span><span class='line'>* Reference To: MFC42.Ordinal:039E, Ord:039Eh
+</span><span class='line'>|
+</span><span class='line'>:0040155E E8D5020000              Call 00401838
+</span><span class='line'>:00401563 683C314000              push 0040313C
+</span><span class='line'>:00401568 50                      push eax
+</span><span class='line'>:00401569 8D442418                lea eax, dword ptr [esp+18]
+</span><span class='line'>:0040156D C744242800000000        mov [esp+28], 00000000
+</span><span class='line'>:00401575 50                      push eax
 </span><span class='line'>
-</span><span class='line'>        nid.cbSize = sizeof(nid);
-</span><span class='line'>        nid.hWnd = hWnd;
-</span><span class='line'>        nid.uID = IDI_PIRAMIDE;
-</span><span class='line'>        nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
-</span><span class='line'>        nid.uCallbackMessage = WM_USER;
-</span><span class='line'>        nid.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_PIRAMIDE));
-</span><span class='line'>        strcpy(nid.szTip, szAppName);
-</span><span class='line'>        Shell_NotifyIcon(NIM_ADD, &nid);
-</span><span class='line'>        break;
+</span><span class='line'>* Reference To: MFC42.Ordinal:039C, Ord:039Ch
+</span><span class='line'>|
+</span><span class='line'>:00401576 E8B7020000              Call 00401832
+</span><span class='line'>:0040157B 8B00                    mov eax, dword ptr [eax]
+</span><span class='line'>:0040157D 6A00                    push 00000000
 </span><span class='line'>
-</span><span class='line'>    case WM_USER:
-</span><span class='line'>        if (lParam == WM_RBUTTONDOWN)
-</span><span class='line'>        {
-</span><span class='line'>            GetCursorPos(&point);
-</span><span class='line'>            // 处理当用户按下ESCAPE键或者在菜单之外单击鼠标时菜单不会消失的情况
-</span><span class='line'>            SetForegroundWindow(hWnd);
-</span><span class='line'>            TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, point.x, point.y, 0, hWnd, NULL);
-</span><span class='line'>        }
-</span><span class='line'>        break;
-</span><span class='line'>
-</span><span class='line'>    case WM_COMMAND:
-</span><span class='line'>        switch (LOWORD(wParam)) {
-</span><span class='line'>        case IDM_TRAYSETTINGS:
-</span><span class='line'>            MessageBox(hWnd, TEXT("Settings not yet implemented!"),
-</span><span class='line'>                             szAppName, MB_ICONEXCLAMATION | MB_OK);
-</span><span class='line'>            return 0;
-</span><span class='line'>
-</span><span class='line'>        case IDM_TRAYHELP:
-</span><span class='line'>            MessageBox(hWnd, TEXT("Help not yet implemented!"),
-</span><span class='line'>                             szAppName, MB_ICONEXCLAMATION | MB_OK);
-</span><span class='line'>            return 0;
-</span><span class='line'>
-</span><span class='line'>        case IDM_TRAYABOUT:
-</span><span class='line'>            MessageBox(hWnd, TEXT("About not yet implemented!"),
-</span><span class='line'>                             szAppName, MB_ICONEXCLAMATION | MB_OK);
-</span><span class='line'>            return 0;
-</span><span class='line'>
-</span><span class='line'>        case IDM_TRAYEXIT:
-</span><span class='line'>            SendMessage(hWnd, WM_CLOSE, 0, 0);
-</span><span class='line'>            return 0;
-</span><span class='line'>        }
-</span><span class='line'>        break;
-</span><span class='line'>
-</span><span class='line'>    case WM_DESTROY:
-</span><span class='line'>        // 处理点击Exit菜单退出后图标仍在托盘区显示，要把鼠标在图标上面过一下才会消失的情况
-</span><span class='line'>        nid.uID = IDI_PIRAMIDE;
-</span><span class='line'>        nid.hWnd = hWnd;
-</span><span class='line'>        Shell_NotifyIcon(NIM_DELETE, &nid);
-</span><span class='line'>        PostQuitMessage(0);
-</span><span class='line'>        break;
-</span><span class='line'>
-</span><span class='line'>    default:
-</span><span class='line'>        /*
-</span><span class='line'>         * 防止当Explorer.exe崩溃以后，程序在系统托盘中的图标就消失了。
-</span><span class='line'>         *
-</span><span class='line'>         * 原理：Explorer.exe重新载入后会重建系统任务栏。当系统任务栏建立的时候会向系统内所有
-</span><span class='line'>         * 注册接收TaskbarCreated消息的顶级窗口发送一条消息，我们只需要捕捉这个消息，并重建系
-</span><span class='line'>         * 统托盘的图标即可。
-</span><span class='line'>         */
-</span><span class='line'>        if (message == WM_TASKBARCREATED)
-</span><span class='line'>        {
-</span><span class='line'>            SendMessage(hWnd, WM_CREATE, wParam, lParam);
-</span><span class='line'>        }
-</span><span class='line'>        break;
-</span><span class='line'>    }
-</span><span class='line'>    return DefWindowProc(hWnd, message, wParam, lParam);
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
-</span><span class='line'>                                        LPSTR szCmdLine, int iCmdShow)
-</span><span class='line'>{
-</span><span class='line'>    HWND hWnd;
-</span><span class='line'>    MSG msg;
-</span><span class='line'>    WNDCLASS wc;
-</span><span class='line'>
-</span><span class='line'>    HWND handle = FindWindow(NULL, szCaption);
-</span><span class='line'>    if (handle != NULL)
-</span><span class='line'>    {
-</span><span class='line'>        MessageBox(NULL, TEXT("Application is already running"),
-</span><span class='line'>                         szAppName, MB_ICONERROR);
-</span><span class='line'>        return 0;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    wc.style = CS_HREDRAW | CS_VREDRAW;
-</span><span class='line'>    wc.lpfnWndProc = WndProc;
-</span><span class='line'>    wc.cbClsExtra = 0;
-</span><span class='line'>    wc.cbWndExtra = 0;
-</span><span class='line'>    wc.hInstance = hInstance;
-</span><span class='line'>    wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-</span><span class='line'>    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-</span><span class='line'>    wc.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
-</span><span class='line'>    wc.lpszMenuName = NULL;
-</span><span class='line'>    wc.lpszClassName = szAppName;
-</span><span class='line'>
-</span><span class='line'>    if (!RegisterClass(&wc))
-</span><span class='line'>    {
-</span><span class='line'>        MessageBox(NULL, TEXT("This program requires Windows NT!"),
-</span><span class='line'>                         szAppName, MB_ICONERROR);
-</span><span class='line'>        return 0;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    // 此处使用WS_EX_TOOLWINDOW属性来隐藏显示在任务栏上的窗口程序按钮
-</span><span class='line'>    hWnd = CreateWindowEx(WS_EX_TOOLWINDOW,
-</span><span class='line'>                        szAppName, szCaption,
-</span><span class='line'>                        WS_POPUP,
-</span><span class='line'>                        CW_USEDEFAULT,
-</span><span class='line'>                        CW_USEDEFAULT,
-</span><span class='line'>                        CW_USEDEFAULT,
-</span><span class='line'>                        CW_USEDEFAULT,
-</span><span class='line'>                        NULL, NULL, hInstance, NULL);
-</span><span class='line'>
-</span><span class='line'>    ShowWindow(hWnd, iCmdShow);
-</span><span class='line'>    UpdateWindow(hWnd);
-</span><span class='line'>
-</span><span class='line'>    while (GetMessage(&msg, NULL, 0, 0))
-</span><span class='line'>    {
-</span><span class='line'>        TranslateMessage(&msg);
-</span><span class='line'>        DispatchMessage(&msg);
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    return msg.wParam;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>* Possible StringData Ref from Data Obj -&gt;"YOU DID IT"
+</span><span class='line'>|
+</span><span class='line'>:0040157F 6820304000              push 00403020
+</span><span class='line'>:00401584 50                      push eax
+</span><span class='line'>:00401585 8BCE                    mov ecx, esi
+</span><span class='line'>:00401587 C644242C01              mov [esp+2C], 01</span></code></pre></td></tr></table></div></figure>
+
+<p>整理后得到：Name的长度必须大于5个字符，且和Serial无关。</p>
+
+<p>小技巧：如何截取W32Dasm中的汇编代码呢？很简单，在W32Dasm中点击其最左边，会有一红点，再按Shift键，点击另一处，选中所需范围，按Ctrl+C复制到剪贴版，剩下的事就是粘贴了。</p>
 </div>
   
   
@@ -792,7 +978,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/learn-to-crack-brad-soblesky-crackme/">练习破解Brad Soblesky的Crackme</a></h1>
+      <h1 class="entry-title"><a href="/blog/remove-popup-ie-window-at-china-games-exit/">去除退出中国游戏中心时弹出的IE窗口</a></h1>
     
     
       <p class="meta">
@@ -801,175 +987,18 @@
 
 
 
-<time class='entry-date' datetime='2005-03-26T00:26:09+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>12:26 am</span></time>
+<time class='entry-date' datetime='2005-11-02T23:23:57+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2005</span></span> <span class='time'>11:23 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p><a href="/uploads/crackme.zip" title="crackme.zip">Crackme程序</a></p>
+  <div class="entry-content"><p>这次破解的版本是0.8.011.4。</p>
 
-<p>这次破解参考了wind[CCG]写的《Crackme-Brad Soblesky的Crackme程序破解》文章。因为我用的是Windows 2000操作系统，TRW2000不能在上面使用，所以我用SoftICE 4.05 来破解。</p>
+<p>中国游戏中心退出时弹出的IE窗口很烦人，决定做个补丁把它去除掉。</p>
 
-<p>用PEiD查看这个程序，发现是用VC++ 6.0编写的且没加过壳，所以用W32Dasm反汇编。打开Functions/Imports查看它调用的函数，能够看见KERNEL32.lstrcmpA。双击它可以看到如下程序段：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>:00401585 8d4de4 lea ecx, dword ptr [ebp-1c]
-</span><span class='line'>:00401588 51 push ecx
-</span><span class='line'>:00401589 8d55f4 lea edx, dword ptr [ebp-0c]
-</span><span class='line'>:0040158c 52 push edx
-</span><span class='line'>
-</span><span class='line'>* reference to: kernel32.lstrcmpa, ord:02fch
-</span><span class='line'>:0040158d ff1500204000 call dword ptr [00402000]
-</span><span class='line'>:00401593 85c0 test eax, eax                      -&gt; 典型的判断，肯定是这里了
-</span><span class='line'>
-</span><span class='line'>:00401595 7516 jne 004015ad                       -&gt; 看见这个跳转了吗
-</span><span class='line'>:00401597 6a40 push 00000040</span></code></pre></td></tr></table></div></figure>
-
-<ol>
-<li>启动SoftICE，然后运行Crackme程序；</li>
-<li>在文本框中输入78787878；</li>
-<li>Ctrl+D 来到SoftICE中，输入bpx lstrcmpA，按回车后用Ctrl+D命令返回Crackme；</li>
-<li>按check，程序中断；</li>
-<li>按F11回到调用lstrcmpA的地方，发现CS寄存器的值为001b，输入bpx 001b: 00401585，按回车后用Ctrl+D命令返回Crackme；</li>
-<li>按check，程序中断；</li>
-<li>F10来到如下程序段：</li>
-</ol>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>:00401585 8d4de4 lea ecx, dword ptr [ebp-1c]
-</span><span class='line'>:00401588 51 push ecx                             -&gt; 在此处用d ecx就可以看到注册码了
-</span><span class='line'>:00401589 8d55f4 lea edx, dword ptr [ebp-0c]
-</span><span class='line'>:0040158c 52 push edx</span></code></pre></td></tr></table></div></figure>
-
-<p>注册码：<code>&lt;BrD-SoB&gt;</code></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/getting-started-with-softice-405/">SoftICE 4.05入门指南</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-03-20T22:18:06+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>20</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>10:18 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>首先，在VC++ 6.0中新建工程Hello，建立源文件Hello.c，编译链接成可执行的Hello.exe文件。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>#include &lt;windows.h&gt;
-</span><span class='line'>
-</span><span class='line'>int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLine, int iCmdShow)
-</span><span class='line'>{
-</span><span class='line'>    MessageBox(NULL, TEXT("Hello, world!"), TEXT("Crack"), 0);
-</span><span class='line'>    return 0;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>然后安装SoftICE 4.05 for Windows 2000，选择manual启动方式。在菜单中选择Start SoftICE快捷方式启动SoftICE。</p>
-
-<p>接着双击Hello.exe程序，按Ctrl+D呼叫出SoftICE，输入bpx MessageBox后按回车键（记住：一定要按回车键啊）。如果提示“Symbol not Defined (xxx)”，可以打开WINNT\system32\winice.dat文件，将所有DLL前的分号去除，然后重新启动SoftICE并且重复上述步骤。</p>
-
-<p>最后按Ctrl+D返回，双击Hello.exe文件，此时就会发现设置的断点被SoftICE中断住了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/log4j-does-not-output-log-in-servlet-init-method/">Servlet.init()中Log4j不能输出日志</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-03-13T08:10:05+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>13</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>8:10 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>web.xml配置文件：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;web-app&gt;
-</span><span class='line'>    &lt;servlet&gt;
-</span><span class='line'>        &lt;servlet-name&gt;hello&lt;/servlet-name&gt;
-</span><span class='line'>        &lt;servlet-class&gt;com.example.learning.HelloServlet&lt;/servlet-class&gt;
-</span><span class='line'>        &lt;init-param&gt;
-</span><span class='line'>            &lt;param-name&gt;log4jConfig&lt;/param-name&gt;
-</span><span class='line'>            &lt;param-value&gt;/WEB-INF/log4j.properties&lt;/param-value&gt;
-</span><span class='line'>        &lt;/init-param&gt;
-</span><span class='line'>    &lt;/servlet&gt;
-</span><span class='line'>&lt;/web-app&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>log4j.properties配置文件：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>log4j.rootLogger=ALL, Console
-</span><span class='line'>log4j.appender.Console=org.apache.log4j.ConsoleAppender
-</span><span class='line'>log4j.appender.Console.layout=org.apache.log4j.PatternLayout
-</span><span class='line'>log4j.appender.Console.layout.ConversionPattern=[%t] %37c %3x - %m%n</span></code></pre></td></tr></table></div></figure>
-
-<p>HelloServlet.java代码：</p>
+<p>省略无数次尝试……确定退出中国游戏中心后打开的网页地址是 <a href="http://www.chinagames.net/PlazaJump/open">http://www.chinagames.net/PlazaJump/open</a> 。用W32Dasm反汇编iGame.exe，通过String Data References找到网址字符串，双击该字符串，看到以下程序：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -994,60 +1023,428 @@
 <span class='line-number'>21</span>
 <span class='line-number'>22</span>
 <span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>import javax.servlet.ServletConfig;
-</span><span class='line'>import javax.servlet.ServletContext;
-</span><span class='line'>import javax.servlet.ServletException;
-</span><span class='line'>import javax.servlet.http.HttpServlet;
+</pre></td><td class='code'><pre><code class=''><span class='line'>:0043397A 90                nop
+</span><span class='line'>:0043397B 90                nop
+</span><span class='line'>:0043397C 90                nop
+</span><span class='line'>:0043397D 90                nop
+</span><span class='line'>:0043397E 90                nop
+</span><span class='line'>:0043397F 90                nop
+</span><span class='line'>:00433980 A1A2034800        mov eax, dword ptr [004803A2]
+</span><span class='line'>:00433985 56                push esi
+</span><span class='line'>:00433986 85C0              test eax, eax
+</span><span class='line'>:00433988 8BF1              mov esi, ecx
+</span><span class='line'>:0043398A 7411              je 0043399D               -&gt; 判断是否要打开IE窗口
+</span><span class='line'>:0043398C 6A00              push 00000000
 </span><span class='line'>
-</span><span class='line'>import org.apache.log4j.BasicConfigurator;
-</span><span class='line'>import org.apache.log4j.Logger;
-</span><span class='line'>import org.apache.log4j.PropertyConfigurator;
+</span><span class='line'>* Possible StringData Ref from Data Obj -&gt;"http://www.chinagames.net/PlazaJump/open/"
+</span><span class='line'>|
+</span><span class='line'>:0043398E 6860D84700        push 0047D860
+</span><span class='line'>:00433993 B9D0FC4700        mov ecx, 0047FCD0
+</span><span class='line'>:00433998 E8B3D2FFFF        call 00430C50             -&gt; 打开IE窗口
 </span><span class='line'>
-</span><span class='line'>public class HelloServlet extends HttpServlet {
-</span><span class='line'>    private Logger logger = Logger.getLogger(HelloServlet.class);
-</span><span class='line'>
-</span><span class='line'>    public void init() throws ServletException {
-</span><span class='line'>        super.init();
-</span><span class='line'>
-</span><span class='line'>        ServletConfig config = getServletConfig();
-</span><span class='line'>        ServletContext sc = getServletContext();
-</span><span class='line'>
-</span><span class='line'>        String log4jConfig = config.getInitParameter("log4jConfig");
-</span><span class='line'>        System.out.println(log4jConfig);
-</span><span class='line'>
-</span><span class='line'>        if (log4jConfig == null) {
-</span><span class='line'>            BasicConfigurator.configure();
-</span><span class='line'>        } else {
-</span><span class='line'>            PropertyConfigurator.configure(sc.getRealPath(log4jConfig));
-</span><span class='line'>        }
-</span><span class='line'>
-</span><span class='line'>        logger.info("This is an info message!");
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void destroy() {
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>* Referenced by a (U)nconditional or (C)onditional Jump at Address:
+</span><span class='line'>|:0043398A(C)
+</span><span class='line'>|
+</span><span class='line'>:0043399D 8BCE              mov ecx, esi</span></code></pre></td></tr></table></div></figure>
 
-<p>程序运行没有问题，可就是不能在Console视图中输出日志信息，而且使用System.out.println()也不能输出，不过在把private Logger logger行注释掉后System.out.println()就可以输出了。查看TOMCAT_HOME/logs中的日志文件，发现有如下异常：</p>
+<p>从上面可以知道，只要将0043398A处的je指令改成jmp指令就可以避免退出时弹出的IE窗口了。</p>
+
+<p>现在使用CodeFusion来制作一个文件补丁。它有三种制作补丁的方案，这里使用Find&amp;Replace方法。将0043397A到00433998段的数据作为查找匹配数据，并将0043398A处的74（je指令）改成eb（jmp指令），然后按照步骤生成补丁文件就可以了。</p>
+
+<p>2008/3/19更新</p>
+
+<p>应ls的要求制作了一个针对最新版本（0.8.011.10）的补丁，和原来的补丁放在一起提供下载。</p>
+
+<p><a href="/uploads/chinagames-patch.zip" title="chinagames-patch.zip">补丁文件</a></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/webwork-and-spring-integration-step-by-step/">一步一步整合WebWork和Spring</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2005-09-26T10:50:27+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>10:50 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>把webwork-2.1.7.jar、spring-1.2.1.jar以及webwork2-srping.jar复制到WEB-INF/lib目录下。</p>
+
+<p>添加以下内容到web.xml文件中：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>----- Root Cause -----
-</span><span class='line'>java.lang.NoClassDefFoundError: org/apache/log4j/Logger
-</span><span class='line'>  at com.example.learning.HelloServlet.&lt;init&gt;(HelloServlet.java:15)</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;listener&gt;
+</span><span class='line'>    &lt;listener-class&gt;org.springframework.web.context.ContextLoaderListener&lt;/listener-class&gt;
+</span><span class='line'>&lt;/listener&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;listener&gt;
+</span><span class='line'>    &lt;listener-class&gt;com.atlassian.xwork.ext.ResolverSetupServletContextListener&lt;/listener-class&gt;
+</span><span class='line'>&lt;/listener&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p>找不到Logger类？是不是WEB-INF/lib目录下没有log4j.jar呢？转到WEB-INF/lib目录，果然没有发现log4j.jar文件。把log4j.jar拷过去再试一下，真的OK了。</p>
+<p>applicationContext.xml中的内容如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;beans&gt;
+</span><span class='line'>    &lt;bean id="dataSource" class="org.springframework.jdbc.datasource.SingleConnectionDataSource"&gt;
+</span><span class='line'>        &lt;property name="driverClassName" value="${driver}" /&gt;
+</span><span class='line'>        &lt;property name="url" value="${url}" /&gt;
+</span><span class='line'>        &lt;property name="username" value="${username}" /&gt;
+</span><span class='line'>        &lt;property name="password" value="${password}" /&gt;
+</span><span class='line'>    &lt;/bean&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;bean id="sqlMapClient" class="org.springframework.orm.ibatis.SqlMapClientFactoryBean"&gt;
+</span><span class='line'>        &lt;property name="configLocation" value="/WEB-INF/sql-map-config.xml" /&gt;
+</span><span class='line'>        &lt;property name="dataSource" ref="dataSource" /&gt;
+</span><span class='line'>    &lt;/bean&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;bean id="userManager" class="com.codemany.netlink.service.impl.UserManagerImpl" singleton="true"&gt;
+</span><span class='line'>        &lt;property name="sqlMapClient" ref="sqlMapClient" /&gt;
+</span><span class='line'>    &lt;/bean&gt;
+</span><span class='line'>&lt;/beans&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>配置文件sql-map-config.xml中的内容如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;sqlMapConfig&gt;
+</span><span class='line'>    &lt;sqlMap resource="com/codemany/netlink/dao/impl/User.xml" /&gt;
+</span><span class='line'>&lt;/sqlMapConfig&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>在xwork.xml中添加以下内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;package name="default" extends="webwork-default"
+</span><span class='line'>        externalReferenceResolver="com.atlassian.xwork.ext.SpringServletContextReferenceResolver"&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;interceptors&gt;
+</span><span class='line'>        &lt;interceptor name="reference-resolver"
+</span><span class='line'>                class="com.opensymphony.xwork.interceptor.ExternalReferencesInterceptor" /&gt;
+</span><span class='line'>
+</span><span class='line'>        &lt;interceptor-stack name="interceptors"&gt;
+</span><span class='line'>            &lt;interceptor-ref name="params" /&gt;
+</span><span class='line'>            &lt;interceptor-ref name="reference-resolver" /&gt;
+</span><span class='line'>        &lt;/interceptor-stack&gt;
+</span><span class='line'>    &lt;/interceptors&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;default-interceptor-ref name="default-interceptor" /&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;action name="login" class="com.codemany.netlink.action.LoginAction"&gt;
+</span><span class='line'>        &lt;external-ref name="userManager"&gt;userManager&lt;/external-ref&gt;
+</span><span class='line'>        &lt;result name="success" type="dispatcher"&gt;/success.jsp&lt;/result&gt;
+</span><span class='line'>        &lt;result name="error" type="dispatcher"&gt;/error.jsp&lt;/result&gt;
+</span><span class='line'>    &lt;/action&gt;
+</span><span class='line'>&lt;/package&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>在LoginAction.java中添加代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private UserManager userManager = null;
+</span><span class='line'>
+</span><span class='line'>public void setUserManager(UserManager userManager) {
+</span><span class='line'>    this.userManager = userManager;</span></code></pre></td></tr></table></div></figure>
+
+<p>建立UserManager.java接口文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public interface UserManager {
+</span><span class='line'>    public User login(String username, String password) throws UserLoginException;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>UserManagerImpl.java实现代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class UserManagerImpl extends SqlMapClientDaoSupport implements UserManager {
+</span><span class='line'>
+</span><span class='line'>    public User login(String username, String password) throws UserLoginException {
+</span><span class='line'>        // do something
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/system-io-address-table/">系统I/O地址表</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2005-09-13T19:00:03+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>13</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>7:00 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>PC机中仅使用A[0]-A[9]地址位来表示I/O地址，即可有1024个地址。前512个供系统电路使用，后512个供扩充插槽使用。当A[9]=0时表示为系统板上的I/O地址；A[9]=1时表示为扩充插槽接口卡上的地址。</p>
+
+<p>系统I/O地址使用情况：</p>
+
+<table><thead>
+<tr>
+<th style="text-align: center">I/O地址范围</th>
+<th>用途</th>
+<th style="text-align: center">I/O地址范围</th>
+<th>用途</th>
+</tr>
+</thead><tbody>
+<tr>
+<td style="text-align: center">0000-001F</td>
+<td>8237A DMA控制器1</td>
+<td style="text-align: center">00E0-00EF</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0020-003F</td>
+<td>8259A中断控制器1</td>
+<td style="text-align: center">00F0</td>
+<td>重置协处理器总线</td>
+</tr>
+<tr>
+<td style="text-align: center">0040-005F</td>
+<td>8253/8254定时/计数器（PIT）</td>
+<td style="text-align: center">00F1</td>
+<td>设置协处理器总线</td>
+</tr>
+<tr>
+<td style="text-align: center">0060-006F</td>
+<td>8042键盘控制器（AT）</td>
+<td style="text-align: center">00F2-00F7</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0070-007F</td>
+<td>CMOS RAM与NMI屏蔽寄存器（AT）</td>
+<td style="text-align: center">00F8-00FF</td>
+<td>协处理器</td>
+</tr>
+<tr>
+<td style="text-align: center">0080-009F</td>
+<td>DMA页寄存器</td>
+<td style="text-align: center">0100-01EF</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">00A0-00BF</td>
+<td>8259A中断控制器2</td>
+<td style="text-align: center">01F0-01F7</td>
+<td>硬盘</td>
+</tr>
+<tr>
+<td style="text-align: center">00C0-00DF</td>
+<td>8237A DMA控制器2</td>
+<td style="text-align: center">01F8-01FF</td>
+<td></td>
+</tr>
+</tbody></table>
+
+<p>扩充插槽I/O地址使用情况：</p>
+
+<table><thead>
+<tr>
+<th style="text-align: center">I/O地址范围</th>
+<th>用途</th>
+<th style="text-align: center">I/O地址范围</th>
+<th>用途</th>
+</tr>
+</thead><tbody>
+<tr>
+<td style="text-align: center">0200-0207</td>
+<td>游戏卡I/O</td>
+<td style="text-align: center">0360-036F</td>
+<td>保留</td>
+</tr>
+<tr>
+<td style="text-align: center">0208-020F</td>
+<td></td>
+<td style="text-align: center">0370-0377</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0210-0217</td>
+<td>扩展部件（仅XT用）</td>
+<td style="text-align: center">0378-037F</td>
+<td>并行口打印机1</td>
+</tr>
+<tr>
+<td style="text-align: center">0218-021F</td>
+<td></td>
+<td style="text-align: center">0380-038F</td>
+<td>SDLC 通信及同步通信1</td>
+</tr>
+<tr>
+<td style="text-align: center">0220-024F</td>
+<td>保留</td>
+<td style="text-align: center">0390-039F</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0250-0277</td>
+<td></td>
+<td style="text-align: center">03A0-03AF</td>
+<td>同步通信2</td>
+</tr>
+<tr>
+<td style="text-align: center">0278-027F</td>
+<td>并行口打印机2</td>
+<td style="text-align: center">03B0-03BF</td>
+<td>MDA 单色显示器</td>
+</tr>
+<tr>
+<td style="text-align: center">0280-02EF</td>
+<td></td>
+<td style="text-align: center">03C0-03CF</td>
+<td>保留</td>
+</tr>
+<tr>
+<td style="text-align: center">02F0-02F7</td>
+<td>保留</td>
+<td style="text-align: center">03D0-03DF</td>
+<td>彩色图形适配器</td>
+</tr>
+<tr>
+<td style="text-align: center">02F8-02FF</td>
+<td>串行口2</td>
+<td style="text-align: center">03E0-03EF</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0300-031F</td>
+<td>试验卡</td>
+<td style="text-align: center">03F0-03F7</td>
+<td>软盘适配器</td>
+</tr>
+<tr>
+<td style="text-align: center">0320-032F</td>
+<td>硬盘适配器</td>
+<td style="text-align: center">03F8-03FF</td>
+<td>串行口1</td>
+</tr>
+<tr>
+<td style="text-align: center">0330-035F</td>
+<td></td>
+<td style="text-align: center"></td>
+<td></td>
+</tr>
+</tbody></table>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/posix-conventions-for-command-line-arguments/">POSIX Conventions for Command Line Arguments</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2005-09-10T00:03:07+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>10</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>12:03 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><ol>
+<li>An option is a hyphen followed by a single alphanumeric character, like this: -o.</li>
+<li>An option may require an argument (which must appear immediately after the option); for example, -oargument or -o argument.</li>
+<li>Options that do not require arguments can be grouped after a hyphen, so, for example, -lst is equivalent to -t -l -s.</li>
+<li>Options can appear in any order; thus -lst is equivalent to -tls.</li>
+<li>Options can appear multiple times.</li>
+<li>Options precede other nonoption arguments: -lst nonoption.</li>
+<li>The -- argument terminates options.</li>
+<li>The - option is typically used to represent one of the standard input streams.</li>
+</ol>
 </div>
   
   
@@ -1072,23 +1469,23 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/test/">test</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/the-power-of-protocol-analyzers/">协议分析器的威力</a>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part19/">ANTLR 4权威参考读书笔记（19）</a>
+        <a href="/blog/test/">test</a>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part18/">ANTLR 4权威参考读书笔记（18）</a>
+        <a href="/blog/test/">test</a>
       </li>
     
       <li class="post">
-        <a href="/blog/how-to-build-a-news-website-layout-with-flexbox/">如何使用Flexbox构建新闻站点布局</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part17/">ANTLR 4权威参考读书笔记（17）</a>
+        <a href="/blog/test/">test</a>
       </li>
     
   </ul>
@@ -1102,7 +1499,7 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 135%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 142%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 131%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
@@ -1118,8 +1515,8 @@
 <a style="font-size: 97%" href="/tags/listview/">ListView</a>
 <a style="font-size: 104%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
-<a style="font-size: 119%" href="/tags/powerbuilder/">PowerBuilder</a>
-<a style="font-size: 101%" href="/tags/powerscript/">PowerScript</a>
+<a style="font-size: 124%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 110%" href="/tags/powerscript/">PowerScript</a>
 <a style="font-size: 117%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
 <a style="font-size: 119%" href="/tags/ruby/">Ruby</a>
