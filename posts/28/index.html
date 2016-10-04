@@ -9,9 +9,8 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="Java语言规范要求equals方法具有下面的特点： 自反性（reflexive）：对于任意非空引用x，x.equals(x)应返回true；
-对称性（symmetric）：对于任意引用x、y，当且仅当y.equals(x)返回true时，x.equals(y)返回true；
-传递性（ &hellip;">
+  <meta name="description" content="在配置JPetStore 4.0.5时出了一点问题，写此文章记录下解决方法，以便日后查找。 按照教程配置好后运行Tomcat，在点击“Enter the Store”时出现了HTTP 500错误。从日志中的异常记录来看是没有找到MySQL的驱动程序。 1
+SimpleDataSource: &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -81,7 +80,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/how-to-write-perfect-equals-method/">如何编写完美的equals方法</a></h1>
+      <h1 class="entry-title"><a href="/blog/problem-configuring-jpetstore-405-with-mysql/">JPetStore 4.0.5配置MySQL数据库时遇到的问题</a></h1>
     
     
       <p class="meta">
@@ -90,24 +89,23 @@
 
 
 
-<time class='entry-date' datetime='2005-09-07T17:47:41+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>7</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>5:47 pm</span></time>
+<time class='entry-date' datetime='2005-03-09T16:33:39+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>9</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>4:33 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>Java语言规范要求equals方法具有下面的特点：</p>
+  <div class="entry-content"><p>在配置JPetStore 4.0.5时出了一点问题，写此文章记录下解决方法，以便日后查找。</p>
 
-<ol>
-<li>自反性（reflexive）：对于任意非空引用x，x.equals(x)应返回true；</li>
-<li>对称性（symmetric）：对于任意引用x、y，当且仅当y.equals(x)返回true时，x.equals(y)返回true；</li>
-<li>传递性（transitive）：对于任意引用x、y、z，如果x.equals(y)返回true，且y.equals(z)也返回true，那么x.equals(z)应返回true；</li>
-<li>一致性（consistent）：如果x和y引用的对象没有改变，那么对x.equals(y)的重复调用应返回同一结果；</li>
-<li>对任意非空引用x，x.equals(null)应返回false。</li>
-</ol>
+<p>按照教程配置好后运行Tomcat，在点击“Enter the Store”时出现了HTTP 500错误。从日志中的异常记录来看是没有找到MySQL的驱动程序。</p>
 
-<p>下面是编写完美equals方法的建议：</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SimpleDataSource: Error while loading properties. Cause: java.lang.ClassNotFoundException: driver</span></code></pre></td></tr></table></div></figure>
+
+<p>可是我已经把驱动程序包放到WEB-INF/lib目录下了呀！</p>
+
+<p>查看sql-xml-config.xml文件中dataSource的属性，发现它们的值如下：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -120,24 +118,39 @@
 <span class='line-number'>9</span>
 <span class='line-number'>10</span>
 <span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>// 测试this和other是否是同一个对象
-</span><span class='line'>if (this == other) return true;
-</span><span class='line'>// 测试other是否为null，如果是就返回false
-</span><span class='line'>if (other == null) return false;
-</span><span class='line'>// 测试this和other是否属于同一个类
-</span><span class='line'>if (getClass() != other.getClass()) {
-</span><span class='line'>    return false;
-</span><span class='line'>}
-</span><span class='line'>// 将other对象的类型转换为你的类所属的类型
-</span><span class='line'>ClassName obj = (ClassName)other;
-</span><span class='line'>// 最后测试需要比较的字段。使用==比较基本类型字段，使用equals比较对象类型字段</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;transactionManager type="JDBC"&gt;
+</span><span class='line'>    &lt;dataSource type="SIMPLE"&gt;
+</span><span class='line'>        &lt;property value="${driver}" name="JDBC.Driver" /&gt;
+</span><span class='line'>        &lt;property value="${url}" name="JDBC.ConnectionURL" /&gt;
+</span><span class='line'>        &lt;property value="${username}" name="JDBC.Username" /&gt;
+</span><span class='line'>        &lt;property value="${password}" name="JDBC.Password" /&gt;
+</span><span class='line'>        &lt;property value="15" name="Pool.MaximumActiveConnections" /&gt;
+</span><span class='line'>        &lt;property value="15" name="Pool.MaximumIdleConnections" /&gt;
+</span><span class='line'>        &lt;property value="1000" name="Pool.MaximumWait" /&gt;
+</span><span class='line'>      &lt;/dataSource&gt;
+</span><span class='line'>&lt;/transactionManager&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p>如果遵循以上的规则定义了一个类的equals方法，定义其子类的equals方法时，首先调用父类的equals方法，如果这项测试能通过，那么再比较子类的字段。</p>
+<p>而在database.properties中的值分别是：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if (!super.equals(other)) return false;</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SimpleDriver=org.gjt.mm.mysql.Driver
+</span><span class='line'>SimpleUrl=jdbc:mysql://localhost:3306/jpetstore
+</span><span class='line'>SimpleUsername=jpetstore
+</span><span class='line'>SimplePassword=ibatis</span></code></pre></td></tr></table></div></figure>
 
-<p>这里有个问题是如果this和other两个对象不是同一个类，equals方法该如何工作？有些程序员可能会使用instanceof代替getClass()来做判断，但这种方法是错误的，因为它违反了规则2所要求的对称性。</p>
+<p>因为dataSource中的属性值是从database.properties文件中读取的，所以要将database.properties中的属性名改成和sql-xml-config.xml中的一致。这样就不会再出现找不到驱动的异常了。改写后的database.properties内容如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>driver=org.gjt.mm.mysql.Driver
+</span><span class='line'>url=jdbc:mysql://localhost:3306/jpetstore
+</span><span class='line'>username=jpetstore
+</span><span class='line'>password=ibatis</span></code></pre></td></tr></table></div></figure>
 </div>
   
   
@@ -150,7 +163,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/best-practices-for-exception-handling/">异常处理最佳实践</a></h1>
+      <h1 class="entry-title"><a href="/blog/ascii-code-table/">ASCII码表</a></h1>
     
     
       <p class="meta">
@@ -159,203 +172,54 @@
 
 
 
-<time class='entry-date' datetime='2005-08-12T10:02:48+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>10:02 am</span></time>
+<time class='entry-date' datetime='2005-02-25T13:18:47+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>25</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>1:18 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>英文原文：<a href="http://www.onjava.com/pub/a/onjava/2003/11/19/exceptions.html">http://www.onjava.com/pub/a/onjava/2003/11/19/exceptions.html</a></p>
+  <div class="entry-content"><p>完整的ASCII编码表如下（源自微软MSDN站点）：</p>
 
-<p>异常处理的问题之一是知道何时以及如何使用它。在这篇文章中，我将讨论一些异常处理的最佳实践。我也会总结最近关于使用Checked异常的争论。</p>
+<p><img src="/uploads/asciitable.png" title="asciitable" ></p>
 
-<p>作为程序员，我们想要编写解决问题的高质量的代码。不幸的是，异常作为我们代码的意外结果出现。没有人喜欢意外结果，因此我们很快找到我们自己的方法去解决它们。我曾经见过一些聪明的程序员以下列方式处理异常：</p>
+<p>仿照 <a href="http://ascii-table.com/">http://ascii-table.com/</a> 做的Flex版本：</p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void consumeAndForgetAllExceptions() {
-</span><span class='line'>    try {
-</span><span class='line'>        // some code that throws exceptions
-</span><span class='line'>    } catch (Exception ex) {
-</span><span class='line'>        ex.printStacktrace();
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+<p><object width="640" height="490" data="/uploads/asciitable.swf" type="application/x-shockwave-flash">
+<param name="quality" value="high" />
+<param name="src" value="/uploads/asciitable.swf" />
+</object></p>
+</div>
+  
+  
 
-<p>上面的代码有什么问题？</p>
 
-<p>一旦一个异常被抛出，正常的程序执行被挂起，并且控制权转移到catch块。catch块捕获异常后什么也没做。在catch块后面的程序继续执行，就好象什么也没发生。</p>
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/problem-running-junit-tests-with-ant-in-eclipse-part2/">Eclipse中Ant执行JUnit测试的问题（2）</a></h1>
+    
+    
+      <p class="meta">
+        
 
-<p>下面的代码怎么样？</p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void someMethod() throws Exception {
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>这是一个空方法，它里面没有任何代码。空方法如何能抛出异常呢？Java不能阻止你这么做。最近我正好遇见过类似的代码：方法声明抛出异常，但方法里没有实际产生那个异常的代码。当我问那个程序员时，他回复说：“我知道，它会让API变得糟糕，但我一直都是这么做的，而且这样做很管用。”</p>
 
-<p>C++社区花了好几年去确定如何使用异常。这种争论在Java社区刚刚开始。我曾经见过几个Java程序员与异常的使用作斗争。如果没有正确使用，异常会减缓你的程序，因为它需要内存和CPU能力去创建、抛出和捕获异常。如果过度使用，会使代码难以阅读，让使用API的程序员感到挫折。我们都知道挫折感（frustrations）会导致特殊技巧（ hacks）和代码味道。客户端代码只要忽略异常或者抛出它们就可以规避这个问题，就像前面的两个例子。</p>
+<time class='entry-date' datetime='2005-02-22T22:02:00+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2005</span></span> <span class='time'>10:02 pm</span></time>
+        
+      </p>
+    
+  </header>
 
-<h3 id="异常的本质">异常的本质</h3>
 
-<p>大体上说，有三种不同的情况可以导致异常被抛出：</p>
+  <div class="entry-content"><p>Eclipse 3.0.3 + Ant 1.6.2 + JUnit 3.8.1</p>
 
-<ul>
-<li><strong>由于编程错误的异常：</strong> 在此类别中，异常是由于编程错误产生的（比如，NullPointerException和IllegalArgumentException）。客户端代码通常不能做关于编程错误的任何事情。</li>
-<li><strong>由于客户端代码错误的异常：</strong> 客户端代码尝试API不允许的东西，从而违反了它的契约。客户端可以采取一些替代的做法，如果在异常中有提供有用的信息。例如：当分析一个非格式良好的XML文档时一个异常被抛出。异常包含有XML文档中引起问题的位置信息。客户端可以使用该信息去采取恢复措施。</li>
-<li><strong>由于资源失败的异常：</strong> 当资源失败时生成的异常。例如：系统内存不足或者网络连接失败。资源失败的客户端响应是上下文驱动的。客户端可以过一段时间后重试操作或者仅仅记录资源失败和使应用程序停止。</li>
-</ul>
-
-<h3 id="java中异常的类型">Java中异常的类型</h3>
-
-<p>Java定义了两类异常：</p>
-
-<ul>
-<li><strong>Checked异常：</strong> 继承自Exception类的异常是Checked异常。客户端代码必须处理被API抛出的Checked异常，不是在catch子句中就是通过throw子句向外转发。</li>
-<li><strong>Unchecked异常：</strong> RuntimeException也是扩展自Exception。不过，所有从RuntimeException继承的异常享有特殊待遇。对客户端代码是否处理它们没有要求，因此它们被称为Unchecked异常。</li>
-</ul>
-
-<p>举例来说，图1显示了NullPointerException的层次结构。</p>
-
-<p><img src="/uploads/exception-hierarchy.gif" title="exception-hierarchy" ></p>
-
-<p>图1. 示例异常层次结构</p>
-
-<p>在这个图中，NullPointerException扩展自RuntimeException，因此是一个Unchecked异常。</p>
-
-<p>我曾经见过Checked异常的重度使用和Unchecked异常的最小使用。最近，在Java社区有激烈的争论关于Checked异常和其真正的价值。这场争论源于Java似乎是第一个带有Checked异常的主流OO语言这个事实。C++和C#根本没有Checked异常，在这些语言中所有的异常都是Unchecked的。</p>
-
-<p>由较低层引发的Checked异常是强制性的，要求调用层必须捕获或者抛出它。如果客户端代码无法有效地处理异常，在API和它客户端之间的Checked异常契约很快就会转变为不必要的负担。客户端代码的程序员可能会走捷径，通过使用一个空的catch块抑制异常或者仅仅抛出它。实际上，它只是把负担放到了客户端调用者身上。</p>
-
-<p>Checked异常也被指责破坏了封装。考虑以下代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public List getAllAccounts() throws FileNotFoundException, SQLException {
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>方法getAllAccounts()抛出两个Checked异常。该方法的客户端必须显式地处理这些特定实现的异常，即使它不知道在getAllAccounts()中什么文件或数据库调用失败，或者没有业务提供文件系统或数据库逻辑。因此，异常处理在方法和它的调用者之间强制造成了一个不适当的紧密耦合。</p>
-
-<h3 id="设计api的最佳实践">设计API的最佳实践</h3>
-
-<p>说了这么多，现在让我们谈谈如何设计一个正确抛出异常的API。</p>
-
-<h4 id="1-当确定使用checked异常还是unchecked异常时，问问你自己：“当异常发生时客户端代码可以采取什么动作？”">1. 当确定使用Checked异常还是Unchecked异常时，问问你自己：“当异常发生时客户端代码可以采取什么动作？”</h4>
-
-<p>如果客户端可以采取一些替代动作从异常中恢复，把它设置为Checked异常。如果客户端不能做任何有用的事情，那就把它设置为Unchecked异常。这里的有用的的意思是采取措施从异常中恢复而不是仅仅记录异常。总结来说：</p>
-
-<table><thead>
-<tr>
-<th>当异常发生时客户端的反应</th>
-<th>异常类型</th>
-</tr>
-</thead><tbody>
-<tr>
-<td>客户端代码不能做任何事情</td>
-<td>把它设置为Unchecked异常</td>
-</tr>
-<tr>
-<td>客户端代码将基于异常中的信息采取一些有用的恢复操作</td>
-<td>把它设置为Checked异常</td>
-</tr>
-</tbody></table>
-
-<p>此外，对于所有的编程错误尽量使用Unchecked异常。Unchecked异常有个好处就是不会强制客户端API显式地处理它们。它们传播到你想捕获它们的地方，或者直接就是报告异常。Java的API有许多Unchecked异常，像NullPointerException、IllegalArgumentException和IllegalStateException。我更倾向于使用Java提供的标准异常而不是创建自己的。这会让我的代码容易理解和避免增加代码的内存占用。</p>
-
-<h4 id="2-保持封装性。">2. 保持封装性。</h4>
-
-<p>不要把特定实现的Checked异常逐步上升到更高的层。例如，不要把来自数据访问代码中的SQLException传播到业务对象层。业务对象层不需要了解SQLException。你有两个选择：</p>
-
-<ul>
-<li>把SQLException转换成别的Checked异常，如果客户端代码期望从异常中恢复。</li>
-<li>把SQLException转换成一个Unchecked异常，如果客户端代码不能做关于它的任何事情。</li>
-</ul>
-
-<p>大多数时候，客户端代码不能做关于SQLExceptions的任何事情。不要犹豫去把它们转换成Unchecked异常。考虑下面的代码片段：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void dataAccessCode() {
-</span><span class='line'>    try {
-</span><span class='line'>        // some code that throws SQLException
-</span><span class='line'>    } catch(SQLException ex) {
-</span><span class='line'>        ex.printStacktrace();
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>这里的catch块只是抑制异常而且什么也不做。理由是关于SQLException我的客户端没有什么能做的。以下列方式处理它怎么样？</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void dataAccessCode() {
-</span><span class='line'>    try {
-</span><span class='line'>        // some code that throws SQLException
-</span><span class='line'>    } catch(SQLException ex) {
-</span><span class='line'>        throw new RuntimeException(ex);
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>它把SQLException转换成RuntimeException。如果SQLException发生，catch子句抛出一个新的RuntimeException。执行线程挂起，报告异常。不管怎样，我没有用不必要的异常处理让我的业务对象层变得糟糕，特别是因为它不能做关于SQLException的任何事情。如果我的捕获需要根异常的原因，我可以利用自JDK 1.4起在所有异常类中有效的getCause()方法。</p>
-
-<p>当SQLException发生时如果你确信业务层能采取一些恢复动作，你可以把它转换成一个更有意义的Checked异常。但我发现大多数时间仅仅抛出RuntimeException就足够。</p>
-
-<h4 id="3-如果不能给客户端代码提供有用的信息就不要试图去创建新的定制异常。">3. 如果不能给客户端代码提供有用的信息就不要试图去创建新的定制异常。</h4>
-
-<p>下面的代码有什么问题？</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class DuplicateUsernameException extends Exception {
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>它没有给客户端代码提供任何有用的信息，除了一个指示的异常名字。不要忘记Java的Exception类就像其它类，在其中你可以添加你认为客户端代码将调用来获得更多信息的方法。</p>
-
-<p>我们可以给DuplicateUsernameException添加有用的方法，像：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class DuplicateUsernameException extends Exception {
-</span><span class='line'>    public DuplicateUsernameException(String username) {}
-</span><span class='line'>    public String requestedUsername() {}
-</span><span class='line'>    public String[] availableNames() {}
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>新版本提供两个有用的方法：requestedUsername()返回请求的名字；availableNames()返回与请求的名字相似的一组有效用户名。客户端可以使用这些方法去告知请求的用户名是无效的和其它的用户名是有效的。但如果你不打算添加额外的信息，那么就抛出一个标准的异常：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>throw new Exception("Username already taken");</span></code></pre></td></tr></table></div></figure>
-
-<p>如果你认为当用户名已被占用时客户端代码除了日志记录不打算采取任何动作，那么抛出一个Unchecked异常就更好：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>throw new RuntimeException("Username already taken");</span></code></pre></td></tr></table></div></figure>
-
-<p>或者，你甚至可以提供一个方法检查是否用户名已被占用。</p>
-
-<p>值得重复的是，Checked异常被用于那些客户端API可以基于异常中的信息采取一些富有成效的动作的情况中。对于所有的编程式错误尽量使用Unchecked异常。它们让你的代码可读性更强。</p>
-
-<h4 id="4-用文档说明异常。">4. 用文档说明异常。</h4>
-
-<p>你可以使用Javadoc的@throws标签来说明API抛出的Checked和Unchecked异常。不过，我倾向于编写单元测试来说明异常。测试允许我看见动作中的异常，因此能被当作可以执行的文档。无论你做什么，都有一些办法让客户端代码可以通过它们了解你的API抛出的异常。这里是一个用于测试IndexOutOfBoundsException的示例单元测试：</p>
+<p>构建配置文件build.xml：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -365,24 +229,39 @@
 <span class='line-number'>6</span>
 <span class='line-number'>7</span>
 <span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void testIndexOutOfBoundsException() {
-</span><span class='line'>    ArrayList blankList = new ArrayList();
-</span><span class='line'>    try {
-</span><span class='line'>        blankList.get(10);
-</span><span class='line'>        fail("Should raise an IndexOutOfBoundsException");
-</span><span class='line'>    } catch (IndexOutOfBoundsException success) {
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;target name="junit"&gt;
+</span><span class='line'>    &lt;junit&gt;
+</span><span class='line'>        &lt;formatter type="xml" /&gt;
+</span><span class='line'>        &lt;batchtest todir="${report.dir}"&gt;
+</span><span class='line'>            &lt;fileset dir="${classes.dir}" includes="**/*Test.class" /&gt;
+</span><span class='line'>        &lt;/batchtest&gt;
+</span><span class='line'>    &lt;/junit&gt;
+</span><span class='line'>&lt;/target&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p>当blankList.get(10)被调用时上面的代码将会抛出IndexOutOfBoundsException。如果没有抛出异常，fail(&quot;Should raise an IndexOutOfBoundsException&quot;)语句会显式地让测试失败。通过为异常编写单元测试，你不仅说明异常是如何工作的，也通过测试特殊场景让你的代码更加健壮。</p>
+<p>执行任务的时候出现了异常：</p>
 
-<h3 id="使用异常的最佳实践">使用异常的最佳实践</h3>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>java.lang.ClassNotFoundException: com.example.learning.HelloTest
+</span><span class='line'>    at java.net.URLClassLoader$1.run(Unknown Source)
+</span><span class='line'>    at java.security.AccessController.doPrivileged(Native Method)
+</span><span class='line'>    at java.net.URLClassLoader.findClass(Unknown Source)
+</span><span class='line'>    at java.lang.ClassLoader.loadClass(Unknown Source)
+</span><span class='line'>    at sun.misc.Launcher$AppClassLoader.loadClass(Unknown Source)
+</span><span class='line'>    at java.lang.ClassLoader.loadClass(Unknown Source)
+</span><span class='line'>    at java.lang.ClassLoader.loadClassInternal(Unknown Source)
+</span><span class='line'>    at java.lang.Class.forName0(Native Method)
+</span><span class='line'>    at java.lang.Class.forName(Unknown Source)</span></code></pre></td></tr></table></div></figure>
 
-<p>下一组最佳实践显示客户端代码将如何处理抛出Checked异常的API。</p>
-
-<h4 id="1-总是要做些清理工作">1.总是要做些清理工作</h4>
-
-<p>如果你使用像数据库连接或网络连接这样的资源，确保你已经把它们清理干净。如果你调用的API只使用Unchecked异常，你仍然应该在使用后用try-finally块清理资源。</p>
+<p>网上搜索没有找到答案，到Ant官网上发现 <a href="http://ant.apache.org/faq.html#delegating-classloader">http://ant.apache.org/faq.html#delegating-classloader</a> 这篇文章讲了该问题。只要在junit任务里加入classpath指出要加载类的路径就可以了。修改后的build.xml文件如下：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -395,47 +274,48 @@
 <span class='line-number'>9</span>
 <span class='line-number'>10</span>
 <span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void dataAccessCode() {
-</span><span class='line'>    Connection conn = null;
-</span><span class='line'>    try {
-</span><span class='line'>        conn = getConnection();
-</span><span class='line'>        // some code that throws SQLException
-</span><span class='line'>    } catch(SQLException ex) {
-</span><span class='line'>        ex.printStacktrace();
-</span><span class='line'>    } finally {
-</span><span class='line'>        DBUtil.closeConnection(conn);
-</span><span class='line'>    }
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>class DBUtil {
-</span><span class='line'>    public static void closeConnection(Connection conn) {
-</span><span class='line'>        try {
-</span><span class='line'>            conn.close();
-</span><span class='line'>        } catch(SQLException ex) {
-</span><span class='line'>            logger.error("Cannot close connection");
-</span><span class='line'>            throw new RuntimeException(ex);
-</span><span class='line'>        }
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;target name="junit"&gt;
+</span><span class='line'>    &lt;junit&gt;
+</span><span class='line'>        &lt;classpath&gt;
+</span><span class='line'>            &lt;pathelement location="${classes.dir}" /&gt;
+</span><span class='line'>        &lt;/classpath&gt;
+</span><span class='line'>        &lt;formatter type="xml" /&gt;
+</span><span class='line'>        &lt;batchtest todir="${report.dir}"&gt;
+</span><span class='line'>            &lt;fileset dir="${classes.dir}" includes="**/*Test.class" /&gt;
+</span><span class='line'>        &lt;/batchtest&gt;
+</span><span class='line'>    &lt;/junit&gt;
+</span><span class='line'>&lt;/target&gt;</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
 
-<p>DBUtil是一个可以关闭连接的实用工具类。重点是finally块的使用，无论异常是否被捕获它都会执行。在这个例子中，finally关闭连接，如果关闭连接有问题就抛出一个RuntimeException。</p>
 
-<h4 id="2-不要使用异常控制流程">2. 不要使用异常控制流程</h4>
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/problem-running-junit-tests-with-ant-in-eclipse-part1/">Eclipse中Ant执行JUnit测试的问题（1）</a></h1>
+    
+    
+      <p class="meta">
+        
 
-<p>生成栈跟踪是昂贵的，栈跟踪的价值是在调试。在一个流程控制的情况中，栈跟踪将被忽略，因为客户端仅仅想知道如何处理。</p>
 
-<p>在下面的代码中，一个定制的异常MaximumCountReachedException被用来控制流程。</p>
+
+
+<time class='entry-date' datetime='2005-02-05T18:33:00+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>5</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>6:33 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Eclipse 3.0.3 + Ant 1.6.2 + JUnit 3.8.1</p>
+
+<p>构建配置文件build.xml：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -445,483 +325,16 @@
 <span class='line-number'>6</span>
 <span class='line-number'>7</span>
 <span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void useExceptionsForFlowControl() {
-</span><span class='line'>    try {
-</span><span class='line'>        while (true) {
-</span><span class='line'>            increaseCount();
-</span><span class='line'>        }
-</span><span class='line'>    } catch (MaximumCountReachedException ex) {
-</span><span class='line'>    }
-</span><span class='line'>    // continue execution
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>public void increaseCount()
-</span><span class='line'>    throws MaximumCountReachedException {
-</span><span class='line'>    if (count &gt;= 5000)
-</span><span class='line'>        throw new MaximumCountReachedException();
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>useExceptionsForFlowControl()使用一个无限循环增加计数直到异常被抛出。这不仅使代码难以阅读，而且让代码变得更慢。仅在特殊情况下使用异常处理。</p>
-
-<h4 id="3-不要抑制或忽略异常">3. 不要抑制或忽略异常</h4>
-
-<p>当来自API的一个方法抛出Checked异常时，它试图告诉你应该采取一些反向动作。如果Checked异常对你毫无意义，不要犹豫去把它转换成一个Unchecked异常并且再次抛出它，但是不要通过用{}捕获异常来忽略它，然后继续，好像什么也没发生过。</p>
-
-<h4 id="4-不要捕获顶级异常">4. 不要捕获顶级异常</h4>
-
-<p>Unchecked异常继承自RuntimeException类，RuntimeException又继承自Exception。通过捕获Exception类，你也捕获了RuntimeException，如以下代码所示：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>try {
-</span><span class='line'>} catch(Exception ex) {
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>上面的代码同样忽略了Unchecked异常。</p>
-
-<h4 id="5-只记录异常一次">5. 只记录异常一次</h4>
-
-<p>记录相同的异常栈跟踪超过一次可能会让程序员在检查关于异常原始源的栈跟踪时被迷惑。因此，只记录它一次。</p>
-
-<h3 id="总结">总结</h3>
-
-<p>这些都是异常处理最佳实践的一些建议。我无意开始一场Checked异常与Unchecked异常之间的宗教战争。你必须根据你的需求自定义设计和用法。我相信，假以时日，我们会找到更好的方法用异常编码。</p>
-
-<p>我要感谢Bruce Eckel、Joshua Kerievsky和Somik Raha他们对我在写这篇文章时的支持。</p>
-
-<h3 id="相关资源">相关资源</h3>
-
-<ul>
-<li><a href="http://www.mindview.net/Etc/Discussions/CheckedExceptions">&quot;Does Java need Checked Exceptions?&quot;</a> by Bruce Eckel</li>
-<li><a href="http://www.octopull.demon.co.uk/java/ExceptionalJava.html">&quot;Exceptional Java,&quot;</a> by Alan Griffiths</li>
-<li><a href="http://www.artima.com/intv/handcuffs.html">&quot;The trouble with checked exceptions: A conversation with Anders Hejlsberg, Part II&quot;</a> on Artima.com</li>
-<li><a href="http://www.c2.com/cgi/wiki?CheckedExceptionsAreOfDubiousValue">&quot;Checked exceptions are of dubious value,&quot;</a> on C2.com</li>
-<li><a href="http://www.artima.com/intv/solid.html">Conversation with James Gosling</a> by Bill Venners</li>
-</ul>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-to-solve-sitemesh-truncate-the-page-containing-chinese-character/">如何解决含有中文的页面末尾内容会被SiteMesh截掉的问题</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-07-22T14:33:59+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2005</span></span> <span class='time'>2:33 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>首先，我们要了解一下ServletResponse.setContentLength(int len)的含义。setContentLength是设置返回内容体长度的方法，len是内容体的长度。由于网络上传输内容是以字节（byte）为单位的，所以len就是指内容体有多少个字节。假设现在有长度为100个字节的数据，在输出数据到客户端前我们用setContentLength(90)设置内容体的长度为90个字节。那么在客户端接收到的数据长度就是90个字节而不是100。下面我们来做个试验：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class PageTruncateFilter implements Filter {
-</span><span class='line'>
-</span><span class='line'>    public void init(FilterConfig config) throws ServletException {
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
-</span><span class='line'>                        throws IOException, ServletException {
-</span><span class='line'>        HttpServletRequest request = (HttpServletRequest)req;
-</span><span class='line'>        HttpServletResponse response = (HttpServletResponse)res;
-</span><span class='line'>
-</span><span class='line'>        String content = "&lt;html&gt;&lt;head&gt;&lt;title&gt;Truncated Page&lt;/title&gt;&lt;/head&gt;";
-</span><span class='line'>               content += "&lt;body&gt;这个页面的内容will be truncated.&lt;/body&gt;&lt;/html&gt;";
-</span><span class='line'>        response.setCharacterEncoding("gbk");
-</span><span class='line'>        response.setContentLength(content.length());
-</span><span class='line'>        PrintWriter out = response.getWriter();
-</span><span class='line'>        out.println(content);
-</span><span class='line'>        out.close();
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void destroy() {
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>由于content字符串含有两个中文字符，每一个中文字符又是由两个字节组成，所以content.length()的值比content的字节数要少2。在客户端显示的内容也会因此少2个字节，即缺少“l&gt;”这两个字符。</p>
-
-<p>现在我们来浏览SiteMesh的源代码找出问题的原因。首先从PageFilter.java的doFilter方法开始。由于页面没有在decorators.xml中注册修饰，所以writeOriginal方法会被调用。下面是writeOriginal方法的源代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>/** Write the original page data to the response. */
-</span><span class='line'>private void writeOriginal(HttpServletRequest request, HttpServletResponse response,
-</span><span class='line'>                          Page page) throws IOException {
-</span><span class='line'>    response.setContentLength(page.getContentLength());
-</span><span class='line'>
-</span><span class='line'>    if (request.getAttribute(USING_STREAM).equals(Boolean.TRUE)) {
-</span><span class='line'>        PrintWriter writer = new PrintWriter(response.getOutputStream());
-</span><span class='line'>        page.writePage(writer);
-</span><span class='line'>        // flush writer to underlying outputStream
-</span><span class='line'>        writer.flush();
-</span><span class='line'>        response.getOutputStream().flush();
-</span><span class='line'>    } else {
-</span><span class='line'>        page.writePage(response.getWriter());
-</span><span class='line'>        response.getWriter().flush();
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>首行代码就是设置内容体长度的，让我们追到page.getContentLength()里面去看看（Page接口的getContentLength方法是由AbstractPage.java实现的）：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public int getContentLength() {
-</span><span class='line'>    return pageData.length;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>它返回pageData数组的长度。但是pageData数组是char类型的，假如pageData中有中文内容时，设置的内容体长度就会小于pageData的字节数。这时就会出现输出到客户端的数据截掉的问题。所以只要修改getContentLength方法返回的值就可以了，下面是修改后的getContentLength方法：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public int getContentLength() {
-</span><span class='line'>    String content = new String(pageData);
-</span><span class='line'>    return content.getBytes().length;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/using-ssh2-to-access-gro-clinux-org-cvs-server-in-eclipse3/">在Eclipse 3中使用SSH2访问gro.clinux.org的CVS服务器</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-07-07T19:48:08+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>7</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>7:48 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在Eclipse中生成公钥和私钥</p>
-
-<p>打开Eclipse，进入Window -&gt; Preferences -&gt; Team -&gt; CVS -&gt; SSH2 Connection Method -&gt; Key Management，点击“Generate RSA Key...”，然后填写Passphrase和Confirm Passphrase，接着点击“Save Private Key...”保存公钥和私钥（公钥和私钥文件保存在~/.ssh/目录下，id_rsa是私钥文件，id_rsa.pub 是公钥文件）。</p>
-
-<p>将公钥上传至gro.clinux.org服务器</p>
-
-<p>登陆gro服务器，进入[帐号维护]，在页面底部你可以看到如下信息：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Shell帐号信息
-</span><span class='line'>
-</span><span class='line'>Shell box：
-</span><span class='line'>CVS/SSH 共享认证Key：0 [编辑Keys]</span></code></pre></td></tr></table></div></figure>
-
-<p>点击[编辑Keys]，然后把刚才生成的文件id_rsa.pub中的内容粘贴到文本框中（看看是不是符合它上面的要求，千万要仔细看看），如果没有问题的话，就更新吧。大约6个小时后Cron会自动更新，在服务器上你的目录下会自动添加文件夹/.ssh/，里面包含了名为authorized_keys2的文件，你的公钥就保存在这里。</p>
-
-<p>在Eclipse中建立CVS连接</p>
-
-<p>打开CVS Repository Exploring Perspective，进入New -&gt; Repository Location，填入以下内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Host：cvs.unixname.gro.clinux.org
-</span><span class='line'>Repository Path：/cvsroot/unixname
-</span><span class='line'>User：你在gro.clinux.org上注册的帐户
-</span><span class='line'>Password：先前保存公钥和私钥时输入的Passphrase
-</span><span class='line'>Connection Type：extssh</span></code></pre></td></tr></table></div></figure>
-
-<p>点击Finish。如果你是第一次登录的话，将会弹出一个对话框，不用看那么仔细，直接点击OK就好了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-to-generate-executable-jar-file/">如何生成可执行的jar文件</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-06-21T21:16:56+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>21</span><span class='date-suffix'>st</span>, <span class='date-year'>2005</span></span> <span class='time'>9:16 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>首先用jar cvf executable.jar *.class命令生成jar文件，然后编辑jar文件中META-INF目录下的MAINFEST文件。在其尾部加上main-class: main-class-name就可以让它变成可执行的了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/why-should-software-modeling/">为什么要软件建模</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-05-16T06:23:07+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>6:23 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>模型是对现实的简化。需要进行建模的原因有以下几点：</p>
-
-<ol>
-<li>人们对复杂问题的理解能力是有限的；</li>
-<li>我们要开发的软件系统是复杂的；</li>
-<li>对系统的完整的理解有助于正确地实施工作（但不一定能使开发工作进展的更快）；</li>
-<li>我们不能完整的理解一个复杂的系统，为了能够更好地理解正在开发的系统，因此要对它进行建模。</li>
-</ol>
-
-<p>那么，是不是任何情况下都要建模呢？未必尽然。是否要进行软件建模是由系统的复杂程度决定的。如果系统的复杂性在我们的控制范围之内，那么就不需要建模。不过，有一个自然趋势：随着时间的推移，几乎所有的应用系统变得越来越复杂。因此要记住的是：狗窝总有一天会膨胀成大厦，并且因为不堪承受其自身的重量而倒塌。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/anemic-domain-model/">贫血领域模型</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-05-12T08:33:42+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>8:33 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="http://martinfowler.com/bliki/AnemicDomainModel.html">http://martinfowler.com/bliki/AnemicDomainModel.html</a></p>
-
-<p>贫血领域模型是那些已近存在了相当长时间的反模式中的一份子，然而目前似乎有一个特定的高潮。我和Eric Evans聊过这个，并且我们都注意到它们似乎越来越流行。作为真正的<a href="http://martinfowler.com/eaaCatalog/domainModel.html">领域模型</a>支持者，这不是一件好事。</p>
-
-<p>贫血领域模型的基本症状是乍一看它就像真的领域模型一样。这些对象大多以领域空间中的名词命名，并且它们被真正的领域模型拥有的丰富的关系和结构连接。当你观察行为时问题来了，你意识到这些对象几乎没有任何行为，仅仅只是封装了getter和setter方法。这些模型的设计规则往往说不要把任何领域逻辑放到领域对象里。取而代之的是一组服务对象捕获了所有的领域逻辑。这些在领域对象上层的服务把领域对象当数据使用。</p>
-
-<p>这种反模式最根本的恐怖在于它和面向对象设计的基本理念完全相反，它只是把数据和处理结合在一起。贫血领域模型其实只是一种过程式风格的设计，正是那种像我（和Eric）自Smalltalk早期以来一直在与之作斗争的顽固者。更糟糕的是，许多人认为贫血对象是真正的对象，因此完全没有抓住面向对象设计是怎么回事的要领。</p>
-
-<p>现在面向对象的纯粹主义当然很好，但我意识到我需要更多的基本论据来反对这种贫血症。本质上贫血领域模型的问题是它们承担了领域模型所有的成本，没有产生任何的好处。主要成本是映射到数据库的笨拙，它通常会导致一整层的O/R映射。在而且只有在你使用强大的面向对象技术去组织复杂的逻辑时这才值得。通过把所有的行为拉取到服务中，不管用什么方法，基本上你最后得到的都是<a href="http://martinfowler.com/eaaCatalog/transactionScript.html">事务脚本</a>，从而失去领域模型能带来的优势。正如我在<a href="http://martinfowler.com/books/eaa.html">《企业应用架构模式》</a>中讨论过的，领域模型并不总是最好的工具。</p>
-
-<p>值得强调的是，把行为放进领域对象不应违背利用分层将领域逻辑从诸如持久和表现责任中分离的坚实方法。在领域对象中的逻辑应该是领域逻辑——验证、计算、业务规则——无论你喜欢叫它什么。（某些情况下，你会产生把数据源和表现逻辑放到领域对象里的争论，但它和我对贫血症的看法无关。）</p>
-
-<p>这一切混乱的来源是许多OO专家强烈推荐在领域模型顶部放一层过程式服务，来形成一个<a href="http://martinfowler.com/eaaCatalog/serviceLayer.html">服务层</a>。但这不是让领域模型完全没有行为的一个论据，其实服务层主张服务层要和行为丰富的领域模型一起使用。</p>
-
-<p>Eric Evans的精彩书籍<a href="http://domaindrivendesign.org/books/">《领域驱动设计》</a>有如下的文字谈及这些层：</p>
-
-<blockquote>
-<p>应用层【他对服务层的命名】：定义软件可以完成的工作，并且指挥具有丰富含义的领域对象来解决问题。这个层所负责的任务对业务影响深远，对跟其它系统的应用层进行交互非常必要。这个层要保持简练。它不包括处理业务规则或知识，只是给下一层中相互协作的领域对象协调任务、委托工作。在这个层次中不反映业务情况的状态，但反映用户或程序的任务进度的状态。</p>
-
-<p>领域层（或者模型层）：负责表示业务概念、业务状况的信息以及业务规则。并且保持这些内容的技术细节由基础结构层来完成，反映业务状况的状态在该层中被控制和使用。这一层是业务软件的核心。</p>
-</blockquote>
-
-<p>这里的关键点是服务层是瘦的——所有的关键逻辑存在于领域层。他在服务模式中重申了这个观点：</p>
-
-<blockquote>
-<p>现在，最常犯的错误就是太轻易地放弃把这种行为配置到合适的对象上，逐渐地滑向过程式编程。</p>
-</blockquote>
-
-<p>我不知道为什么这个反模式如此常见。我猜想它是因为大多数人还没有真正地和正确的领域模型工作过，特别是如果他们有数据背景。有些技术鼓励正确的领域模型，例如J2EE的实体Bean，它是我偏爱<a href="http://martinfowler.com/bliki/POJO.html">POJO</a>领域模型的理由之一。</p>
-
-<p>总之，你在服务中发现越多的行为，你就越难体会到领域模型的好处。如果你所有的逻辑都在服务中，那你将得不到任何好处。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/learn-to-crack-andrnalin-crackme/">练习破解Andrnalin的Crackme</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-04-05T21:32:19+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>5</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>9:32 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>拿到这个程序，用PEiD查看这个程序，发现是用Microsoft Visual Basic 5.0编写的且没有加过壳，所以用W32Dasm反汇编。通过Functions/Imports查看它调用的函数，能够看见MSVBVM50!__vbaStrCmp字样。</p>
-
-<ol>
-<li>启动SoftICE，然后运行Crackme程序；</li>
-<li>在文本框中输入12345678；</li>
-<li>Ctrl+D来到SoftICE中，输入bpx __vbaStrCmp，按回车后用Ctrl+D命令返回Crackme；</li>
-<li>点击OK，程序被SoftICE中断；</li>
-<li>按F12回到调用__vbaStrCmp的地方；</li>
-<li>按F6切换到代码窗口，移动光标，直到代码窗口中出现如下程序段：</li>
-</ol>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>001B:00401D70                MOV ECX, [EBP-28]
-</span><span class='line'>001B:00401D73                PUSH ECX
-</span><span class='line'>001B:00401D74                PUSH 00401A54
-</span><span class='line'>001B:00401D79                CALL [MSVBVM50!__vbaStrCmp]</span></code></pre></td></tr></table></div></figure>
-
-<p>因此可以知道__vbaStrCmp比较的是ECX和00401A54所指向的字符串。记下00401A54这个值，然后重复步骤1、2、3、4。接着查看ECX和00401a54指向的内容就可以知道正确的key了。</p>
-
-<p>d ecx的显示如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>0023:0013CC1C 31 00 32 00 33 00 34 00-35 00 36 00 37 00 38 00 1.2.3.4.5.6.7.8.
-</span><span class='line'>0023:0013CC2C 00 00 72 00 61 00 6D 00-46 00 69 00 79 00 05 00 ..r.a.m.F.i.y...</span></code></pre></td></tr></table></div></figure>
-
-<p>d 401a54的显示如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>0023:00401A54 53 00 79 00 6E 00 54 00-61 00 58 00 20 00 32 00 S.y.n.T.a.X. .2.
-</span><span class='line'>0023:00401A64 6F 00 6F 00 31 00 00 00-4C 00 00 00 52 00 69 00 o.o.1...L...R.i.</span></code></pre></td></tr></table></div></figure>
-
-<p>12345678是我们输入的key，所以正确的key是SynTaX 2oo1（注意中间的空格）。</p>
-
-<p>注意：如果你是在破解VB6程序，你应该在断点前加上msvbvm60!。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/create-system-tray-program-with-win32/">使用Win32实现系统托盘程序</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-03-30T12:36:00+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>30</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>12:36 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>废话不多说，直接上代码：</p>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;target name="junit"&gt;
+</span><span class='line'>    &lt;junit&gt;
+</span><span class='line'>        &lt;formatter type="xml" /&gt;
+</span><span class='line'>        &lt;batchtest todir="${report.dir}"&gt;
+</span><span class='line'>            &lt;fileset dir="${classes.dir}" includes="**/*Test.class" /&gt;
+</span><span class='line'>        &lt;/batchtest&gt;
+</span><span class='line'>    &lt;/junit&gt;
+</span><span class='line'>&lt;/target&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>在执行时出现了以下问题：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -959,266 +372,63 @@
 <span class='line-number'>34</span>
 <span class='line-number'>35</span>
 <span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-<span class='line-number'>44</span>
-<span class='line-number'>45</span>
-<span class='line-number'>46</span>
-<span class='line-number'>47</span>
-<span class='line-number'>48</span>
-<span class='line-number'>49</span>
-<span class='line-number'>50</span>
-<span class='line-number'>51</span>
-<span class='line-number'>52</span>
-<span class='line-number'>53</span>
-<span class='line-number'>54</span>
-<span class='line-number'>55</span>
-<span class='line-number'>56</span>
-<span class='line-number'>57</span>
-<span class='line-number'>58</span>
-<span class='line-number'>59</span>
-<span class='line-number'>60</span>
-<span class='line-number'>61</span>
-<span class='line-number'>62</span>
-<span class='line-number'>63</span>
-<span class='line-number'>64</span>
-<span class='line-number'>65</span>
-<span class='line-number'>66</span>
-<span class='line-number'>67</span>
-<span class='line-number'>68</span>
-<span class='line-number'>69</span>
-<span class='line-number'>70</span>
-<span class='line-number'>71</span>
-<span class='line-number'>72</span>
-<span class='line-number'>73</span>
-<span class='line-number'>74</span>
-<span class='line-number'>75</span>
-<span class='line-number'>76</span>
-<span class='line-number'>77</span>
-<span class='line-number'>78</span>
-<span class='line-number'>79</span>
-<span class='line-number'>80</span>
-<span class='line-number'>81</span>
-<span class='line-number'>82</span>
-<span class='line-number'>83</span>
-<span class='line-number'>84</span>
-<span class='line-number'>85</span>
-<span class='line-number'>86</span>
-<span class='line-number'>87</span>
-<span class='line-number'>88</span>
-<span class='line-number'>89</span>
-<span class='line-number'>90</span>
-<span class='line-number'>91</span>
-<span class='line-number'>92</span>
-<span class='line-number'>93</span>
-<span class='line-number'>94</span>
-<span class='line-number'>95</span>
-<span class='line-number'>96</span>
-<span class='line-number'>97</span>
-<span class='line-number'>98</span>
-<span class='line-number'>99</span>
-<span class='line-number'>100</span>
-<span class='line-number'>101</span>
-<span class='line-number'>102</span>
-<span class='line-number'>103</span>
-<span class='line-number'>104</span>
-<span class='line-number'>105</span>
-<span class='line-number'>106</span>
-<span class='line-number'>107</span>
-<span class='line-number'>108</span>
-<span class='line-number'>109</span>
-<span class='line-number'>110</span>
-<span class='line-number'>111</span>
-<span class='line-number'>112</span>
-<span class='line-number'>113</span>
-<span class='line-number'>114</span>
-<span class='line-number'>115</span>
-<span class='line-number'>116</span>
-<span class='line-number'>117</span>
-<span class='line-number'>118</span>
-<span class='line-number'>119</span>
-<span class='line-number'>120</span>
-<span class='line-number'>121</span>
-<span class='line-number'>122</span>
-<span class='line-number'>123</span>
-<span class='line-number'>124</span>
-<span class='line-number'>125</span>
-<span class='line-number'>126</span>
-<span class='line-number'>127</span>
-<span class='line-number'>128</span>
-<span class='line-number'>129</span>
-<span class='line-number'>130</span>
-<span class='line-number'>131</span>
-<span class='line-number'>132</span>
-<span class='line-number'>133</span>
-<span class='line-number'>134</span>
-<span class='line-number'>135</span>
-<span class='line-number'>136</span>
-<span class='line-number'>137</span>
-<span class='line-number'>138</span>
-<span class='line-number'>139</span>
-<span class='line-number'>140</span>
-<span class='line-number'>141</span>
-<span class='line-number'>142</span>
-<span class='line-number'>143</span>
-<span class='line-number'>144</span>
-<span class='line-number'>145</span>
-<span class='line-number'>146</span>
-<span class='line-number'>147</span>
-<span class='line-number'>148</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>#include &lt;windows.h&gt;
-</span><span class='line'>#include "resource.h"
+</pre></td><td class='code'><pre><code class=''><span class='line'>BUILD FAILED: build.xml:44: Could not create task or type of type: junit.
 </span><span class='line'>
-</span><span class='line'>static LPCTSTR szAppName = TEXT("TrayHelper");
-</span><span class='line'>static LPCTSTR szCaption = TEXT("TrayIcon");
+</span><span class='line'>Ant could not find the task or a class this task relies upon.
 </span><span class='line'>
-</span><span class='line'>LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-</span><span class='line'>{
-</span><span class='line'>    static HMENU hMenu;
-</span><span class='line'>    static UINT WM_TASKBARCREATED;
+</span><span class='line'>This is common and has a number of causes; the usual
+</span><span class='line'>solutions are to read the manual pages then download and
+</span><span class='line'>install needed JAR files, or fix the build file:
+</span><span class='line'> - You have misspelt 'junit'.
+</span><span class='line'>   Fix: check your spelling.
+</span><span class='line'> - The task needs an external JAR file to execute
+</span><span class='line'>     and this is not found at the right place in the classpath.
+</span><span class='line'>   Fix: check the documentation for dependencies.
+</span><span class='line'>   Fix: declare the task.
+</span><span class='line'> - The task is an Ant optional task and the JAR file and/or libraries
+</span><span class='line'>     implementing the functionality were not found at the time you
+</span><span class='line'>     yourself built your installation of Ant from the Ant sources.
+</span><span class='line'>   Fix: Look in the ANT_HOME/lib for the 'ant-' JAR corresponding to the
+</span><span class='line'>     task and make sure it contains more than merely a META-INF/MANIFEST.MF.
+</span><span class='line'>     If all it contains is the manifest, then rebuild Ant with the needed
+</span><span class='line'>     libraries present in ${ant.home}/lib/optional/, or alternatively,
+</span><span class='line'>     download a pre-built release version from apache.org
+</span><span class='line'> - The build file was written for a later version of Ant
+</span><span class='line'>   Fix: upgrade to at least the latest release version of Ant
+</span><span class='line'> - The task is not an Ant core or optional task
+</span><span class='line'>     and needs to be declared using &lt;taskdef&gt;.
+</span><span class='line'> - You are attempting to use a task defined using
+</span><span class='line'>    &lt;presetdef&gt; or &lt;macrodef&gt; but have spelt wrong or not
+</span><span class='line'>   defined it at the point of use
 </span><span class='line'>
-</span><span class='line'>    POINT point;
-</span><span class='line'>    HINSTANCE hInstance;
-</span><span class='line'>    NOTIFYICONDATA nid;
+</span><span class='line'>Remember that for JAR files to be visible to Ant tasks implemented
+</span><span class='line'>in ANT_HOME/lib, the files must be in the same directory or on the
+</span><span class='line'>classpath
 </span><span class='line'>
-</span><span class='line'>    switch (message)
-</span><span class='line'>    {
-</span><span class='line'>    case WM_CREATE:
-</span><span class='line'>        // 不要修改TaskbarCreated字符串，这是系统任务栏自定义的消息
-</span><span class='line'>        WM_TASKBARCREATED = RegisterWindowMessage(TEXT("TaskbarCreated"));
+</span><span class='line'>Please neither file bug reports on this problem, nor email the
+</span><span class='line'>Ant mailing lists, until all of these causes have been explored,
+</span><span class='line'>as this is not an Ant bug.</span></code></pre></td></tr></table></div></figure>
+
+<p>产生上面错误的原因是Ant在执行junit任务时没有找到junit.jar这个文件。将junit.jar放到ANT_HOME/lib目录下，再次执行，这下该OK了吧！</p>
+
+<p>有没有搞错，还产生同样的错误！到命令行下试试。打入命令ant junit，然后出现：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Buildfile: build.xml
 </span><span class='line'>
-</span><span class='line'>        hInstance = ((LPCREATESTRUCT)lParam)-&gt;hInstance;
+</span><span class='line'>junit:
 </span><span class='line'>
-</span><span class='line'>        hMenu = LoadMenu(hInstance, MAKEINTRESOURCE(IDR_TRAYMENU));
-</span><span class='line'>        hMenu = GetSubMenu(hMenu, 0);
-</span><span class='line'>
-</span><span class='line'>        nid.cbSize = sizeof(nid);
-</span><span class='line'>        nid.hWnd = hWnd;
-</span><span class='line'>        nid.uID = IDI_PIRAMIDE;
-</span><span class='line'>        nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
-</span><span class='line'>        nid.uCallbackMessage = WM_USER;
-</span><span class='line'>        nid.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_PIRAMIDE));
-</span><span class='line'>        strcpy(nid.szTip, szAppName);
-</span><span class='line'>        Shell_NotifyIcon(NIM_ADD, &nid);
-</span><span class='line'>        break;
-</span><span class='line'>
-</span><span class='line'>    case WM_USER:
-</span><span class='line'>        if (lParam == WM_RBUTTONDOWN)
-</span><span class='line'>        {
-</span><span class='line'>            GetCursorPos(&point);
-</span><span class='line'>            // 处理当用户按下ESCAPE键或者在菜单之外单击鼠标时菜单不会消失的情况
-</span><span class='line'>            SetForegroundWindow(hWnd);
-</span><span class='line'>            TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, point.x, point.y, 0, hWnd, NULL);
-</span><span class='line'>        }
-</span><span class='line'>        break;
-</span><span class='line'>
-</span><span class='line'>    case WM_COMMAND:
-</span><span class='line'>        switch (LOWORD(wParam)) {
-</span><span class='line'>        case IDM_TRAYSETTINGS:
-</span><span class='line'>            MessageBox(hWnd, TEXT("Settings not yet implemented!"),
-</span><span class='line'>                             szAppName, MB_ICONEXCLAMATION | MB_OK);
-</span><span class='line'>            return 0;
-</span><span class='line'>
-</span><span class='line'>        case IDM_TRAYHELP:
-</span><span class='line'>            MessageBox(hWnd, TEXT("Help not yet implemented!"),
-</span><span class='line'>                             szAppName, MB_ICONEXCLAMATION | MB_OK);
-</span><span class='line'>            return 0;
-</span><span class='line'>
-</span><span class='line'>        case IDM_TRAYABOUT:
-</span><span class='line'>            MessageBox(hWnd, TEXT("About not yet implemented!"),
-</span><span class='line'>                             szAppName, MB_ICONEXCLAMATION | MB_OK);
-</span><span class='line'>            return 0;
-</span><span class='line'>
-</span><span class='line'>        case IDM_TRAYEXIT:
-</span><span class='line'>            SendMessage(hWnd, WM_CLOSE, 0, 0);
-</span><span class='line'>            return 0;
-</span><span class='line'>        }
-</span><span class='line'>        break;
-</span><span class='line'>
-</span><span class='line'>    case WM_DESTROY:
-</span><span class='line'>        // 处理点击Exit菜单退出后图标仍在托盘区显示，要把鼠标在图标上面过一下才会消失的情况
-</span><span class='line'>        nid.uID = IDI_PIRAMIDE;
-</span><span class='line'>        nid.hWnd = hWnd;
-</span><span class='line'>        Shell_NotifyIcon(NIM_DELETE, &nid);
-</span><span class='line'>        PostQuitMessage(0);
-</span><span class='line'>        break;
-</span><span class='line'>
-</span><span class='line'>    default:
-</span><span class='line'>        /*
-</span><span class='line'>         * 防止当Explorer.exe崩溃以后，程序在系统托盘中的图标就消失了。
-</span><span class='line'>         *
-</span><span class='line'>         * 原理：Explorer.exe重新载入后会重建系统任务栏。当系统任务栏建立的时候会向系统内所有
-</span><span class='line'>         * 注册接收TaskbarCreated消息的顶级窗口发送一条消息，我们只需要捕捉这个消息，并重建系
-</span><span class='line'>         * 统托盘的图标即可。
-</span><span class='line'>         */
-</span><span class='line'>        if (message == WM_TASKBARCREATED)
-</span><span class='line'>        {
-</span><span class='line'>            SendMessage(hWnd, WM_CREATE, wParam, lParam);
-</span><span class='line'>        }
-</span><span class='line'>        break;
-</span><span class='line'>    }
-</span><span class='line'>    return DefWindowProc(hWnd, message, wParam, lParam);
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
-</span><span class='line'>                                        LPSTR szCmdLine, int iCmdShow)
-</span><span class='line'>{
-</span><span class='line'>    HWND hWnd;
-</span><span class='line'>    MSG msg;
-</span><span class='line'>    WNDCLASS wc;
-</span><span class='line'>
-</span><span class='line'>    HWND handle = FindWindow(NULL, szCaption);
-</span><span class='line'>    if (handle != NULL)
-</span><span class='line'>    {
-</span><span class='line'>        MessageBox(NULL, TEXT("Application is already running"),
-</span><span class='line'>                         szAppName, MB_ICONERROR);
-</span><span class='line'>        return 0;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    wc.style = CS_HREDRAW | CS_VREDRAW;
-</span><span class='line'>    wc.lpfnWndProc = WndProc;
-</span><span class='line'>    wc.cbClsExtra = 0;
-</span><span class='line'>    wc.cbWndExtra = 0;
-</span><span class='line'>    wc.hInstance = hInstance;
-</span><span class='line'>    wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-</span><span class='line'>    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-</span><span class='line'>    wc.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
-</span><span class='line'>    wc.lpszMenuName = NULL;
-</span><span class='line'>    wc.lpszClassName = szAppName;
-</span><span class='line'>
-</span><span class='line'>    if (!RegisterClass(&wc))
-</span><span class='line'>    {
-</span><span class='line'>        MessageBox(NULL, TEXT("This program requires Windows NT!"),
-</span><span class='line'>                         szAppName, MB_ICONERROR);
-</span><span class='line'>        return 0;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    // 此处使用WS_EX_TOOLWINDOW属性来隐藏显示在任务栏上的窗口程序按钮
-</span><span class='line'>    hWnd = CreateWindowEx(WS_EX_TOOLWINDOW,
-</span><span class='line'>                        szAppName, szCaption,
-</span><span class='line'>                        WS_POPUP,
-</span><span class='line'>                        CW_USEDEFAULT,
-</span><span class='line'>                        CW_USEDEFAULT,
-</span><span class='line'>                        CW_USEDEFAULT,
-</span><span class='line'>                        CW_USEDEFAULT,
-</span><span class='line'>                        NULL, NULL, hInstance, NULL);
-</span><span class='line'>
-</span><span class='line'>    ShowWindow(hWnd, iCmdShow);
-</span><span class='line'>    UpdateWindow(hWnd);
-</span><span class='line'>
-</span><span class='line'>    while (GetMessage(&msg, NULL, 0, 0))
-</span><span class='line'>    {
-</span><span class='line'>        TranslateMessage(&msg);
-</span><span class='line'>        DispatchMessage(&msg);
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    return msg.wParam;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>BUILD SUCCESSFUL
+</span><span class='line'>Total time: 1 second</span></code></pre></td></tr></table></div></figure>
+
+<p>怎么会这样？命令行下可以，Eclipse中就不行了？</p>
+
+<p>到Preferences -&gt; Ant -&gt; Runtime -&gt; Classpath下设置一下junit.jar的路径，再次执行junit任务，终于在Console视图中看到了成功的消息。</p>
 </div>
   
   
@@ -1231,7 +441,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/learn-to-crack-brad-soblesky-crackme/">练习破解Brad Soblesky的Crackme</a></h1>
+      <h1 class="entry-title"><a href="/blog/the-operating-system-partition-type-list/">操作系统分区类型大全</a></h1>
     
     
       <p class="meta">
@@ -1240,18 +450,275 @@
 
 
 
-<time class='entry-date' datetime='2005-03-26T00:26:09+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>12:26 am</span></time>
+<time class='entry-date' datetime='2005-01-31T13:05:09+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>31</span><span class='date-suffix'>st</span>, <span class='date-year'>2005</span></span> <span class='time'>1:05 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p><a href="/uploads/crackme.zip" title="crackme.zip">Crackme程序</a></p>
+  <div class="entry-content"><p>大概是最全的操作系统分区类型列表了:)</p>
 
-<p>这次破解参考了wind[CCG]写的《Crackme-Brad Soblesky的Crackme程序破解》文章。因为我用的是Windows 2000操作系统，TRW2000不能在上面使用，所以我用SoftICE 4.05 来破解。</p>
+<table><thead>
+<tr>
+<th style="text-align: center">分区类型</th>
+<th>操作系统</th>
+<th style="text-align: center">分区类型</th>
+<th>操作系统</th>
+</tr>
+</thead><tbody>
+<tr>
+<td style="text-align: center">0x0</td>
+<td>UNUSED</td>
+<td style="text-align: center">0x80</td>
+<td>Old Minix</td>
+</tr>
+<tr>
+<td style="text-align: center">0x1</td>
+<td>DOS FAT12</td>
+<td style="text-align: center">0x81</td>
+<td>Minix/Old Linux</td>
+</tr>
+<tr>
+<td style="text-align: center">0x2</td>
+<td>Xenix root</td>
+<td style="text-align: center">0x82</td>
+<td>Linux Swap</td>
+</tr>
+<tr>
+<td style="text-align: center">0x3</td>
+<td>Xenix user</td>
+<td style="text-align: center">0x83</td>
+<td>Linux EXT2</td>
+</tr>
+<tr>
+<td style="text-align: center">0x4</td>
+<td>DOS FAT16 &lt; 32MB</td>
+<td style="text-align: center">0x84</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0x5</td>
+<td>DOS Extended</td>
+<td style="text-align: center">0x85</td>
+<td>Linux EXT</td>
+</tr>
+<tr>
+<td style="text-align: center">0x6</td>
+<td>DOS FAT16 &gt;= 32M</td>
+<td style="text-align: center">0x86</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0x7</td>
+<td>HPFS/NTFS</td>
+<td style="text-align: center">0x87</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0x8</td>
+<td>AIX</td>
+<td style="text-align: center">0x88</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0x9</td>
+<td>AIX bootable</td>
+<td style="text-align: center">0x89</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0xA</td>
+<td>OS/2 boot manager</td>
+<td style="text-align: center">0x8A</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0xB</td>
+<td>OS FAT32</td>
+<td style="text-align: center">0x8B</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0xC</td>
+<td>DOS FAT Cyl &gt; 1024</td>
+<td style="text-align: center">0x8C</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0xE</td>
+<td>DOS FAT system</td>
+<td style="text-align: center">0x8E</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0xF</td>
+<td>DOS big Extended</td>
+<td style="text-align: center">0x8F</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0x13</td>
+<td></td>
+<td style="text-align: center">0x93</td>
+<td>Amoeba</td>
+</tr>
+<tr>
+<td style="text-align: center">0x14</td>
+<td></td>
+<td style="text-align: center">0x94</td>
+<td>Amoeba BBT</td>
+</tr>
+<tr>
+<td style="text-align: center">0x25</td>
+<td></td>
+<td style="text-align: center">0xA5</td>
+<td>FreeBSD</td>
+</tr>
+<tr>
+<td style="text-align: center">0x26</td>
+<td>[Hidden]</td>
+<td style="text-align: center">0xA6</td>
+<td>OpenBSD</td>
+</tr>
+<tr>
+<td style="text-align: center">0x27</td>
+<td></td>
+<td style="text-align: center">0xA7</td>
+<td>NeXT STEP</td>
+</tr>
+<tr>
+<td style="text-align: center">0x29</td>
+<td></td>
+<td style="text-align: center">0xA9</td>
+<td>NetBSD</td>
+</tr>
+<tr>
+<td style="text-align: center">0x37</td>
+<td></td>
+<td style="text-align: center">0xB7</td>
+<td>BSDI</td>
+</tr>
+<tr>
+<td style="text-align: center">0x38</td>
+<td></td>
+<td style="text-align: center">0xB8</td>
+<td>BSDI Swap</td>
+</tr>
+<tr>
+<td style="text-align: center">0x40</td>
+<td>Venix 80286</td>
+<td style="text-align: center">0xC0</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0x41</td>
+<td>PPC PReP boot</td>
+<td style="text-align: center">0xC1</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0x47</td>
+<td></td>
+<td style="text-align: center">0xC7</td>
+<td>Syrinx</td>
+</tr>
+<tr>
+<td style="text-align: center">0x51</td>
+<td>Novell ?</td>
+<td style="text-align: center">0xD1</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0x52</td>
+<td>MicroPort</td>
+<td style="text-align: center">0xD2</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0x5B</td>
+<td></td>
+<td style="text-align: center">0xDB</td>
+<td>CP/M</td>
+</tr>
+<tr>
+<td style="text-align: center">0x61</td>
+<td></td>
+<td style="text-align: center">0xE1</td>
+<td>DOS access</td>
+</tr>
+<tr>
+<td style="text-align: center">0x63</td>
+<td>GNU hurd</td>
+<td style="text-align: center">0xE3</td>
+<td>DOS R/0</td>
+</tr>
+<tr>
+<td style="text-align: center">0x64</td>
+<td>Novell NetWare</td>
+<td style="text-align: center">0xE4</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0x65</td>
+<td>Novell NetWare</td>
+<td style="text-align: center">0xE5</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0x6B</td>
+<td></td>
+<td style="text-align: center">0xEB</td>
+<td>BeOS</td>
+</tr>
+<tr>
+<td style="text-align: center">0x72</td>
+<td></td>
+<td style="text-align: center">0xF2</td>
+<td>DOS secondary</td>
+</tr>
+<tr>
+<td style="text-align: center">0x75</td>
+<td>PC/IX</td>
+<td style="text-align: center">0xF5</td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center">0x7F</td>
+<td></td>
+<td style="text-align: center">0xFF</td>
+<td>BBT</td>
+</tr>
+</tbody></table>
+</div>
+  
+  
 
-<p>用PEiD查看这个程序，发现是用VC++ 6.0编写的且没加过壳，所以用W32Dasm反汇编。打开Functions/Imports查看它调用的函数，能够看见KERNEL32.lstrcmpA。双击它可以看到如下程序段：</p>
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-insert-line-breaks-into-textarea-with-jsp/">JSP中怎样输出\r\n到textarea中</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2005-01-12T12:47:51+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>12:47 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>测试代码如下：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1264,38 +731,278 @@
 <span class='line-number'>9</span>
 <span class='line-number'>10</span>
 <span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>:00401585 8d4de4 lea ecx, dword ptr [ebp-1c]
-</span><span class='line'>:00401588 51 push ecx
-</span><span class='line'>:00401589 8d55f4 lea edx, dword ptr [ebp-0c]
-</span><span class='line'>:0040158c 52 push edx
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%
+</span><span class='line'>    String str = "first line\r\nsecond line";
+</span><span class='line'>%&gt;
 </span><span class='line'>
-</span><span class='line'>* reference to: kernel32.lstrcmpa, ord:02fch
-</span><span class='line'>:0040158d ff1500204000 call dword ptr [00402000]
-</span><span class='line'>:00401593 85c0 test eax, eax                      -&gt; 典型的判断，肯定是这里了
+</span><span class='line'>&lt;body&gt;
+</span><span class='line'>    &lt;textarea id="editor" name="editor"&gt;&lt;/textarea&gt;;
+</span><span class='line'>&lt;/body&gt;
 </span><span class='line'>
-</span><span class='line'>:00401595 7516 jne 004015ad                       -&gt; 看见这个跳转了吗
-</span><span class='line'>:00401597 6a40 push 00000040</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>&lt;script type="text/javascript"&gt;
+</span><span class='line'>&lt;!–-
+</span><span class='line'>    var editor = document.getElementById('editor');
+</span><span class='line'>    editor.value = '&lt;%= str.replaceAll("\r\n", "\\\\r\\\\n") %&gt;';
+</span><span class='line'>//-–&gt;
+</span><span class='line'>&lt;/script&gt;</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
 
-<ol>
-<li>启动SoftICE，然后运行Crackme程序；</li>
-<li>在文本框中输入78787878；</li>
-<li>Ctrl+D 来到SoftICE中，输入bpx lstrcmpA，按回车后用Ctrl+D命令返回Crackme；</li>
-<li>按check，程序中断；</li>
-<li>按F11回到调用lstrcmpA的地方，发现CS寄存器的值为001b，输入bpx 001b: 00401585，按回车后用Ctrl+D命令返回Crackme；</li>
-<li>按check，程序中断；</li>
-<li>F10来到如下程序段：</li>
-</ol>
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/forgot-root-password-for-linux/">忘记Linux的root密码后</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2004-12-04T18:29:10+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>4</span><span class='date-suffix'>th</span>, <span class='date-year'>2004</span></span> <span class='time'>6:29 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>一不小心忘记了Linux的root密码，只能以普通用户zer0ne的身份进入系统了。</p>
+
+<p>找到Linux的DISC 1安装光盘，从光盘启动，出现boot:引导符后输入（其中，/dev/hda3是Linux系统所在的分区）：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>linux single root=/dev/hda3 initrd=</span></code></pre></td></tr></table></div></figure>
+
+<p>进入系统，把/etc目录下的shadow和passwd文件复制到/home/zer0ne目录下，修改shadow文件的属性。再到 <a href="http://www.openwall.com/john/">http://www.openwall.com/john/</a> 下载一个John the Ripper，编译安装好后输入：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>./unshadow passwd shadow &gt; passwd.1</span></code></pre></td></tr></table></div></figure>
+
+<p>接着运行破解：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>john passwd.1</span></code></pre></td></tr></table></div></figure>
+
+<p>这样，过了半个多小时我的root密码就回来了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/install-and-configure-jdk-150-on-linux/">Linux下JDK 1.5.0的安装和配置</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2004-12-01T11:28:09+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>1</span><span class='date-suffix'>st</span>, <span class='date-year'>2004</span></span> <span class='time'>11:28 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>先是在网上找了两篇在Linux上安装JDK的文章：<a href="http://www.cnblogs.com/sirsunny/archive/2004/11/22/67029.html">http://www.cnblogs.com/sirsunny/archive/2004/11/22/67029.html</a> 和 <a href="http://dev.csdn.net/article/46/article/46/46877.shtm">http://dev.csdn.net/article/46/article/46/46877.shtm</a> 。</p>
+
+<p>觉得后者写的比较详细，就照着它来了。步骤1、2、3没问题，把JDK安装好了，现在要配置环境变量了，有三种方法，哪种好呢？第1种不方便，换个shell登陆就不行了，第3种也不好，所有登陆用户都能用，那就只能选择第2种方法了。用vi打开.bashrc文件，在文件末尾添加以下内容：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>:00401585 8d4de4 lea ecx, dword ptr [ebp-1c]
-</span><span class='line'>:00401588 51 push ecx                             -&gt; 在此处用d ecx就可以看到注册码了
-</span><span class='line'>:00401589 8d55f4 lea edx, dword ptr [ebp-0c]
-</span><span class='line'>:0040158c 52 push edx</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>set JAVA_HOME=/usr/java/jdk1.5.0
+</span><span class='line'>export JAVA_HOME
+</span><span class='line'>set PATH=$PATH:$JAVA_HOME/bin
+</span><span class='line'>export PATH
+</span><span class='line'>set CLASSPATH=.:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar
+</span><span class='line'>export CLASSPATH</span></code></pre></td></tr></table></div></figure>
 
-<p>注册码：<code>&lt;BrD-SoB&gt;</code></p>
+<p>现在文件内容为：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># .bashrc
+</span><span class='line'># User specific aliases and functions
+</span><span class='line'>
+</span><span class='line'># Source global definitions
+</span><span class='line'>if [ -f /etc/bashrc ]; then
+</span><span class='line'>    . /etc/bashrc
+</span><span class='line'>fi
+</span><span class='line'>
+</span><span class='line'>set JAVA_HOME=/usr/java/jdk1.5.0
+</span><span class='line'>export JAVA_HOME
+</span><span class='line'>set PATH=$PATH:$JAVA_HOME/bin
+</span><span class='line'>export PATH
+</span><span class='line'>set CLASSPATH=.:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar
+</span><span class='line'>export CLASSPATH</span></code></pre></td></tr></table></div></figure>
+
+<p>然后重新登陆，用echo $JAVA_HOME查看环境变量，咦，怎么是空的呢？肯定有什么地方出错了，是不是不要什么set啊，试试把它去掉看看，修改后的.bashrc文件内容如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># .bashrc
+</span><span class='line'># User specific aliases and functions
+</span><span class='line'>
+</span><span class='line'># Source global definitions
+</span><span class='line'>if [ -f /etc/bashrc ]; then
+</span><span class='line'>    . /etc/bashrc
+</span><span class='line'>fi
+</span><span class='line'>
+</span><span class='line'>JAVA_HOME=/usr/java/j2sdk1.5.0
+</span><span class='line'>export JAVA_HOME
+</span><span class='line'>PATH=$PATH:$JAVA_HOME/bin
+</span><span class='line'>export PATH
+</span><span class='line'>CLASSPATH=.:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar
+</span><span class='line'>export CLASSPATH</span></code></pre></td></tr></table></div></figure>
+
+<p>再执行echo $JAVA_HOME命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>/usr/java/jdk1.5.0/</span></code></pre></td></tr></table></div></figure>
+
+<p>果然，去掉set后环境变量就正确了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/inside-protected-mode/">Inside Protected Mode</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2004-11-23T13:10:07+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>23</span><span class='date-suffix'>rd</span>, <span class='date-year'>2004</span></span> <span class='time'>1:10 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>以下所说的书指的是杨季文的《80X86汇编语言程序设计教程》。</p>
+
+<p>在380页，他说是“在实方式下被预取，在保护方式下被执行”。这个说法不太正确。现在就来说说在进/出保护模式时究竟发生了什么？</p>
+
+<p>在实模式时，通过指令lgdt fword ptr vgdtr把vgdtr处6个字节的内容装入GDTR中（记住，仅仅只是装入）。然后打开A20地址线（打开A20地址线是为了能存取1M以上的内存，和进不进保护模式其实没有必然的联系，也就是说不打开A20也能进入保护模式，只不过这时在保护模式下就不能存取1M以上的内存了）。然后把CR0寄存器的PE位置1，这是告诉CPU开启保护模式。</p>
+
+<p>讲到这里，就要先来说说shadow cache了。shadow cache的layout可以看388页。在实模式下的时候有些位是只读的。大家还记的实模式下取址的方法吗？对，段寄存器值 * 16 + offset。是直接由MMU这样做然后再取址的吗？不是，实际上是：当你往段寄存器（比如说CS）送值后，MMU同时会把CS * 16的值放入到CS的shadow cache中。这样以后只要不改变CS的值，那么，在同一段代码段中的寻址将是offset加上shadow cache中的段基址部分。明白了吗？好，我们再回过来讲。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>mov eax, cr0
+</span><span class='line'>or eax, 1
+</span><span class='line'>mov cr0, eax</span></code></pre></td></tr></table></div></figure>
+
+<p>这段代码究竟做了什么呢？其实它做的是开放段寄存器shadow cache的每个位（也就是每个位的值都能修改了，而在实模式下有些位是只读的）。还有就是告诉CPU开启保护模式。记住，这时候在shadow cache中的内容还没有变，还是原来实模式下的地址值。</p>
+
+<p>现在再来谈谈保护模式下的寻址。在386以后的机器，保护模式下的寻址其实和在实模式下的寻址是一样的，也是offset加上shadow cache中的段基址部分。这样就可以理解为什么把CR0的PE位置1后还能执行后面的指令了。因为把CR0的PE位置1虽然使系统进入了保护模式。但因为在shadow cache中的内容还是实模式下的内容，所以才能在保护模式下执行实地址处的指令。然后呢！看看jump指令做了什么？</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>jump selector, offset</span></code></pre></td></tr></table></div></figure>
+
+<p>这个指令做了什么？它的意思是要跳到选择子为selector的段的偏移为offset处，执行那里的指令。这时CPU究竟做了什么呢？因为是段间跳转（就是带selector的跳转啦）。又因为现在是在保护模式下，所以MMU根据selector从GDT（知道LDGT的作用了吧）来找到段的真实段基址，然后再把它放入到相应段的shadow cache中。接着MMU再把offset和（shadow cache中的段基址部分）相加。这样就得到了下一个指令的地址。同样的道理，从保护模式出来时用</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>mov eax，cr0
+</span><span class='line'>and eax，0xffffffff
+</span><span class='line'>mov cr0，eax</span></code></pre></td></tr></table></div></figure>
+
+<p>使各段的shadow cache中一部分位固定，并且宣告进入实模式，即以后的寻址将采用实模式方式。然后通过执行jump cs, offset来把CS * 16的值装入shadow cache中。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/source-not-found-for-in-eclipse-when-debugging-servlet/">在Eclipse下调试Servlet时出现Source not found for</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2004-11-03T11:03:19+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2004</span></span> <span class='time'>11:03 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在Eclipse下调试Servlet出现了Source not found for HelloServlet.doGet()的问题，猜想是没有将Servlet代码加入到debug路径下，以致在调试的时候找不到source。虽然知道原因，却不知道怎么解决。就在Eclipse里乱逛，东点西击，最后终于找到了解决问题所在。</p>
+
+<p>进入Window -&gt; Preferences -&gt; Tomcat -&gt; Source Path，在Source Path标签下有行文字：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Add java projects to source path (Eclipse debugger will search for source files in these projects).</span></code></pre></td></tr></table></div></figure>
+
+<p>将要调试的project选中然后再调试，果然不再出现警告了。</p>
 </div>
   
   
@@ -1320,23 +1027,23 @@
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/test/">test</a>
-      </li>
-    
-      <li class="post">
         <a href="/blog/the-power-of-protocol-analyzers/">协议分析器的威力</a>
       </li>
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part19/">ANTLR 4权威参考读书笔记（19）</a>
       </li>
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part18/">ANTLR 4权威参考读书笔记（18）</a>
       </li>
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/how-to-build-a-news-website-layout-with-flexbox/">如何使用Flexbox构建新闻站点布局</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part17/">ANTLR 4权威参考读书笔记（17）</a>
       </li>
     
   </ul>
@@ -1350,7 +1057,7 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 142%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 135%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 131%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
@@ -1366,8 +1073,8 @@
 <a style="font-size: 97%" href="/tags/listview/">ListView</a>
 <a style="font-size: 104%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
-<a style="font-size: 124%" href="/tags/powerbuilder/">PowerBuilder</a>
-<a style="font-size: 110%" href="/tags/powerscript/">PowerScript</a>
+<a style="font-size: 119%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 101%" href="/tags/powerscript/">PowerScript</a>
 <a style="font-size: 117%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
 <a style="font-size: 119%" href="/tags/ruby/">Ruby</a>
