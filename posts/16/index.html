@@ -9,10 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="导入/导出Heroku上应用的数据需要安装Taps包： 1
-gem install taps 导入数据到Heroku里： 1
-heroku db:push 导出数据到本地： 1
-heroku db:pull 其中导入/导出数据由config/database.yml配置设定。 &hellip;">
+  <meta name="description" content="从2.2版本起Rails开始内置支持i18n，因此以后实现国际化/本地化就可以不再需要各种各样的插件了。 Rails默认的Locale文件夹是config/locales，假设你要支持中文和英文，那么你需要在这个文件夹下放置zh.yml和en.yml两个文件。 相应的入门教程网上有不少， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -76,6 +73,139 @@ heroku db:pull 其中导入/导出数据由config/database.yml配置设定。 &h
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/using-rails-23-to-create-a-simple-accounting-app-part10/">用Rails 2.3打造简单记账应用（10）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2010-01-04T20:34:41+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>4</span><span class='date-suffix'>th</span>, <span class='date-year'>2010</span></span> <span class='time'>8:34 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>从2.2版本起Rails开始内置支持i18n，因此以后实现国际化/本地化就可以不再需要各种各样的插件了。</p>
+
+<p>Rails默认的Locale文件夹是config/locales，假设你要支持中文和英文，那么你需要在这个文件夹下放置zh.yml和en.yml两个文件。</p>
+
+<p>相应的入门教程网上有不少，我也就不多讲了。这里主要说一下如何在记账应用中实现可以让用户指定语言的i18n实现，即当用户选择English，那么界面就切换成英文界面，并且以后打开的页面也是以英文出现，反之亦如此。</p>
+
+<p>首先在header区添加以下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= link_to 'Chinese', :locale =&gt; 'zh' %&gt;
+</span><span class='line'>&lt;%= link_to 'English', :locale =&gt; 'en' %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>点击其中某个链接后，浏览器就会传递对应的参数zh或en到后台。</p>
+
+<p>然后在app/controllers/application_controller.rb中添加以下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>before_filter :set_locale
+</span><span class='line'>
+</span><span class='line'>protected
+</span><span class='line'>  def set_locale
+</span><span class='line'>    I18n.locale = params[:locale]
+</span><span class='line'>  end</span></code></pre></td></tr></table></div></figure>
+
+<p>不过这里有个问题就是url中必须得带着参数，不然的话用户的选择就会失效。要想使选择达到持续的效果，可以考虑把这些信息保存在session中，改进后的代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def set_locale
+</span><span class='line'>  I18n.locale = params[:locale] || session[:locale]
+</span><span class='line'>  session[:locale] = I18n.locale
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>现在这样就基本上差不多了。剩下的就是处理第一次访问时的语言，这个可以从request的ACCEPT_LANGUAGE参数中获取。最终实现的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def set_locale
+</span><span class='line'>  accept_lang = request.env['HTTP_ACCEPT_LANGUAGE'].scan(/^[a-z]{2}/).first
+</span><span class='line'>  I18n.locale = params[:locale] || session[:locale] || accept_lang || 'zh'
+</span><span class='line'>  session[:locale] = I18n.locale
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>不过当用户选择中文后，在新建记录时会报以下错误：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>can't convert Symbol into String
+</span><span class='line'>
+</span><span class='line'>Extracted source (around line #8):
+</span><span class='line'>
+</span><span class='line'>    6:   &lt;p&gt;
+</span><span class='line'>    7:     &lt;%= t(:effective_date) %&gt;&lt;br /&gt;
+</span><span class='line'>    8:     &lt;%= f.date_select :effective_date %&gt;
+</span><span class='line'>    9:   &lt;/p&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>查找资料后发现可以通过在date_select中加入order来解决，不过日期下拉列表中的月份还有问题，出现的是一些随机数，不是正常月份。这个也可以通过添加month_names参数解决。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= t(:effective_date) %&gt;&lt;br /&gt;
+</span><span class='line'>&lt;%= f.date_select :effective_date, :order =&gt; [:year, :month, :day] %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>更好的办法是把它们放到对应的Locale文件里：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># en.yml
+</span><span class='line'>en:
+</span><span class='line'>  date:
+</span><span class='line'>    month_names: [~, January, February, ..., November, December]
+</span><span class='line'>    order: [:year, :month, :day]</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># zh.yml
+</span><span class='line'>zh:
+</span><span class='line'>  date:
+</span><span class='line'>    month_names: [~, 一月, 二月, ..., 十一月, 十二月]
+</span><span class='line'>    order: [:year, :month, :day]</span></code></pre></td></tr></table></div></figure>
+
+<p>代码下载：<a href="https://github.com/dohkoos/qianbao">https://github.com/dohkoos/qianbao</a></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1512,150 +1642,6 @@ heroku db:pull 其中导入/导出数据由config/database.yml配置设定。 &h
 </span><span class='line'>    end
 </span><span class='line'>  end
 </span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<p>代码下载：<a href="https://github.com/dohkoos/qianbao">https://github.com/dohkoos/qianbao</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/using-rails-23-to-create-a-simple-accounting-app-part3/">用Rails 2.3打造简单记账应用（3）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2009-11-15T16:21:33+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>15</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>4:21 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>这次要给应用加上一个认证系统（注册、激活、登录、登出）。当用户输入注册信息时，必须输入有效的邮箱地址，注册成功后，用户并不能立即登录系统，而是要登录注册时输入的邮箱，通过该邮箱内的激活邮件来激活账户。通过这种方式可以防止用户的恶意注册。</p>
-
-<p><a href="https://github.com/technoweenie/restful-authentication">restful_authentication</a>是一个支持Rails 2.0的认证系统插件，它为你生成REST风格的认证系统模板，除了提供最基本的用户注册登录登出功能外，还有一个可选的邮件激活功能。只要一个命令，它就为你生成了User模型、管理注册和登录的控制器、相应的视图页面、mailer等等。</p>
-
-<p>安装插件和生成框架代码</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>script/plugin install git://github.com/technoweenie/restful-authentication.git restful_authentication
-</span><span class='line'>script/generate authenticated user sessions --include-activation
-</span><span class='line'>rake db:migrate</span></code></pre></td></tr></table></div></figure>
-
-<p>--include-activation选项决定是否生成向新注册用户发送激活码邮件的代码。</p>
-
-<p>如果你想你的URL看起来更符合惯例一些，那么可以在config/routes.rb中添加：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>map.signup '/signup', :controller =&gt; 'users', :action =&gt; 'new'
-</span><span class='line'>map.login '/login', :controller =&gt; 'sessions', :action =&gt; 'new'
-</span><span class='line'>map.logout '/logout', :controller =&gt; 'sessions', :action =&gt; 'destroy'</span></code></pre></td></tr></table></div></figure>
-
-<p>因为使用了--include-activation选项，所以还要在config/routes.rb中增加以下映射：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>map.activate '/activate/:activation_code',
-</span><span class='line'>             :controller =&gt; 'users', :action =&gt; 'activate', :activation_code =&gt; nil</span></code></pre></td></tr></table></div></figure>
-
-<p>最后，还需要添加一个observer到config/environment.rb的Rails::Initializer块中：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>config.active_record.observers = :user_observer</span></code></pre></td></tr></table></div></figure>
-
-<p>设置ActionMailer，在config/environments/development.rb中添加：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># Don't care if the mailer can't send
-</span><span class='line'>config.action_mailer.raise_delivery_errors = true
-</span><span class='line'>config.action_mailer.perform_deliveries = true
-</span><span class='line'>config.action_mailer.delivery_method = :smtp
-</span><span class='line'>config.action_mailer.smtp_settings = {
-</span><span class='line'>  :address =&gt; "smtp.example.com",
-</span><span class='line'>  :port =&gt; 25,
-</span><span class='line'>  :domain =&gt; "example.com",
-</span><span class='line'>  :authentication =&gt; :login,
-</span><span class='line'>  :user_name =&gt; "yourname@example.com",
-</span><span class='line'>  :password =&gt; "yourpassword"
-</span><span class='line'>}
-</span><span class='line'>config.action_mailer.default_charset = "utf-8"
-</span><span class='line'>
-</span><span class='line'>HOST = "localhost:3000"
-</span><span class='line'>ADMINEMAIL = "yourname@example.com"</span></code></pre></td></tr></table></div></figure>
-
-<p>打开app/models/user_mailer.rb，修改</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>@body[:url]  = "http://YOURSITE/activate/#{user.activation_code}"
-</span><span class='line'>@body[:url]  = "http://YOURSITE/"
-</span><span class='line'>@subject     = "[YOURSITE] "
-</span><span class='line'>@from        = "ADMINEMAIL"</span></code></pre></td></tr></table></div></figure>
-
-<p>为以下代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>@body[:url]  = "http://#{HOST}/activate/#{user.activation_code}"
-</span><span class='line'>@body[:url]  = "http://#{HOST}/"
-</span><span class='line'>@subject     = "[#{HOST}] "
-</span><span class='line'>@from        = "#{ADMINEMAIL}"</span></code></pre></td></tr></table></div></figure>
-
-<p>如果出现以下错误信息，那么可能是smtp_settings中的domain没有填写：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Net::SMTPSyntaxError (500 Error: bad syntax):
-</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:679:in 'check_response'
-</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:652:in 'getok'
-</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:622:in 'helo'</span></code></pre></td></tr></table></div></figure>
-
-<p>user_mailer.rb中的ADMINEMAIL必须是一个有效的邮件账号，否则会出现：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Net::SMTPFatalError (550 Invalid User):
-</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:679:in 'check_response'
-</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:652:in 'getok'
-</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:630:in 'mailfrom'</span></code></pre></td></tr></table></div></figure>
 
 <p>代码下载：<a href="https://github.com/dohkoos/qianbao">https://github.com/dohkoos/qianbao</a></p>
 </div>
