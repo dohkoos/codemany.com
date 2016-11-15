@@ -155,21 +155,21 @@
 
 
   <div class="entry-content"><ul>
-<li>action 操作</li>
+<li>action 动作</li>
 <li>clause 子句</li>
 </ul>
 
-<p>Listener和Visitor机制是极好的。大多数时候，我们可以用Listener或Visitor构建语言应用，它们让特定应用的代码置身于语法之外，使语法容易被阅读。</p>
+<p>监听器和访问者机制是极好的。大多数时候，我们可以用监听器或访问者来构建语言应用，它们让特定应用的代码置身于语法之外，使语法容易被阅读。</p>
 
-<p>但有时候我们需要额外的控制权和灵活性。为了达到这个目的，我们可以直接在语法中嵌入代码片段（这些嵌入的代码片段被称为操作）。这些操作会被注入到由ANTLR工具生成的分析器代码中。这些被注入的代码在分析期间执行，并且能像其它任意代码片段一样收集信息或生成输出。结合语义谓词，我们甚至可以在运行时让我们语法的某部分消失！例如，我们可能想打开或关闭Java语法中的enum关键词，分析语言的不同版本。没有语义谓词，我们就需要两个不同版本的语法。</p>
+<p>但有时候我们需要额外的控制权和灵活性。为了达到这个目的，我们可以直接在语法中嵌入代码片段（这些嵌入的代码片段被称为动作）。这些动作会被注入到由ANTLR工具生成的分析器代码中。这些被注入的代码在分析期间执行，并且能像其它任意代码片段一样收集信息或生成输出。结合语义谓词，我们甚至可以在运行时让我们语法的某部分消失！例如，我们可能想打开或关闭Java语法中的enum关键字，分析语言的不同版本。没有语义谓词，我们就需要两个不同版本的语法。</p>
 
 <p>下面我们将实现一个简单的程序，读入数据行，然后打印出在特定列中找到的值。</p>
 
-<h3 id="在语法中嵌入任意的操作">在语法中嵌入任意的操作</h3>
+<h3 id="在语法中嵌入任意的动作">在语法中嵌入任意的动作</h3>
 
-<p>如果我们不想付出构建语法分析树的开销，或者想要在分析期间动态地计算值或把东西打印出来，那么可以通过在语法中嵌入任意代码实现。它的比较困难的，因为我们必须明白在语法分析器上的操作的影响，以及在哪里放置这些操作。</p>
+<p>如果我们不想付出构建语法分析树的开销，或者想要在分析期间动态地计算值或把东西打印出来，那么可以通过在语法中嵌入任意代码来实现。它是比较困难的，因为我们必须明白在语法分析器上的动作的影响，以及在哪里放置这些动作。</p>
 
-<p>为了解释嵌入在语法中的操作，让我们先来看下文件rows.txt中的数据：</p>
+<p>为了解释嵌入在语法中的动作，让我们先来看下文件rows.txt中的数据：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -185,7 +185,7 @@
 </pre></td><td class='code'><pre><code class=''><span class='line'>file : (row NL)+ ;    // NL is newline token: '\r'? '\n'
 </span><span class='line'>row  : STUFF+ ;</span></code></pre></td></tr></table></div></figure>
 
-<p>我们需要创建一个构造器以便我们能传递我们想要的列号（从1开始计数），所以我们需要在规则中添加一些操作来做这些事情：</p>
+<p>我们需要创建一个构造器以便我们能传递我们想要的列号（从1开始计数），所以我们需要在规则中添加一些动作来做这个事情：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -212,10 +212,12 @@
 <span class='line-number'>23</span>
 <span class='line-number'>24</span>
 <span class='line-number'>25</span>
+<span class='line-number'>26</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'>grammar Rows;
 </span><span class='line'>
 </span><span class='line'>@parser::members {    // add members to generated RowsParser
 </span><span class='line'>    int col;
+</span><span class='line'>
 </span><span class='line'>    public RowsParser(TokenStream input, int col) {    // custom constructor
 </span><span class='line'>        this(input);
 </span><span class='line'>        this.col = col;
@@ -228,8 +230,8 @@
 </span><span class='line'>locals [int i=0]
 </span><span class='line'>    : ( STUFF
 </span><span class='line'>        {
-</span><span class='line'>        $i++;
-</span><span class='line'>        if ( $i == col ) System.out.println($STUFF.text);
+</span><span class='line'>            $i++;
+</span><span class='line'>            if ($i == col) System.out.println($STUFF.text);
 </span><span class='line'>        }
 </span><span class='line'>      )+
 </span><span class='line'>    ;
@@ -238,7 +240,7 @@
 </span><span class='line'>NL   :  '\r'? '\n' ;      // match and pass to the parser
 </span><span class='line'>STUFF:  ~[\t\r\n]+ ;      // match any chars except tab, newline</span></code></pre></td></tr></table></div></figure>
 
-<p>在上述语法中，操作是被花括号括起来的代码片段；members操作的代码将会被注入到生成的语法分析器类中的成员区；在规则row中的操作访问的$i是由locals子句定义的局部变量，该操作也用$STUFF.text获取最近匹配的STUFF记号的文本内容。STUFF词法规则匹配任何非TAB或换行的字符，这意味着在列中可以有空格字符。</p>
+<p>在上述语法中，动作是被花括号括起来的代码片段；members动作的代码将会被注入到生成的语法分析器类中的成员区；在规则row中的动作访问的$i是由locals子句定义的局部变量，该动作也用$STUFF.text获取最近匹配的STUFF记号的文本内容。STUFF词法规则匹配任何非TAB或换行的字符，这意味着在列中可以有空格字符。</p>
 
 <p>现在，是时候去思考如何使用定制的构造器传递一个列号给语法分析器，并且告诉语法分析器不要构建语法分析树了：</p>
 
@@ -285,7 +287,7 @@
 </span><span class='line'>tombu
 </span><span class='line'>bke</span></code></pre></td></tr></table></div></figure>
 
-<p>如果将上面命令中的1换成2，你会看到rows.txt文件的第2列内容被输出；如果换成3，那么rows.txt文件的第3列内容将会被输出。</p>
+<p>如果将上面命令中的1换成2，你会看到文件的第2列内容被输出；如果换成3，那么第3列内容将会被输出。</p>
 </div>
   
   
@@ -393,15 +395,15 @@
   </header>
 
 
-  <div class="entry-content"><p>在<a href="/blog/reading-notes-the-definitive-antlr4-reference-part3/">ANTLR 4权威参考读书笔记（3）</a>以及<a href="/blog/reading-notes-the-definitive-antlr4-reference-part4/">ANTLR 4权威参考读书笔记（4）</a>中我们分别用Visitor和Listener机制实现了计算器的解释执行和编译执行。但并没有给出这两种机制的太多细节，这次就来详细地讲讲。</p>
+  <div class="entry-content"><p>在<a href="/blog/reading-notes-the-definitive-antlr4-reference-part3/">ANTLR 4权威参考读书笔记（3）</a>以及<a href="/blog/reading-notes-the-definitive-antlr4-reference-part4/">ANTLR 4权威参考读书笔记（4）</a>中我们分别用访问者和监听器机制实现了计算器的解释执行和编译执行。但并没有给出这两种机制的太多细节，这次就来详细地讲讲。</p>
 
-<p>ANTLR在它的运行库中为两种树遍历机制提供支持。默认情况下，ANTLR生成一个语法分析树Listener接口，在其中定义了回调方法，用于响应被内建的树遍历器触发的事件。</p>
+<p>ANTLR在它的运行库中为两种树遍历机制提供支持。默认情况下，ANTLR生成一个语法分析树监听器接口，在其中定义了回调方法，用于响应被内建的树遍历器触发的事件。</p>
 
-<p>在Listener和Visitor机制之间最大的不同是：Listener方法被ANTLR提供的遍历器对象调用；而Visitor方法必须显式的调用visit方法遍历它们的子节点，在一个节点的子节点上如果忘记调用visit方法就意味着那些子树没有得到访问。</p>
+<p>在监听器和访问者机制之间最大的不同是：监听器方法被ANTLR提供的遍历器对象调用；而访问者方法必须显式的调用visit方法遍历它们的子节点，在一个节点的子节点上如果忘记调用visit方法就意味着那些子树没有得到访问。</p>
 
-<p>让我们首先从Listener开始。在我们了解Listener之后，我们也将看到ANTLR如何生成遵循Visitor设计模式的树遍历器。</p>
+<p>让我们首先从监听器开始。在我们了解监听器之后，我们也将看到ANTLR如何生成遵循访问者设计模式的树遍历器。</p>
 
-<h3 id="语法分析树listener">语法分析树Listener</h3>
+<h3 id="语法分析树监听器">语法分析树监听器</h3>
 
 <p>在Calc.java中有这样两行代码：</p>
 
@@ -410,21 +412,21 @@
 </pre></td><td class='code'><pre><code class=''><span class='line'>ParseTreeWalker walker = new ParseTreeWalker();
 </span><span class='line'>walker.walk(new DirectiveListener(), tree);</span></code></pre></td></tr></table></div></figure>
 
-<p>类ParseTreeWalker是ANTLR运行时提供的用于遍历语法分析树和触发Listener中回调方法的树遍历器。ANTLR工具根据Calc.g中的语法自动生成ParseTreeListener接口的子接口CalcListener和默认实现CalcBaseListener，其中含有针对语法中每个规则的enter和exit方法。DirectiveListener是我们编写的继承自CalcBaseListener的包含特定应用代码的实现，把它传递给树遍历器后，树遍历器在遍历语法分析树时就会触发DirectiveListener中的回调方法。</p>
+<p>类ParseTreeWalker是ANTLR运行时提供的用于遍历语法分析树和触发监听器中回调方法的树遍历器。ANTLR工具根据Calc.g中的语法自动生成ParseTreeListener接口的子接口CalcListener和默认实现CalcBaseListener，其中含有针对语法中每个规则的enter和exit方法。DirectiveListener是我们编写的继承自CalcBaseListener的包含特定应用代码的实现，把它传递给树遍历器后，树遍历器在遍历语法分析树时就会触发DirectiveListener中的回调方法。</p>
 
 <p><img src="/uploads/calc-listener-hierachy.png" title="calc-listener-hierachy" ></p>
 
-<p>下图左边的语法分析树显示ParseTreeWalker执行了一次深度优先遍历，由粗虚线表示，箭头方向代表遍历方向。右边显示的是语法分析树的完整调用序列，它们由ParseTreeWalker触发调用。当树遍历器遇到规则assign的节点时，它触发enterAssign()并且给它传递AssignContext语法分析树节点。在树遍历器访问完assign节点的所有子节点后，它触发exitAssign()。</p>
+<p>下图左边的语法分析树显示ParseTreeWalker执行了一次深度优先遍历，由粗虚线表示，箭头方向代表遍历方向。右边显示的是语法分析树的完整调用序列，它们由ParseTreeWalker触发调用。当树遍历器遇到规则assign的节点时，它触发enterAssign()并且给它传递AssignContext这个语法分析树节点的上下文。在树遍历器访问完assign节点的所有子节点后，它触发exitAssign()。</p>
 
 <p><img src="/uploads/listener-call-sequence.png" title="listener-call-sequence" ></p>
 
-<p>Listener机制的强大之处在于所有都是自动的。我们不必要写语法分析树遍历器，而且我们的Listener方法也不必要显式地访问它们的子节点。</p>
+<p>监听器机制的强大之处在于所有都是自动的。我们不必要写语法分析树遍历器，而且我们的监听器方法也不必要显式地访问它们的子节点。</p>
 
-<h3 id="语法分析树visitor">语法分析树Visitor</h3>
+<h3 id="语法分析树访问者">语法分析树访问者</h3>
 
-<p>有些情况下，我们实际想要控制的是遍历本身，在那里我们可以显式地调用visit方法去访问子树节点。选项-visitor告诉ANTLR工具从相应语法生成Visitor接口和默认实现，其中含有针对语法中每个规则的visit方法。</p>
+<p>有些情况下，我们实际想要控制的是遍历本身，在那里我们可以显式地调用visit方法去访问子树节点。参数-visitor告诉ANTLR工具从相应语法生成访问者接口和默认实现，其中含有针对语法中每个规则的visit方法。</p>
 
-<p>下图是我们熟悉的Visitor模式操作在语法分析树上。左边部分的粗虚线表示语法分析树的深度优先遍历，箭头方向代表遍历方向。右边部分指明Visitor中的方法调用序列。</p>
+<p>下图是我们熟悉的访问者模式操作在语法分析树上。左边部分的粗虚线表示语法分析树的深度优先遍历，箭头方向代表遍历方向。右边部分指明访问者中的方法调用序列。</p>
 
 <p><img src="/uploads/visitor-call-sequence.png" title="visitor-call-sequence" ></p>
 
@@ -437,11 +439,11 @@
 </span><span class='line'>// To start walking the parse tree
 </span><span class='line'>eval.visit(tree);</span></code></pre></td></tr></table></div></figure>
 
-<p>我们首先初始化自制的树遍历器EvalVisitor，然后调用visit()去访问整棵语法分析树。ANTLR运行时提供的Visitor支持代码会在看到根节点时调用visitProg()。在那里，visitProg()会把子树作为参数调用visit方法继续遍历，如此等等。</p>
+<p>我们首先初始化自制的树遍历器EvalVisitor，然后调用visit()去访问整棵语法分析树。ANTLR运行时提供的访问者支持代码会在看到根节点时调用visitProg()。在那里，visitProg()会把子树作为参数调用visit方法继续遍历，如此等等。</p>
 
 <p><img src="/uploads/calc-visitor-hierachy.png" title="calc-visitor-hierachy" ></p>
 
-<p>ANTLR自动生成的Visitor接口和默认实现可以让我们为Visitor方法编写自己的实现，让我们避免必须覆写接口中的每个方法，让我们仅仅聚焦在我们感兴趣的方法上。这种方法减少了我们学习ANTLR必须要花费的时间，让我们回到我们所熟悉的编程语言领域。</p>
+<p>ANTLR自动生成的访问者接口和默认实现可以让我们为访问者方法编写自己的实现，让我们避免必须覆写接口中的每个方法，仅仅聚焦在我们感兴趣的方法上。这种方式减少了我们学习ANTLR必须要花费的时间，让我们回到我们所熟悉的编程语言领域。</p>
 </div>
   
   
@@ -530,9 +532,9 @@
 </tr>
 </tbody></table>
 
-<p>做这个最简单的方法是使用ANTLR的语法分析树Listener机制实现DirectiveListener类，然后它通过监听来自树遍历器触发的事件，输出对应的机器指令。</p>
+<p>做这个最简单的方法是使用ANTLR的语法分析树监听器机制实现DirectiveListener类，然后它通过监听来自树遍历器触发的事件，输出对应的机器指令。</p>
 
-<p>Listener机制的优势是我们不必要自己去做任何树遍历，甚至我们不必要知道遍历语法分析树的运行时如何调用我们的方法，我们只要知道我们的DirectiveListener类得到通知，在与语法规则匹配的短语开始和结束时。这种方法减少了我们学习ANTLR必须要花费的时间，让我们回到我们所熟悉的编程语言领域。</p>
+<p>监听器机制的优势是我们不必要自己去做任何树遍历，甚至我们不必要知道遍历语法分析树的运行时如何调用我们的方法，我们只要知道我们的DirectiveListener类得到通知，在与语法规则匹配的短语开始和结束时。这种方式减少了我们学习ANTLR必须要花费的时间，让我们回到我们所熟悉的编程语言领域。</p>
 
 <p>这里不需要创建新的语法规则，还是继续沿用前文Calc.g所包含的语法，标签也要保留：</p>
 
@@ -613,7 +615,7 @@
 </pre></td><td class='code'><pre><code class=''><span class='line'>Calc.tokens         CaclLexer.java          CalcParser.java
 </span><span class='line'>CalcLexer.tokens    CalcBaseListener.java   CalcListener.java</span></code></pre></td></tr></table></div></figure>
 
-<p>正如这里我们看到的，ANTLR会为我们自动生成Listener基础设施。其中CalcListener是语法和Listener对象之间的关键接口，描述我们可以实现的回调方法：</p>
+<p>正如这里我们看到的，ANTLR会为我们自动生成监听器基础设施。其中CalcListener是语法和监听器对象之间的关键接口，描述我们可以实现的回调方法：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -628,7 +630,7 @@
 </span><span class='line'>    ...
 </span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>CalcBaseListener则是ANTLR生成的一组空的默认实现。ANTLR内建的树遍历器会去触发在Listener中像enterProg()和exitProg()这样的一串回调方法，如同它对语法分析树执行了一次深度优先遍历。为响应树遍历器触发的事件，我们的DirectiveListener需要继承CalcBaseListener并实现一些方法。我们不需要实现全部的接口方法，我们也不需要去覆写每个enter和exit方法，我们只需要去覆写那些我们感兴趣的回调方法。</p>
+<p>CalcBaseListener则是ANTLR生成的一组空的默认实现。ANTLR内建的树遍历器会去触发在监听器中像enterProg()和exitProg()这样的一串回调方法，如同它对语法分析树执行了一次深度优先遍历。为响应树遍历器触发的事件，我们的DirectiveListener需要继承CalcBaseListener并实现一些方法。我们不需要实现全部的接口方法，我们也不需要去覆写每个enter和exit方法，我们只需要去覆写那些我们感兴趣的回调方法。</p>
 
 <p>在本例中，我们需要通过覆写6个方法对6个事件——当树遍历器exit那些有标签的选项时触发——作出响应。我们的基本策略是当这些事件发生时打印出已转换的指令。以下是完整的实现代码：</p>
 
@@ -754,7 +756,7 @@
 </span><span class='line'>    }
 </span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>这个程序和前文Calc.java中的代码极度相似，区别只在12-13行。这两行代码负责创建树遍历器，然后让树遍历器去遍历那颗从语法分析器返回的语法分析树，当树遍历器遍历时，它就会触发调用到我们的DirectiveListener中实现的方法。此外，通过传入一个不同的Listener实现我们能简单地生成完全不同的输出。Listener机制有效地隔离了语法和语言应用，使语法可以被其它应用再次使用。</p>
+<p>这个程序和前文Calc.java中的代码极度相似，区别只在12-13行。这两行代码负责创建树遍历器，然后让树遍历器去遍历那颗从语法分析器返回的语法分析树，当树遍历器遍历时，它就会触发调用到我们的DirectiveListener中实现的方法。此外，通过传入一个不同的监听器实现我们能简单地生成完全不同的输出。监听器机制有效地隔离了语法和语言应用，使语法可以被其它应用再次使用。</p>
 
 <p>现在一切完备，让我们尝试着去编译和运行它吧！下面是完整的命令序列：</p>
 
@@ -805,8 +807,6 @@
 </span><span class='line'>LDC 3
 </span><span class='line'>MUL
 </span><span class='line'>RET</span></code></pre></td></tr></table></div></figure>
-
-<p>代码下载：<a href="https://github.com/dohkoos/antlr4-calculator">https://github.com/dohkoos/antlr4-calculator</a></p>
 </div>
   
   
@@ -926,11 +926,11 @@
 
 <p><img src="/uploads/calc-parse-tree.png" title="calc-parse-tree" ></p>
 
-<h3 id="使用visitor模式计算结果">使用Visitor模式计算结果</h3>
+<h3 id="使用访问者模式计算结果">使用访问者模式计算结果</h3>
 
-<p>为了给前面的算术表达式语法分析器计算出结果，我们还需要做些其它的事情。</p>
+<p>为了让前面的算术表达式语法分析器计算出结果，我们还需要做些其它的事情。</p>
 
-<p>ANTLR v4鼓励我们保持语法的整洁，使用语法分析树Visitor和其它遍历器来实现语言应用。不过在接触这些之前，我们需要对语法做些修改。</p>
+<p>ANTLR v4鼓励我们使用语法分析树访问者和其它遍历器来实现语言应用，以保持语法的整洁。不过在接触这些之前，我们需要对语法做些修改。</p>
 
 <p>首先，我们需要用标签标明规则的选项，标签可以是和规则名没有冲突的任意标志符。如果选项上没有标签，ANTLR只会为每个规则生成一个visit方法。</p>
 
@@ -980,12 +980,12 @@
 
 <p>现在，我们有了一个增强型的语法。接下来要做的事情是实现一个EvalVisitor类，它通过遍历表达式语法分析树计算和返回值。</p>
 
-<p>执行下面的命令，让ANTLR生成Visitor接口和它的默认实现，其中-no-listener参数是告诉ANTLR不再生成Listener相关的代码：</p>
+<p>执行下面的命令，让ANTLR生成访问者接口和它的默认实现，其中-no-listener参数是告诉ANTLR不再生成监听器相关的代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'>antlr -no-listener -visitor Calc.g</span></code></pre></td></tr></table></div></figure>
 
-<p>所有被标签标明的选项在生成的Visitor接口中都定义了一个visit方法：</p>
+<p>所有被标签标明的选项在生成的访问者接口中都定义了一个visit方法：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1188,8 +1188,6 @@
 </span><span class='line'>(prog (stat (expr 193)) (stat a = (expr 5)) (stat b = (expr 6))
 </span><span class='line'> (stat (expr (expr a) + (expr (expr b) * (expr 2)))) (stat (expr
 </span><span class='line'> (expr ( (expr (expr 1) + (expr 2)) )) * (expr 3))))</span></code></pre></td></tr></table></div></figure>
-
-<p>代码下载：<a href="https://github.com/dohkoos/antlr4-calculator">https://github.com/dohkoos/antlr4-calculator</a></p>
 </div>
   
   
@@ -1225,7 +1223,7 @@
 
 <h3 id="安装antlr">安装ANTLR</h3>
 
-<p>ANTLR是由Java写成的，所以在安装ANTLR前必须保证已经安装有Java 1.6或以上版本。你可以到 <a href="http://www.antlr.org/download.html">http://www.antlr.org/download.html</a> 下载ANTLR的最新版本，或者也可使用命令行工具。</p>
+<p>ANTLR是由Java写成的，所以在安装ANTLR前必须保证已经安装有Java 1.6或以上版本。你可以到 <a href="http://www.antlr.org/download.html">http://www.antlr.org/download.html</a> 下载ANTLR的最新版本，或者也可使用命令行工具下载：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'>curl -O http://www.antlr.org/download/antlr-4.5.1-complete.jar</span></code></pre></td></tr></table></div></figure>
@@ -1237,7 +1235,7 @@
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'>java -jar antlr-4.5.1-complete.jar  # 启动org.antlr.v4.Tool</span></code></pre></td></tr></table></div></figure>
 
-<p>如果正常会看到以下帮助信息：</p>
+<p>如果正常的话会看到以下帮助信息：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1299,7 +1297,7 @@
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'>compile *.java</span></code></pre></td></tr></table></div></figure>
 
-<p>到此，我们已经有了一个可以被HelloParser和HelloLexer利用的可执行的识别器，只缺一个主程序去触发语言识别了。</p>
+<p>到此，我们已经有了一个可以被执行的识别器，只缺一个主程序去触发语言识别了。</p>
 
 <p>ANTLR运行库有提供称之为TestRig的测试工具，可以让你不创建主程序就能测试语法。TestRig使用Java反射调用编译后的识别器，它能显示关于识别器如何匹配输入的大量信息。</p>
 
@@ -1399,23 +1397,25 @@
 <li>parse tree 语法分析树，表示语法如何匹配输入的数据结构。</li>
 <li>tree walker 树遍历器</li>
 <li>top-down 自顶向下</li>
+<li>listener 监听器</li>
+<li>visitor 访问者</li>
 <li>backtracking 回溯</li>
 <li>semantic predicates 语义谓词</li>
 </ul>
 
 <p>ANTLR v4是一款强大的语法分析器生成器，可以用来读取，处理，执行和转换结构化文本或二进制文件。通过语法文件，ANTLR可以自动生成词法分析器、语法分析树和树遍历器。</p>
 
-<p>ANTLR语法分析器使用一种新的分析技术称之为<code>Adaptive LL(*)</code>或<code>ALL(*)</code>，<code>ALL(*)</code>是v3版本<code>LL(*)</code>的扩展，它可以在生成的语法分析器执行前在运行时动态地执行语法分析而不是静态地。</p>
+<p>ANTLR v4的语法分析器使用一种新的分析技术称之为<code>Adaptive LL(*)</code>或<code>ALL(*)</code>，是v3 <code>LL(*)</code>的扩展，它可以在生成的语法分析器执行前在运行时动态地执行语法分析而不是静态地。</p>
 
 <p>ANTLR v4极大地简化了用来匹配像算术表达式语法结构的语法规则。对于传统的自顶向下的语法分析器生成器像ANTLR v3，识别表达式的最自然的语法是无效的，v4则不然。ANTLR v4会自动地重写左递归规则为非左递归等价物，唯一的约束是左递归必须是直接的——规则立刻引用它自身。</p>
 
-<p>此前，ANTLR v3用户必须用树构造操作增强语法。现在，ANTLR v4会自动构建语法分析树，也会以Listener和Visitor模式实现的形式自动生成树遍历器。所以，你不再需要构建树语法，可以用Visitor模式代替。降低在语法中嵌入动作的重要性使得甚至可以在不重新编译生成的语法分析器的情况下在不同的应用中重用相同的语法。</p>
+<p>此前，ANTLR v3用户必须用树构造操作来增强语法。现在，ANTLR v4会自动构建语法分析树，也会以监听器和访问者模式实现的形式自动生成树遍历器。所以，你不再需要构建树语法，可以用访问者模式代替。降低在语法中嵌入动作的重要性使得甚至可以在不重新编译生成的语法分析器的情况下在不同的应用中重用相同的语法。</p>
 
 <p>ANTLR v3的<code>LL(*)</code>分析策略弱于v4的<code>ALL(*)</code>，因此v3有时候需要依赖回溯去正确地分析输入的短语。回溯使得很难去通过生成的语法分析器步进调试语法，因为语法分析器可能会分析相同的输入多次（递归地）；回溯也让语法分析器在无效的输入之上给出一个好的错误消息更难。</p>
 
 <h3 id="这本书里有什么？">这本书里有什么？</h3>
 
-<p>免费在线文档提供足够的资料学习基本的语法和语义，但没有详细地解释ANTLR的概念。只有这本书解释了如何识别语言的语法模式，以及如何用ANTLR语法表示它们。这本书也将帮助你充分的了解ANTLR，是成为高级用户的必读物。</p>
+<p>免费在线文档提供了足够的资料用于学习基本的语法和语义，但没有详细地解释ANTLR的概念。只有这本书解释了如何识别语言的语法模式，以及如何用ANTLR语法表示它们。这本书也将帮助你充分的了解ANTLR，是成为高级用户的必读物。</p>
 
 <p>这本书被组织成四个部分。</p>
 

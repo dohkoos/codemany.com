@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="在ANTLR 4权威参考读书笔记（3）以及ANTLR 4权威参考读书笔记（4）中我们分别用Visitor和Listener机制实现了计算器的解释执行和编译执行。但并没有给出这两种机制的太多细节，这次就来详细地讲讲。 ANTLR在它的运行库中为两种树遍历机制提供支持。默认情况下， &hellip;">
+  <meta name="description" content="在ANTLR 4权威参考读书笔记（3）以及ANTLR 4权威参考读书笔记（4）中我们分别用访问者和监听器机制实现了计算器的解释执行和编译执行。但并没有给出这两种机制的太多细节，这次就来详细地讲讲。 ANTLR在它的运行库中为两种树遍历机制提供支持。默认情况下，ANTLR生成一个语法分析树监听器接口 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -92,15 +92,15 @@
   </header>
 
 
-<div class="entry-content"><p>在<a href="/blog/reading-notes-the-definitive-antlr4-reference-part3/">ANTLR 4权威参考读书笔记（3）</a>以及<a href="/blog/reading-notes-the-definitive-antlr4-reference-part4/">ANTLR 4权威参考读书笔记（4）</a>中我们分别用Visitor和Listener机制实现了计算器的解释执行和编译执行。但并没有给出这两种机制的太多细节，这次就来详细地讲讲。</p>
+<div class="entry-content"><p>在<a href="/blog/reading-notes-the-definitive-antlr4-reference-part3/">ANTLR 4权威参考读书笔记（3）</a>以及<a href="/blog/reading-notes-the-definitive-antlr4-reference-part4/">ANTLR 4权威参考读书笔记（4）</a>中我们分别用访问者和监听器机制实现了计算器的解释执行和编译执行。但并没有给出这两种机制的太多细节，这次就来详细地讲讲。</p>
 
-<p>ANTLR在它的运行库中为两种树遍历机制提供支持。默认情况下，ANTLR生成一个语法分析树Listener接口，在其中定义了回调方法，用于响应被内建的树遍历器触发的事件。</p>
+<p>ANTLR在它的运行库中为两种树遍历机制提供支持。默认情况下，ANTLR生成一个语法分析树监听器接口，在其中定义了回调方法，用于响应被内建的树遍历器触发的事件。</p>
 
-<p>在Listener和Visitor机制之间最大的不同是：Listener方法被ANTLR提供的遍历器对象调用；而Visitor方法必须显式的调用visit方法遍历它们的子节点，在一个节点的子节点上如果忘记调用visit方法就意味着那些子树没有得到访问。</p>
+<p>在监听器和访问者机制之间最大的不同是：监听器方法被ANTLR提供的遍历器对象调用；而访问者方法必须显式的调用visit方法遍历它们的子节点，在一个节点的子节点上如果忘记调用visit方法就意味着那些子树没有得到访问。</p>
 
-<p>让我们首先从Listener开始。在我们了解Listener之后，我们也将看到ANTLR如何生成遵循Visitor设计模式的树遍历器。</p>
+<p>让我们首先从监听器开始。在我们了解监听器之后，我们也将看到ANTLR如何生成遵循访问者设计模式的树遍历器。</p>
 
-<h3 id="语法分析树listener">语法分析树Listener</h3>
+<h3 id="语法分析树监听器">语法分析树监听器</h3>
 
 <p>在Calc.java中有这样两行代码：</p>
 
@@ -109,21 +109,21 @@
 </pre></td><td class='code'><pre><code class=''><span class='line'>ParseTreeWalker walker = new ParseTreeWalker();
 </span><span class='line'>walker.walk(new DirectiveListener(), tree);</span></code></pre></td></tr></table></div></figure>
 
-<p>类ParseTreeWalker是ANTLR运行时提供的用于遍历语法分析树和触发Listener中回调方法的树遍历器。ANTLR工具根据Calc.g中的语法自动生成ParseTreeListener接口的子接口CalcListener和默认实现CalcBaseListener，其中含有针对语法中每个规则的enter和exit方法。DirectiveListener是我们编写的继承自CalcBaseListener的包含特定应用代码的实现，把它传递给树遍历器后，树遍历器在遍历语法分析树时就会触发DirectiveListener中的回调方法。</p>
+<p>类ParseTreeWalker是ANTLR运行时提供的用于遍历语法分析树和触发监听器中回调方法的树遍历器。ANTLR工具根据Calc.g中的语法自动生成ParseTreeListener接口的子接口CalcListener和默认实现CalcBaseListener，其中含有针对语法中每个规则的enter和exit方法。DirectiveListener是我们编写的继承自CalcBaseListener的包含特定应用代码的实现，把它传递给树遍历器后，树遍历器在遍历语法分析树时就会触发DirectiveListener中的回调方法。</p>
 
 <p><img src="/uploads/calc-listener-hierachy.png" title="calc-listener-hierachy" ></p>
 
-<p>下图左边的语法分析树显示ParseTreeWalker执行了一次深度优先遍历，由粗虚线表示，箭头方向代表遍历方向。右边显示的是语法分析树的完整调用序列，它们由ParseTreeWalker触发调用。当树遍历器遇到规则assign的节点时，它触发enterAssign()并且给它传递AssignContext语法分析树节点。在树遍历器访问完assign节点的所有子节点后，它触发exitAssign()。</p>
+<p>下图左边的语法分析树显示ParseTreeWalker执行了一次深度优先遍历，由粗虚线表示，箭头方向代表遍历方向。右边显示的是语法分析树的完整调用序列，它们由ParseTreeWalker触发调用。当树遍历器遇到规则assign的节点时，它触发enterAssign()并且给它传递AssignContext这个语法分析树节点的上下文。在树遍历器访问完assign节点的所有子节点后，它触发exitAssign()。</p>
 
 <p><img src="/uploads/listener-call-sequence.png" title="listener-call-sequence" ></p>
 
-<p>Listener机制的强大之处在于所有都是自动的。我们不必要写语法分析树遍历器，而且我们的Listener方法也不必要显式地访问它们的子节点。</p>
+<p>监听器机制的强大之处在于所有都是自动的。我们不必要写语法分析树遍历器，而且我们的监听器方法也不必要显式地访问它们的子节点。</p>
 
-<h3 id="语法分析树visitor">语法分析树Visitor</h3>
+<h3 id="语法分析树访问者">语法分析树访问者</h3>
 
-<p>有些情况下，我们实际想要控制的是遍历本身，在那里我们可以显式地调用visit方法去访问子树节点。选项-visitor告诉ANTLR工具从相应语法生成Visitor接口和默认实现，其中含有针对语法中每个规则的visit方法。</p>
+<p>有些情况下，我们实际想要控制的是遍历本身，在那里我们可以显式地调用visit方法去访问子树节点。参数-visitor告诉ANTLR工具从相应语法生成访问者接口和默认实现，其中含有针对语法中每个规则的visit方法。</p>
 
-<p>下图是我们熟悉的Visitor模式操作在语法分析树上。左边部分的粗虚线表示语法分析树的深度优先遍历，箭头方向代表遍历方向。右边部分指明Visitor中的方法调用序列。</p>
+<p>下图是我们熟悉的访问者模式操作在语法分析树上。左边部分的粗虚线表示语法分析树的深度优先遍历，箭头方向代表遍历方向。右边部分指明访问者中的方法调用序列。</p>
 
 <p><img src="/uploads/visitor-call-sequence.png" title="visitor-call-sequence" ></p>
 
@@ -136,11 +136,11 @@
 </span><span class='line'>// To start walking the parse tree
 </span><span class='line'>eval.visit(tree);</span></code></pre></td></tr></table></div></figure>
 
-<p>我们首先初始化自制的树遍历器EvalVisitor，然后调用visit()去访问整棵语法分析树。ANTLR运行时提供的Visitor支持代码会在看到根节点时调用visitProg()。在那里，visitProg()会把子树作为参数调用visit方法继续遍历，如此等等。</p>
+<p>我们首先初始化自制的树遍历器EvalVisitor，然后调用visit()去访问整棵语法分析树。ANTLR运行时提供的访问者支持代码会在看到根节点时调用visitProg()。在那里，visitProg()会把子树作为参数调用visit方法继续遍历，如此等等。</p>
 
 <p><img src="/uploads/calc-visitor-hierachy.png" title="calc-visitor-hierachy" ></p>
 
-<p>ANTLR自动生成的Visitor接口和默认实现可以让我们为Visitor方法编写自己的实现，让我们避免必须覆写接口中的每个方法，让我们仅仅聚焦在我们感兴趣的方法上。这种方法减少了我们学习ANTLR必须要花费的时间，让我们回到我们所熟悉的编程语言领域。</p>
+<p>ANTLR自动生成的访问者接口和默认实现可以让我们为访问者方法编写自己的实现，让我们避免必须覆写接口中的每个方法，仅仅聚焦在我们感兴趣的方法上。这种方式减少了我们学习ANTLR必须要花费的时间，让我们回到我们所熟悉的编程语言领域。</p>
 </div>
 
 
