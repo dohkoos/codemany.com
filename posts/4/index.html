@@ -9,12 +9,10 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="abcde五人打渔，打完睡觉，a先醒来，扔掉1条鱼，把剩下的分成5份，拿1份走了；b再醒来，也扔掉1条，把剩下的分成5份，拿1份走了；然后cde都按上面的方法取鱼。问他们最少打了多少条鱼？ 渔民
-醒来时鱼的总数
-取走的鱼数 a
-x1 = x
-(x1 - 1) / 5 b
-x2 = 4 * (x1 &hellip;">
+  <meta name="description" content="设计抽奖活动时，我们总是要控制抽奖物品出现的概率，让好的东西很难被抽到；
+设计游戏打怪时，我们要控制打怪时的命中概率，要控制宝物掉出的概率；
+网站的置顶广告，我们也要根据广告主的广告费用控制广告的出现时间；
+设计负载均衡算法时，我们要根据服务器的性能控制服务器被选中的可能。 深入思考这些需求， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -78,6 +76,127 @@ x2 = 4 * (x1 &hellip;">
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/random-with-weight-function/">带权随机函数</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2015-11-18T18:51:05+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>6:51 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><ul>
+<li>设计抽奖活动时，我们总是要控制抽奖物品出现的概率，让好的东西很难被抽到；</li>
+<li>设计游戏打怪时，我们要控制打怪时的命中概率，要控制宝物掉出的概率；</li>
+<li>网站的置顶广告，我们也要根据广告主的广告费用控制广告的出现时间；</li>
+<li>设计负载均衡算法时，我们要根据服务器的性能控制服务器被选中的可能。</li>
+</ul>
+
+<p>深入思考这些需求，你会发现它们都有相通的概念：每次从多个候选项中随机选取其中一项，要求每个候选项的出现都有一定的概率。</p>
+
+<p>假设有这样的候选项和对应概率：a:20%，b:25%，c:40%，d:15%。现在，把每个候选项的概率用一个称之为权重的正整数表示（最简单的方法是把百分符号去掉）。那么，</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>实际概率 = 候选项权重 / 权重总和 * 100%</span></code></pre></td></tr></table></div></figure>
+
+<p>事实上，权重的总和不一定要等于100，可以是任意大小。</p>
+
+<h3 id="算法描述">算法描述</h3>
+
+<p>依次将各候选项的权重从原点开始放在x轴坐标上首尾相连。这样，每个候选项对应一个取值区间，在总区间范围内随机选取一个值，该值所在区间就对应了选中的项。</p>
+
+<p><img src="/uploads/random-with-weight.png" title="random-with-weight" ></p>
+
+<h3 id="ruby代码实现">Ruby代码实现</h3>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def random(weight)
+</span><span class='line'>  # 获取所有候选项的权重总和
+</span><span class='line'>  total_weight = weight.inject { |r, e| r + e }
+</span><span class='line'>
+</span><span class='line'>  # 随机选取一个介于0到权重总和之间的整数
+</span><span class='line'>  rand_value = rand(total_weight)  # [0, total_weight)
+</span><span class='line'>
+</span><span class='line'>  # 扫描所有候选项，并且保留候选项权重的累积数。
+</span><span class='line'>  # 每当随机数小于累积数时，就停止并选出当前项。
+</span><span class='line'>  weight_barrier = 0
+</span><span class='line'>  weight.each_index do |i|
+</span><span class='line'>    weight_barrier += weight[i]
+</span><span class='line'>
+</span><span class='line'>    break i if rand_value &lt; weight_barrier
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>该实现不能保证每个候选项都恰好按正确的比例被选中，但当次数足够多时，应该会十分接近预先设定的比例。</p>
+
+<h3 id="实际案例">实际案例</h3>
+
+<p>要求写int[] get_weight(int[] weight)函数，返回的是权重的索引。其中weight是权重的数字数组，最终的结果是要大概保证按照给定的比例。</p>
+
+<ul>
+<li>比如weight为[1, 2, 2]，那么权重比例为1:2:2，执行10次后，大概的输出是0 1 1 0 1 1 2 2 2 2；</li>
+<li>比如weight为[100, 0]，那么权重比例为100:0，执行10次后，大概的输出是0 0 0 0 0 0 0 0 0 0；</li>
+<li>比如weight为[1, 1]，那么权重比例为1:1，执行10次后，大概的输出是0 1 0 1 0 0 1 1 0 1。</li>
+</ul>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def get_weight(weight)
+</span><span class='line'>  10.times.map { random(weight) }
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>weight = [1, 2, 2]
+</span><span class='line'>puts get_weight(weight).join(' ')
+</span><span class='line'>
+</span><span class='line'>weight = [100, 0]
+</span><span class='line'>puts get_weight(weight).join(' ')
+</span><span class='line'>
+</span><span class='line'>weight = [1, 1]
+</span><span class='line'>puts get_weight(weight).join(' ')</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1051,120 +1170,6 @@ x2 = 4 * (x1 &hellip;">
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/elasticsearch-installation/">Elasticsearch安装</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2015-02-10T23:50:34+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>10</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>11:50 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p><a href="http://elastic.co/">Elasticsearch</a>是一款基于<a href="http://lucene.apache.org/">Lucene</a>构建的开源分布式全文检索服务器。提供RESTful API，采用多shard的方式保证数据安全，提供自动resharding的功能，能够很轻松地进行大规模的横向扩展，以支撑PB级的结构化和非结构化海量数据的处理。</p>
-
-<p>安装Java 1.7</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mkdir /usr/java
-</span><span class='line'>cd /usr/java
-</span><span class='line'>wget --no-check-certificate --no-cookies --header "Cookie: oraclelicense=accept-securebackup-cookie" http://download.oracle.com/otn-pub/java/jdk/7u67-b01/jdk-7u67-linux-x64.rpm
-</span><span class='line'>rpm -ivh jdk-7u67-linux-x64.rpm
-</span><span class='line'>java -version
-</span><span class='line'>echo $JAVA_HOME</span></code></pre></td></tr></table></div></figure>
-
-<p>安装Elasticsearch 1.4.1</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mkdir /usr/elasticsearch
-</span><span class='line'>cd /usr/elasticsearch
-</span><span class='line'>wget https://download.elastic.co/elasticsearch/elasticsearch/elasticsearch-1.4.1.tar.gz
-</span><span class='line'>tar -xvf elasticsearch-1.4.1.tar.gz
-</span><span class='line'>cd elasticsearch-1.4.1
-</span><span class='line'>./bin/elasticsearch</span></code></pre></td></tr></table></div></figure>
-
-<p>然后访问<code>http://localhost:9200/?pretty</code>就可以看到类似下面的返回：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>{
-</span><span class='line'>  "status" : 200,
-</span><span class='line'>  "name" : "Powerpax",
-</span><span class='line'>  "cluster_name" : "elasticsearch",
-</span><span class='line'>  "version" : {
-</span><span class='line'>    "number" : "1.4.1",
-</span><span class='line'>    "lucene_version" : "4.10.2"
-</span><span class='line'>  },
-</span><span class='line'>  "tagline" : "You Know, for Search"
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>只是运行起来是不够的，通常我们需要将Elasticsearch安装成服务，设置成开机自启动什么的。这要用到<a href="https://github.com/elasticsearch/elasticsearch-servicewrapper">elasticsearch-servicewrapper</a>了。下载解压后把service文件夹拷贝到elasticsearch-1.4.1/bin目录下。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>./bin/service/elasticsearch install  # 安装服务
-</span><span class='line'>./bin/service/elasticsearch start  # 运行服务</span></code></pre></td></tr></table></div></figure>
-
-<p>其它选项：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>console 以前台方式运行Elasticsearch
-</span><span class='line'>stop 停止Elasticsearch
-</span><span class='line'>remove 移除系统启动中的Elasticsearch服务（init.d/service）</span></code></pre></td></tr></table></div></figure>
-
-<p>需要注意的是，在小内存机器上运行时，需要限制下内存大小，否则服务会无法启动，出现如下警告信息：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Starting Elasticsearch...
-</span><span class='line'>Waiting for Elasticsearch......................
-</span><span class='line'>WARNING: Elasticsearch may have failed to start.</span></code></pre></td></tr></table></div></figure>
-
-<p>打开bin/service/elasticsearch.conf文件，设置Elasticsearch能够分配的JVM内存大小。一般情况下，设置成总内存的50%比较好。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>set.default.ES_HEAP_SIZE=512</span></code></pre></td></tr></table></div></figure>
-
-<p>如果要限制ES_MIN_MEM和ES_MAX_MEM，建议设置成一样大，避免出现频繁的内存分配。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/5">&larr; Older</a>
@@ -1182,6 +1187,10 @@ x2 = 4 * (x1 &hellip;">
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/chess-mess-master-development-record-part1/">象棋残局大师开发实录（1）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/the-power-of-protocol-analyzers/">协议分析器的威力</a>
       </li>
     
@@ -1197,10 +1206,6 @@ x2 = 4 * (x1 &hellip;">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part18/">ANTLR 4权威参考读书笔记（18）</a>
       </li>
     
-      <li class="post">
-        <a href="/blog/how-to-build-a-news-website-layout-with-flexbox/">如何使用Flexbox构建新闻站点布局</a>
-      </li>
-    
   </ul>
 </section>
 <section>
@@ -1214,7 +1219,7 @@ x2 = 4 * (x1 &hellip;">
   <ul class="tag-cloud">
     <a style="font-size: 135%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 131%" href="/tags/android/">Android</a>
+<a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
 <a style="font-size: 107%" href="/tags/css/">CSS</a>
 <a style="font-size: 110%" href="/tags/crack/">Crack</a>
@@ -1296,7 +1301,7 @@ x2 = 4 * (x1 &hellip;">
     </div>
   </div>
   <footer role="contentinfo"><p>
-  Copyright &copy; 2016 - dohkoos -
+  Copyright &copy; 2017 - dohkoos -
   <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
 </p>
 
