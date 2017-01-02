@@ -111,7 +111,7 @@
 <li>用户界面。有了它，程序才可以用。</li>
 </ol>
 
-<p>但这里开发的程序主要是用于研究象棋残局的，所以它还需要一些特殊的辅助功能。在最理想的情况下，残局的人机博弈走法应该和参考走法相同。但有时候我们会发现黑方会走出不在参考走法上的步骤。因为参考走法是经过多年的演变而来，通常是最优的，所以我们需要能对黑方的走棋进行纠错。当然，最好的做法是提高博弈算法的能力，但智能的改进不是一蹴而就的，纠错功能的提供只是作为这种无奈的补充。假如黑方的走法确实比参考走法更优，并且我们发现黑方这样走以后红方似乎找不到可以赢棋或者和棋的走法，这时就需要机器帮助我们计算出最佳走法。此外，轮到红方走棋时可能会发现有貌似比参考走法上更优的走法需要验证，这时我们需要在验证失败后能够回退到不同走法的分叉点上。</p>
+<p>但我要开发的程序主要是用于研究象棋残局的，所以它还需要一些特殊的辅助功能。在最理想的情况下，残局的人机博弈走法应该和参考走法相同。但有时候我们会发现黑方会走出不在参考走法上的步骤。因为参考走法是经过多年的演变而来，通常是最优的，所以我们需要能对黑方的走棋进行纠错。当然，最好的做法是提高博弈算法的能力，但智能的改进不是一蹴而就的，纠错功能的提供只是作为这种无奈的补充。假如黑方的走法确实比参考走法更优，并且我们发现黑方这样走以后红方似乎找不到可以赢棋或者和棋的走法，这时就需要机器帮助我们计算出最佳走法。此外，轮到红方走棋时可能会发现有貌似比参考走法上更优的走法需要验证，这时我们需要在验证失败后能够回退到不同走法的分叉点上。</p>
 
 <p>带有这些特殊需求的游戏原型界面如下图所示：</p>
 
@@ -400,6 +400,128 @@
 <p><img src="/uploads/effective-icons-19.png" title="effective-icons-19" ></p>
 
 <p>最终，我想说创建优秀图标的方法不仅仅是学习Illustrator技巧，尽管它们也是必需的。最好的做法是练习把你周围看到的事物分解成简单图形。你在这点上越是变得更好，你越是能够成为更高超的图像设计师！加油！</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part20/">ANTLR 4权威参考读书笔记（20）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-07-03T18:37:26+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2016</span></span> <span class='time'>6:37 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>单独的语法不是很有用，因为相关的语法分析器只能告诉我们某个输入句子是否遵守语言规格。为构建语言应用，我们需要语法分析器在看到特定的输入句子、短语或者记号时触发特定的动作。这些短语-动作对的集合表示语言应用或者至少是在语法和一个更大的周边应用之间的接口。</p>
+
+<p>我们可以使用语法分析树监听器和访问者构建语言应用。监听器是一个响应规则进入和退出事件的对象，这些短语识别事件在语法分析树遍历器发现和完成节点时触发。为了支持应用必须控制树是如何被遍历的这种情况，ANTLR生成的语法分析树也支持著名的树访问者模式。</p>
+
+<p>监听器和访问者之间最大的不同是，监听器方法不对显式地调用方法去遍历它们的子树负责，而访问者必须显式地触发访问子节点以保持树的遍历继续。通过这些显式的访问子树的调用，访问者控制遍历的顺序以及多少树被访问。为方便起见，我们使用术语“事件方法”来指代监听器回调或者访问者方法。</p>
+
+<p>为了确切地知道ANTLR为我们构建了什么样的树遍历设施以及为什么，让我们首先看看监听器机制的起源以及如何使用监听器和访问者把特定应用的代码和语法分离。</p>
+
+<h3 id="从嵌入动作演化到监听器">从嵌入动作演化到监听器</h3>
+
+<p>监听器和访问者机制将语法从应用代码中解耦，提供了一些令人信服的好处。这种解耦很好地封装了应用程序，而不是把它切割成碎片分散到语法中的各个地方。没有嵌入动作，我们可以在不同的应用中复用相同的语法，甚至不需要重新编译生成的语法分析器。如果没有嵌入动作，ANTLR还可以用相同的语法生成不同编程语言的语法分析器。集成语法缺陷修复或更新也更容易，因为我们不必担心嵌入动作导致的合并冲突。</p>
+
+<p>接下来，我们将探讨从带有嵌入动作的语法到完全解耦的语法和应用的演化。以下含有用«...»描述的嵌入动作的属性文件语法读取属性文件，每行一个属性赋值。像«start file»这样的动作只是Java代码适当的替代。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar PropertyFile;
+</span><span class='line'>file : {«start file»} prop+ {«finish file»} ;
+</span><span class='line'>prop : ID '=' STRING '\n' {«process property»} ;
+</span><span class='line'>ID   : [a-z]+ ;
+</span><span class='line'>STRING : '"' .*? '"' ;</span></code></pre></td></tr></table></div></figure>
+
+<p>这样的紧密耦合把语法束缚到一个特定的应用上。一个更好的方法是创建由ANTLR生成的语法分析器PropertyFileParser的子类，然后把嵌入动作转换成方法。重构仅留下不重要的方法调用在语法中触发新创建方法的动作，然后，通过子类化语法分析器，我们可以实现任意数量的不同应用而无需修改语法。这样的重构看起来像：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar PropertyFile;
+</span><span class='line'>@members {
+</span><span class='line'>    void startFile() { }    // blank implementations
+</span><span class='line'>    void finishFile() { }
+</span><span class='line'>    void defineProperty(Token name, Token value) { }
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>file : {startFile();} prop+ {finishFile();} ;
+</span><span class='line'>prop : ID '=' STRING '\n' {defineProperty($ID, $STRING)} ;
+</span><span class='line'>ID   : [a-z]+ ;
+</span><span class='line'>STRING : '"' .*? '"' ;</span></code></pre></td></tr></table></div></figure>
+
+<p>解耦可以让语法被不同的应用复用，但语法因为方法调用的关系仍然被绑定在Java上。</p>
+
+<p>为演示已重构语法的复用性，让我们构建两个不同的应用。首先从遇到属性后只是打印它们的那个开始。这个过程只是去扩展由ANTLR生成的语法分析器类和覆盖一个或多个由语法触发的方法。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class PropertyFilePrinter extends PropertyFileParser {
+</span><span class='line'>    void defineProperty(Token name, Token value) {
+</span><span class='line'>        System.out.println(name.getText() + "=" + value.getText());
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>由于ANTLR生成的PropertyFileParser类中的默认实现，我们不需要覆盖startFile()或finishFile()。</p>
+
+<p>为了启动这个应用，我们需要创建一个特定的PropertyFilePrinter语法分析器子类的实例，而不是常规的PropertyFileParser的。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>PropertyFileLexer lexer = new PropertyFileLexer(input);
+</span><span class='line'>CommonTokenStream tokens = new CommonTokenStream(lexer);
+</span><span class='line'>PropertyFilePrinter parser = new PropertyFilePrinter(tokens);
+</span><span class='line'>parser.file();    // launch our special version of the parser</span></code></pre></td></tr></table></div></figure>
+
+<p>作为第二个应用，我们把属性加载到一个map中而不是打印它们。我们需要做的就是创建一个新的子类并把不同的功能放到defineProperty()中。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class PropertyFileLoader extends PropertyFileParser {
+</span><span class='line'>    Map&lt;String,String&gt; props = new OrderedHashMap&lt;String, String&gt;();
+</span><span class='line'>    void defineProperty(Token name, Token value) {
+</span><span class='line'>        props.put(name.getText(), value.getText());
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>在语法分析器执行完毕后，字段props将会包含名-值对。</p>
 </div>
   
   
@@ -3138,50 +3260,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part14/">ANTLR 4权威参考读书笔记（14）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-05-16T20:26:22+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>8:26 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>对于大多数语法而言，注释和空格都是语法分析器可以忽略的东西。如果我们不想让注释和空格在语法中到处都是，那么就需要让词法分析器把它们扔掉。不幸的是，这意味着任何后续的处理步骤都不能再访问注释和空格。保留但忽略注释和空格的秘密是把这些发送给语法分析器的记号放到一个“隐藏通道”中。因为语法分析器只能调谐到单个通道，所以我们可以把任何我们想要的东西传递到其它通道中。这里是如何实现的语法：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>COMMENT
-</span><span class='line'>    : '/*' .*? '*/' -&gt; channel(HIDDEN)    // match anything between /* and */
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>WS  : [ \r\t\n]+    -&gt; channel(HIDDEN)
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<p>就像我们前面讨论过的<code>-&gt; skip</code>那样，<code>-&gt; channel(HIDDEN)</code>也是一个词法分析器指令。在这里，它设置那些记号的通道号码以便它们可以被语法分析器忽略。记号流仍然维护着原始的记号序列，但在传递记号给语法分析器时会略过隐藏通道中的记号。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/2">&larr; Older</a>
@@ -3209,11 +3287,11 @@
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part19/">ANTLR 4权威参考读书笔记（19）</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part20/">ANTLR 4权威参考读书笔记（20）</a>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part18/">ANTLR 4权威参考读书笔记（18）</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part19/">ANTLR 4权威参考读书笔记（19）</a>
       </li>
     
   </ul>
@@ -3227,7 +3305,7 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 135%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 136%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>

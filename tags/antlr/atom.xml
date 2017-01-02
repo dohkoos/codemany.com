@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: ANTLR | 乐者为王]]></title>
   <link href="http://codemany.com/tags/antlr/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-01-01T21:50:54+08:00</updated>
+  <updated>2017-01-02T20:12:39+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,72 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（20）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part20/"/>
+    <updated>2016-07-03T18:37:26+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part20</id>
+    <content type="html"><![CDATA[<p>单独的语法不是很有用，因为相关的语法分析器只能告诉我们某个输入句子是否遵守语言规格。为构建语言应用，我们需要语法分析器在看到特定的输入句子、短语或者记号时触发特定的动作。这些短语-动作对的集合表示语言应用或者至少是在语法和一个更大的周边应用之间的接口。</p>
+
+<p>我们可以使用语法分析树监听器和访问者构建语言应用。监听器是一个响应规则进入和退出事件的对象，这些短语识别事件在语法分析树遍历器发现和完成节点时触发。为了支持应用必须控制树是如何被遍历的这种情况，ANTLR生成的语法分析树也支持著名的树访问者模式。</p>
+
+<p>监听器和访问者之间最大的不同是，监听器方法不对显式地调用方法去遍历它们的子树负责，而访问者必须显式地触发访问子节点以保持树的遍历继续。通过这些显式的访问子树的调用，访问者控制遍历的顺序以及多少树被访问。为方便起见，我们使用术语“事件方法”来指代监听器回调或者访问者方法。</p>
+
+<p>为了确切地知道ANTLR为我们构建了什么样的树遍历设施以及为什么，让我们首先看看监听器机制的起源以及如何使用监听器和访问者把特定应用的代码和语法分离。</p>
+
+<h3 id="从嵌入动作演化到监听器">从嵌入动作演化到监听器</h3>
+
+<p>监听器和访问者机制将语法从应用代码中解耦，提供了一些令人信服的好处。这种解耦很好地封装了应用程序，而不是把它切割成碎片分散到语法中的各个地方。没有嵌入动作，我们可以在不同的应用中复用相同的语法，甚至不需要重新编译生成的语法分析器。如果没有嵌入动作，ANTLR还可以用相同的语法生成不同编程语言的语法分析器。集成语法缺陷修复或更新也更容易，因为我们不必担心嵌入动作导致的合并冲突。</p>
+
+<p>接下来，我们将探讨从带有嵌入动作的语法到完全解耦的语法和应用的演化。以下含有用«...»描述的嵌入动作的属性文件语法读取属性文件，每行一个属性赋值。像«start file»这样的动作只是Java代码适当的替代。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">grammar PropertyFile;
+file : {«start file»} prop+ {«finish file»} ;
+prop : ID &#39;=&#39; STRING &#39;\n&#39; {«process property»} ;
+ID   : [a-z]+ ;
+STRING : &#39;&quot;&#39; .*? &#39;&quot;&#39; ;
+</code></pre></div>
+<p>这样的紧密耦合把语法束缚到一个特定的应用上。一个更好的方法是创建由ANTLR生成的语法分析器PropertyFileParser的子类，然后把嵌入动作转换成方法。重构仅留下不重要的方法调用在语法中触发新创建方法的动作，然后，通过子类化语法分析器，我们可以实现任意数量的不同应用而无需修改语法。这样的重构看起来像：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">grammar PropertyFile;
+@members {
+    void startFile() { }    // blank implementations
+    void finishFile() { }
+    void defineProperty(Token name, Token value) { }
+}
+
+file : {startFile();} prop+ {finishFile();} ;
+prop : ID &#39;=&#39; STRING &#39;\n&#39; {defineProperty($ID, $STRING)} ;
+ID   : [a-z]+ ;
+STRING : &#39;&quot;&#39; .*? &#39;&quot;&#39; ;
+</code></pre></div>
+<p>解耦可以让语法被不同的应用复用，但语法因为方法调用的关系仍然被绑定在Java上。</p>
+
+<p>为演示已重构语法的复用性，让我们构建两个不同的应用。首先从遇到属性后只是打印它们的那个开始。这个过程只是去扩展由ANTLR生成的语法分析器类和覆盖一个或多个由语法触发的方法。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">class PropertyFilePrinter extends PropertyFileParser {
+    void defineProperty(Token name, Token value) {
+        System.out.println(name.getText() + &quot;=&quot; + value.getText());
+    }
+}
+</code></pre></div>
+<p>由于ANTLR生成的PropertyFileParser类中的默认实现，我们不需要覆盖startFile()或finishFile()。</p>
+
+<p>为了启动这个应用，我们需要创建一个特定的PropertyFilePrinter语法分析器子类的实例，而不是常规的PropertyFileParser的。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">PropertyFileLexer lexer = new PropertyFileLexer(input);
+CommonTokenStream tokens = new CommonTokenStream(lexer);
+PropertyFilePrinter parser = new PropertyFilePrinter(tokens);
+parser.file();    // launch our special version of the parser
+</code></pre></div>
+<p>作为第二个应用，我们把属性加载到一个map中而不是打印它们。我们需要做的就是创建一个新的子类并把不同的功能放到defineProperty()中。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">class PropertyFileLoader extends PropertyFileParser {
+    Map&lt;String,String&gt; props = new OrderedHashMap&lt;String, String&gt;();
+    void defineProperty(Token name, Token value) {
+        props.put(name.getText(), value.getText());
+    }
+}
+</code></pre></div>
+<p>在语法分析器执行完毕后，字段props将会包含名-值对。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（19）]]></title>
@@ -297,48 +363,6 @@ block : &#39;{&#39; stat* &#39;}&#39; ;             // 匹配在括号中的语�
 <p>分析树中的内部树节点是规则引用，叶子是记号引用。从树根到任何节点的路径表示元素的规则调用栈（或者ANTLR生成的递归下降语法分析器调用栈）。路径代表递归嵌套的子树有多个相同规则的引用。规则节点是其下方子树的标签。根节点是expr，所以整棵树是一个表达式。在1之前的那棵expr子树会把整数当作一个表达式。</p>
 
 <p>实现上述模式，我们只需要由选项、记号引用、规则引用组成的语法规则即可。我们还可以把这些元素组成子规则，子规则是裹在括号内的行内规则。我们也可以将子规则标记为“?”或“*”或“+”循环去识别被包围的语法片段多次。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（15）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part15/"/>
-    <updated>2016-05-22T17:51:36+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part15</id>
-    <content type="html"><![CDATA[<p>在聚焦到具体的语法规则内部结构之前，我们要先讨论下语法的整体剖析以及如何形成一套初始的语法骨架。</p>
-
-<p>语法文件通常是由一个命名语法的头和一系列可以彼此调用的规则组成。就像下面这样：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">grammar MyG;
-
-rule1 : «stuff» ;
-rule2 : «more stuff» ;
-...
-</code></pre></div>
-<p>设计语法就是要搞清楚«stuff»是什么？哪个规则是开始规则。这要求我们需要知道给定语言的一系列代表性的输入例子。当然，从语言参考手册甚至另一个语法分析器生成器格式而来的语法也是有帮助的。</p>
-
-<p>正确设计语法的方法是借鉴功能分解或者自顶向下的设计，从粗粒度级别到细粒度级别逐步定义语言结构并把它们编码为语法规则。所以，我们的第一个任务就是找到粗粒度语言结构的名字，同时它也是开始规则。在英语中我们使用sentence，对于XML文件来说它则是document。</p>
-
-<p>设计开始规则的内容是用英语伪代码描述整个输入格式的问题。例如，“a comma-separated-value (CSV) file is a sequence of rows terminated by newlines.”这段文字，在is a左边的至关重要的单词file是规则名字，在is a右边的所有内容则成为在规则定义右则的«stuff»的内容：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">file : «a sequence of rows terminated by newlines» ;
-</code></pre></div>
-<p>然后我们通过描述在开始规则右侧被确定的元素来进行下一个粒度级别的设计。在规则右侧的名词通常是对记号或尚未定义的规则的引用，这些记号是那些我们在正常情况下视为单词、标点符号、运算符的元素。就像单词是英语句子中的原子成分那样，记号在语法规则中也是如此。规则引用则涉及到像row那样需要被分解为更详细部分的其它语言结构。</p>
-
-<p>进入细节的另外一层，我们可以说row是一系列被逗号分隔的field，而field则是一个数字或字符串。就像以下所示：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">row   : «a sequence of fields separated by commas» ;
-field : «number or string» ;
-</code></pre></div>
-<p>当没有规则再需要定义时，我们就得到了语法的一个粗略的草图。</p>
-
-<p>如果有其它格式的语法作为参考的话设计语法会容易的多，但要小心不要盲目地遵循它，否则你会误入歧途的。非ANTLR格式的语法只是让你知道别人是如何决定分解语言中的短语的，它最大的作用就是可以给我们一份规则名称的列表作为参考。</p>
-
-<p>不推荐从参考手册上复制粘贴语法到ANTLR，然后再通过细微的调整让它工作。把它当作一套指南而不是一段代码是更好的办法。为了清晰地描述语法，参考手册通常是相当松散的。这意味着语法能识别大量不在语言中的句子，或者语法可能不够明确，可以用多种方法匹配相同的输入序列。例如，语法可能会说表达式可以调用一个构建器或者访问一个函数，问题是像T(i)这样的输入可以同时匹配两者。理想情况下，在语法中是不能有这样的二义性的，每个输入句子我们只需要一种解释。</p>
-
-<p>在另一个极端，参考手册中的语法有时过于明确地说明了规则。有些约束是需要在分析完输入后实施的，而不是试图对语法结构实施约束。例如，W3C XML语法就显式地指定标签中什么地方必须要有空格以及什么地方的空格可以省略。但事实是我们可以简单地让词法分析器在把记号发送给语法分析器之前去除空格，不需要在语法中到处测试它。</p>
-
-<p>规格还说&lt;?xml ...&gt;标签可以有两个附加属性encoding和standalone。我们需要知道约束，但它是很容易去允许任何属性名字，然后在语法分析后检查语法分析树，以确保所有这些限制都满足的。
-归根结底，XML只是嵌在文本中的一对标签，因此它的语法结构是相当直白的。唯一的挑战是如何分别对待什么在标签内以及什么在标签外。</p>
-
-<p>识别语法规则并用伪代码表示它们的右侧部分最初是个挑战，但当你为更多的语言构建语法后它会变得越来越容易。一旦我们有了伪代码，我们就需要把它转换成ANTLR表示法，以便能得到一个可以工作的语法。</p>
 ]]></content>
   </entry>
   
