@@ -4,7 +4,7 @@
   <title><![CDATA[乐者为王]]></title>
   <link href="http://codemany.com/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-01-02T20:12:39+08:00</updated>
+  <updated>2017-01-03T20:08:28+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -283,6 +283,130 @@
 <p><img src="http://codemany.com/uploads/effective-icons-19.png" title="effective-icons-19" ></p>
 
 <p>最终，我想说创建优秀图标的方法不仅仅是学习Illustrator技巧，尽管它们也是必需的。最好的做法是练习把你周围看到的事物分解成简单图形。你在这点上越是变得更好，你越是能够成为更高超的图像设计师！加油！</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（21）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part21/"/>
+    <updated>2016-07-14T18:38:42+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part21</id>
+    <content type="html"><![CDATA[<p>前文的语法仍然存在问题，因为它限制我们只能使用Java生成语法分析器。为使语法可复用和语言无关，我们需要完全避免嵌入动作。接下来就将展示如何用监听器做到这点。</p>
+
+<h3 id="使用语法分析树监听器实现应用">使用语法分析树监听器实现应用</h3>
+
+<p>在构建语言应用时要避免应用和语法纠缠在一起，关键是让语法分析器生成语法分析树，然后遍历该树去触发特定的应用代码。我们可以使用我们最喜欢的技术遍历树，也可以使用ANTLR生成的树遍历机制中的一个。在本节中，我们将使用ANTLR内建的ParseTreeWalker构建一个基于监听器版本的属性文件应用。</p>
+
+<p>让我们从属性文件语法的原始版本开始：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>file : prop+ ;
+</span><span class='line'>prop : ID '=' STRING '\n' ;</span></code></pre></td></tr></table></div></figure>
+
+<p>下面是属性示例文件t.properties的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>user="parrt"
+</span><span class='line'>machine="maniac"</span></code></pre></td></tr></table></div></figure>
+
+<p>通过上述语法，ANTLR生成PropertyFileParser，该语法分析器会自动构建如下图所示的语法分析树：</p>
+
+<p><img src="http://codemany.com/uploads/propertyfile-parse-tree.png" title="propertyfile-parse-tree" ></p>
+
+<p>有了语法分析树，我们就可以使用ParseTreeWalker去访问所有的节点，触发进入和退出方法。</p>
+
+<p>现在来看一下ANTLR通过语法PropertyFile生成的监听器接口PropertyFileListener，当ANTLR的ParseTreeWalker发现和完成节点时，它会为每个规则子树分别触发进入和退出方法。因为在语法PropertyFile中只有两条语法规则，所以在接口中有4个方法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public interface PropertyFileListener extends ParseTreeListener {
+</span><span class='line'>    void enterFile(PropertyFileParser.FileContext ctx);
+</span><span class='line'>    void exitFile(PropertyFileParser.FileContext ctx);
+</span><span class='line'>    void enterProp(PropertyFileParser.PropContext ctx);
+</span><span class='line'>    void exitProp(PropertyFileParser.PropContext ctx);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>FileContext和PropContext对象是针对每条语法规则的语法分析树节点的实现，它们包含一些有用的方法。</p>
+
+<p>为方便起见，ANTLR也会生成带有默认实现的类PropertyFileBaseListener，这些默认实现模仿在前文语法中@member区域我们手写的空白方法。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class PropertyFileBaseVisitor&lt;T&gt; extends AbstractParseTreeVisitor&lt;T&gt;
+</span><span class='line'>                                        implements PropertyFileVisitor&lt;T&gt; {
+</span><span class='line'>    @Override
+</span><span class='line'>    public T visitFile(PropertyFileParser.FileContext ctx) { }
+</span><span class='line'>    @Override
+</span><span class='line'>    public T visitProp(PropertyFileParser.PropContext ctx) { }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>默认实现让我们只需要覆盖和实现那些我们关心的方法。例如，以下是属性文件加载器的一个重新实现，像前面那样它只有一个方法，但使用监听器机制：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static class PropertyFileLoader extends PropertyFileBaseListener {
+</span><span class='line'>    Map&lt;String,String&gt; props = new OrderedHashMap&lt;String, String&gt;();
+</span><span class='line'>    public void exitProp(PropertyFileParser.PropContext ctx) {
+</span><span class='line'>        String id = ctx.ID().getText();    // prop : ID '=' STRING '\n' ;
+</span><span class='line'>        String value = ctx.STRING().getText();
+</span><span class='line'>        props.put(id, value);
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>主要的不同是这个版本扩展了基类监听器，而不是语法分析器，监听器方法在语法分析器完成后被触发。</p>
+
+<p>这里面有很多的接口和类，让我们看一下在这些关键元素间的继承关系。</p>
+
+<p><img src="http://codemany.com/uploads/propertyfile-listener-hierachy.png" title="propertyfile-listener-hierachy" ></p>
+
+<p>处于ANTLR运行库中的接口ParseTreeListener要求每个监听器对事件visitTerminal()、enterEveryRule()和exitEveryRule()作出反应，如果有语法错误的还要加上visitErrorNode()。ANTLR从语法文件PropertyFile生成接口PropertyFileListener，并且为类PropertyFileBaseListener的所有方法生成默认实现。我们仅需要构建PropertyFileLoader，它继承了PropertyFileBaseListener中的所有空方法。</p>
+
+<p>方法exitProp()可以访问与规则prop相关的规则上下文对象PropContext，该上下文对象持有在规则prop中提到的每个元素（ID和STRING）的对应方法。因为这些元素是语法中的记号引用，所以方法返回语法分析树节点TerminalNode。我们既可以通过getText()直接访问记号的文本，也可以通过getSymbol()首先获取Token。</p>
+
+<p>现在让我们创建测试文件TestPropertyFile.java遍历树，倾听来自PropertyFileLoader的声音：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// create a standard ANTLR parse tree walker
+</span><span class='line'>ParseTreeWalker walker = new ParseTreeWalker();
+</span><span class='line'>// create listener then feed to walker
+</span><span class='line'>PropertyFileLoader loader = new PropertyFileLoader();
+</span><span class='line'>walker.walk(loader, tree);    // walk parse tree
+</span><span class='line'>System.out.println(loader.props);    // print results</span></code></pre></td></tr></table></div></figure>
+
+<p>然后就是编译和生成代码，运行测试程序去处理输入文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr PropertyFile.g
+</span><span class='line'>compile *.java
+</span><span class='line'>run TestPropertyFile t.properties
+</span><span class='line'>{user="parrt", machine="maniac"}</span></code></pre></td></tr></table></div></figure>
+
+<p>测试程序成功地把文件中的属性赋值重组成内存中的映射数据结构。</p>
 ]]></content>
   </entry>
   
@@ -4047,39 +4171,6 @@ another runner in the night<br>
 <h4 id="《书法有法》"><a href="https://book.douban.com/subject/5247986/">《书法有法》</a></h4>
 
 <p>点评：全书可用“转笔”二字一言蔽之。但疑惑的是，既然她这么推崇转笔，并且通过私相授受的方式从长辈手中得以传承这个笼罩着神秘、高深莫测、技巧高难、妙不可言的笔法的不传之秘，为什么她在书写时却几乎不用呢？而且文中对古人论述书法的言论的解释多有牵强附会之处。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[贫富差距精简版]]></title>
-    <link href="http://codemany.com/blog/economic-inequality-the-short-version/"/>
-    <updated>2016-03-21T20:40:27+08:00</updated>
-    <id>http://codemany.com/blog/economic-inequality-the-short-version</id>
-    <content type="html"><![CDATA[<p>英文原文：<a href="http://paulgraham.com/sim.html">http://paulgraham.com/sim.html</a></p>
-
-<p>2016年1月</p>
-
-<p><em>正如经常发生的那样——当说一些有争议的话题时，已经有我刚写的一篇贫富差距的文章的一些非常新奇的解释。我想这可能有助于澄清问题，如果我试着写一个简简单单、没有误解的版本。</em></p>
-
-<p>很多人谈论贫富差距。几乎所有人都说贫富差距增大是坏的，贫富差距缩小是好的。</p>
-
-<p>但是贫富差距本身并非坏事。它有多方面的原因。很多是坏的，但有些是好的。</p>
-
-<p>例如，高入狱率和税收漏洞是增大贫富差距的不良因素。</p>
-
-<p>但是创业同样地增大贫富差距。创业成功的创始人最终会得到值很多钱的股票。</p>
-
-<p>而且不像高入狱率和税收漏洞，创业整体上是好的。</p>
-
-<p>既然贫富差距本身并非坏事，我们就不应该攻击它。相反，我们应该攻击那些造成贫富差距的不良因素。</p>
-
-<p>例如，我们应该攻击贫穷，而不是攻击贫富差距。</p>
-
-<p>攻击贫富差距是双重错误。它会损害好的和坏的原因。但更糟的是，这是一个攻击坏的原因的无效方式。</p>
-
-<p>除非我们直接攻击坏的贫富差距原因，否则我们不能做好解决它们的工作。</p>
-
-<p>但是，如果我们解决了所有坏的贫富差距原因，我们依然将增加贫富差距的水平，因为正在增长的技术力量。</p>
 ]]></content>
   </entry>
   
