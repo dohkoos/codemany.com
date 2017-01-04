@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: ANTLR | 乐者为王]]></title>
   <link href="http://codemany.com/tags/antlr/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-01-03T20:08:28+08:00</updated>
+  <updated>2017-01-04T20:37:25+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,61 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（22）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part22/"/>
+    <updated>2016-07-24T21:40:28+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part22</id>
+    <content type="html"><![CDATA[<p>基于监听器的方法是极好的，因为所有树遍历和方法触发被自动完成。尽管有时候自动树遍历也是一个缺点，因为我们不能控制遍历本身。例如，我们可能想遍历一段C程序的语法分析树，通过跳过函数体子树忽略函数中的一切。监听器事件方法也不能使用方法返回值去传递数据。当我们需要控制遍历或返回带有事件方法返回值的值时，我们使用访问者模式。现在，让我们构建一个基于访问者版本的属性文件加载器去比较这两种方法。</p>
+
+<h3 id="使用访问者实现应用">使用访问者实现应用</h3>
+
+<p>使用访问者代替监听器，我们只需要让ANTLR生成访问者接口和实现接口，然后创建一段测试代码在语法分析树上调用visit()，根本不需要触及到语法。</p>
+
+<p>在命令行使用-visitor参数时，ANTLR生成接口PropertyFileVisitor和类PropertyFileBaseVisitor，后者有如下的默认实现：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public class PropertyFileBaseVisitor&lt;T&gt; extends AbstractParseTreeVisitor&lt;T&gt;
+                                        implements PropertyFileVisitor&lt;T&gt; {
+    @Override
+    public T visitFile(PropertyFileParser.FileContext ctx) { ... }
+    @Override
+    public T visitProp(PropertyFileParser.PropContext ctx) { ... }
+}
+</code></pre></div>
+<p>我们可以从监听器的exitProp()中拷贝映射功能，然后把它粘贴到与规则prop相关的访问者方法中。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public class TestPropertyFileVisitor {
+    public static class PropertyFileVisitor extends PropertyFileBaseVisitor&lt;Void&gt; {
+        Map&lt;String,String&gt; props = new OrderedHashMap&lt;String, String&gt;();
+        public Void visitProp(PropertyFileParser.PropContext ctx) {
+            String id = ctx.ID().getText();    // prop : ID &#39;=&#39; STRING &#39;\n&#39; ;
+            String value = ctx.STRING().getText();
+            props.put(id, value);
+            return null;    // Java says must return something even when Void
+        }
+    }
+</code></pre></div>
+<p>这里是访问者接口和类之间的继承关系：</p>
+
+<p><img src="/uploads/propertyfile-visitor-hierachy.png" title="propertyfile-visitor-hierachy" ></p>
+
+<p>访问者在子节点上通过显式地调用接口ParseTreeVisitor的visit()方法遍历语法分析树。那些方法在AbstractParseTreeVisitor中实现。在这里，为prop调用创建的节点没有子树，因此visitProp()不需要调用visit()。</p>
+
+<p>在监听器和访问者的测试代码（例如TestPropertyFileVisitor）之间最大的不同是访问者的测试代码不需要ParseTreeWalker，它只需要让访问者去访问由语法分析器创建的树。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">PropertyFileVisitor loader = new PropertyFileVisitor();
+loader.visit(tree);
+System.out.println(loader.props);    // print results
+</code></pre></div>
+<p>以下是构建和测试序列：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">antlr -visitor PropertyFile.g  # create visitor as well this time
+compile *.java
+run TestPropertyFileVisitor t.properties
+</code></pre></div>
+<p>这里是输出的内容：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">{user=&quot;parrt&quot;, machine=&quot;maniac&quot;}
+</code></pre></div>
+<p>我们可以使用监听器和访问者构建几乎任何我们想要的。一旦我们处于Java空间，就不再需要学习更多的ANTLR知识。我们只要知道语法、语法分析树、监听器和访问者事件方法之间的关系。除此之外，就是代码。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（21）]]></title>
@@ -89,7 +144,9 @@ System.out.println(loader.props);    // print results
 <div class="highlight"><pre><code class="language-text" data-lang="text">antlr PropertyFile.g
 compile *.java
 run TestPropertyFile t.properties
-{user=&quot;parrt&quot;, machine=&quot;maniac&quot;}
+</code></pre></div>
+<p>这里是输出的内容：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">{user=&quot;parrt&quot;, machine=&quot;maniac&quot;}
 </code></pre></div>
 <p>测试程序成功地把文件中的属性赋值重组成内存中的映射数据结构。</p>
 ]]></content>
@@ -316,51 +373,6 @@ COMMENT      : &#39;/*&#39; .*? &#39;*/&#39;       -&gt; skip ;    // 匹配&quo
 <div class="highlight"><pre><code class="language-text" data-lang="text">WS : [ \t\r\n]+ -&gt; skip ;    // 匹配一个或多个空格但丢弃
 </code></pre></div>
 <p>当换行符既是要被忽略的空格又是命令终结符时，就会有个问题。换行符是上下文有关的，在语法上下文中，我们要扔掉换行符，但在其它地方，我们需要把它传递给语法分析器以便让它知道某个命令已经结束。例如，在Python中，后面有换行符的f()会执行代码，调用f()方法，但是如果我们在括号中也插入一个额外的换行符，Python就会在执行调用前等待直到右括号后面的换行符为止。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（17）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part17/"/>
-    <updated>2016-06-07T13:09:54+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part17</id>
-    <content type="html"><![CDATA[<p>用自顶向下的语法指定和通过手工的递归下降语法分析器识别表达式一直是个麻烦。首先是因为大部分自然语法是模糊的，其次是因为大部分自然语法规格使用一种被称为左递归的特殊类型递归。所以自顶向下的语法和语法分析器不能处理传统形式上的左递归。</p>
-
-<p>为了阐明这个问题，设想一个算术表达式语言，它只有乘法和加法运算符以及整数。表达式是自相似的。也就是说，一个乘法表达式是由“*”运算符连接的两个子表达式。同样的，一个加法表达式是由“+”运算符连接的两个子表达式。我们也可以把整数看作表达式。整个语法规则看起来就像下面显示的那样：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">expr : expr &#39;*&#39; expr    // 匹配由“*”运算符连接的子表达式
-     | expr &#39;+&#39; expr    // 匹配由“+”运算符连接的子表达式
-     | INT              // 匹配简单整数
-     ;
-</code></pre></div>
-<p>问题是上述规则对于某些输入短语来说是模棱两可的。换句话说，这个规则能用多种方法匹配单个输入流。对于简单的整数和像1+2和1*2这样的单运算符表达式是没问题的，因为只有一种方法能去匹配它们。例如，规则可以仅用第二个选项匹配1+2。就像下图左边所示的那样：</p>
-
-<p><img src="/uploads/ambiguity-parse-tree.png" title="ambiguity-parse-tree" ></p>
-
-<p>问题在于指定的规则可以像中间和右边语法分析树描绘的那样用两种方法解释1+2*3这样的输入。两者的解释是不同的，因为中间的树说1加到2乘3的结果上，而右边的树说1加2的结果乘以3。这是一个运算符优先级的问题，但常规语法根本没有指定优先级的方法。大部分语法工具使用额外的符号来指定运算符优先级。</p>
-
-<p>与此相反的是，ANTLR使用有利于首先给出的选项，隐式地允许我们指定运算符优先级的方法来解决二义性。规则expr有一个乘法选项在加法选项之前，因此，ANTLR解决1+2*3的运算符二义性的方法有利于乘法。</p>
-
-<p>默认情况下，ANTLR是从左到右结合运算符，然而某些像指数这样的运算符则是从右到左。因此，我们必须使用参数assoc手动指定运算符记号上的相关性。这里是一个能正确地把输入<code>2^3^4</code>解释成<code>2^(3^4)</code>的表达式规则：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">expr : expr &#39;^&#39;&lt;assoc=right&gt; expr    // 运算符是右结合的
-     | INT
-     ;
-</code></pre></div>
-<p>下图中的语法分析树阐明了运算符左右结合版本的不同。右边的语法分析树是惯常的解释：</p>
-
-<p><img src="/uploads/power-parse-tree.png" title="power-parse-tree" ></p>
-
-<p>为了把指数、乘法和加法这三个运算符合并成一条规则，我们把指数表达式选项放在其它表达式选项之前，因为它的运算符优先级比乘法和加法都要高。合并后的语法如下所示：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">expr : expr &#39;^&#39;&lt;assoc=right&gt; expr    // 运算符是右结合的
-     | expr &#39;*&#39; expr                 // 匹配由“*”运算符连接的子表达式
-     | expr &#39;+&#39; expr                 // 匹配由“+”运算符连接的子表达式
-     | INT                           // 匹配简单整数
-     ;
-</code></pre></div>
-<p>不像其它常规的语法分析器生成器那样，ANTLR v4是可以处理直接左递归的。左递归规则是指在选项的左边缘直接或者间接调用自身的规则。规则expr是直接左递归的，因为除INT选项外的其它所有选项都开始于规则expr自身的引用。如果规则expr的引用处在某些选项的右边缘，那么它就是右递归的。虽然ANTLR v4可以处理直接左递归，但它不能处理间接左递归。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">expr : expo ;    // 通过expo左递归地间接调用expr
-expo : expr &#39;^&#39;&lt;assoc=right&gt; expr ;
-</code></pre></div>
-<p>ANTLR v4可以简化直接左递归的表达式规则的工作。这种新的机制不仅更有效率，而且表达式规则也更小和更容易理解。</p>
 ]]></content>
   </entry>
   

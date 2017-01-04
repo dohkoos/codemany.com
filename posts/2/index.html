@@ -9,13 +9,8 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="在聚焦到具体的语法规则内部结构之前，我们要先讨论下语法的整体剖析以及如何形成一套初始的语法骨架。 语法文件通常是由一个命名语法的头和一系列可以彼此调用的规则组成。就像下面这样： 1
-2
-3
-4
-5
-grammar MyG; rule1 : «stuff» ;
-rule2 : «more stuff &hellip;">
+  <meta name="description" content="initializer 初始值设定项
+construct 构造体 现在，我们已经有了一个自顶向下的草拟出语法的通用策略，下面我们要专注于一些常用的语言模式。尽管在过去几十年里有大量的语言被发明，但仍然只有较少的基本语言模式需要被处理。这是因为人们趋向于设计遵循自然语言约束的语言， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -79,6 +74,138 @@ rule2 : «more stuff &hellip;">
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part16/">ANTLR 4权威参考读书笔记（16）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-06-02T10:16:21+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2016</span></span> <span class='time'>10:16 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><ul>
+<li>initializer 初始值设定项</li>
+<li>construct 构造体</li>
+</ul>
+
+<p>现在，我们已经有了一个自顶向下的草拟出语法的通用策略，下面我们要专注于一些常用的语言模式。尽管在过去几十年里有大量的语言被发明，但仍然只有较少的基本语言模式需要被处理。这是因为人们趋向于设计遵循自然语言约束的语言，语言也会因为设计者遵循数学上的常用表示法而趋向于相似。甚至在词法级别，语言趋向于重用一些相同的结构，例如标志符、整数、字符串等。这些单词顺序和依赖的约束来源于自然语言，并逐渐演化成为四种抽象的语言模式：</p>
+
+<h4 id="模式1：序列">模式1：序列</h4>
+
+<p>这是像数组初始值设定项中的值那样的元素序列，也是在计算机语言中最常见的结构。例如，下面是登录到POP服务器时的序列：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>USER parrt
+</span><span class='line'>PASS secret
+</span><span class='line'>RETR 1</span></code></pre></td></tr></table></div></figure>
+
+<p>这些命令本身也是序列。大部分命令是一个关键字（保留标志符，例如USER和RETR）跟随一个运算元再跟随一个换行符。为了在语法中指定此类序列，我们可以按照顺序简单地列出各个元素。以下是检索命令的序列（其中INT表示整数记号类型）：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>retr : 'RETR' INT '\n' ;</span></code></pre></td></tr></table></div></figure>
+
+<p>我们可以给RETR序列打上retr规则的标签，这样在语法的其它地方，我们就能使用规则名字作为简写来引用RETR序列。</p>
+
+<p>对于任意长度的序列像矢量[1 2 3]这样的简单整数列表，虽然它是一个有限序列，但我们不可能通过像INT INT INT ...这样的规则片段来列出所有可能的整数列表。为了编码这样的一个或者多个元素，我们使用“+”子规则运算符。例如，{INT}+表示任意长度的整数序列，或者使用简写INT+也可以。至于可以为空的列表，我们则使用零个或者多个运算符“*”。</p>
+
+<p>这种模式的变体有带终结符的序列和带分隔符的序列，CSV文件就很好地示范了这两者。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>file : (row '\n')* ;           // 带一个“\n”终结符的序列
+</span><span class='line'>row  : field (',' field)* ;    // 带一个“,”分隔符的序列
+</span><span class='line'>field: INT ;                   // 假设字段只是整数</span></code></pre></td></tr></table></div></figure>
+
+<p>规则file使用带终结符模式的列表去匹配零个或者多个row &#39;\n&#39;序列，记号“\n”终结序列的每个元素。规则row使用带分隔符模式的列表去匹配一个field后面有零个或者多个&#39;,&#39; field序列，记号“,”分隔各个字段。</p>
+
+<p>最后，还有个特殊类型的零个或者一个序列，用“?”指定。可以使用它去表达可选的构造体。</p>
+
+<h4 id="模式2：选择">模式2：选择</h4>
+
+<p>这是一个在多个可供替代的短语之间的选择，比如在编程语言中不同种类的语句。为了在语言中表示选择的这个概念，我们使用“|”作为ANTLR中的“or”运算符去分隔被称为“选项”的语法选择。</p>
+
+<p>回到CVS语法，我们可以通过整数或者字符串的选择让规则field变得更灵活。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>field: INT | STRING ;</span></code></pre></td></tr></table></div></figure>
+
+<p>任何时候，如果你发现正在说“语言结构x可以是这个或者那个”，那么你就可以确定应该使用选择模式，在规则x中使用“|”。</p>
+
+<h4 id="模式3：记号依赖">模式3：记号依赖</h4>
+
+<p>记号依赖表示一个记号的存在需要在短语的其它地方有它的对等物的存在，比如匹配的左右括号。前面我们曾经使用INT+去表达矢量[1 2 3]中的整数非空序列。为指定周围有方括号的矢量，我们需要一种方法去表达记号中的依赖。如果我们在句子中看到一个符号，那么我们必须在句子的其它地方找到它的对等物。为表达这种语法，我们必须使用同时指定对等符号的序列，它们通常包围或分组着其它元素。在这个案例中，我们这样指定矢量：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>vector : '[' INT+ ']' ;    // [1], [1 2], [1 2 3], ...</span></code></pre></td></tr></table></div></figure>
+
+<p>扫视任何有效的代码，你会看到必须成对出现的各种分组符号：(...)，[...]，{...}。但是要牢记，依赖符号并不是必须配对的，类C语言都有的a ? b : c三元运算符就指定了当看到“?”符号时需要在接下来的短语中看到“:”符号。</p>
+
+<h4 id="模式4：嵌套短语">模式4：嵌套短语</h4>
+
+<p>嵌套短语有一个自相似的语言结构，它的子短语也遵循相同的结构。表达式是典型的自相似语言结构，由被运算符分隔的嵌套子表达式组成。类似地，while的代码块是嵌套在外部代码块内的一个代码块。我们在语法中使用递归规则表达自相似的语言结构。因此，如果规则的伪代码引用它自身，我们将需要一个递归的自引用规则。</p>
+
+<p>让我们来看下代码块的嵌套是如何工作的。while语句是关键字while后随一个在括号中的条件表达式再后接一条语句。我们也可以把多条语句包裹在花括号里当作一个语句块。表达语法如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>stat : 'while' '(' expr ')' stat    // 匹配WHILE语句
+</span><span class='line'>     | '{' stat* '}'                // 匹配在括号中的语句块
+</span><span class='line'>     ;</span></code></pre></td></tr></table></div></figure>
+
+<p>这里的stat可以是单条语句或者被花括号括起来的一组语句。规则stat是直接递归的，因为它在两个选项中直接引用它自身。如果我们把第二个选项移到它自己的规则中，规则stat和block将是双向间接递归的。语法如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>stat : 'while' '(' expr ')' stat    // 匹配WHILE语句
+</span><span class='line'>     | '{' stat* '}'                // 匹配语句块
+</span><span class='line'>     ;
+</span><span class='line'>block : '{' stat* '}' ;             // 匹配在括号中的语句块</span></code></pre></td></tr></table></div></figure>
+
+<p>看下面仅有3类表达式（索引数组引用、括号表达式和整数）的简单语言的语法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>expr : ID '[' expr ']'    // a[1], a[b[1]], a[(2*b[1])]
+</span><span class='line'>     | '(' expr ')'       // (1), (a[1]), (((1))), (2*a[1])
+</span><span class='line'>     | INT                // 1, 94117
+</span><span class='line'>     ;</span></code></pre></td></tr></table></div></figure>
+
+<p>注意递归是如何自然地发生的。数组索引表达式的索引组件是表达式本身，因此我们只需要在选项中引用expr即可。</p>
+
+<p>下图是关于两个例子输入的语法分析树：</p>
+
+<p><img src="/uploads/expr-parse-tree.png" title="expr-parse-tree" ></p>
+
+<p>分析树中的内部树节点是规则引用，叶子是记号引用。从树根到任何节点的路径表示元素的规则调用栈（或者ANTLR生成的递归下降语法分析器调用栈）。路径代表递归嵌套的子树有多个相同规则的引用。规则节点是其下方子树的标签。根节点是expr，所以整棵树是一个表达式。在1之前的那棵expr子树会把整数当作一个表达式。</p>
+
+<p>实现上述模式，我们只需要由选项、记号引用、规则引用组成的语法规则即可。我们还可以把这些元素组成子规则，子规则是裹在括号内的行内规则。我们也可以将子规则标记为“?”或“*”或“+”循环去识别被包围的语法片段多次。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1321,69 +1448,6 @@ another runner in the night<br>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/books-not-recommended/">哪些书不要读</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-03-25T19:48:57+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>25</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>7:48 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>为什么要列这个资源？因为某些书读完之后往往会有浪费时间的感觉。为了帮助各位读者节省时间，我决定在我看过的书中选出一份合适的书单，并给出我的观点，方便读者在购书和选书时作出取舍。本清单离详尽还很远（会不断更新的），而且难免带有本人的主观偏见，所以各位如果觉得有什么错漏的话，可以在评论区给我留言。</p>
-
-<h3 id="计算机">计算机</h3>
-
-<h4 id="《像程序员一样思考》"><a href="https://book.douban.com/subject/24733747/">《像程序员一样思考》</a></h4>
-
-<p>点评：这是一本教你学会如何解决编程问题的书。但实际上只有第1、第7和第8章值得一读。</p>
-
-<h3 id="经济学">经济学</h3>
-
-<h4 id="《郎咸平说：我们的日子为什么这么难》"><a href="https://book.douban.com/subject/5283699/">《郎咸平说：我们的日子为什么这么难》</a></h4>
-
-<p>点评：提出的观点都是当前大家关心的问题，可惜他只是财务和公司治理专家，不是经济学专家，所提的解决方案或说的话也只是让大家心中的郁闷可以有机会发泄下，所以郎咸平的其它关于经济学的书籍你就可以不要看了。如果你想学公司财务方面的东西，那么他的论文（注意不是书，是发表过的学术论文）是一定要读的。延伸阅读是东方出版社搞的，而非郎咸平，推荐的也都是该出版社的书。</p>
-
-<h4 id="《货币战争》"><a href="https://book.douban.com/subject/2081876/">《货币战争》</a></h4>
-
-<p>点评：又是一本博大众眼球的书。可是一个连美联储是私有的都要当作秘密大声来讲的作者你就知道他是什么水平了，这些可是人家美联储官方网站上都黑纸白纸写出来的。其它什么断章取义、胡乱拼凑的就不要讲了，我读了一部分就看不下去，把它扔角落里去了。以前还写过一篇<a href="/blog/how-currency-wars-confuse-reader-opnion">博文</a>来讲这本书是如何混淆读者视听的，只是可惜没有完成。</p>
-
-<h4 id="《魔鬼经济学》"><a href="https://book.douban.com/subject/1473250/">《魔鬼经济学》</a></h4>
-
-<p>点评：引用郭凯的话“虽然书里的每个故事都是基于作者的实证研究，可是他的那些实证研究没有一个不存在致命缺陷，他所有的结论事后都被更仔细的研究推翻了。”</p>
-
-<h4 id="《13个严重的经济学谬误》"><a href="https://book.douban.com/subject/4884855/">《13个严重的经济学谬误》</a></h4>
-
-<p>点评：这本书有点专业，且翻译的极为糟糕，好些语句和段落不甚通顺，所以部分内容读起来有种似是而非的感觉。翻译后的书名加上“经济学的真相”，完全是想用耸人听闻的标题吸引读者的注意。该书最值得看的是《前言》和《一份经济学研究方法的备忘录》，尤其是后者，可以让你了解一些经济学观点是怎么得出的。谬误1整篇文章几乎看不出是在证明命题的错误；谬误3中的印度可以用中国替代。作者的观点看似有理其实偏颇，看过郭凯的《王二的经济学故事》中关于汇率的文章就可以知道，印度出口商品换成美元结余，只劳动不消费，相当于给美国白打工；印度坚持高估美元，虽然可以保持它在与美国贸易中的顺差地位，但这种强制性的高估实际上是在用贸易补贴美国。谬误5虽然讲的有道理，但实在想不明白作者是如何得到租金限制法令的几个特征的！谬误7中房屋的建筑成本是不包含土地价格的，这种违背常识的假设会增加理解的困难。而且，设定房屋价格后再去谈论削减建筑成本不会影响房价，怎么看怎么觉得奇怪，虽然我同意他关于削减建筑成本不会降低房价的观点。谬误9的第4段翻译的极其马虎，明显有两个人翻译的痕迹，错字漏字导致边际成本傻傻的说不清。</p>
-
-<h4 id="《一切皆有价》"><a href="https://book.douban.com/subject/6519849/">《一切皆有价》</a></h4>
-
-<p>点评：书名标题很诱人，容易引起读者进一步阅读的欲望，可惜内容只是大量数据和案例的罗列，毫无作者自己的观点。</p>
-
-<h3 id="书法">书法</h3>
-
-<h4 id="《书法有法》"><a href="https://book.douban.com/subject/5247986/">《书法有法》</a></h4>
-
-<p>点评：全书可用“转笔”二字一言蔽之。但疑惑的是，既然她这么推崇转笔，并且通过私相授受的方式从长辈手中得以传承这个笼罩着神秘、高深莫测、技巧高难、妙不可言的笔法的不传之秘，为什么她在书写时却几乎不用呢？而且文中对古人论述书法的言论的解释多有牵强附会之处。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/3">&larr; Older</a>
@@ -1413,11 +1477,11 @@ another runner in the night<br>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part21/">ANTLR 4权威参考读书笔记（21）</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part22/">ANTLR 4权威参考读书笔记（22）</a>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part20/">ANTLR 4权威参考读书笔记（20）</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part21/">ANTLR 4权威参考读书笔记（21）</a>
       </li>
     
   </ul>

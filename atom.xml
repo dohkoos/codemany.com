@@ -4,7 +4,7 @@
   <title><![CDATA[乐者为王]]></title>
   <link href="http://codemany.com/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-01-03T20:08:28+08:00</updated>
+  <updated>2017-01-04T20:37:25+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -287,6 +287,90 @@
   </entry>
   
   <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（22）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part22/"/>
+    <updated>2016-07-24T21:40:28+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part22</id>
+    <content type="html"><![CDATA[<p>基于监听器的方法是极好的，因为所有树遍历和方法触发被自动完成。尽管有时候自动树遍历也是一个缺点，因为我们不能控制遍历本身。例如，我们可能想遍历一段C程序的语法分析树，通过跳过函数体子树忽略函数中的一切。监听器事件方法也不能使用方法返回值去传递数据。当我们需要控制遍历或返回带有事件方法返回值的值时，我们使用访问者模式。现在，让我们构建一个基于访问者版本的属性文件加载器去比较这两种方法。</p>
+
+<h3 id="使用访问者实现应用">使用访问者实现应用</h3>
+
+<p>使用访问者代替监听器，我们只需要让ANTLR生成访问者接口和实现接口，然后创建一段测试代码在语法分析树上调用visit()，根本不需要触及到语法。</p>
+
+<p>在命令行使用-visitor参数时，ANTLR生成接口PropertyFileVisitor和类PropertyFileBaseVisitor，后者有如下的默认实现：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class PropertyFileBaseVisitor&lt;T&gt; extends AbstractParseTreeVisitor&lt;T&gt;
+</span><span class='line'>                                        implements PropertyFileVisitor&lt;T&gt; {
+</span><span class='line'>    @Override
+</span><span class='line'>    public T visitFile(PropertyFileParser.FileContext ctx) { ... }
+</span><span class='line'>    @Override
+</span><span class='line'>    public T visitProp(PropertyFileParser.PropContext ctx) { ... }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>我们可以从监听器的exitProp()中拷贝映射功能，然后把它粘贴到与规则prop相关的访问者方法中。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class TestPropertyFileVisitor {
+</span><span class='line'>    public static class PropertyFileVisitor extends PropertyFileBaseVisitor&lt;Void&gt; {
+</span><span class='line'>        Map&lt;String,String&gt; props = new OrderedHashMap&lt;String, String&gt;();
+</span><span class='line'>        public Void visitProp(PropertyFileParser.PropContext ctx) {
+</span><span class='line'>            String id = ctx.ID().getText();    // prop : ID '=' STRING '\n' ;
+</span><span class='line'>            String value = ctx.STRING().getText();
+</span><span class='line'>            props.put(id, value);
+</span><span class='line'>            return null;    // Java says must return something even when Void
+</span><span class='line'>        }
+</span><span class='line'>    }</span></code></pre></td></tr></table></div></figure>
+
+<p>这里是访问者接口和类之间的继承关系：</p>
+
+<p><img src="http://codemany.com/uploads/propertyfile-visitor-hierachy.png" title="propertyfile-visitor-hierachy" ></p>
+
+<p>访问者在子节点上通过显式地调用接口ParseTreeVisitor的visit()方法遍历语法分析树。那些方法在AbstractParseTreeVisitor中实现。在这里，为prop调用创建的节点没有子树，因此visitProp()不需要调用visit()。</p>
+
+<p>在监听器和访问者的测试代码（例如TestPropertyFileVisitor）之间最大的不同是访问者的测试代码不需要ParseTreeWalker，它只需要让访问者去访问由语法分析器创建的树。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>PropertyFileVisitor loader = new PropertyFileVisitor();
+</span><span class='line'>loader.visit(tree);
+</span><span class='line'>System.out.println(loader.props);    // print results</span></code></pre></td></tr></table></div></figure>
+
+<p>以下是构建和测试序列：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr -visitor PropertyFile.g  # create visitor as well this time
+</span><span class='line'>compile *.java
+</span><span class='line'>run TestPropertyFileVisitor t.properties</span></code></pre></td></tr></table></div></figure>
+
+<p>这里是输出的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>{user="parrt", machine="maniac"}</span></code></pre></td></tr></table></div></figure>
+
+<p>我们可以使用监听器和访问者构建几乎任何我们想要的。一旦我们处于Java空间，就不再需要学习更多的ANTLR知识。我们只要知道语法、语法分析树、监听器和访问者事件方法之间的关系。除此之外，就是代码。</p>
+]]></content>
+  </entry>
+  
+  <entry>
     <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（21）]]></title>
     <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part21/"/>
     <updated>2016-07-14T18:38:42+08:00</updated>
@@ -400,11 +484,14 @@
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
-<span class='line-number'>4</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'>antlr PropertyFile.g
 </span><span class='line'>compile *.java
-</span><span class='line'>run TestPropertyFile t.properties
-</span><span class='line'>{user="parrt", machine="maniac"}</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>run TestPropertyFile t.properties</span></code></pre></td></tr></table></div></figure>
+
+<p>这里是输出的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>{user="parrt", machine="maniac"}</span></code></pre></td></tr></table></div></figure>
 
 <p>测试程序成功地把文件中的属性赋值重组成内存中的映射数据结构。</p>
 ]]></content>
@@ -4128,49 +4215,6 @@ another runner in the night<br>
 <p>为了通过迷宫，我们必须在每个岔口选择一条有效路径，正如我们必须在语法分析器中选择选项一样。通过把我们句子中下一个单词（们）和沿着来自每个岔口的每条路径上可见的单词比较，我们做出决定该走哪条路。我们能从岔口看到的单词与预读记号类似。当每条路径以唯一的单词开始时决定是相当容易的。在规则stat中，每个选项从唯一的记号开始，因此stat()可以通过查看第一个预读记号识别选项。</p>
 
 <p>当单词从一个岔口重叠部分开始每条路径时，语法分析器需要继续往前看，扫描可以识别选项的单词。ANTLR可以根据需要为每个分析决定自动上下调节预读数量。如果预读的结果是多条同样的到出口的路径，那说明当前的输入短语有多种解释，这会导致二义性。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[哪些书不要读]]></title>
-    <link href="http://codemany.com/blog/books-not-recommended/"/>
-    <updated>2016-03-25T19:48:57+08:00</updated>
-    <id>http://codemany.com/blog/books-not-recommended</id>
-    <content type="html"><![CDATA[<p>为什么要列这个资源？因为某些书读完之后往往会有浪费时间的感觉。为了帮助各位读者节省时间，我决定在我看过的书中选出一份合适的书单，并给出我的观点，方便读者在购书和选书时作出取舍。本清单离详尽还很远（会不断更新的），而且难免带有本人的主观偏见，所以各位如果觉得有什么错漏的话，可以在评论区给我留言。</p>
-
-<h3 id="计算机">计算机</h3>
-
-<h4 id="《像程序员一样思考》"><a href="https://book.douban.com/subject/24733747/">《像程序员一样思考》</a></h4>
-
-<p>点评：这是一本教你学会如何解决编程问题的书。但实际上只有第1、第7和第8章值得一读。</p>
-
-<h3 id="经济学">经济学</h3>
-
-<h4 id="《郎咸平说：我们的日子为什么这么难》"><a href="https://book.douban.com/subject/5283699/">《郎咸平说：我们的日子为什么这么难》</a></h4>
-
-<p>点评：提出的观点都是当前大家关心的问题，可惜他只是财务和公司治理专家，不是经济学专家，所提的解决方案或说的话也只是让大家心中的郁闷可以有机会发泄下，所以郎咸平的其它关于经济学的书籍你就可以不要看了。如果你想学公司财务方面的东西，那么他的论文（注意不是书，是发表过的学术论文）是一定要读的。延伸阅读是东方出版社搞的，而非郎咸平，推荐的也都是该出版社的书。</p>
-
-<h4 id="《货币战争》"><a href="https://book.douban.com/subject/2081876/">《货币战争》</a></h4>
-
-<p>点评：又是一本博大众眼球的书。可是一个连美联储是私有的都要当作秘密大声来讲的作者你就知道他是什么水平了，这些可是人家美联储官方网站上都黑纸白纸写出来的。其它什么断章取义、胡乱拼凑的就不要讲了，我读了一部分就看不下去，把它扔角落里去了。以前还写过一篇<a href="http://codemany.com/blog/how-currency-wars-confuse-reader-opnion">博文</a>来讲这本书是如何混淆读者视听的，只是可惜没有完成。</p>
-
-<h4 id="《魔鬼经济学》"><a href="https://book.douban.com/subject/1473250/">《魔鬼经济学》</a></h4>
-
-<p>点评：引用郭凯的话“虽然书里的每个故事都是基于作者的实证研究，可是他的那些实证研究没有一个不存在致命缺陷，他所有的结论事后都被更仔细的研究推翻了。”</p>
-
-<h4 id="《13个严重的经济学谬误》"><a href="https://book.douban.com/subject/4884855/">《13个严重的经济学谬误》</a></h4>
-
-<p>点评：这本书有点专业，且翻译的极为糟糕，好些语句和段落不甚通顺，所以部分内容读起来有种似是而非的感觉。翻译后的书名加上“经济学的真相”，完全是想用耸人听闻的标题吸引读者的注意。该书最值得看的是《前言》和《一份经济学研究方法的备忘录》，尤其是后者，可以让你了解一些经济学观点是怎么得出的。谬误1整篇文章几乎看不出是在证明命题的错误；谬误3中的印度可以用中国替代。作者的观点看似有理其实偏颇，看过郭凯的《王二的经济学故事》中关于汇率的文章就可以知道，印度出口商品换成美元结余，只劳动不消费，相当于给美国白打工；印度坚持高估美元，虽然可以保持它在与美国贸易中的顺差地位，但这种强制性的高估实际上是在用贸易补贴美国。谬误5虽然讲的有道理，但实在想不明白作者是如何得到租金限制法令的几个特征的！谬误7中房屋的建筑成本是不包含土地价格的，这种违背常识的假设会增加理解的困难。而且，设定房屋价格后再去谈论削减建筑成本不会影响房价，怎么看怎么觉得奇怪，虽然我同意他关于削减建筑成本不会降低房价的观点。谬误9的第4段翻译的极其马虎，明显有两个人翻译的痕迹，错字漏字导致边际成本傻傻的说不清。</p>
-
-<h4 id="《一切皆有价》"><a href="https://book.douban.com/subject/6519849/">《一切皆有价》</a></h4>
-
-<p>点评：书名标题很诱人，容易引起读者进一步阅读的欲望，可惜内容只是大量数据和案例的罗列，毫无作者自己的观点。</p>
-
-<h3 id="书法">书法</h3>
-
-<h4 id="《书法有法》"><a href="https://book.douban.com/subject/5247986/">《书法有法》</a></h4>
-
-<p>点评：全书可用“转笔”二字一言蔽之。但疑惑的是，既然她这么推崇转笔，并且通过私相授受的方式从长辈手中得以传承这个笼罩着神秘、高深莫测、技巧高难、妙不可言的笔法的不传之秘，为什么她在书写时却几乎不用呢？而且文中对古人论述书法的言论的解释多有牵强附会之处。</p>
 ]]></content>
   </entry>
   
