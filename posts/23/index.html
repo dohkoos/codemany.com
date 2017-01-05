@@ -9,31 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="今天，突然心血来潮，写了一段分拆短信的代码。代码如下： 1
-2
-3
-4
-5
-6
-7
-8
-9
-10
-11
-12
-13
-14
-15
-16
-17
-18
-19
-20
-21
-22
-23
-24
-public class SMSHelper { private static final int &hellip;">
+  <meta name="description" content="wxWidgets提供了一个用来检测是否只有一个实例在运行的wxSingleInstanceChecker类。为了检测程序只运行一个实例，你可以在程序运行之初使用该类创建一个m_check对象，这个对象将存在于程序的整个生命周期。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -97,6 +73,287 @@ public class SMSHelper { private static final int &hellip;">
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/run-only-one-instance-and-active-an-instance-of-the-former/">程序只运行一个实例，并将前一个实例提到前台</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-12-01T09:59:19+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>1</span><span class='date-suffix'>st</span>, <span class='date-year'>2007</span></span> <span class='time'>9:59 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>wxWidgets提供了一个用来检测是否只有一个实例在运行的wxSingleInstanceChecker类。为了检测程序只运行一个实例，你可以在程序运行之初使用该类创建一个m_check对象，这个对象将存在于程序的整个生命周期。然后就可以在OnInit函数中调用其IsAnotherRunning函数检测是否已经有别的实例在运行。代码如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>bool MainApp::OnInit()
+</span><span class='line'>{
+</span><span class='line'>    wxString name = wxString::Format(wxT("MainApp-%s"), wxGetUserId().GetData());
+</span><span class='line'>    m_checker = new wxSingleInstanceChecker(name);
+</span><span class='line'>    if (m_checker-&gt;IsAnotherRunning())
+</span><span class='line'>    {
+</span><span class='line'>        wxLogError(wxT("Another program instance is already running, aborting."));
+</span><span class='line'>        delete m_checker;
+</span><span class='line'>        return false;
+</span><span class='line'>    }
+</span><span class='line'>    // more initializations
+</span><span class='line'>    return true;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>int MainApp::OnExit()
+</span><span class='line'>{
+</span><span class='line'>    delete m_checker;
+</span><span class='line'>    return 0;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>注意：上面使用了wxGetUserId()来构建实例名，这表示允许不同的用户能同时运行程序的一个实例。如果不这样，那么程序就只能被一个用户运行一次。</p>
+
+<p>但是，如果你想把旧的实例提到前台，或者想使旧的实例打开传递给新的实例的作为命令行参数的文件，该怎么办呢？一般来说，这需要在这两个实例间进行通讯。我们可以使用wxWidgets提供的进程间通讯类来实现。</p>
+
+<p>在下面的实例中，我们将实现程序多个实例间的通讯，以便允许第二个实例请求第一个实例将自己带到前台以提醒用户它已经在运行。下面的代码实现了一个连接类，这个类将被两个实例使用。一个服务器类被旧的实例使用，以便监听新的实例的连接请求。一个客户端类被新的实例使用，以便和旧的实例进行通讯。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class AppServer : public wxServer
+</span><span class='line'>{
+</span><span class='line'>public:
+</span><span class='line'>    virtual wxConnectionBase* OnAcceptConnection(const wxString& topic);
+</span><span class='line'>};</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class AppClient : public wxClient
+</span><span class='line'>{
+</span><span class='line'>public:
+</span><span class='line'>    virtual wxConnectionBase* OnMakeConnection();
+</span><span class='line'>};</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class AppConnection : public wxConnection
+</span><span class='line'>{
+</span><span class='line'>public:
+</span><span class='line'>    virtual bool OnExecute(const wxString& WXUNUSED(topic), wxChar* WXUNUSED(data),
+</span><span class='line'>                          int WXUNUSED(size), wxIPCFormat WXUNUSED(format));
+</span><span class='line'>};</span></code></pre></td></tr></table></div></figure>
+
+<p>当有新的实例（作为Client）进行连接请求时，旧的实例（作为Server）中的OnAcceptConnection函数首先检查旧的实例中没有任何模式对话框。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>wxConnectionBase* AppServer::OnAcceptConnection(const wxString& topic)
+</span><span class='line'>{
+</span><span class='line'>    if (topic.Lower() == wxT("only-one"))
+</span><span class='line'>    {
+</span><span class='line'>        wxWindowList::Node* node = wxTopLevelWindows.GetFirst();
+</span><span class='line'>        while (node)
+</span><span class='line'>        {
+</span><span class='line'>            wxDialog* dialog = wxDynamicCast(node-&gt;GetData(), wxDialog);
+</span><span class='line'>            if (dialog && dialog-&gt;IsModal())
+</span><span class='line'>            {
+</span><span class='line'>                return false;
+</span><span class='line'>            }
+</span><span class='line'>            node = node-&gt;GetNext();
+</span><span class='line'>        }
+</span><span class='line'>        return new AppConnection();
+</span><span class='line'>    }
+</span><span class='line'>    else
+</span><span class='line'>    {
+</span><span class='line'>        return NULL;
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>OnExecute函数是一个回调函数，在新的实例对其连接对象（由AppConnection创建的对象）调用Execute函数时被调用。OnExecute函数可以有一个空的参数，这表示它只要将自己提到前台就可以了。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>bool AppConnection::OnExecute(const wxString& WXUNUSED(topic), wxChar* WXUNUSED(data),
+</span><span class='line'>                              int WXUNUSED(size), wxIPCFormat WXUNUSED(format))
+</span><span class='line'>{
+</span><span class='line'>    wxFrame* frame = wxDynamicCast(wxGetApp().GetTopWindow(), wxFrame);
+</span><span class='line'>    if (frame)
+</span><span class='line'>    {
+</span><span class='line'>        frame-&gt;Restore();    // 必须要有这句，不然当主窗口最小化时，就不能被提到前台
+</span><span class='line'>        frame-&gt;Raise();
+</span><span class='line'>    }
+</span><span class='line'>    return true;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>接下来我们还需要修改OnInit()函数。当没有别的实例在运行时，这个实例需要将自己设置为Server，等待别的实例的连接请求，如果已经有实例在运行，那么就创建一个和那个实例的连接，请求那个实例将程序的主窗口提到前台。下面的修改后的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>bool MainApp::OnInit()
+</span><span class='line'>{
+</span><span class='line'>    wxString name = wxString::Format(wxT("MainApp-%s"), wxGetUserId().GetData());
+</span><span class='line'>    m_checker = new wxSingleInstanceChecker(name);
+</span><span class='line'>    if (!m_checker-&gt;IsAnotherRunning())
+</span><span class='line'>    {
+</span><span class='line'>        m_server = new AppServer();
+</span><span class='line'>        if (!m_server-&gt;Create(wxT("wxMainApp")))
+</span><span class='line'>        {
+</span><span class='line'>            wxLogDebug(wxT("Failed to create an IPC service."));
+</span><span class='line'>            return false;
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>    else
+</span><span class='line'>    {
+</span><span class='line'>        AppClient* client = new AppClient();
+</span><span class='line'>        wxString hostName = wxT("localhost");
+</span><span class='line'>        wxConnectionBase* conn = client-&gt;MakeConnection(hostName, wxT("wxMainApp"), wxT("only-one"));
+</span><span class='line'>        if (conn)
+</span><span class='line'>        {
+</span><span class='line'>            conn-&gt;Execute(wxEmptyString);
+</span><span class='line'>            conn-&gt;Disconnect();
+</span><span class='line'>            delete conn;
+</span><span class='line'>        }
+</span><span class='line'>        else
+</span><span class='line'>        {
+</span><span class='line'>            wxString msg = wxT("Sorry, the existing instance may be too busy to respond.\nPlease close any open dialogs and retry.");
+</span><span class='line'>            wxMessageBox(msg, wxT("wxMainApp"), wxICON_INFORMATION | wxOK);
+</span><span class='line'>        }
+</span><span class='line'>        delete client;    // 如果没有这句，在运行Debug版本时就会显示如下图的警告
+</span><span class='line'>        return false;
+</span><span class='line'>    }
+</span><span class='line'>    // more initializations
+</span><span class='line'>    return true;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p><img src="/uploads/wxdde-alert.png" title="wxdde-alert" ></p>
+
+<p>释放实例资源</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>int MainApp::OnExit()
+</span><span class='line'>{
+</span><span class='line'>    delete m_checker;
+</span><span class='line'>    delete m_server;
+</span><span class='line'>    return 0;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>遇到的问题：</p>
+
+<p>1、调用wxGetApp时编译错误</p>
+
+<p>在调用wxGetApp()时可能会有编译错误，提示说“identifier not found”。这可以通过在App类后加上一行DECLARE_APP(XXXApp)来解决。</p>
+
+<p>2、引入ipc.h和wx.h时的顺序问题</p>
+
+<p>运行第二个实例的时候，发现它总是会挂起在MakeConnection处，查看进程可以看到有两个实例在运行。在网上找了n久，只在wxWidgets Forum上发现有提到这个问题（<a href="http://wxforum.shadonet.com/viewtopic.php?t=4367&highlight=makeconnection">Windows service using wxWidgets ipc</a>），可是也没有提到如何解决。只能靠自己啦，经过对程序的一步步排除，终于发现是因为引入头文件时将ipc.h放在wx.h之前的原因，掉换引入头文件的顺序后问题被解决。</p>
+
+<p><a href="/uploads/wxSingleton.zip" title="wxSingleton.zip">代码下载</a></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -982,120 +1239,6 @@ public class SMSHelper { private static final int &hellip;">
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/install-and-use-ruby-dbi/">Ruby DBI的安装和使用</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2007-09-04T22:35:15+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>4</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>10:35 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Ruby DBI是一个为Ruby程序访问数据库提供的与数据库无关的统一数据库编程接口。结构层次上可以分为两层：</p>
-
-<ol>
-<li>Database Interface 数据库接口层，与数据库无关，提供与数据库无关的标准接口</li>
-<li>Database Driver 数据库驱动，与数据库相关</li>
-</ol>
-
-<p>Ruby DBI模块可以从 <a href="http://ruby-dbi.sourceforge.net/">http://ruby-dbi.sourceforge.net/</a> 取得，下载后解压缩，配置，然后安装：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ruby setup.rb config --with=dbi,dbd_mysql
-</span><span class='line'>ruby setup.rb setup
-</span><span class='line'>ruby setup.rb install</span></code></pre></td></tr></table></div></figure>
-
-<p>注意：--with参数必须根据你所安装的数据库类型来选择。可以配置多个，但不能选择没有安装在你机器上的数据库类型。记得刚开始的时候我使用ruby setup.rb config来配置（我机器上只安装了MySQL和SQL Server），结果在ruby setup.rb setup时一直出现像下面这样的错误信息：</p>
-
-<p><img src="/uploads/ruby-dbi.png" title="ruby-dbi" ></p>
-
-<p>下面是一个完整的例子</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># dbitest.rb
-</span><span class='line'>require 'dbi'
-</span><span class='line'>
-</span><span class='line'># Connect to a database
-</span><span class='line'>dbh = DBI.connect('dbi:Mysql:rubydbi:localhost', 'root', '123456')
-</span><span class='line'>
-</span><span class='line'>dbh.do('DROP TABLE IF EXISTS people')
-</span><span class='line'>dbh.do('CREATE TABLE people (id int, name varchar(30))')
-</span><span class='line'>
-</span><span class='line'># Insert some rows, use placeholders
-</span><span class='line'>sql = 'INSERT INTO people VALUES (?, ?)'
-</span><span class='line'>dbh.prepare(sql) do |sth|
-</span><span class='line'>    sth.execute('100', 'Michael')
-</span><span class='line'>    sth.execute('200', 'John')
-</span><span class='line'>end
-</span><span class='line'>
-</span><span class='line'># Select all rows
-</span><span class='line'>sth = dbh.prepare('SELECT * FROM people')
-</span><span class='line'>sth.execute
-</span><span class='line'>
-</span><span class='line'># Print out each row
-</span><span class='line'>while row = sth.fetch do
-</span><span class='line'>    p row
-</span><span class='line'>end
-</span><span class='line'>
-</span><span class='line'># Close the statement handle when done
-</span><span class='line'>sth.finish
-</span><span class='line'>
-</span><span class='line'>dbh.do('DROP TABLE people')
-</span><span class='line'>
-</span><span class='line'># Finally, disconnect
-</span><span class='line'>dbh.disconnect</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/24">&larr; Older</a>
@@ -1121,15 +1264,15 @@ public class SMSHelper { private static final int &hellip;">
       </li>
     
       <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part23/">ANTLR 4权威参考读书笔记（23）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/how-to-create-effective-icons/">如何创建有效的图标</a>
       </li>
     
       <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part22/">ANTLR 4权威参考读书笔记（22）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part21/">ANTLR 4权威参考读书笔记（21）</a>
       </li>
     
   </ul>
@@ -1143,7 +1286,7 @@ public class SMSHelper { private static final int &hellip;">
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 137%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 138%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>

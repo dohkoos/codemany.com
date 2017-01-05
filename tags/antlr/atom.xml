@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: ANTLR | 乐者为王]]></title>
   <link href="http://codemany.com/tags/antlr/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-01-04T20:37:25+08:00</updated>
+  <updated>2017-01-05T17:47:44+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,77 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（23）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part23/"/>
+    <updated>2016-08-16T18:09:05+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part23</id>
+    <content type="html"><![CDATA[<p>默认情况下，ANTLR为每个规则生成一个单一的事件类型，而不管语法分析器匹配了哪个选项。这很不方便，因为监听器和访问者方法必须确定哪个选项被语法分析器匹配。在本节中，我们将看到如何得到更细粒度的事件。</p>
+
+<h3 id="为规则选项贴标签以得到精确的事件方法">为规则选项贴标签以得到精确的事件方法</h3>
+
+<p>为阐明事件粒度问题，让我们为以下的表达式语法构建一个带有监听器的简单计算器：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">grammar Expr;
+s : e ;
+e : e op=MULT e    // MULT is &#39;*&#39;
+  | e op=ADD e     // ADD is &#39;+&#39;
+  | INT
+  ;
+</code></pre></div>
+<p>按照上面的语法，规则e会产生一个相当无用的监听器，因为规则e的所有选项导致树遍历器触发相同的enterE()和exitE()方法。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public interface ExprListener extends ParseTreeListener {
+    void enterE(ExprParser.EContext ctx);
+    void exitE(ExprParser.EContext ctx);
+</code></pre></div>
+<p>监听器方法必须使用op记号标签和ctx的方法进行测试以查看语法分析器为每个e子树匹配了哪个选项。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitE(ExprParser.EContext ctx) {
+    if (ctx.getChildCount() == 3) {    // operations have 3 children
+        int left = values.get(ctx.e(0));
+        int right = values.get(ctx.e(1));
+        if (ctx.op.getType() == ExprParser.MULT) {
+            values.put(ctx, left * right);
+        } else {
+            values.put(ctx, left + right);
+        }
+    } else {
+        values.put(ctx, values.get(ctx.getChild(0)));    // an INT
+    }
+}
+</code></pre></div>
+<p>在exitE()中引用的MULT字段是在ExprParser中由ANTLR自动生成的：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public class ExprParser extends Parser {
+    public static final int MULT=1, ADD=2, INT=3, WS=4;
+</code></pre></div>
+<p>如果我们查看在类ExprParser中的类EContext，我们可以看到ANTLR把来自3个选项的所有元素都塞进了相同的上下文对象。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public static class EContext extends ParserRuleContext {
+    public Token op;                     // derived from label op
+    public List&lt;EContext&gt; e() { ... }    // get all e subtrees
+    public EContext e(int i) { ... }     // get ith e subtree
+    public TerminalNode INT() { ... }    // get INT node if alt 3 of e
+</code></pre></div>
+<p>为得到更精确的监听器事件，ANTLR让我们使用#运算符给任何规则最外层的选项打标签。让我们从Expr派生语法LExpr，并给e的选项打上标签，以下是修改后的e规则：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">e : e MULT e  # Mult
+  | e ADD e   # Add
+  | INT       # Int
+  ;
+</code></pre></div>
+<p>现在，ANTLR为e的每个选项生成了单独的监听器方法，因此，我们不再需要op记号标签。对于选项标签X，ANTLR生成方法enterX()和exitX()。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public interface LExprListener extends ParseTreeListener {
+    void enterMult(LExprParser.MultContext ctx);
+    void exitMult(LExprParser.MultContext ctx);
+    void enterAdd(LExprParser.AddContext ctx);
+    void exitAdd(LExprParser.AddContext ctx);
+    void enterInt(LExprParser.IntContext ctx);
+    void exitInt(LExprParser.IntContext ctx);
+    ...
+}
+</code></pre></div>
+<p>注意，ANTLR也为选项生成特定的以标签命名的上下文对象（EContext的子类）。专门的上下文对象的getter方法只限于应用在那些相关的选项。例如，IntContext只有一个INT()方法，我们可以在enterInt()中调用ctx.INT()，但在enterAdd()中就不能。</p>
+
+<p>监听器和访问者是极好的。我们只需要通过充实事件方法就可以得到可复用和可重定目标的语法以及封装的语言应用。ANTLR甚至会为我们自动生成骨架代码。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（22）]]></title>
@@ -64,7 +135,7 @@ run TestPropertyFileVisitor t.properties
 <p>这里是输出的内容：</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">{user=&quot;parrt&quot;, machine=&quot;maniac&quot;}
 </code></pre></div>
-<p>我们可以使用监听器和访问者构建几乎任何我们想要的。一旦我们处于Java空间，就不再需要学习更多的ANTLR知识。我们只要知道语法、语法分析树、监听器和访问者事件方法之间的关系。除此之外，就是代码。</p>
+<p>我们可以使用监听器和访问者构建几乎任何我们想要的。一旦我们处于Java空间，就不再需要学习更多的ANTLR知识。我们只要知道语法、语法分析树、监听器和访问者事件方法之间的关系。除此之外，就是代码。在对识别中的输入短语的回答中，我们可以生成输出、收集信息、以某种方式验证短语，或者执行计算。</p>
 ]]></content>
   </entry>
   
@@ -270,109 +341,6 @@ WS    : &#39; &#39; -&gt; skip ;                    // 忽略空格
 <p>把词法规则IP切换成语法规则ip显示了我们可以多么轻易地移动这条分界线。</p>
 
 <p>如果要求处理HTTP协议命令字符串的内容，我们可以遵循相同的思考过程。如果不需要检查字符串的部分，那么词法分析器可以把整个字符串作为一个单独的记号传递给语法分析器。如果我们需要抽出各种不同的部分，最好就是让词法分析器去识别那些部分后再把这些匹配出的构件传递给语法分析器。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（18）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part18/"/>
-    <updated>2016-06-14T11:56:18+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part18</id>
-    <content type="html"><![CDATA[<p>编程语言在词法上看起来惊人地相似，无论是函数式、过程式、声明式还是面向对象语言，看起来几乎都是一样的。这很棒，因为我们只需要学习一次如何描述标志符和整数，没有太大的变化，就可以把它们应用到大多数编程语言上。正如语法分析器以及词法分析器使用规则去描述各种语言构造体一样，我们要使用基本相同的表示法。唯一的区别是语法分析器识别在记号流中的语法结构，而词法分析器识别在字符流中的语法结构。</p>
-
-<p>因为词法分析和语法分析有相似的结构，ANTLR允许我们把两者合并在单个语法文件中。但是因为词法分析和语法分析是语言识别的两个不同阶段，我们必须告诉ANTLR每个规则是和哪个阶段相关联的。我们可以通过以大写字母开始的词法规则名字和以小写字母开始的语法规则名字做到这点。例如，ID是一个词法规则名字，expr则是一个语法规则名字。</p>
-
-<p>当开始构建一个新的语法时，对于那些常用的词法构造体：标志符、数字、字符串、注释以及空格等，我们可以从已经存在的语法中拷贝粘贴规则。然后，通过一些细微的调整，就可以让它运行起来。几乎所有的语言，甚至像JSON和XML这样的非编程语言，都有这些记号的变体。例如，C语言的词法分析器完全可以标记化以下的JSON代码：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">{
-  &quot;title&quot;:&quot;Cat wrestling&quot;,
-  &quot;chapters&quot;:[ {&quot;Intro&quot;:&quot;...&quot;}, ... ]
-}
-</code></pre></div>
-<p>另一个例子就是块注释。在C语言中，它们是被/* ... */括起来的。而在XML里，注释是被&lt;!-- ... --&gt;括起来的。但它们除了开始和结束符号之外，或多或少都有相同的词法构造。</p>
-
-<p>对于关键字、运算符和标点符号，我们不需要词法规则，因为我们可以在语法分析规则中直接引用它们，用单引号括起来，就像<code>&#39;while&#39;</code>、<code>&#39;*&#39;</code>、<code>&#39;++&#39;</code>这样。有些开发者更喜欢使用像MUL而不是字面量<code>&#39;*&#39;</code>这样的词法规则引用，这些都没问题，因为它们都有相同的记号类型。</p>
-
-<p>为了阐明词法规则看起来像什么，让我们从标志符开始构建一个常用记号的简单版本。</p>
-
-<h4 id="匹配标志符">匹配标志符</h4>
-
-<p>在语法伪代码中，一个基本的标志符是由大写或小写字母组成的一个非空序列。根据已经学习到的知识，我们知道需要用(...)+表示法来表示这样的序列模式。因为序列元素可以是大写或小写字母，所以在子规则中我们需要使用选择运算符：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">ID : (&#39;a&#39;..&#39;z&#39;|&#39;A&#39;..&#39;Z&#39;)+ ;    // 匹配一个或多个大小写字母
-</code></pre></div>
-<p>唯一的新ANTLR表示法是范围运算符：&#39;a&#39;..&#39;z&#39;代表从a到z的任意字符。或者你也可以使用Unicode码位字面量&#39;\uXXXX&#39;，这里的XXXX是Unicode字符码位值的十六进制值。</p>
-
-<p>作为字符集的一个简写，ANTLR支持我们使用更熟悉的正则表达式集合表示法：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">ID : [a-zA-Z]+ ;    // 匹配一个或多个大小写字母
-</code></pre></div>
-<p>有时候我们会发现像下面这样的语法貌似存在冲突的现象：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">enumDef : &#39;enum&#39; &#39;{&#39; ... &#39;}&#39; ;
-FOR : &#39;for&#39; ;
-ID : [a-zA-Z]+ ;    // 不匹配&#39;enum&#39;或者&#39;for&#39;
-</code></pre></div>
-<p>规则ID也可以同时匹配enum和for这样的关键字，这意味着同样的字符串能被多个规则匹配。但事实上，ANTLR处理这种混合语法时会把字符串字面量以及词法规则与语法规则分隔开，像enum这样的字面量就变成了词法规则并紧随在语法规则之后和在显式的词法规则之前。</p>
-
-<p>ANTLR词法分析器通过偏爱首先指定的规则来解决词法规则间的二义性，这意味着ID规则应该定义在所有的关键字规则之后。ANTLR把隐式的为字面量生成的词法规则放在显式的词法规则之前，因此它们总是有更高的优先级。在这里，&#39;enum&#39;被自动赋予比ID高的优先级。</p>
-
-<p>因为ANTLR总是会重新排序词法规则并让它们在语法规则之后发生。所以上面的语法与下面的变体是相同的：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">FOR : &#39;for&#39; ;
-ID : [a-zA-Z]+ ;    // 不匹配&#39;enum&#39;或者&#39;for&#39;
-enumDef : &#39;enum&#39; &#39;{&#39; ... &#39;}&#39; ;
-</code></pre></div>
-<h4 id="匹配数字">匹配数字</h4>
-
-<p>描述像10这样的整型数字非常容易，因为它只是一个数字序列。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">INT : &#39;0&#39;..&#39;9&#39;+ ;    // 匹配一个或多个数字
-</code></pre></div>
-<p>或者</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">INT : [0..9]+ ;    // 匹配一个或多个数字
-</code></pre></div>
-<p>浮点数要复杂的多，但如果我们忽略指数的话，可以很容易地制作一个简化版本。浮点数是数字序列后面跟着一个句点和一个可选的小数部分；或者以一个句点开始，然后是数字序列。单独一个句点是不合法的。因此我们的浮点规则使用一个选择和一些序列模式：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">FLOAT: DIGIT+ &#39;.&#39; DIGIT*    // 匹配1. 39. 3.14159等等
-     | &#39;.&#39; DIGIT+           // 匹配.1 .14159
-     ;
-
-fragment
-DIGIT: [0-9] ;              // 匹配单个数字
-</code></pre></div>
-<p>这里我们使用了一个帮助规则DIGIT，因此我们不必到处去写[0-9]。通过在规则前面加上fragment前缀，我们让ANTLR知道该规则仅被其它词法规则使用。它本身不是一个记号，这意味着我们不能在语法规则中引用它。</p>
-
-<h4 id="匹配字符串字面量">匹配字符串字面量</h4>
-
-<p>计算机语言中共同具有的下一个常用记号是字符串字面量，例如&quot;hello&quot;。大部分使用双引号作分隔符，有些使用单引号或者两者都使用。以双引号为分隔符而言，在语法伪代码中，一个字符串就是在双引号中的任意字符序列：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">STRING : &#39;&quot;&#39; .*? &#39;&quot;&#39; ;    // 匹配在双引号中的任意字符
-</code></pre></div>
-<p>语法中的点是通配符运算符，它可以匹配任意单个字符。因此，“<code>.*</code>”是一个能够匹配任意零个或多个字符的序列的循环。当然，它也将消费字符直到文件结尾，所以不是很有用。幸运的是，ANTLR通过正则表达式表示法（?后缀）提供对非贪婪模式规则的支持。非贪婪模式意味着“直到看见在词法规则中跟在子规则后的字符时才停止吃掉字符”。更确切地说，非贪婪模式规则匹配最小数量的字符，同时仍然允许整个周围的规则被匹配。相反，“<code>.*</code>”被认为是贪婪模式，因为它贪婪地消费能够匹配循环内部的所有字符。</p>
-
-<p>以上的STRING规则做得还不够好，因为它不允许字符串中有双引号。为了做到这点，大部分语言定义了以反斜杠开始的转义字符。在字符串中的双引号我们可以使用“\&quot;”。为支持常用的转义字符，我们需要使用以下规则：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">STRING: &#39;&quot;&#39; (ESC|.)*? &#39;&quot;&#39; ;
-
-fragment
-ESC : &#39;\\&quot;&#39; | &#39;\\\\&#39; ;    // 匹配字符\&quot;和\\
-</code></pre></div>
-<p>ANTLR自身也需要避开转义字符，所以这里我们需要用“\”去指定反斜杠字符。</p>
-
-<p>现在，在STRING规则中的循环既可以通过调用fragment规则ESC去匹配转义字符序列，也可以通过点通配符去匹配任意字符。当看到一个非转义双引号字符时，“<code>*?</code>”子规则运算符终止“<code>(ESC|.)*?</code>”循环。</p>
-
-<h4 id="匹配注释和空格">匹配注释和空格</h4>
-
-<p>词法分析器会把匹配到的记号通过记号流传递给语法分析器，然后语法分析器检查流的语法结构。但我们希望当词法分析器匹配到注释和空格时能把它们扔掉。那样，语法分析器就不必为匹配无处不在的可选的注释和空格担心。例如，当WS是一个空格的词法规则时以下的语法规则就非常尴尬和容易出错：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">assign : ID (WS|COMMENT)? &#39;=&#39; (WS|COMMENT)? expr (WS|COMMENT)? ;
-</code></pre></div>
-<p>定义这些被丢弃的记号和定义非丢弃的记号一样，我们只需要使用skip指令去表明词法分析器应该扔掉它们。以下是匹配那些衍生自C的语言的单行和多行注释的语法规则：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">LINE_COMMENT : &#39;//&#39; .*? &#39;\r&#39;? &#39;\n&#39; -&gt; skip ;    // 匹配&quot;//&quot; stuff &#39;\n&#39;
-COMMENT      : &#39;/*&#39; .*? &#39;*/&#39;       -&gt; skip ;    // 匹配&quot;/*&quot; stuff &quot;*/&quot;
-</code></pre></div>
-<p>在COMMENT中，“<code>.*?</code>”消费在“<code>/*</code>”和“<code>*/</code>”之间的任意字符。在LINE_COMMENT中，“<code>.*?</code>”消费“//”之后的任意字符，直到它看到一个换行符。</p>
-
-<p>词法分析器接受若干跟随在-&gt;运算符后的指令，skip只是它们中的一个。例如，我们可以通过使用channel指令把传递给语法分析器的记号放进隐藏通道。</p>
-
-<p>最后，让我们处理空格（换行符等也被当作空格）这个常用记号。大部分编程语言都把空格当作记号分隔符，但是另一方面又忽略它们。（Python是个例外，因为它把空格用作特殊语法目的：终止命令和缩进级别的换行符。）以下是告诉ANTLR如何扔掉空格的语法：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">WS : (&#39; &#39;|&#39;\t&#39;|&#39;\r&#39;|&#39;\n&#39;)+ -&gt; skip ;    // 匹配一个或多个空格但丢弃
-</code></pre></div>
-<p>或者</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">WS : [ \t\r\n]+ -&gt; skip ;    // 匹配一个或多个空格但丢弃
-</code></pre></div>
-<p>当换行符既是要被忽略的空格又是命令终结符时，就会有个问题。换行符是上下文有关的，在语法上下文中，我们要扔掉换行符，但在其它地方，我们需要把它传递给语法分析器以便让它知道某个命令已经结束。例如，在Python中，后面有换行符的f()会执行代码，调用f()方法，但是如果我们在括号中也插入一个额外的换行符，Python就会在执行调用前等待直到右括号后面的换行符为止。</p>
 ]]></content>
   </entry>
   
