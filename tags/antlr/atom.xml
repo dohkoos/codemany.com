@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: ANTLR | 乐者为王]]></title>
   <link href="http://codemany.com/tags/antlr/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-01-06T23:00:07+08:00</updated>
+  <updated>2017-01-07T20:41:20+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,107 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（25）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part25/"/>
+    <updated>2016-09-03T16:16:56+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part25</id>
+    <content type="html"><![CDATA[<p>这次我们要做的是通过监听器实现CSV文件的加载器，用于建立一个二维列表数据结构。</p>
+
+<h3 id="加载csv数据">加载CSV数据</h3>
+
+<p>我们的目标是构建一个监听器去加载CSV数据到一个映射列表数据结构中，这是任何数据格式阅读器或配置文件阅读器都会做的事。我们会收集每行的字段并放到一个映射中，构成头名-值组合。以下是示例文件t.csv的内容：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">Details,Month,Amount
+Mid Bonus,June,&quot;$2,000&quot;
+,January,&quot;&quot;&quot;zippo&quot;&quot;&quot;
+Total Bonuses,&quot;&quot;,&quot;$5,000&quot;
+</code></pre></div>
+<p>我们想要看到如下的映射列表被打印出：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">[{Details=Mid Bonus, Month=June, Amount=&quot;$2,000&quot;},
+ {Details=, Month=January, Amount=&quot;&quot;&quot;zippo&quot;&quot;&quot;},
+ {Details=Total Bonuses, Month=&quot;&quot;, Amount=&quot;$5,000&quot;}]
+</code></pre></div>
+<p>为了在监听器中得到精确的方法，我们给CSV语法中field规则的每个选项打上标签：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">grammar CSV;
+
+file : hdr row+ ;
+hdr : row ;
+row : field (&#39;,&#39; field)* &#39;\r&#39;? &#39;\n&#39; ;
+field
+    : TEXT    # text
+    | STRING  # string
+    |         # empty
+    ;
+
+TEXT : ~[,\n\r&quot;]+ ;
+STRING : &#39;&quot;&#39; (&#39;&quot;&quot;&#39;|~&#39;&quot;&#39;)* &#39;&quot;&#39; ;     // quote-quote is an escaped quote
+</code></pre></div>
+<p>我们可以从定义我们需要的数据结构开始监听器的实现。首先，我们需要的数据结构是称为rows的映射列表。我们也需要在头行中找到的列名列表header。为处理数据行，我们需要把字段值读到一个临时列表currentRowFieldValues中，然后把列名映射到那些值上。以下是监听器LoadCSV.java的实现代码：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public static class Loader extends CSVBaseListener {
+    public static final String EMPTY = &quot;&quot;;
+    /** Load a list of row maps that map field name to value */
+    List&lt;Map&lt;String,String&gt;&gt; rows = new ArrayList&lt;Map&lt;String, String&gt;&gt;();
+    /** List of column names */
+    List&lt;String&gt; header;
+    /** Build up a list of fields in current row */
+    List&lt;String&gt; currentRowFieldValues;
+</code></pre></div>
+<p>下面的3个规则方法通过计算适当的字符串处理字段值，并把它添加到currentRowFieldValues中。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitString(CSVParser.StringContext ctx) {
+    currentRowFieldValues.add(ctx.STRING().getText());
+}
+public void exitText(CSVParser.TextContext ctx) {
+    currentRowFieldValues.add(ctx.TEXT().getText());
+}
+public void exitEmpty(CSVParser.EmptyContext ctx) {
+    currentRowFieldValues.add(EMPTY);
+}
+</code></pre></div>
+<p>在我们能处理数据行之前，我们需要从第一行取得列名列表。头行在语法上仅仅是另外的行，但我们在对待它时要不同于常规的数据行，那意味着我们需要检查上下文。暂时让我们假设在exitRow()执行后，currentRowFieldValues包含列名列表。要填充header，我们只需要捕获第一行的字段值。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitHdr(CSVParser.HdrContext ctx) {
+    header = new ArrayList&lt;String&gt;();
+    header.addAll(currentRowFieldValues);
+}
+</code></pre></div>
+<p>谈到行时，我们需要两个操作：一个是当我们开始一行时，另一个是当我们结束一行时。当我们开始一行时，我们需要分配或清除currentRowFieldValues，准备获取一组新的数据。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public void enterRow(CSVParser.RowContext ctx) {
+    currentRowFieldValues = new ArrayList&lt;String&gt;();
+}
+</code></pre></div>
+<p>在行结束的时候，我们必须考虑上下文。如果我们仅仅加载头行，那我们不能改变rows字段，因为列名不是数据。在exitRow()中，我们可以通过查看在语法分析树中的父节点的getRuleIndex()值（或者询问父节点是否是HdrContext类型）测试上下文。如果当前行是数据行，我们将通过同时遍历header中的列名和currentRowFieldValues中的值获取的内容创建映射。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitRow(CSVParser.RowContext ctx) {
+    // If this is the header row, do nothing
+    // if ( ctx.parent instanceof CSVParser.HdrContext ) return; OR:
+    if ( ctx.getParent().getRuleIndex() == CSVParser.RULE_hdr ) {
+        return;
+    }
+    // It&#39;s a data row
+    Map&lt;String, String&gt; m = new LinkedHashMap&lt;String, String&gt;();
+    int i = 0;
+    for (String v : currentRowFieldValues) {
+        m.put(header.get(i), v);
+        i++;
+    }
+    rows.add(m);
+}
+</code></pre></div>
+<p>到这里，加载CSV数据到数据结构中的任务就算已经完成。在使用ParseTreeWalker遍历树后，我们就可以紧接着打印出rows字段：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">ParseTreeWalker walker = new ParseTreeWalker();
+Loader loader = new Loader();
+walker.walk(loader, tree);
+System.out.println(loader.rows);
+</code></pre></div>
+<p>以下是构建和测试序列：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">antlr CSV.g
+compile *.java
+run LoadCSV t.csv
+</code></pre></div>
+<p>下面显示的是输出结果：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">[{Details=Mid Bonus, Month=June, Amount=&quot;$2,000&quot;}, {Details=, Month=January,
+Amount=&quot;&quot;&quot;zippo&quot;&quot;&quot;}, {Details=Total Bonuses, Month=&quot;&quot;, Amount=&quot;$5,000&quot;}]
+</code></pre></div>]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（24）]]></title>
@@ -406,72 +507,6 @@ run TestPropertyFile t.properties
 <div class="highlight"><pre><code class="language-text" data-lang="text">{user=&quot;parrt&quot;, machine=&quot;maniac&quot;}
 </code></pre></div>
 <p>测试程序成功地把文件中的属性赋值重组成内存中的映射数据结构。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（20）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part20/"/>
-    <updated>2016-07-03T18:37:26+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part20</id>
-    <content type="html"><![CDATA[<p>单独的语法不是很有用，因为相关的语法分析器只能告诉我们某个输入句子是否遵守语言规格。为构建语言应用，我们需要语法分析器在看到特定的输入句子、短语或者记号时触发特定的动作。这些短语-动作对的集合表示语言应用或者至少是在语法和一个更大的周边应用之间的接口。</p>
-
-<p>我们可以使用语法分析树监听器和访问者构建语言应用。监听器是一个响应规则进入和退出事件的对象，这些短语识别事件在语法分析树遍历器发现和完成节点时触发。为了支持应用必须控制树是如何被遍历的这种情况，ANTLR生成的语法分析树也支持著名的树访问者模式。</p>
-
-<p>监听器和访问者之间最大的不同是，监听器方法不对显式地调用方法去遍历它们的子树负责，而访问者必须显式地触发访问子节点以保持树的遍历继续。通过这些显式的访问子树的调用，访问者控制遍历的顺序以及多少树被访问。为方便起见，我们使用术语“事件方法”来指代监听器回调或者访问者方法。</p>
-
-<p>为了确切地知道ANTLR为我们构建了什么样的树遍历设施以及为什么，让我们首先看看监听器机制的起源以及如何使用监听器和访问者把特定应用的代码和语法分离。</p>
-
-<h3 id="从嵌入动作演化到监听器">从嵌入动作演化到监听器</h3>
-
-<p>监听器和访问者机制将语法从应用代码中解耦，提供了一些令人信服的好处。这种解耦很好地封装了应用程序，而不是把它切割成碎片分散到语法中的各个地方。没有嵌入动作，我们可以在不同的应用中复用相同的语法，甚至不需要重新编译生成的语法分析器。如果没有嵌入动作，ANTLR还可以用相同的语法生成不同编程语言的语法分析器。集成语法缺陷修复或更新也更容易，因为我们不必担心嵌入动作导致的合并冲突。</p>
-
-<p>接下来，我们将探讨从带有嵌入动作的语法到完全解耦的语法和应用的演化。以下含有用«...»描述的嵌入动作的属性文件语法读取属性文件，每行一个属性赋值。像«start file»这样的动作只是Java代码适当的替代。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">grammar PropertyFile;
-file : {«start file»} prop+ {«finish file»} ;
-prop : ID &#39;=&#39; STRING &#39;\n&#39; {«process property»} ;
-ID   : [a-z]+ ;
-STRING : &#39;&quot;&#39; .*? &#39;&quot;&#39; ;
-</code></pre></div>
-<p>这样的紧密耦合把语法束缚到一个特定的应用上。一个更好的方法是创建由ANTLR生成的语法分析器PropertyFileParser的子类，然后把嵌入动作转换成方法。重构仅留下不重要的方法调用在语法中触发新创建方法的动作，然后，通过子类化语法分析器，我们可以实现任意数量的不同应用而无需修改语法。这样的重构看起来像：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">grammar PropertyFile;
-@members {
-    void startFile() { }    // blank implementations
-    void finishFile() { }
-    void defineProperty(Token name, Token value) { }
-}
-
-file : {startFile();} prop+ {finishFile();} ;
-prop : ID &#39;=&#39; STRING &#39;\n&#39; {defineProperty($ID, $STRING)} ;
-ID   : [a-z]+ ;
-STRING : &#39;&quot;&#39; .*? &#39;&quot;&#39; ;
-</code></pre></div>
-<p>解耦可以让语法被不同的应用复用，但语法因为方法调用的关系仍然被绑定在Java上。</p>
-
-<p>为演示已重构语法的复用性，让我们构建两个不同的应用。首先从遇到属性后只是打印它们的那个开始。这个过程只是去扩展由ANTLR生成的语法分析器类和覆盖一个或多个由语法触发的方法。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">class PropertyFilePrinter extends PropertyFileParser {
-    void defineProperty(Token name, Token value) {
-        System.out.println(name.getText() + &quot;=&quot; + value.getText());
-    }
-}
-</code></pre></div>
-<p>由于ANTLR生成的PropertyFileParser类中的默认实现，我们不需要覆盖startFile()或finishFile()。</p>
-
-<p>为了启动这个应用，我们需要创建一个特定的PropertyFilePrinter语法分析器子类的实例，而不是常规的PropertyFileParser的。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">PropertyFileLexer lexer = new PropertyFileLexer(input);
-CommonTokenStream tokens = new CommonTokenStream(lexer);
-PropertyFilePrinter parser = new PropertyFilePrinter(tokens);
-parser.file();    // launch our special version of the parser
-</code></pre></div>
-<p>作为第二个应用，我们把属性加载到一个map中而不是打印它们。我们需要做的就是创建一个新的子类并把不同的功能放到defineProperty()中。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">class PropertyFileLoader extends PropertyFileParser {
-    Map&lt;String,String&gt; props = new OrderedHashMap&lt;String, String&gt;();
-    void defineProperty(Token name, Token value) {
-        props.put(name.getText(), value.getText());
-    }
-}
-</code></pre></div>
-<p>在语法分析器执行完毕后，字段props将会包含名-值对。</p>
 ]]></content>
   </entry>
   

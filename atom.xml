@@ -4,7 +4,7 @@
   <title><![CDATA[乐者为王]]></title>
   <link href="http://codemany.com/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-01-06T23:00:07+08:00</updated>
+  <updated>2017-01-07T20:41:20+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -186,6 +186,186 @@
 <p>这个配置告诉Wireshark不管文件大小每10分钟创建一个新文件，并且确保程序保留总计3个文件，根据需要删除最旧的。这确保从错误被通知的时间起我有30分钟去停止捕获。这是一个非常有用的技术用于捕获极其间歇性的问题。</p>
 
 <p>这些是你需要的以便用Wireshark开始故障排除的所有基本技术。使用这些技术和资源，你会发现你经常能用比几乎任何其它技术更短的时间找到和验证网络问题的原因。快乐的故障排除。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（25）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part25/"/>
+    <updated>2016-09-03T16:16:56+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part25</id>
+    <content type="html"><![CDATA[<p>这次我们要做的是通过监听器实现CSV文件的加载器，用于建立一个二维列表数据结构。</p>
+
+<h3 id="加载csv数据">加载CSV数据</h3>
+
+<p>我们的目标是构建一个监听器去加载CSV数据到一个映射列表数据结构中，这是任何数据格式阅读器或配置文件阅读器都会做的事。我们会收集每行的字段并放到一个映射中，构成头名-值组合。以下是示例文件t.csv的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Details,Month,Amount
+</span><span class='line'>Mid Bonus,June,"$2,000"
+</span><span class='line'>,January,"""zippo"""
+</span><span class='line'>Total Bonuses,"","$5,000"</span></code></pre></td></tr></table></div></figure>
+
+<p>我们想要看到如下的映射列表被打印出：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>[{Details=Mid Bonus, Month=June, Amount="$2,000"},
+</span><span class='line'> {Details=, Month=January, Amount="""zippo"""},
+</span><span class='line'> {Details=Total Bonuses, Month="", Amount="$5,000"}]</span></code></pre></td></tr></table></div></figure>
+
+<p>为了在监听器中得到精确的方法，我们给CSV语法中field规则的每个选项打上标签：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar CSV;
+</span><span class='line'>
+</span><span class='line'>file : hdr row+ ;
+</span><span class='line'>hdr : row ;
+</span><span class='line'>row : field (',' field)* '\r'? '\n' ;
+</span><span class='line'>field
+</span><span class='line'>    : TEXT    # text
+</span><span class='line'>    | STRING  # string
+</span><span class='line'>    |         # empty
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>TEXT : ~[,\n\r"]+ ;
+</span><span class='line'>STRING : '"' ('""'|~'"')* '"' ;     // quote-quote is an escaped quote</span></code></pre></td></tr></table></div></figure>
+
+<p>我们可以从定义我们需要的数据结构开始监听器的实现。首先，我们需要的数据结构是称为rows的映射列表。我们也需要在头行中找到的列名列表header。为处理数据行，我们需要把字段值读到一个临时列表currentRowFieldValues中，然后把列名映射到那些值上。以下是监听器LoadCSV.java的实现代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static class Loader extends CSVBaseListener {
+</span><span class='line'>    public static final String EMPTY = "";
+</span><span class='line'>    /** Load a list of row maps that map field name to value */
+</span><span class='line'>    List&lt;Map&lt;String,String&gt;&gt; rows = new ArrayList&lt;Map&lt;String, String&gt;&gt;();
+</span><span class='line'>    /** List of column names */
+</span><span class='line'>    List&lt;String&gt; header;
+</span><span class='line'>    /** Build up a list of fields in current row */
+</span><span class='line'>    List&lt;String&gt; currentRowFieldValues;</span></code></pre></td></tr></table></div></figure>
+
+<p>下面的3个规则方法通过计算适当的字符串处理字段值，并把它添加到currentRowFieldValues中。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitString(CSVParser.StringContext ctx) {
+</span><span class='line'>    currentRowFieldValues.add(ctx.STRING().getText());
+</span><span class='line'>}
+</span><span class='line'>public void exitText(CSVParser.TextContext ctx) {
+</span><span class='line'>    currentRowFieldValues.add(ctx.TEXT().getText());
+</span><span class='line'>}
+</span><span class='line'>public void exitEmpty(CSVParser.EmptyContext ctx) {
+</span><span class='line'>    currentRowFieldValues.add(EMPTY);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>在我们能处理数据行之前，我们需要从第一行取得列名列表。头行在语法上仅仅是另外的行，但我们在对待它时要不同于常规的数据行，那意味着我们需要检查上下文。暂时让我们假设在exitRow()执行后，currentRowFieldValues包含列名列表。要填充header，我们只需要捕获第一行的字段值。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitHdr(CSVParser.HdrContext ctx) {
+</span><span class='line'>    header = new ArrayList&lt;String&gt;();
+</span><span class='line'>    header.addAll(currentRowFieldValues);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>谈到行时，我们需要两个操作：一个是当我们开始一行时，另一个是当我们结束一行时。当我们开始一行时，我们需要分配或清除currentRowFieldValues，准备获取一组新的数据。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void enterRow(CSVParser.RowContext ctx) {
+</span><span class='line'>    currentRowFieldValues = new ArrayList&lt;String&gt;();
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>在行结束的时候，我们必须考虑上下文。如果我们仅仅加载头行，那我们不能改变rows字段，因为列名不是数据。在exitRow()中，我们可以通过查看在语法分析树中的父节点的getRuleIndex()值（或者询问父节点是否是HdrContext类型）测试上下文。如果当前行是数据行，我们将通过同时遍历header中的列名和currentRowFieldValues中的值获取的内容创建映射。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitRow(CSVParser.RowContext ctx) {
+</span><span class='line'>    // If this is the header row, do nothing
+</span><span class='line'>    // if ( ctx.parent instanceof CSVParser.HdrContext ) return; OR:
+</span><span class='line'>    if ( ctx.getParent().getRuleIndex() == CSVParser.RULE_hdr ) {
+</span><span class='line'>        return;
+</span><span class='line'>    }
+</span><span class='line'>    // It's a data row
+</span><span class='line'>    Map&lt;String, String&gt; m = new LinkedHashMap&lt;String, String&gt;();
+</span><span class='line'>    int i = 0;
+</span><span class='line'>    for (String v : currentRowFieldValues) {
+</span><span class='line'>        m.put(header.get(i), v);
+</span><span class='line'>        i++;
+</span><span class='line'>    }
+</span><span class='line'>    rows.add(m);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>到这里，加载CSV数据到数据结构中的任务就算已经完成。在使用ParseTreeWalker遍历树后，我们就可以紧接着打印出rows字段：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ParseTreeWalker walker = new ParseTreeWalker();
+</span><span class='line'>Loader loader = new Loader();
+</span><span class='line'>walker.walk(loader, tree);
+</span><span class='line'>System.out.println(loader.rows);</span></code></pre></td></tr></table></div></figure>
+
+<p>以下是构建和测试序列：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr CSV.g
+</span><span class='line'>compile *.java
+</span><span class='line'>run LoadCSV t.csv</span></code></pre></td></tr></table></div></figure>
+
+<p>下面显示的是输出结果：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>[{Details=Mid Bonus, Month=June, Amount="$2,000"}, {Details=, Month=January,
+</span><span class='line'>Amount="""zippo"""}, {Details=Total Bonuses, Month="", Amount="$5,000"}]</span></code></pre></td></tr></table></div></figure>
 ]]></content>
   </entry>
   
@@ -987,7 +1167,7 @@
 </span><span class='line'>PropertyFilePrinter parser = new PropertyFilePrinter(tokens);
 </span><span class='line'>parser.file();    // launch our special version of the parser</span></code></pre></td></tr></table></div></figure>
 
-<p>作为第二个应用，我们把属性加载到一个map中而不是打印它们。我们需要做的就是创建一个新的子类并把不同的功能放到defineProperty()中。</p>
+<p>作为第二个应用，我们把属性加载到一个映射中而不是打印它们。我们需要做的就是创建一个新的子类并把不同的功能放到defineProperty()中。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -4449,29 +4629,6 @@ another runner in the night<br>
 <p>上面输出的每一行代表一个记号，包含记号索引、开始和结束字符、记号文本、记号类型，最后的行和字符位置则告诉我们词法分析器如何标记化输入。</p>
 
 <p>在命令行中，XML tokens序列处通常是一个语法名字后面跟着开始规则，但在这里，我们使用语法名字后面跟着特殊的规则名字tokens来告诉TestRig应该运行词法分析器而不是语法分析器。接着使用选项-tokens打印出匹配的记号列表。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（11）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part11/"/>
-    <updated>2016-04-18T18:13:27+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part11</id>
-    <content type="html"><![CDATA[<p>为制作语言应用，我们必须为每个输入短语或子短语执行一些适当的代码，那样做最简单的方法是操作由语法分析器自动创建的语法分析树。</p>
-
-<p>早些时候我们已经学习了词法分析器处理字符和把记号传递给语法分析器，然后语法分析器分析语法和创建语法分析树的相关知识。对应的ANTLR类分别是CharStream、Lexer、Token、Parser和ParseTree。连接词法分析器和语法分析器的管道被称为TokenStream。下图说明了这些类型的对象如何连接到内存中其它的对象。</p>
-
-<p><img src="http://codemany.com/uploads/basic-data-structure.png" title="basic-data-structure" ></p>
-
-<p>这些ANTLR数据结构共享尽可能多的数据以便节省内存的需要。上图显示在语法分析树中的叶子（记号）节点含有在记号流中记号的点。记号记录开始和结束字符在CharStream中的索引，而不是复制子串。这里没有与空格字符有关的记号，因为我们假设我们的词法分析器扔掉了空格。</p>
-
-<p>下图显示的是ParseTree的子类RuleNode和TerminalNode以及它们所对应的子树根节点和叶子节点。RuleNode包含有方法如getChild()和getParent()等，但RuleNode并不专属于特定语法所有。为了能更好地访问在特定节点中的元素，ANTLR为每个规则生成一个RuleNode的子类。下图显示了赋值语句例子的子树根节点的特定类，它们是StatContext、AssignContext和ExprContext：</p>
-
-<p><img src="http://codemany.com/uploads/parse-tree-node.png" title="parse-tree-node" ></p>
-
-<p>它们记录了通过规则对短语识别的每件事情，所以被称为上下文对象。每个上下文对象都知道被识别短语的开始和结束记号以及提供对所有短语的元素的访问。例如，AssignContext提供方法ID()和expr()去访问标志符节点和表达式子树。</p>
-
-<p>给出了具体类型的描述后，我们可以手工编写代码去执行树的深度优先遍历。当我们发现和完成节点时我们可以执行任何我们想要的动作。典型的动作是诸如计算结果，更新数据结构，或者生成输出。相比每次为每个应用编写同样的树遍历样板代码，使用ANTLR自动生成的树遍历机制更方便、更容易。</p>
 ]]></content>
   </entry>
   

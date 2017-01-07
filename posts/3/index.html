@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="一个模棱两可的短语或句子通常是指它有不止一种解释。换句话说，短语或句子能匹配不止一种语法结构。要解释或转换一个短语，程序必须要能唯一地确认它的含义，这意味着我们必须提供无歧义的语法，以便生成的语法分析器能用明确的一个方法匹配每个输入短语。 在这里，让我们展示一些有歧义的语法以便让二义性的概念更具体 &hellip;">
+  <meta name="description" content="为制作语言应用，我们必须为每个输入短语或子短语执行一些适当的代码，那样做最简单的方法是操作由语法分析器自动创建的语法分析树。 早些时候我们已经学习了词法分析器处理字符和把记号传递给语法分析器，然后语法分析器分析语法和创建语法分析树的相关知识。对应的ANTLR类分别是CharStream、Lexer &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,49 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part11/">ANTLR 4权威参考读书笔记（11）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-04-18T18:13:27+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:13 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>为制作语言应用，我们必须为每个输入短语或子短语执行一些适当的代码，那样做最简单的方法是操作由语法分析器自动创建的语法分析树。</p>
+
+<p>早些时候我们已经学习了词法分析器处理字符和把记号传递给语法分析器，然后语法分析器分析语法和创建语法分析树的相关知识。对应的ANTLR类分别是CharStream、Lexer、Token、Parser和ParseTree。连接词法分析器和语法分析器的管道被称为TokenStream。下图说明了这些类型的对象如何连接到内存中其它的对象。</p>
+
+<p><img src="/uploads/basic-data-structure.png" title="basic-data-structure" ></p>
+
+<p>这些ANTLR数据结构共享尽可能多的数据以便节省内存的需要。上图显示在语法分析树中的叶子（记号）节点含有在记号流中记号的点。记号记录开始和结束字符在CharStream中的索引，而不是复制子串。这里没有与空格字符有关的记号，因为我们假设我们的词法分析器扔掉了空格。</p>
+
+<p>下图显示的是ParseTree的子类RuleNode和TerminalNode以及它们所对应的子树根节点和叶子节点。RuleNode包含有方法如getChild()和getParent()等，但RuleNode并不专属于特定语法所有。为了能更好地访问在特定节点中的元素，ANTLR为每个规则生成一个RuleNode的子类。下图显示了赋值语句例子的子树根节点的特定类，它们是StatContext、AssignContext和ExprContext：</p>
+
+<p><img src="/uploads/parse-tree-node.png" title="parse-tree-node" ></p>
+
+<p>它们记录了通过规则对短语识别的每件事情，所以被称为上下文对象。每个上下文对象都知道被识别短语的开始和结束记号以及提供对所有短语的元素的访问。例如，AssignContext提供方法ID()和expr()去访问标志符节点和表达式子树。</p>
+
+<p>给出了具体类型的描述后，我们可以手工编写代码去执行树的深度优先遍历。当我们发现和完成节点时我们可以执行任何我们想要的动作。典型的动作是诸如计算结果，更新数据结构，或者生成输出。相比每次为每个应用编写同样的树遍历样板代码，使用ANTLR自动生成的树遍历机制更方便、更容易。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -825,83 +868,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part5/">ANTLR 4权威参考读书笔记（5）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-01-22T21:18:51+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2016</span></span> <span class='time'>9:18 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在<a href="/blog/reading-notes-the-definitive-antlr4-reference-part3/">ANTLR 4权威参考读书笔记（3）</a>以及<a href="/blog/reading-notes-the-definitive-antlr4-reference-part4/">ANTLR 4权威参考读书笔记（4）</a>中我们分别用访问者和监听器机制实现了计算器的解释执行和编译执行。但并没有给出这两种机制的太多细节，这次就来详细地讲讲。</p>
-
-<p>ANTLR在它的运行库中为两种树遍历机制提供支持。默认情况下，ANTLR生成一个语法分析树监听器接口，在其中定义了回调方法，用于响应被内建的树遍历器触发的事件。</p>
-
-<p>在监听器和访问者机制之间最大的不同是：监听器方法被ANTLR提供的遍历器对象调用；而访问者方法必须显式的调用visit方法遍历它们的子节点，在一个节点的子节点上如果忘记调用visit方法就意味着那些子树没有得到访问。</p>
-
-<p>让我们首先从监听器开始。在我们了解监听器之后，我们也将看到ANTLR如何生成遵循访问者设计模式的树遍历器。</p>
-
-<h3 id="语法分析树监听器">语法分析树监听器</h3>
-
-<p>在Calc.java中有这样两行代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ParseTreeWalker walker = new ParseTreeWalker();
-</span><span class='line'>walker.walk(new DirectiveListener(), tree);</span></code></pre></td></tr></table></div></figure>
-
-<p>类ParseTreeWalker是ANTLR运行时提供的用于遍历语法分析树和触发监听器中回调方法的树遍历器。ANTLR工具根据Calc.g中的语法自动生成ParseTreeListener接口的子接口CalcListener和默认实现CalcBaseListener，其中含有针对语法中每个规则的enter和exit方法。DirectiveListener是我们编写的继承自CalcBaseListener的包含特定应用代码的实现，把它传递给树遍历器后，树遍历器在遍历语法分析树时就会触发DirectiveListener中的回调方法。</p>
-
-<p><img src="/uploads/calc-listener-hierachy.png" title="calc-listener-hierachy" ></p>
-
-<p>下图左边的语法分析树显示ParseTreeWalker执行了一次深度优先遍历，由粗虚线表示，箭头方向代表遍历方向。右边显示的是语法分析树的完整调用序列，它们由ParseTreeWalker触发调用。当树遍历器遇到规则assign的节点时，它触发enterAssign()并且给它传递AssignContext这个语法分析树节点的上下文。在树遍历器访问完assign节点的所有子节点后，它触发exitAssign()。</p>
-
-<p><img src="/uploads/listener-call-sequence.png" title="listener-call-sequence" ></p>
-
-<p>监听器机制的强大之处在于所有都是自动的。我们不必要写语法分析树遍历器，而且我们的监听器方法也不必要显式地访问它们的子节点。</p>
-
-<h3 id="语法分析树访问者">语法分析树访问者</h3>
-
-<p>有些情况下，我们实际想要控制的是遍历本身，在那里我们可以显式地调用visit方法去访问子树节点。参数-visitor告诉ANTLR工具从相应语法生成访问者接口和默认实现，其中含有针对语法中每个规则的visit方法。</p>
-
-<p>下图是我们熟悉的访问者模式操作在语法分析树上。左边部分的粗虚线表示语法分析树的深度优先遍历，箭头方向代表遍历方向。右边部分指明访问者中的方法调用序列。</p>
-
-<p><img src="/uploads/visitor-call-sequence.png" title="visitor-call-sequence" ></p>
-
-<p>下面是Calc.java中的两行代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>EvalVisitor eval = new EvalVisitor();
-</span><span class='line'>// To start walking the parse tree
-</span><span class='line'>eval.visit(tree);</span></code></pre></td></tr></table></div></figure>
-
-<p>我们首先初始化自制的树遍历器EvalVisitor，然后调用visit()去访问整棵语法分析树。ANTLR运行时提供的访问者支持代码会在看到根节点时调用visitProg()。在那里，visitProg()会把子树作为参数调用visit方法继续遍历，如此等等。</p>
-
-<p><img src="/uploads/calc-visitor-hierachy.png" title="calc-visitor-hierachy" ></p>
-
-<p>ANTLR自动生成的访问者接口和默认实现可以让我们为访问者方法编写自己的实现，让我们避免必须覆写接口中的每个方法，仅仅聚焦在我们感兴趣的方法上。这种方式减少了我们学习ANTLR必须要花费的时间，让我们回到我们所熟悉的编程语言领域。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/4">&larr; Older</a>
@@ -927,15 +893,15 @@
       </li>
     
       <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part25/">ANTLR 4权威参考读书笔记（25）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part24/">ANTLR 4权威参考读书笔记（24）</a>
       </li>
     
       <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part23/">ANTLR 4权威参考读书笔记（23）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/how-to-create-effective-icons/">如何创建有效的图标</a>
       </li>
     
   </ul>
@@ -949,7 +915,7 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 139%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 140%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
