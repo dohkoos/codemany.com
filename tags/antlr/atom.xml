@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: ANTLR | 乐者为王]]></title>
   <link href="http://codemany.com/tags/antlr/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-01-07T20:41:20+08:00</updated>
+  <updated>2017-01-08T20:52:29+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,144 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（26）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part26/"/>
+    <updated>2016-09-09T22:22:47+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part26</id>
+    <content type="html"><![CDATA[<p>今天准备做的是把JSON文本文件转换成XML文本文件。</p>
+
+<h3 id="把json转换成xml">把JSON转换成XML</h3>
+
+<p>许多Web服务返回的是JSON数据，但是我们可能会遇到一种情况，需要把JSON数据送给那些只接受XML数据的代码。这就需要我们构建一个JSON到XML的转换器。我们的目标是读入像下面这样的JSON数据：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">{
+&quot;description&quot; : &quot;An imaginary server config file&quot;,
+&quot;logs&quot; : {&quot;level&quot;:&quot;verbose&quot;, &quot;dir&quot;:&quot;/var/log&quot;},
+&quot;host&quot; : &quot;antlr.org&quot;,
+&quot;admin&quot;: [&quot;parrt&quot;, &quot;tombu&quot;],
+&quot;aliases&quot;: []
+}
+</code></pre></div>
+<p>放出等价的XML数据，就像下面这样的：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;description&gt;An imaginary server config file&lt;/description&gt;
+&lt;logs&gt;
+  &lt;level&gt;verbose&lt;/level&gt;
+  &lt;dir&gt;/var/log&lt;/dir&gt;
+&lt;/logs&gt;
+&lt;host&gt;antlr.org&lt;/host&gt;
+&lt;admin&gt;
+  &lt;element&gt;parrt&lt;/element&gt;
+  &lt;element&gt;tombu&lt;/element&gt;
+&lt;/admin&gt;
+&lt;aliases&gt;&lt;/aliases&gt;
+</code></pre></div>
+<p>正如我们对CSV做的那样，让我们给JSON语法中的一些选项打上标签，以便让ANTLR生成更精确的监听器方法。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">object
+    : &#39;{&#39; pair (&#39;,&#39; pair)* &#39;}&#39;    # AnObject
+    | &#39;{&#39; &#39;}&#39;                     # EmptyObject
+    ;
+array
+    : &#39;[&#39; value (&#39;,&#39; value)* &#39;]&#39;  # ArrayOfValues
+    | &#39;[&#39; &#39;]&#39;                     # EmptyArray
+    ;
+</code></pre></div>
+<p>我们将对规则value做同样的事，但是稍有不同。除3个选项外的其它所有选项只需要返回被匹配的值的文本，所以我们可以为其它所有选项使用相同的标签，使语法分析树遍历器为那些选项触发相同的监听器方法。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">value
+    : STRING    # String
+    | NUMBER    # Atom
+    | object    # ObjectValue
+    | array     # ArrayValue
+    | &#39;true&#39;    # Atom
+    | &#39;false&#39;   # Atom
+    | &#39;null&#39;    # Atom
+    ;
+</code></pre></div>
+<p>为构建这样的转换器，明智的做法是让每个规则返回被它匹配的输入短语的XML等价物。为追踪部分结构，我们使用字段xml和两个帮助方法来注解语法分析树。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public static class XMLEmitter extends JSONBaseListener {
+    ParseTreeProperty&lt;String&gt; xml = new ParseTreeProperty&lt;String&gt;();
+    String getXML(ParseTree ctx) { return xml.get(ctx); }
+    void setXML(ParseTree ctx, String s) { xml.put(ctx, s); }
+</code></pre></div>
+<p>我们把每棵子树转换后的字符串挂载到该子树的根节点。在语法分析树更高节点上工作的方法可以捕获这些值以便计算更大的字符串。然后挂载在根节点上的字符串完成计算。</p>
+
+<p>让我们从最简单的转换开始。value的Atom选项返回匹配记号的文本。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitAtom(JSONParser.AtomContext ctx) {
+    setXML(ctx, ctx.getText());
+}
+</code></pre></div>
+<p>字符串基本上是相同的，只是我们必须去除双引号。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitString(JSONParser.StringContext ctx) {
+    setXML(ctx, stripQuotes(ctx.getText()));
+}
+</code></pre></div>
+<p>如果value()规则方法找到一个对象或数组，它可以把组合元素的部分转换拷贝到它自己的语法分析树节点。以下代码是找到对象时的处理：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitObjectValue(JSONParser.ObjectValueContext ctx) {
+    // analogous to String value() {return object();}
+    setXML(ctx, getXML(ctx.object()));
+}
+</code></pre></div>
+<p>一旦我们可以转换所有的值，我们需要担心名-值对以及把它们转换成标签和文本。生成的XML的标签名字来源于STRING &#39;:&#39; value选项中的STRING。在左右尖括号之间的文本来源于挂载在value子节点上的文本。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitPair(JSONParser.PairContext ctx) {
+    String tag = stripQuotes(ctx.STRING().getText());
+    JSONParser.ValueContext vctx = ctx.value();
+    String x = String.format(&quot;&lt;%s&gt;%s&lt;/%s&gt;\n&quot;, tag, getXML(vctx), tag);
+    setXML(ctx, x);
+}
+</code></pre></div>
+<p>JSON对象由名-值对组成。因此，对于被选项中标记为AnObject的object找到的每个对，我们把计算后的结果追加在语法分析树。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitAnObject(JSONParser.AnObjectContext ctx) {
+    StringBuilder buf = new StringBuilder();
+    buf.append(&quot;\n&quot;);
+    for (JSONParser.PairContext pctx : ctx.pair()) {
+        buf.append(getXML(pctx));
+    }
+    setXML(ctx, buf.toString());
+}
+public void exitEmptyObject(JSONParser.EmptyObjectContext ctx) {
+    setXML(ctx, &quot;&quot;);
+}
+</code></pre></div>
+<p>处理数组遵循相似的模式，只是简单地连接来自子节点的结果列表，然后把它们包裹在<code>&lt;element&gt;</code>标签中。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitArrayOfValues(JSONParser.ArrayOfValuesContext ctx) {
+    StringBuilder buf = new StringBuilder();
+    buf.append(&quot;\n&quot;);
+    for (JSONParser.ValueContext vctx : ctx.value()) {
+        buf.append(&quot;&lt;element&gt;&quot;); // conjure up element for valid XML
+        buf.append(getXML(vctx));
+        buf.append(&quot;&lt;/element&gt;&quot;);
+        buf.append(&quot;\n&quot;);
+    }
+    setXML(ctx, buf.toString());
+}
+public void exitEmptyArray(JSONParser.EmptyArrayContext ctx) {
+    setXML(ctx, &quot;&quot;);
+}
+</code></pre></div>
+<p>最后，我们需要使用从一个对象或数组收集来的全部转换注解语法分析树的根节点。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">json: object
+    | array
+    ;
+</code></pre></div>
+<p>我们可以在监听器里用一个集合运算做到这点。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitJson(JSONParser.JsonContext ctx) {
+    setXML(ctx, getXML(ctx.getChild(0)));
+}
+</code></pre></div>
+<p>以下是构建和测试序列：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">antlr JSON.g
+compile *.java
+run JSON2XML t.json
+</code></pre></div>
+<p>下面的是部分的输出结果：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;description&gt;An imaginary server config file&lt;/description&gt;
+&lt;logs&gt;
+&lt;level&gt;verbose&lt;/level&gt;
+...
+</code></pre></div>
+<p>有些转换不总是像JSON到XML那样直白的。但是，这个例子向我们表明如何通过拼凑部分翻译短语处理句子转换问题。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（25）]]></title>
@@ -423,90 +561,6 @@ run TestPropertyFileVisitor t.properties
 <div class="highlight"><pre><code class="language-text" data-lang="text">{user=&quot;parrt&quot;, machine=&quot;maniac&quot;}
 </code></pre></div>
 <p>我们可以使用监听器和访问者构建几乎任何我们想要的。一旦我们处于Java空间，就不再需要学习更多的ANTLR知识。我们只要知道语法、语法分析树、监听器和访问者事件方法之间的关系。除此之外，就是代码。在对识别中的输入短语的回答中，我们可以生成输出、收集信息、以某种方式验证短语，或者执行计算。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（21）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part21/"/>
-    <updated>2016-07-14T18:38:42+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part21</id>
-    <content type="html"><![CDATA[<p>前文的语法仍然存在问题，因为它限制我们只能使用Java生成语法分析器。为使语法可复用和语言无关，我们需要完全避免嵌入动作。接下来就将展示如何用监听器做到这点。</p>
-
-<h3 id="使用语法分析树监听器实现应用">使用语法分析树监听器实现应用</h3>
-
-<p>在构建语言应用时要避免应用和语法纠缠在一起，关键是让语法分析器生成语法分析树，然后遍历该树去触发特定的应用代码。我们可以使用我们最喜欢的技术遍历树，也可以使用ANTLR生成的树遍历机制中的一个。在本节中，我们将使用ANTLR内建的ParseTreeWalker构建一个基于监听器版本的属性文件应用。</p>
-
-<p>让我们从属性文件语法的原始版本开始：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">file : prop+ ;
-prop : ID &#39;=&#39; STRING &#39;\n&#39; ;
-</code></pre></div>
-<p>下面是属性示例文件t.properties的内容：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">user=&quot;parrt&quot;
-machine=&quot;maniac&quot;
-</code></pre></div>
-<p>通过上述语法，ANTLR生成PropertyFileParser，该语法分析器会自动构建如下图所示的语法分析树：</p>
-
-<p><img src="/uploads/propertyfile-parse-tree.png" title="propertyfile-parse-tree" ></p>
-
-<p>有了语法分析树，我们就可以使用ParseTreeWalker去访问所有的节点，触发进入和退出方法。</p>
-
-<p>现在来看一下ANTLR通过语法PropertyFile生成的监听器接口PropertyFileListener，当ANTLR的ParseTreeWalker发现和完成节点时，它会为每个规则子树分别触发进入和退出方法。因为在语法PropertyFile中只有两条语法规则，所以在接口中有4个方法：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public interface PropertyFileListener extends ParseTreeListener {
-    void enterFile(PropertyFileParser.FileContext ctx);
-    void exitFile(PropertyFileParser.FileContext ctx);
-    void enterProp(PropertyFileParser.PropContext ctx);
-    void exitProp(PropertyFileParser.PropContext ctx);
-}
-</code></pre></div>
-<p>FileContext和PropContext对象是针对每条语法规则的语法分析树节点的实现，它们包含一些有用的方法。</p>
-
-<p>为方便起见，ANTLR也会生成带有默认实现的类PropertyFileBaseListener，这些默认实现模仿在前文语法中@member区域我们手写的空白方法。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public class PropertyFileBaseVisitor&lt;T&gt; extends AbstractParseTreeVisitor&lt;T&gt;
-                                        implements PropertyFileVisitor&lt;T&gt; {
-    @Override
-    public T visitFile(PropertyFileParser.FileContext ctx) { }
-    @Override
-    public T visitProp(PropertyFileParser.PropContext ctx) { }
-}
-</code></pre></div>
-<p>默认实现让我们只需要覆盖和实现那些我们关心的方法。例如，以下是属性文件加载器的一个重新实现，像前面那样它只有一个方法，但使用监听器机制：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public static class PropertyFileLoader extends PropertyFileBaseListener {
-    Map&lt;String,String&gt; props = new OrderedHashMap&lt;String, String&gt;();
-    public void exitProp(PropertyFileParser.PropContext ctx) {
-        String id = ctx.ID().getText();    // prop : ID &#39;=&#39; STRING &#39;\n&#39; ;
-        String value = ctx.STRING().getText();
-        props.put(id, value);
-    }
-}
-</code></pre></div>
-<p>主要的不同是这个版本扩展了基类监听器，而不是语法分析器，监听器方法在语法分析器完成后被触发。</p>
-
-<p>这里面有很多的接口和类，让我们看一下在这些关键元素间的继承关系。</p>
-
-<p><img src="/uploads/propertyfile-listener-hierachy.png" title="propertyfile-listener-hierachy" ></p>
-
-<p>处于ANTLR运行库中的接口ParseTreeListener要求每个监听器对事件visitTerminal()、enterEveryRule()和exitEveryRule()作出反应，如果有语法错误的还要加上visitErrorNode()。ANTLR从语法文件PropertyFile生成接口PropertyFileListener，并且为类PropertyFileBaseListener的所有方法生成默认实现。我们仅需要构建PropertyFileLoader，它继承了PropertyFileBaseListener中的所有空方法。</p>
-
-<p>方法exitProp()可以访问与规则prop相关的规则上下文对象PropContext，该上下文对象持有在规则prop中提到的每个元素（ID和STRING）的对应方法。因为这些元素是语法中的记号引用，所以方法返回语法分析树节点TerminalNode。我们既可以通过getText()直接访问记号的文本，也可以通过getSymbol()首先获取Token。</p>
-
-<p>现在让我们创建测试文件TestPropertyFile.java遍历树，倾听来自PropertyFileLoader的声音：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">// create a standard ANTLR parse tree walker
-ParseTreeWalker walker = new ParseTreeWalker();
-// create listener then feed to walker
-PropertyFileLoader loader = new PropertyFileLoader();
-walker.walk(loader, tree);    // walk parse tree
-System.out.println(loader.props);    // print results
-</code></pre></div>
-<p>然后就是编译和生成代码，运行测试程序去处理输入文件：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">antlr PropertyFile.g
-compile *.java
-run TestPropertyFile t.properties
-</code></pre></div>
-<p>这里是输出的内容：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">{user=&quot;parrt&quot;, machine=&quot;maniac&quot;}
-</code></pre></div>
-<p>测试程序成功地把文件中的属性赋值重组成内存中的映射数据结构。</p>
 ]]></content>
   </entry>
   

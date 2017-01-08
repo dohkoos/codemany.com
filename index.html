@@ -295,6 +295,272 @@
       
   <header>
     
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part26/">ANTLR 4权威参考读书笔记（26）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-09-09T22:22:47+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>9</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>10:22 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>今天准备做的是把JSON文本文件转换成XML文本文件。</p>
+
+<h3 id="把json转换成xml">把JSON转换成XML</h3>
+
+<p>许多Web服务返回的是JSON数据，但是我们可能会遇到一种情况，需要把JSON数据送给那些只接受XML数据的代码。这就需要我们构建一个JSON到XML的转换器。我们的目标是读入像下面这样的JSON数据：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>{
+</span><span class='line'>"description" : "An imaginary server config file",
+</span><span class='line'>"logs" : {"level":"verbose", "dir":"/var/log"},
+</span><span class='line'>"host" : "antlr.org",
+</span><span class='line'>"admin": ["parrt", "tombu"],
+</span><span class='line'>"aliases": []
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>放出等价的XML数据，就像下面这样的：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;description&gt;An imaginary server config file&lt;/description&gt;
+</span><span class='line'>&lt;logs&gt;
+</span><span class='line'>  &lt;level&gt;verbose&lt;/level&gt;
+</span><span class='line'>  &lt;dir&gt;/var/log&lt;/dir&gt;
+</span><span class='line'>&lt;/logs&gt;
+</span><span class='line'>&lt;host&gt;antlr.org&lt;/host&gt;
+</span><span class='line'>&lt;admin&gt;
+</span><span class='line'>  &lt;element&gt;parrt&lt;/element&gt;
+</span><span class='line'>  &lt;element&gt;tombu&lt;/element&gt;
+</span><span class='line'>&lt;/admin&gt;
+</span><span class='line'>&lt;aliases&gt;&lt;/aliases&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>正如我们对CSV做的那样，让我们给JSON语法中的一些选项打上标签，以便让ANTLR生成更精确的监听器方法。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>object
+</span><span class='line'>    : '{' pair (',' pair)* '}'    # AnObject
+</span><span class='line'>    | '{' '}'                     # EmptyObject
+</span><span class='line'>    ;
+</span><span class='line'>array
+</span><span class='line'>    : '[' value (',' value)* ']'  # ArrayOfValues
+</span><span class='line'>    | '[' ']'                     # EmptyArray
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>我们将对规则value做同样的事，但是稍有不同。除3个选项外的其它所有选项只需要返回被匹配的值的文本，所以我们可以为其它所有选项使用相同的标签，使语法分析树遍历器为那些选项触发相同的监听器方法。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>value
+</span><span class='line'>    : STRING    # String
+</span><span class='line'>    | NUMBER    # Atom
+</span><span class='line'>    | object    # ObjectValue
+</span><span class='line'>    | array     # ArrayValue
+</span><span class='line'>    | 'true'    # Atom
+</span><span class='line'>    | 'false'   # Atom
+</span><span class='line'>    | 'null'    # Atom
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>为构建这样的转换器，明智的做法是让每个规则返回被它匹配的输入短语的XML等价物。为追踪部分结构，我们使用字段xml和两个帮助方法来注解语法分析树。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static class XMLEmitter extends JSONBaseListener {
+</span><span class='line'>    ParseTreeProperty&lt;String&gt; xml = new ParseTreeProperty&lt;String&gt;();
+</span><span class='line'>    String getXML(ParseTree ctx) { return xml.get(ctx); }
+</span><span class='line'>    void setXML(ParseTree ctx, String s) { xml.put(ctx, s); }</span></code></pre></td></tr></table></div></figure>
+
+<p>我们把每棵子树转换后的字符串挂载到该子树的根节点。在语法分析树更高节点上工作的方法可以捕获这些值以便计算更大的字符串。然后挂载在根节点上的字符串完成计算。</p>
+
+<p>让我们从最简单的转换开始。value的Atom选项返回匹配记号的文本。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitAtom(JSONParser.AtomContext ctx) {
+</span><span class='line'>    setXML(ctx, ctx.getText());
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>字符串基本上是相同的，只是我们必须去除双引号。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitString(JSONParser.StringContext ctx) {
+</span><span class='line'>    setXML(ctx, stripQuotes(ctx.getText()));
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>如果value()规则方法找到一个对象或数组，它可以把组合元素的部分转换拷贝到它自己的语法分析树节点。以下代码是找到对象时的处理：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitObjectValue(JSONParser.ObjectValueContext ctx) {
+</span><span class='line'>    // analogous to String value() {return object();}
+</span><span class='line'>    setXML(ctx, getXML(ctx.object()));
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>一旦我们可以转换所有的值，我们需要担心名-值对以及把它们转换成标签和文本。生成的XML的标签名字来源于STRING &#39;:&#39; value选项中的STRING。在左右尖括号之间的文本来源于挂载在value子节点上的文本。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitPair(JSONParser.PairContext ctx) {
+</span><span class='line'>    String tag = stripQuotes(ctx.STRING().getText());
+</span><span class='line'>    JSONParser.ValueContext vctx = ctx.value();
+</span><span class='line'>    String x = String.format("&lt;%s&gt;%s&lt;/%s&gt;\n", tag, getXML(vctx), tag);
+</span><span class='line'>    setXML(ctx, x);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>JSON对象由名-值对组成。因此，对于被选项中标记为AnObject的object找到的每个对，我们把计算后的结果追加在语法分析树。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitAnObject(JSONParser.AnObjectContext ctx) {
+</span><span class='line'>    StringBuilder buf = new StringBuilder();
+</span><span class='line'>    buf.append("\n");
+</span><span class='line'>    for (JSONParser.PairContext pctx : ctx.pair()) {
+</span><span class='line'>        buf.append(getXML(pctx));
+</span><span class='line'>    }
+</span><span class='line'>    setXML(ctx, buf.toString());
+</span><span class='line'>}
+</span><span class='line'>public void exitEmptyObject(JSONParser.EmptyObjectContext ctx) {
+</span><span class='line'>    setXML(ctx, "");
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>处理数组遵循相似的模式，只是简单地连接来自子节点的结果列表，然后把它们包裹在<code>&lt;element&gt;</code>标签中。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitArrayOfValues(JSONParser.ArrayOfValuesContext ctx) {
+</span><span class='line'>    StringBuilder buf = new StringBuilder();
+</span><span class='line'>    buf.append("\n");
+</span><span class='line'>    for (JSONParser.ValueContext vctx : ctx.value()) {
+</span><span class='line'>        buf.append("&lt;element&gt;"); // conjure up element for valid XML
+</span><span class='line'>        buf.append(getXML(vctx));
+</span><span class='line'>        buf.append("&lt;/element&gt;");
+</span><span class='line'>        buf.append("\n");
+</span><span class='line'>    }
+</span><span class='line'>    setXML(ctx, buf.toString());
+</span><span class='line'>}
+</span><span class='line'>public void exitEmptyArray(JSONParser.EmptyArrayContext ctx) {
+</span><span class='line'>    setXML(ctx, "");
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>最后，我们需要使用从一个对象或数组收集来的全部转换注解语法分析树的根节点。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>json: object
+</span><span class='line'>    | array
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>我们可以在监听器里用一个集合运算做到这点。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitJson(JSONParser.JsonContext ctx) {
+</span><span class='line'>    setXML(ctx, getXML(ctx.getChild(0)));
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>以下是构建和测试序列：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr JSON.g
+</span><span class='line'>compile *.java
+</span><span class='line'>run JSON2XML t.json</span></code></pre></td></tr></table></div></figure>
+
+<p>下面的是部分的输出结果：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;description&gt;An imaginary server config file&lt;/description&gt;
+</span><span class='line'>&lt;logs&gt;
+</span><span class='line'>&lt;level&gt;verbose&lt;/level&gt;
+</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
+
+<p>有些转换不总是像JSON到XML那样直白的。但是，这个例子向我们表明如何通过拼凑部分翻译短语处理句子转换问题。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
       <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part25/">ANTLR 4权威参考读书笔记（25）</a></h1>
     
     
@@ -1427,104 +1693,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part19/">ANTLR 4权威参考读书笔记（19）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-06-21T21:12:40+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>21</span><span class='date-suffix'>st</span>, <span class='date-year'>2016</span></span> <span class='time'>9:12 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><ul>
-<li>component 构件</li>
-</ul>
-
-<p>因为词法规则可以使用递归，所以词法解析器在技术上和语法解析器一样强大。那意味着我们甚至可以在词法分析器中匹配语法结构。或者，在另一个极端，我们可以把字符当作记号，使用语法分析器去把语法结构应用到字符流（这种被称为无扫描语法分析器）。这导致什么在词法分析器中匹配和什么在语法分析器中匹配的界线在哪里并不是很明显。幸运的是，有几条经验法则可以让我们做出判断：</p>
-
-<ul>
-<li>在词法分析器中匹配和丢弃任何语法分析器根本不需要见到的东西。例如，在词法分析器中识别和扔掉像注释和空格这些东西。否则，语法分析器必须经常查看是否有注释或空格在记号间。</li>
-<li>在词法分析器中匹配诸如标志符、关键字、字符串和数字这样的常用记号。语法分析器比词法分析器有更多的开销，因此，我们不必让语法分析器承受把数字放在一起识别成整数的负担。</li>
-<li>把那些语法分析器不需要去辨别的词法结构合并成一个单独的记号类型。例如，如果我们的应用把整数和浮点数当作同一事物对待，然后把它们合并成记号类型NUMBER，那么就没必要向语法分析器发送单独的记号类型。</li>
-<li>合并能被语法分析器视为一个单独实体的任何东西。例如，如果语法分析器不在乎XML标签里的内容，词法分析器可以把尖括号中的任何东西合并成一个单独的被称为TAG的记号类型。</li>
-<li>如果语法分析器需要先拆开一小块文本后才能去处理它，那么词法分析器应该传递独立的构件作为记号给语法分析器。例如，如果语法分析器需要处理一个IP地址的元素，词法分析器应该发送IP构件（整数和点）的独立的记号。</li>
-</ul>
-
-<p>想象下现在需要处理Web服务器上的日志文件，每一行表示一条记录。让我们假设每条记录都有一个请求IP地址、HTTP协议命令和结果代码。这里是一个日志条目的示例：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>192.168.209.85 "GET /download/foo.html HTTP/1.0" 200</span></code></pre></td></tr></table></div></figure>
-
-<p>如果想要统计文件中有多少行，那么我们可以忽略掉任何东西除了换行字符的序列：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>file  : NL+ ;               // 匹配换行符（NL）序列的语法规则
-</span><span class='line'>STUFF : ~'\n'+ -&gt; skip ;    // 匹配和丢弃除'\n'外的任何东西
-</span><span class='line'>NL    : '\n' ;              // 返回NL给语法分析器或调用代码</span></code></pre></td></tr></table></div></figure>
-
-<p>词法分析器不必识别太多的结构，语法分析器会匹配换行记号的序列。</p>
-
-<p>接下来，我们需要从日志文件中收集一系列的IP地址。这意味着我们需要一条规则去识别IP地址的词法结构。并且我们也可以提供其它记录元素的词法规则：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>IP    : INT '.' INT '.' INT '.' INT ;    // 192.168.209.85
-</span><span class='line'>INT   : [0-9]+ ;                         // 匹配IP八位组或者HTTP结果代码
-</span><span class='line'>STRING: '"' .*? '"' ;                    // 匹配HTTP协议命令
-</span><span class='line'>NL    : '\n' ;                           // 匹配日志文件记录终结符
-</span><span class='line'>WS    : ' ' -&gt; skip ;                    // 忽略空格</span></code></pre></td></tr></table></div></figure>
-
-<p>拥有一套完整的记号后，我们可以让语法规则匹配日志文件中的记录：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>file : row+ ;                // 匹配日志文件中行的语法规则
-</span><span class='line'>row  : IP STRING INT NL ;    // 匹配日志文件记录</span></code></pre></td></tr></table></div></figure>
-
-<p>更进一步，我们需要把文本IP地址转换成32位的数字。使用便利的库函数split(&#39;.&#39;)，我们可以把IP地址切割成字符串传递给语法分析器让它去处理。但是，更好的做法是让词法分析器匹配IP地址的词法结构，然后把匹配出的构件作为记号传递给语法分析器。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>file  : row+ ;                           // 匹配日志文件中行的语法规则
-</span><span class='line'>row   : ip STRING INT NL ;               // 匹配日志文件记录
-</span><span class='line'>ip    : INT '.' INT '.' INT '.' INT ;    // 在语法分析器中匹配IP地址
-</span><span class='line'>INT   : [0-9]+ ;                         // 匹配IP八位组或者HTTP结果代码
-</span><span class='line'>STRING: '"' .*? '"' ;                    // 匹配HTTP协议命令
-</span><span class='line'>NL    : '\n' ;                           // 匹配日志文件记录终结符
-</span><span class='line'>WS    : ' ' -&gt; skip ;                    // 忽略空格</span></code></pre></td></tr></table></div></figure>
-
-<p>把词法规则IP切换成语法规则ip显示了我们可以多么轻易地移动这条分界线。</p>
-
-<p>如果要求处理HTTP协议命令字符串的内容，我们可以遵循相同的思考过程。如果不需要检查字符串的部分，那么词法分析器可以把整个字符串作为一个单独的记号传递给语法分析器。如果我们需要抽出各种不同的部分，最好就是让词法分析器去识别那些部分后再把这些匹配出的构件传递给语法分析器。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/2">&larr; Older</a>
@@ -1548,15 +1716,15 @@
       </li>
     
       <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part26/">ANTLR 4权威参考读书笔记（26）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part25/">ANTLR 4权威参考读书笔记（25）</a>
       </li>
     
       <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part24/">ANTLR 4权威参考读书笔记（24）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part23/">ANTLR 4权威参考读书笔记（23）</a>
       </li>
     
   </ul>
@@ -1570,7 +1738,7 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 140%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 141%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
