@@ -4,7 +4,7 @@
   <title><![CDATA[乐者为王]]></title>
   <link href="http://codemany.com/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-01-08T20:52:29+08:00</updated>
+  <updated>2017-01-09T21:51:28+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -39,6 +39,262 @@
 <p>带有这些特殊需求的游戏原型界面如下图所示：</p>
 
 <p><img src="http://codemany.com/uploads/chess-mess-master.png" title="chess-mess-master" ></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（27）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part27/"/>
+    <updated>2016-09-28T09:32:41+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part27</id>
+    <content type="html"><![CDATA[<p>前面我们主要处理的是数据，今天我们就来做些编程语言方面的事情。</p>
+
+<h3 id="生成调用关系图">生成调用关系图</h3>
+
+<p>软件很难编写和维护，这就是为什么我们试图构建工具去提高我们的生产力和工作效率。例如，在过去的十年里，我们已经看到测试框架、代码覆盖工具和代码分析器的激增，也很高心看到类层次结构的可视化树，以及大部分开发环境支持这个功能。其中有种可视化被称为调用图，它由函数作为节点，并且函数调用作为节点间的有向边。</p>
+
+<p>这本节中，我们将使用Cymbol语法构建一个调用图生成器。考虑以下函数和函数调用集：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>int main() { fact(); a(); }
+</span><span class='line'>float fact(int n) {
+</span><span class='line'>    print(n);
+</span><span class='line'>    if (n == 0) then return 1;
+</span><span class='line'>    return n * fact(n - 1);
+</span><span class='line'>}
+</span><span class='line'>void a() { int x = b(); if false then {c(); d();} }
+</span><span class='line'>void b() { c(); }
+</span><span class='line'>void c() { b(); }
+</span><span class='line'>void d() { }
+</span><span class='line'>void e() { }</span></code></pre></td></tr></table></div></figure>
+
+<p>我们将会把它可视化成如下的调用图：</p>
+
+<p><img src="http://codemany.com/uploads/cymbol-call-graph.png" title="cymbol-call-graph" ></p>
+
+<p>可视化的好处是人眼可以很容易地挑出偏差。例如，e()节点是个孤立节点，它意味着没有函数调用它，因此它是一段死代码。一目了然，我们找到一个可以被丢弃的函数。我们还可以通过在图中寻找像fact() -&gt; fact()和b() -&gt; c() -&gt; d()这样的循环非常容易地检测递归。</p>
+
+<p>为了可视化调用图，我们需要读入一段Cymol程序和创建一个DOT文件。例如，以下是我们需要为t.cymbol生成的DOT文件。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>digraph G {
+</span><span class='line'>    ranksep=.25;
+</span><span class='line'>    edge [arrowsize=.5]
+</span><span class='line'>    node [shape=circle, fontname="ArialNarrow",
+</span><span class='line'>    fontsize=12, fixedsize=true, height=.45];
+</span><span class='line'>    main; fact; a; b; c; d; e;
+</span><span class='line'>    main -&gt; fact;
+</span><span class='line'>    main -&gt; a;
+</span><span class='line'>    fact -&gt; print;
+</span><span class='line'>    fact -&gt; fact;
+</span><span class='line'>    a -&gt; b;
+</span><span class='line'>    a -&gt; c;
+</span><span class='line'>    a -&gt; d;
+</span><span class='line'>    b -&gt; c;
+</span><span class='line'>    c -&gt; b;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>上面的输出包括样本设置描述，例如ranksep=.25;和一列节点和边。为抓住孤立节点，我们需要确保为每个函数名生成节点定义，即使它没有出边和入边。否则它将不会出现在图中。注意在节点定义行末尾的e节点。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>main; fact; a; b; c; d; e;</span></code></pre></td></tr></table></div></figure>
+
+<p>我们的策略很简单，当语法分析器找到一个函数声明时，应用会把当前函数名添加到一个列表，并且设置一个字段称为currentFunctionName。当语法分析器看到一个函数调用，应用会记录从currentFunctionName到被调用函数名的一条边。</p>
+
+<p>开始之前，让我们给Cymbol.g中的一些规则选项打上标签，以便获得更精确的监听器方法。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>expr: ID '(' exprList? ')'    # Call
+</span><span class='line'>    | expr '[' expr ']'       # Index
+</span><span class='line'>    | '-' expr                # Negate
+</span><span class='line'>    | '!' expr                # Not
+</span><span class='line'>    | expr '*' expr           # Mult
+</span><span class='line'>    | expr ('+'|'-') expr     # AddSub
+</span><span class='line'>    | expr '==' expr          # Equal
+</span><span class='line'>    | ID                      # Var
+</span><span class='line'>    | INT                     # Int
+</span><span class='line'>    | '(' expr ')'            # Parens
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>然后，作为语言应用的基础，把所有图相关的东西封装进一个类。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>static class Graph {
+</span><span class='line'>    // I'm using org.antlr.v4.runtime.misc: OrderedHashSet, MultiMap
+</span><span class='line'>    Set&lt;String&gt; nodes = new OrderedHashSet&lt;String&gt;();    // list of functions
+</span><span class='line'>    MultiMap&lt;String, String&gt; edges = new MultiMap&lt;String, String&gt;();    // caller-&gt;callee
+</span><span class='line'>    public void edge(String source, String target) {
+</span><span class='line'>        edges.map(source, target);
+</span><span class='line'>    }</span></code></pre></td></tr></table></div></figure>
+
+<p>从节点和边的集合中，我们可以在类Graph的toDOT()中使用一些Java代码转储出适当的DOT代码。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public String toDOT() {
+</span><span class='line'>    StringBuilder buf = new StringBuilder();
+</span><span class='line'>    buf.append("digraph G {\n");
+</span><span class='line'>    buf.append("    ranksep=.25;\n");
+</span><span class='line'>    buf.append("    edge [arrowsize=.5]\n");
+</span><span class='line'>    buf.append("    node [shape=circle, fontname=\"ArialNarrow\",\n");
+</span><span class='line'>    buf.append("    fontsize=12, fixedsize=true, height=.45];\n");
+</span><span class='line'>    buf.append("    ");
+</span><span class='line'>    for (String node : nodes) {    // print all nodes first
+</span><span class='line'>        buf.append(node);
+</span><span class='line'>        buf.append("; ");
+</span><span class='line'>    }
+</span><span class='line'>    buf.append("\n");
+</span><span class='line'>    for (String src : edges.keySet()) {
+</span><span class='line'>        for (String trg : edges.get(src)) {
+</span><span class='line'>            buf.append("    ");
+</span><span class='line'>            buf.append(src);
+</span><span class='line'>            buf.append(" -&gt; ");
+</span><span class='line'>            buf.append(trg);
+</span><span class='line'>            buf.append(";\n");
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>    buf.append("}\n");
+</span><span class='line'>    return buf.toString();
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>现在我们要做的是使用监听器填满这些数据结构，监听器需要两个字段用于记录。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>static class FunctionListener extends CymbolBaseListener {
+</span><span class='line'>    Graph graph = new Graph();
+</span><span class='line'>    String currentFunctionName = null;</span></code></pre></td></tr></table></div></figure>
+
+<p>然后应用只需要监听两个事件。首先，在语法分析器发现函数声明时记录当前的函数名。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void enterFunctionDecl(CymbolParser.FunctionDeclContext ctx) {
+</span><span class='line'>    currentFunctionName = ctx.ID().getText();
+</span><span class='line'>    graph.nodes.add(currentFunctionName);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>其次，当语法分析器侦测到函数调用时，应用需要记录从当前函数到被调用函数的一条边。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitCall(CymbolParser.CallContext ctx) {
+</span><span class='line'>    String funcName = ctx.ID().getText();
+</span><span class='line'>    // map current function to the callee
+</span><span class='line'>    graph.edge(currentFunctionName, funcName);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>注意，函数调用不能隐藏在嵌套代码块或诸如a()这样的声明中。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>void a() { int x = b(); if false then {c(); d();} }</span></code></pre></td></tr></table></div></figure>
+
+<p>无论什么时候，只要树遍历器发现函数调用就触发监听器方法exitCall()。</p>
+
+<p>通过语法分析树和类FunctionListener，我们可以启动带有监听器的一个遍历器去产生输出。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ParseTreeWalker walker = new ParseTreeWalker();
+</span><span class='line'>FunctionListener collector = new FunctionListener();
+</span><span class='line'>walker.walk(collector, tree);
+</span><span class='line'>System.out.println(collector.graph.toString())</span></code></pre></td></tr></table></div></figure>
+
+<p>在转储DOT字符串前，该代码会打印出函数和边的列表。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr Cymbol.g
+</span><span class='line'>compile *.java
+</span><span class='line'>run CallGraph t.cymbol</span></code></pre></td></tr></table></div></figure>
+
+<p>以下是部分输出结果：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>edges: {main=[fact, a], fact=[print, fact], a=[b, c, d], b=[c], c=[b]},
+</span><span class='line'>functions: [main, fact, a, b, c, d, e]
+</span><span class='line'>digraph G {
+</span><span class='line'>ranksep=.25;
+</span><span class='line'>edge [arrowsize=.5]
+</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
 ]]></content>
   </entry>
   
@@ -4697,52 +4953,6 @@
 </span><span class='line'>3123</span></code></pre></td></tr></table></div></figure>
 
 <p>仅用几行代码，我们就能够没有任何烦恼地对某些内容做轻微的调整。这种策略对于源代码检测或重构这类一般性的问题是非常有效的。TokenStreamRewriter是一个非常强大且有效的操作记号流的工具。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[开发者被灯光蒙蔽了双眼]]></title>
-    <link href="http://codemany.com/blog/developers-are-blinded-by-the-light/"/>
-    <updated>2016-04-30T23:08:43+08:00</updated>
-    <id>http://codemany.com/blog/developers-are-blinded-by-the-light</id>
-    <content type="html"><![CDATA[<p>英文原文：<a href="http://programmingzen.com/2008/12/30/developers-are-blinded-by-the-light/">http://programmingzen.com/2008/12/30/developers-are-blinded-by-the-light/</a></p>
-
-<blockquote>
-<p>Blinded by the light,<br>
-revved up like a deuce,<br>
-another runner in the night<br>
-— Bruce Springsteen</p>
-</blockquote>
-
-<p>人类在计算几率方面是异常地差。我们有限的经验强烈地影响着我们对事件的可能性的认知。例如，我们往往极大地高估由恐怖袭击、意外枪支走火或者飓风引起死亡的几率，并且极大地低估像坠落、溺水或者流感死亡的原因。其原因是媒体经常提醒我们恐怖主义、飓风的危险或者关于孩子们被意外射杀的瞬间故事。你很少发现关于一个人溺水、坠落或者由于流感死亡的故事在国家新闻频道上被报道。新闻报道有一种倾向是耸人听闻，为的是引起人们的注意和钩住大量的观众，因此当谈到估计什么可能/不可能发生时它们促成人们的偏见。</p>
-
-<p>同样的，在电视和报纸上过度曝光心花怒放的彩票中奖者举起他们超大的支票往往歪曲人们对通过购买一注彩票胜利的可能性的认知。对这个问题持一个严谨和客观的态度将会很快揭露中奖的几率比它们表面上看起来的要差得多。[1]</p>
-
-<p>我注意到这种情况也正在开发/创业的世界里发生。这是一波新的淘金热。太多的开发者正在试图建立下一个大的社交网络，成为下一个Facebook（或YouTube），聚集数以百万计的人群，希望被大公司以一笔数量荒谬的钱收购。媒体喜欢这类故事。</p>
-
-<p>因此，正在试图构建下一个Facebook的开发者类似于彩票买家。他们中的一些人会成功和获胜，但大部分人会惨遭失败。我们真正需要多少社交网络？广告支撑的模式适合某些设法吸引庞大的人群同时保持其费用最低（例如PlentyOfFish）或者被收购（例如YouTube，它也在花Google的钱）的幸运的公司。在这个过程中其他人都是在烧钱以及浪费VC的钱和诚意。</p>
-
-<p>我担心很多开发者被灯光蒙蔽了双眼。他们对获得成功的真实几率的认知受到了媒体连续报道的百万——如果不是10亿——美元收购和成功故事的扭曲。而且有些VC鼓励这种行为，希望能在他们的投资上看到高回报。毕竟这些都是非常富有的人，他们对小规模的成功不感兴趣。</p>
-
-<p>除了明显的浪费时间和资源之外，我认为许多开发者为了追求极不可能的结果放弃了极好的机会。用一个传统商业计划挣1,000万的可能性和按YouTube的方式挣10亿的可能性的比例，与这些金额能负担得起你的不同生活质量不成正比。如果你破产了，有3万美元的信用卡债务，或者你是中产阶级，你会发现1,000万美元可以提高的生活质量总是远远超过从1,000万到10亿能提高的。而且重要的是，我们要认识到瞄准尽管更小，但更有可能的结果不会以任何方式阻止你以后的“伟大梦想”，一旦你的第一次（或者第一次成功的）创业已经取得了成功。</p>
-
-<p>你愿意参加20次有1次胜利机会的100万美元抽奖，还是50,000,000次有1次机会的5亿美元抽奖？理性的人会选择第1个，然而在今天，大部分创业公司都倾向于选择第2个。他们这么做是因为他们极大地高估了他们以第2个抽奖成功的几率。</p>
-
-<p>创建一个产品并让人们为它付费。不要拿VC的钱，除非你真的不考虑依靠自己的力量启动你的公司。软件世界的主要优点之一是在开始的时候极少量的资本需要。如果你想做Web应用，可以使用软件即服务（SaaS）模型，让你的用户为你提供的软件和服务付费。你将会有更加少的受众，更少的可伸缩性问题和费用，以及有更多的收入和更大的盈利机会。Joel Spolsky（和<a href="http://www.joelonsoftware.com/items/2008/12/29.html">他那华丽的办公空间</a>）挣得数百万收入是因为他的公司在出售一套Web版的bug追踪器。你知道有多少免费的bug追踪器？在这个市场上存在多少竞争对手？我确信有许多。然而，虽然Joel的人气毫无疑问地帮助到了他的公司，但此案例仍然展示了一个企业如何通过构建一个更好的产品而成功。</p>
-
-<p>就像David Heinemeier Hansson提及的，有无数不受关注的公司在像那样挣钱。[2]如果你把视线从聚光灯上移开，你将看到许多公司在它们所做的事情上面非常成功，尽管它们不出名或者没有制造新闻头条。它们中的有些公司实际上努力不去吸引太多的关注到它们的成功上（经常用数百万美元来衡量），以便防止竞争对手的涌现。</p>
-
-<p>不管你的名字是不是家喻户晓，你甚至不必创建Web应用才能非常成功。你可能会想到为智能手机包括iPhone开发移动应用。但是良好的老式桌面应用让各种各样的软件公司继续发展。这就是为什么“你不能再用商业桌面软件挣钱，或者桌面应用都死了”的扭曲的认知太荒谬的原因。作为开发者/微型ISV/创业公司，你用良好设计的桌面软件挣钱的机会远远高于构建任何一款YouTube、Flickr或者Facebook复制品的机会。</p>
-
-<p>要了解我们的认知是怎么被扭曲的，你只需要和那些公开分享它们软件销售统计的公司交谈。你将会被用相对普通的软件挣到钱的数额震惊。Balsamiq制作了一款UI草图应用卖79美元。作者成功挣到了<a href="http://www.balsamiq.com/blog/?p=424">10万美元收入在前5个月</a>，大部分是通过销售应用的桌面版本。在这个产业里他当然远非最大的赢家之一。我提到这个不过是因为它表明那是一个非常不错的想法，很好执行，当你让你的用户付费时能很快带来收入。如果你认为在5个月里10万美元很少，那我来问你有多少免费网站达成一个类似的每月收入净额。如果你正在寻找更大的收入，了解下Omni Graffle，它给<a href="http://www.omnigroup.com/applications/OmniGraffle/">Omni Group</a>赚取了数百万美元，或者把你的目光放到B2B应用上（在那个市场里某些应用卖上千美元一份）。</p>
-
-<p>当许多开发者被灯光蒙蔽了双眼的时候，有创业想法的智者正在建立真正的软件业务。我请你走出来做同样的事情。</p>
-
-<p>脚注</p>
-
-<p>[1] 我在这里总结的概念被Dan Gilbert在<a href="http://www.ted.com/index.php/talks/dan_gilbert_researches_happiness.html">这个TED演讲</a>里更详细地说明了。</p>
-
-<p>[2] David Heinemeier Hansson在<a href="http://www.37signals.com/svn/posts/1495-the-untold-millions">他的一篇帖子</a>中持类似的观点，该帖给了本文以灵感。</p>
 ]]></content>
   </entry>
   

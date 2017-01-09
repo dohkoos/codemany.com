@@ -9,7 +9,8 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="最近忽然突发奇想，想统计一下我最经常上的网站是哪些，并且在这些网站上都停留了多久。为此决定写一个BHO插件来做这件事。 BHO（Browser Help Objects）是实现了特定接口（IObjectWithSite）的COM组件。开发好的BHO插件除了要在注册表中注册为COM Server外， &hellip;">
+  <meta name="description" content="方法一：使用OutputDebugString函数 函数的原型如下： 1
+void OutputDebugString(LPCTSTR lpOutputString); 该函数会输出信息到系统的DEBUGER，输出结果可以使用工具DebugView观察。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +74,76 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-debug-win32-program/">如何调试Win32程序</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2008-02-13T17:00:53+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>13</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>5:00 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>方法一：使用OutputDebugString函数</p>
+
+<p>函数的原型如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>void OutputDebugString(LPCTSTR lpOutputString);</span></code></pre></td></tr></table></div></figure>
+
+<p>该函数会输出信息到系统的DEBUGER，输出结果可以使用工具<a href="http://www.microsoft.com/technet/sysinternals/Miscellaneous/DebugView.mspx">DebugView</a>观察。因为OutputDebugString的参数是字符串，而我们在实际使用过程中通常希望能像printf一样支持变参。下面的方法实现了这个效果：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>void DebugString(LPCTSTR lpszFormat, ...)
+</span><span class='line'>{
+</span><span class='line'>    va_list args;
+</span><span class='line'>    TCHAR szText[1024];
+</span><span class='line'>
+</span><span class='line'>    va_start(args, lpszFormat);
+</span><span class='line'>    wvsprintf(szText, lpszFormat, args);
+</span><span class='line'>    OutputDebugString(szText);
+</span><span class='line'>    va_end(args);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>方法二：输出调试信息到Console上</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>FILE *stream;
+</span><span class='line'>AllocConsole();
+</span><span class='line'>freopen_s(&stream, "CONOUT$", "w", stdout);
+</span><span class='line'>printf("Hello, world!\n");</span></code></pre></td></tr></table></div></figure>
+
+<p>这里AllocConsole()用来打开Console，而freopen_s则把标准输出和Cosole关联。“CONOUT$”这个很关键。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1478,56 +1549,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/problem-highlight-a-row-on-datawindow/">数据窗口中高亮一行时出现的问题</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2007-09-14T12:18:36+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>14</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>12:18 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>高亮数据窗口中的一行很简单，只要在数据窗口控件的rowfocuschanged事件中添加下面的代码就可以了：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>long ll_row = this.GetRow()
-</span><span class='line'>if ll_row &gt; 0 then
-</span><span class='line'>    this.SelectRow(0, false)
-</span><span class='line'>    this.SelectRow(ll_row, true)
-</span><span class='line'>end if</span></code></pre></td></tr></table></div></figure>
-
-<p>不过这样处理后会有些问题，当你点击某一行时该行会显示成边框为深蓝色，背景为白色的矩形，如下图：</p>
-
-<p><img src="/uploads/pb-highlight-1.png" title="pb-highlight-1" ></p>
-
-<p>这是因为该行中列的样式类型是Edit，可以编辑，所以才会出现上图的效果。由此推断，只要将列设置为不可编辑就行。将一列设为不可编辑有三种方式：TabSequence为0、Edit.DisplayOnly被选中、Protect为1，设置其中任何一种都会使列变为不可编辑。</p>
-
-<p>实践后发现选中Edit.DisplayOnly后还是会出现如上图那样的问题，而在设置TabSequence或Protect后则显示出了完美的高亮效果。</p>
-
-<p><img src="/uploads/pb-highlight-2.png" title="pb-highlight-2" ></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/24">&larr; Older</a>
@@ -1549,6 +1570,10 @@
       </li>
     
       <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part27/">ANTLR 4权威参考读书笔记（27）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/the-power-of-protocol-analyzers/">协议分析器的威力</a>
       </li>
     
@@ -1558,10 +1583,6 @@
     
       <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part25/">ANTLR 4权威参考读书笔记（25）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part24/">ANTLR 4权威参考读书笔记（24）</a>
       </li>
     
   </ul>
@@ -1575,7 +1596,7 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 141%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 142%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
