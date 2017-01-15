@@ -4,7 +4,7 @@
   <title><![CDATA[乐者为王]]></title>
   <link href="http://codemany.com/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-01-09T21:51:28+08:00</updated>
+  <updated>2017-01-15T22:53:00+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -39,6 +39,122 @@
 <p>带有这些特殊需求的游戏原型界面如下图所示：</p>
 
 <p><img src="http://codemany.com/uploads/chess-mess-master.png" title="chess-mess-master" ></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（28）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part28/"/>
+    <updated>2016-10-06T18:42:25+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part28</id>
+    <content type="html"><![CDATA[<p>为了阐明Cymbol语法是可复用的，本节中我们将在不做修改的基础上再次使用它，用于构建一个完全不同的应用。不仅如此，我们还会在同样的树上使用两个不同的监听器做两次遍历。</p>
+
+<h3 id="验证程序符号的使用情况">验证程序符号的使用情况</h3>
+
+<p>为Cymbol这样的编程语言构建解释器、编译器或者转换器，我们需要验证Cymbol程序是否正确地使用符号（标志符）。接下来，我们将构建一个Cymbol验证器用于检查以下的条件：</p>
+
+<ul>
+<li>可见的变量引用有相应的定义（在范围内）。</li>
+<li>函数引用有相应的定义（函数可以以任何顺序出现）。</li>
+<li>变量不作为函数使用。</li>
+<li>函数不作为变量使用。</li>
+</ul>
+
+<p>让我们看一下有许多不同引用的Cymbol示例代码，其中有些是无效的。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>int f(int x, float y) {
+</span><span class='line'>    g();      // forward reference is ok
+</span><span class='line'>    i = 3;    // no declaration for i (error)
+</span><span class='line'>    g = 4;    // g is not variable (error)
+</span><span class='line'>    return x + y;    // x, y are defined, so no problem
+</span><span class='line'>}
+</span><span class='line'>void g() {
+</span><span class='line'>    int x = 0;
+</span><span class='line'>    float y;
+</span><span class='line'>    y = 9;    // y is defined
+</span><span class='line'>    f();      // backward reference is ok
+</span><span class='line'>    z();      // no such function (error)
+</span><span class='line'>    y();      // y is not function (error)
+</span><span class='line'>    x = f;    // f is not a variable (error)
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>为验证程序中的一切都没问题，根据前面的条件，我们应该打印出函数列表和本地变量以及全局符号列表（函数和全局变量）。更进一步，当我们发现问题时应该给出一个错误。例如，使用上述输入，让我们构建一个称为CheckSymbols的应用。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>java CheckSymbols vars.cymbol</span></code></pre></td></tr></table></div></figure>
+
+<p>在执行以上命令后会生成如下输出：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>locals:[]
+</span><span class='line'>function&lt;f:tINT&gt;:[&lt;x:tINT&gt;, &lt;y:tFLOAT&gt;]
+</span><span class='line'>locals:[x, y]
+</span><span class='line'>function&lt;g:tVOID&gt;:[]
+</span><span class='line'>globals:[f, g]
+</span><span class='line'>line 3:4 no such variable: i
+</span><span class='line'>line 4:4 g is not a variable
+</span><span class='line'>line 13:4 no such function: z
+</span><span class='line'>line 14:4 y is not a function
+</span><span class='line'>line 15:8 f is not a variable</span></code></pre></td></tr></table></div></figure>
+
+<p>实现这类问题的关键是一个被称为符号表的相应的数据结构。我们的应用会把符号存在符号表中，然后通过在符号表中查找符号引用检查它们的正确性。在接下来的部分，我们将大概看一看数据结构看起来像什么，并且使用它去解决手头的验证问题。</p>
+
+<h3 id="符号表中的速成课">符号表中的速成课</h3>
+
+<p>语言实现者通常称持有符号的数据结构为符号表。语言的实现决定符号表的结构和复杂性，如果一门语言允许相同的标志符在不同的上下文中指向不同的东西，符号表会将那些符号分组到不同的作用域中。作用域只是一组符号，例如函数的参数列表或变量列表以及在全局范围内的函数。</p>
+
+<p>符号表自身只是一个符号定义的存储库——它不作任何检查。为了验证代码，我们需要检查表达式中违反我们之前设置的规则的变量和函数引用。符号验证有两个基本操作：定义符号和解决符号。定义一个符号意味着把它添加到一个作用域中。解决一个符号意味着计算出符号指向哪个定义。在某种程度上，解决一个符号意味着找到最近的匹配定义。最近的作用域是最近的封闭作用域。例如，让我们看看另一个Cymbol例子，它在不同的作用域有符号定义。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>int x;
+</span><span class='line'>int y;
+</span><span class='line'>void a()
+</span><span class='line'>{
+</span><span class='line'>    int x;
+</span><span class='line'>    x = 1;
+</span><span class='line'>    // x resolves to current scope, not x in global scope
+</span><span class='line'>    y = 2;
+</span><span class='line'>    // y is not found in current scope, but resolves in global
+</span><span class='line'>    { int y = x; }
+</span><span class='line'>}
+</span><span class='line'>void b(int z)
+</span><span class='line'>{ }</span></code></pre></td></tr></table></div></figure>
 ]]></content>
   </entry>
   
@@ -4837,122 +4953,6 @@
 </tbody></table>
 
 <p>现在，结果已经出来了：德国人养鱼。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（13）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part13/"/>
-    <updated>2016-05-06T18:24:18+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part13</id>
-    <content type="html"><![CDATA[<p>现在我们准备构建一个工具，用来把<a href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part7/">ANTLR 4权威参考读书笔记（7）</a>中idata.txt里的数据按group分行显示，就像这样：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>2 9 10
-</span><span class='line'>3 1 2 3</span></code></pre></td></tr></table></div></figure>
-
-<p>我们可以借助语法分析树的监听器机制来对词法分析结束后生成的记号流进行改写，我们不需要实现每一个监听器接口方法，只需要在捕获到group的时候把换行符插到它末尾就行。实现改写的代码如下所示：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class RewriteListener extends IDataBaseListener {
-</span><span class='line'>    TokenStreamRewriter rewriter;
-</span><span class='line'>
-</span><span class='line'>    public RewriteListener(TokenStream tokens) {
-</span><span class='line'>        rewriter = new TokenStreamRewriter(tokens);
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    @Override
-</span><span class='line'>    public void enterGroup(IDataParser.GroupContext ctx) {
-</span><span class='line'>        rewriter.insertAfter(ctx.stop, '\n');
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>接着就是写一个小程序来调用我们上面的改写类：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class IData {
-</span><span class='line'>
-</span><span class='line'>    public static void main(String[] args) throws Exception {
-</span><span class='line'>        InputStream is = args.length &gt; 0 ? new FileInputStream(args[0]) : System.in;
-</span><span class='line'>
-</span><span class='line'>        ANTLRInputStream input = new ANTLRInputStream(is);
-</span><span class='line'>        IDataLexer lexer = new IDataLexer(input);
-</span><span class='line'>        CommonTokenStream tokens = new CommonTokenStream(lexer);
-</span><span class='line'>        IDataParser parser = new IDataParser(tokens);
-</span><span class='line'>        ParseTree tree = parser.file();
-</span><span class='line'>
-</span><span class='line'>        RewriteListener listener = new RewriteListener(tokens);
-</span><span class='line'>
-</span><span class='line'>        System.out.println("Before Rewriting");
-</span><span class='line'>        System.out.println(listener.rewriter.getText());
-</span><span class='line'>
-</span><span class='line'>        ParseTreeWalker walker = new ParseTreeWalker();
-</span><span class='line'>        walker.walk(listener, tree);
-</span><span class='line'>
-</span><span class='line'>        System.out.println("After Rewriting");
-</span><span class='line'>        System.out.println(listener.rewriter.getText());
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>这里的关键是TokenStreamRewriter对象知道如何在不修改流的情况下提供一个记号流的修改过的视图。它把所有的操作方法当作指令并把它们排进队列，等到在遍历记号流把它作为文本渲染回去的时候再执行。每次我们调用getText()时rewriter就会执行那些指令。</p>
-
-<p>最后就是构建和测试应用：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr IData.g
-</span><span class='line'>compile *.java
-</span><span class='line'>run IData idata.txt</span></code></pre></td></tr></table></div></figure>
-
-<p>以下是输出结果：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Before Rewriting
-</span><span class='line'>29103123
-</span><span class='line'>After Rewriting
-</span><span class='line'>2910
-</span><span class='line'>3123</span></code></pre></td></tr></table></div></figure>
-
-<p>仅用几行代码，我们就能够没有任何烦恼地对某些内容做轻微的调整。这种策略对于源代码检测或重构这类一般性的问题是非常有效的。TokenStreamRewriter是一个非常强大且有效的操作记号流的工具。</p>
 ]]></content>
   </entry>
   

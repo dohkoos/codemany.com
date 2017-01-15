@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: ANTLR | 乐者为王]]></title>
   <link href="http://codemany.com/tags/antlr/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-01-09T21:51:28+08:00</updated>
+  <updated>2017-01-15T22:53:00+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,79 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（28）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part28/"/>
+    <updated>2016-10-06T18:42:25+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part28</id>
+    <content type="html"><![CDATA[<p>为了阐明Cymbol语法是可复用的，本节中我们将在不做修改的基础上再次使用它，用于构建一个完全不同的应用。不仅如此，我们还会在同样的树上使用两个不同的监听器做两次遍历。</p>
+
+<h3 id="验证程序符号的使用情况">验证程序符号的使用情况</h3>
+
+<p>为Cymbol这样的编程语言构建解释器、编译器或者转换器，我们需要验证Cymbol程序是否正确地使用符号（标志符）。接下来，我们将构建一个Cymbol验证器用于检查以下的条件：</p>
+
+<ul>
+<li>可见的变量引用有相应的定义（在范围内）。</li>
+<li>函数引用有相应的定义（函数可以以任何顺序出现）。</li>
+<li>变量不作为函数使用。</li>
+<li>函数不作为变量使用。</li>
+</ul>
+
+<p>让我们看一下有许多不同引用的Cymbol示例代码，其中有些是无效的。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">int f(int x, float y) {
+    g();      // forward reference is ok
+    i = 3;    // no declaration for i (error)
+    g = 4;    // g is not variable (error)
+    return x + y;    // x, y are defined, so no problem
+}
+void g() {
+    int x = 0;
+    float y;
+    y = 9;    // y is defined
+    f();      // backward reference is ok
+    z();      // no such function (error)
+    y();      // y is not function (error)
+    x = f;    // f is not a variable (error)
+}
+</code></pre></div>
+<p>为验证程序中的一切都没问题，根据前面的条件，我们应该打印出函数列表和本地变量以及全局符号列表（函数和全局变量）。更进一步，当我们发现问题时应该给出一个错误。例如，使用上述输入，让我们构建一个称为CheckSymbols的应用。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">java CheckSymbols vars.cymbol
+</code></pre></div>
+<p>在执行以上命令后会生成如下输出：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">locals:[]
+function&lt;f:tINT&gt;:[&lt;x:tINT&gt;, &lt;y:tFLOAT&gt;]
+locals:[x, y]
+function&lt;g:tVOID&gt;:[]
+globals:[f, g]
+line 3:4 no such variable: i
+line 4:4 g is not a variable
+line 13:4 no such function: z
+line 14:4 y is not a function
+line 15:8 f is not a variable
+</code></pre></div>
+<p>实现这类问题的关键是一个被称为符号表的相应的数据结构。我们的应用会把符号存在符号表中，然后通过在符号表中查找符号引用检查它们的正确性。在接下来的部分，我们将大概看一看数据结构看起来像什么，并且使用它去解决手头的验证问题。</p>
+
+<h3 id="符号表中的速成课">符号表中的速成课</h3>
+
+<p>语言实现者通常称持有符号的数据结构为符号表。语言的实现决定符号表的结构和复杂性，如果一门语言允许相同的标志符在不同的上下文中指向不同的东西，符号表会将那些符号分组到不同的作用域中。作用域只是一组符号，例如函数的参数列表或变量列表以及在全局范围内的函数。</p>
+
+<p>符号表自身只是一个符号定义的存储库——它不作任何检查。为了验证代码，我们需要检查表达式中违反我们之前设置的规则的变量和函数引用。符号验证有两个基本操作：定义符号和解决符号。定义一个符号意味着把它添加到一个作用域中。解决一个符号意味着计算出符号指向哪个定义。在某种程度上，解决一个符号意味着找到最近的匹配定义。最近的作用域是最近的封闭作用域。例如，让我们看看另一个Cymbol例子，它在不同的作用域有符号定义。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">int x;
+int y;
+void a()
+{
+    int x;
+    x = 1;
+    // x resolves to current scope, not x in global scope
+    y = 2;
+    // y is not found in current scope, but resolves in global
+    { int y = x; }
+}
+void b(int z)
+{ }
+</code></pre></div>]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（27）]]></title>
@@ -581,77 +654,6 @@ stack result = 7
 <p>注解者通常可以作为默认解决方案采用，因为它允许你任意地提供信息给事件方法操作语法分析树中上上下下的节点。你也可以传递多个值，它们可以是任意类型。在许多情况下注解胜于使用带有短暂值的栈。在各种方法的数据传递准备间很少有断开的机会。比起在编程语言中说返回值，使用setValue(ctx, value)注解树不太直观，但是更通用。超过其它两种的这种方法的唯一缺点是在树遍历期间部分结果是保留的，因此它有较大的内存占用。</p>
 
 <p>从另一方面来说，在某些应用中能够注解树正是我们需要的。应用需要在树上通过多遍，第一遍是很方便在树上计算和储存数据的。当语法分析树遍历器重新遍历树的时候第二遍然后就很容易访问数据。总的来说，树注解非常灵活，有一个可接受的内存负担。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（23）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part23/"/>
-    <updated>2016-08-16T18:09:05+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part23</id>
-    <content type="html"><![CDATA[<p>默认情况下，ANTLR为每个规则生成一个单一的事件类型，而不管语法分析器匹配了哪个选项。这很不方便，因为监听器和访问者方法必须确定哪个选项被语法分析器匹配。在本节中，我们将看到如何得到更细粒度的事件。</p>
-
-<h3 id="为规则选项贴标签以得到精确的事件方法">为规则选项贴标签以得到精确的事件方法</h3>
-
-<p>为阐明事件粒度问题，让我们为以下的表达式语法构建一个带有监听器的简单计算器：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">grammar Expr;
-s : e ;
-e : e op=MULT e    // MULT is &#39;*&#39;
-  | e op=ADD e     // ADD is &#39;+&#39;
-  | INT
-  ;
-</code></pre></div>
-<p>按照上面的语法，规则e会产生一个相当无用的监听器，因为规则e的所有选项导致树遍历器触发相同的enterE()和exitE()方法。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public interface ExprListener extends ParseTreeListener {
-    void enterE(ExprParser.EContext ctx);
-    void exitE(ExprParser.EContext ctx);
-</code></pre></div>
-<p>监听器方法必须使用op记号标签和ctx的方法进行测试以查看语法分析器为每个e子树匹配了哪个选项。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitE(ExprParser.EContext ctx) {
-    if (ctx.getChildCount() == 3) {    // operations have 3 children
-        int left = values.get(ctx.e(0));
-        int right = values.get(ctx.e(1));
-        if (ctx.op.getType() == ExprParser.MULT) {
-            values.put(ctx, left * right);
-        } else {
-            values.put(ctx, left + right);
-        }
-    } else {
-        values.put(ctx, values.get(ctx.getChild(0)));    // an INT
-    }
-}
-</code></pre></div>
-<p>在exitE()中引用的MULT字段是在ExprParser中由ANTLR自动生成的：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public class ExprParser extends Parser {
-    public static final int MULT=1, ADD=2, INT=3, WS=4;
-</code></pre></div>
-<p>如果我们查看在类ExprParser中的类EContext，我们可以看到ANTLR把来自3个选项的所有元素都塞进了相同的上下文对象。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public static class EContext extends ParserRuleContext {
-    public Token op;                     // derived from label op
-    public List&lt;EContext&gt; e() { ... }    // get all e subtrees
-    public EContext e(int i) { ... }     // get ith e subtree
-    public TerminalNode INT() { ... }    // get INT node if alt 3 of e
-</code></pre></div>
-<p>为得到更精确的监听器事件，ANTLR让我们使用#运算符给任何规则最外层的选项打标签。让我们从Expr派生语法LExpr，并给e的选项打上标签，以下是修改后的e规则：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">e : e MULT e  # Mult
-  | e ADD e   # Add
-  | INT       # Int
-  ;
-</code></pre></div>
-<p>现在，ANTLR为e的每个选项生成了单独的监听器方法，因此，我们不再需要op记号标签。对于选项标签X，ANTLR生成方法enterX()和exitX()。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public interface LExprListener extends ParseTreeListener {
-    void enterMult(LExprParser.MultContext ctx);
-    void exitMult(LExprParser.MultContext ctx);
-    void enterAdd(LExprParser.AddContext ctx);
-    void exitAdd(LExprParser.AddContext ctx);
-    void enterInt(LExprParser.IntContext ctx);
-    void exitInt(LExprParser.IntContext ctx);
-    ...
-}
-</code></pre></div>
-<p>注意，ANTLR也为选项生成特定的以标签命名的上下文对象（EContext的子类）。专门的上下文对象的getter方法只限于应用在那些相关的选项。例如，IntContext只有一个INT()方法，我们可以在enterInt()中调用ctx.INT()，但在enterAdd()中就不能。</p>
-
-<p>监听器和访问者是极好的。我们只需要通过充实事件方法就可以得到可复用和可重定目标的语法以及封装的语言应用。ANTLR甚至会为我们自动生成骨架代码。</p>
 ]]></content>
   </entry>
   

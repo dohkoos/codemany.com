@@ -9,18 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="今天浏览订阅的博客时发现了一个巧妙的从数组中抽取随机不重复数字的算法。譬如，在100个不重复的数字中选择10个不相同的数字，通过这个算法就不需要修改数组长度和删除数组元素等。具体算法如下： 1
-2
-3
-4
-5
-6
-7
-8
-9
-10
-11
-int[] numbers = new int[100]; &hellip;">
+  <meta name="description" content="在Rails生成的控制器模版中，包含的destroy方法只能处理单个对象，而批量删除要求能够同时处理多个对象，这需要自定义一个批量操作action。批量删除的效果图如下： 每一行记录的第一列设置成Checkbox，用于标记此行是否被选中。表下方放置一个全选Checkbox，表示全部选中或全部反选。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -84,6 +73,133 @@ int[] numbers = new int[100]; &hellip;">
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/deleting-multiple-records-using-checkboxes-in-rails/">Rails中通过Checkbox实现批量删除</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2012-12-14T18:20:20+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>14</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>6:20 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在Rails生成的控制器模版中，包含的destroy方法只能处理单个对象，而批量删除要求能够同时处理多个对象，这需要自定义一个批量操作action。批量删除的效果图如下：</p>
+
+<p><img src="/uploads/table-with-checkboxes.png" title="table-with-checkboxes" ></p>
+
+<p>每一行记录的第一列设置成Checkbox，用于标记此行是否被选中。表下方放置一个全选Checkbox，表示全部选中或全部反选。全选和反选的JavaScript代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;script&gt;
+</span><span class='line'>function toggle_checkall(field_name, state) {
+</span><span class='line'>  var checkboxes = document.getElementsByTagName('input');
+</span><span class='line'>  var count = checkboxes.length;
+</span><span class='line'>  for (var i = 0; i &lt; count; i++) {
+</span><span class='line'>    if (checkboxes[i].type == "checkbox"
+</span><span class='line'>        && checkboxes[i].name == field_name + "_ids[]") {
+</span><span class='line'>      checkboxes[i].checked = state;
+</span><span class='line'>    }
+</span><span class='line'>  }
+</span><span class='line'>}
+</span><span class='line'>&lt;/script&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>在routes.rb中配置批量删除action的映射：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>resources :departs do
+</span><span class='line'>  delete 'destroy_multiple', :on =&gt; collection
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>在index.html.erb中添加代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= form_tag destroy_multiple_departs_path, method: :delete do %&gt;
+</span><span class='line'>&lt;%= submit_tag "删除选中" %&gt;
+</span><span class='line'>&lt;table&gt;
+</span><span class='line'>  &lt;thead&gt;
+</span><span class='line'>    &lt;tr&gt;
+</span><span class='line'>      &lt;th&gt;&lt;input type="checkbox" onclick="toggle_checkall('depart', this.checked);" /&gt;&lt;/th&gt;
+</span><span class='line'>    &lt;/tr&gt;
+</span><span class='line'>  &lt;/thead&gt;
+</span><span class='line'>
+</span><span class='line'>  &lt;tbody&gt;
+</span><span class='line'>    &lt;tr&gt;
+</span><span class='line'>      &lt;td&gt;&lt;%= check_box_tag "depart_ids[]", depart.id %&gt;&lt;/td&gt;
+</span><span class='line'>    &lt;/tr&gt;
+</span><span class='line'>    &lt;tr&gt;
+</span><span class='line'>      &lt;td&gt;&lt;%= check_box_tag "depart_ids[]", depart.id %&gt;&lt;/td&gt;
+</span><span class='line'>    &lt;/tr&gt;
+</span><span class='line'>  &lt;/tbody&gt;
+</span><span class='line'>&lt;/table&gt;
+</span><span class='line'>&lt;% end %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>在controller中添加批量删除实现代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def destroy_multiple
+</span><span class='line'>  Depart.destroy(params[:depart_ids]) unless params[:depart_ids].blank?
+</span><span class='line'>
+</span><span class='line'>  respond_to do |format|
+</span><span class='line'>    format.html { redirect_to departs }
+</span><span class='line'>    format.json { head :no_content }
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1996,94 +2112,6 @@ int[] numbers = new int[100]; &hellip;">
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/using-ruby-to-batch-rename-filename-from-traditional-to-simplified/">使用Ruby批量修改繁体文件名为简体</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2012-08-08T14:44:13+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>8</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>2:44 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>首先是遍历目录所有文件，使用了 <a href="http://beike.iteye.com/blog/361108">http://beike.iteye.com/blog/361108</a> 的代码，稍微做了下修改。主要是在Windows下处理系统目录时会停止遍历，加上了异常处理。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>def traverse(path)
-</span><span class='line'>  begin
-</span><span class='line'>    if File.directory?(path)
-</span><span class='line'>      Dir.foreach(path) do |file|
-</span><span class='line'>        if file != "." and file != ".."
-</span><span class='line'>          traverse(path + "/" + file) {|x| yield x}
-</span><span class='line'>        end
-</span><span class='line'>      end
-</span><span class='line'>    else
-</span><span class='line'>      yield path
-</span><span class='line'>    end
-</span><span class='line'>  rescue
-</span><span class='line'>    puts "Error: #{$!}"
-</span><span class='line'>  end
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<p>如果不输入文件夹路径，就使用当前目录作为根目录：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>root = ARGV[0] || Dir.pwd</span></code></pre></td></tr></table></div></figure>
-
-<p>将繁体中文改成简体的代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mapping = {}
-</span><span class='line'>mapping["無"] = "无"
-</span><span class='line'>mapping["龍"] = "龙"
-</span><span class='line'>
-</span><span class='line'>mapping.each do |key, value|
-</span><span class='line'>  file.gsub!(key.encode('gbk', 'utf-8'), value.encode('gbk', 'utf-8'))
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<p>文件重命名：
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>File.rename(old_file_name, new_file_name)</span></code></pre></td></tr></table></div></figure></p>
-
-<p>代码下载：<a href="https://github.com/dohkoos/big2gb">https://github.com/dohkoos/big2gb</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/10">&larr; Older</a>
@@ -2105,6 +2133,10 @@ int[] numbers = new int[100]; &hellip;">
       </li>
     
       <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part28/">ANTLR 4权威参考读书笔记（28）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part27/">ANTLR 4权威参考读书笔记（27）</a>
       </li>
     
@@ -2114,10 +2146,6 @@ int[] numbers = new int[100]; &hellip;">
     
       <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part26/">ANTLR 4权威参考读书笔记（26）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part25/">ANTLR 4权威参考读书笔记（25）</a>
       </li>
     
   </ul>

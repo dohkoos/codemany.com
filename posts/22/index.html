@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="在Windows Server 2008中使用ANTLRWorks调试语法时，总是提示说什么端口49153已被占用。使用netstat -an发现这个端口正在被别的进程监听着，虽然知道问题原因，但是不知道如何解决。后来从如果AntlrWorks的Debug报错“当前端口已被占用”， &hellip;">
+  <meta name="description" content="到目前为止，PowerScript的词法分析已经完成的差不多了，接下来就要开始实现它的语法规则。我们准备先从表达式（expression）开始下手，因为它是语法规则中最核心的部分。 简单的来说，表达式是计算的最小单元，是可以被计算产生值的代码的任何部分。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,234 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/using-antlr-to-build-powerscript-parser-part4/">使用ANTLR构建PowerScript语法分析器（4）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2008-04-26T22:17:05+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>10:17 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>到目前为止，PowerScript的词法分析已经完成的差不多了，接下来就要开始实现它的语法规则。我们准备先从表达式（expression）开始下手，因为它是语法规则中最核心的部分。</p>
+
+<p>简单的来说，表达式是计算的最小单元，是可以被计算产生值的代码的任何部分。一般是由一个或多个运算元和通常是一个运算符构成，运算元本身也可以是表达式。这样层层递归嵌套，直到被称为基本表达式（primary expression）的最简单部分。</p>
+
+<p>基本表达式包含有标志符、字面量（literal）、字段存取、函数调用和数组存取等，圆括号括起的表达式通常也被认为是基本表达式。以下是它们的大致表现形式：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rating
+</span><span class='line'>'This is a string'
+</span><span class='line'>x.y
+</span><span class='line'>f(x)
+</span><span class='line'>a[x]
+</span><span class='line'>(x)</span></code></pre></td></tr></table></div></figure>
+
+<p>在PowerScript中调用函数和事件的语法如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>{ objectname. } { ancestorname :: } { type } { calltype } { when } name ( { argumentlist } )</span></code></pre></td></tr></table></div></figure>
+
+<p>其中，花括号中的项表示可以有可以无。type有两个值function和event，calltype有两个值static和dynamic，when有两个值trigger和post，并且type，calltype和when的顺序可以任意调换。如果ancestorclass是当前对象的直接父类的话，那么可以使用super关键字代替。</p>
+
+<p>这里是收集的一些基本表达式：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>this.ls_array[1]
+</span><span class='line'>this.event pfc_addrow()
+</span><span class='line'>this.event rowfocuschanged(ll_row)
+</span><span class='line'>this.event post doubleclicked(xpos, ypos, row, dwo)
+</span><span class='line'>this.uo_1.function hallo()
+</span><span class='line'>post function column_order_update_from_grid()
+</span><span class='line'>event ue_process()
+</span><span class='line'>
+</span><span class='line'>close(parent)
+</span><span class='line'>parent.enabled
+</span><span class='line'>parent.hide()
+</span><span class='line'>parent.event ue_postconstructor()
+</span><span class='line'>parent.function static trigger wf_process( )
+</span><span class='line'>parent.post uf_process_item ()
+</span><span class='line'>
+</span><span class='line'>super::create
+</span><span class='line'>super::event clicked()
+</span><span class='line'>super::event clicked(xpos, ypos, row, dwo)
+</span><span class='line'>super::of_remove_tail(anv_tailnode)
+</span><span class='line'>super::event trigger selectionchanging(oldindex, newindex)
+</span><span class='line'>
+</span><span class='line'>iu_tab_postings.post of_enable_sort(dw_main, dw_detail, false)
+</span><span class='line'>lw_sheet.dynamic event pfc_close()
+</span><span class='line'>w_main.event doubleclicked(flags, xpos, ypos)
+</span><span class='line'>dw_main.event pfc_retrieve()
+</span><span class='line'>cb_ok.event trigger clicked()
+</span><span class='line'>cb_ok.triggerevent(clicked!)</span></code></pre></td></tr></table></div></figure>
+
+<p>有了以上的这些信息，我们就可以很容易地得到基本表达式的语法规则：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>expression_list
+</span><span class='line'>    : expression (',' expression)*
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>expression
+</span><span class='line'>    : primary_expression
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>primary_expression
+</span><span class='line'>    : '(' expression ')'
+</span><span class='line'>    | (object_name '.')* (ancestor_name '::')? call_specifier* IDENTIFIER identifier_suffix?
+</span><span class='line'>    | literal
+</span><span class='line'>    | '::'? object_name
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>object_name
+</span><span class='line'>    : 'this'
+</span><span class='line'>    | 'parent'
+</span><span class='line'>    | IDENTIFIER
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>ancestor_name
+</span><span class='line'>    : 'super'
+</span><span class='line'>    | IDENTIFIER
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>call_specifier
+</span><span class='line'>    : 'function'
+</span><span class='line'>    | 'event'
+</span><span class='line'>    | 'static'
+</span><span class='line'>    | 'dynamic'
+</span><span class='line'>    | 'trigger'
+</span><span class='line'>    | 'post'
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>identifier_suffix
+</span><span class='line'>    : arguments ('.' IDENTIFIER arguments)*    // cascaded calling
+</span><span class='line'>    | '[' expression_list? ']'
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>arguments
+</span><span class='line'>    : '(' expression_list? ')'
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>literal
+</span><span class='line'>    : STRING_LITERAL
+</span><span class='line'>    | INTEGER_LITERAL
+</span><span class='line'>    | FLOAT_LITERAL
+</span><span class='line'>    | BOOLEAN_LITERAL
+</span><span class='line'>    | LINE_COMMENT
+</span><span class='line'>    | BLOCK_COMMENT
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>不过，如果到这里就开始用ANTLR工具生成词法分析器和语法分析器的话，你会得到一堆的警告信息。要消除这些警告需要在语法文件头部添加：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>options {
+</span><span class='line'>    backtrack=true;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>它的作用是告诉ANTLR在LL(*)语法分析失败的时候要去尝试匹配其它选项。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -824,54 +1052,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/wxwidgets-wizard-for-visual-studio-2005-and-2008/">wxWidgets Wizard for Visual Studio 2005/2008</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2008-02-16T08:13:19+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>8:13 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>花了点时间为VS2005/VS2008写了一个简单的wxWidgets Wizard。本来想写的更完善一些再发布出来的，只是实在没有多少心思再继续地写下去了。而且该向导程序已经基本可以满足我自己的要求了。不过，如果以后有时间的话还是会继续完善它的。以下是我原本打算要实现的一些功能：</p>
-
-<ol>
-<li>支持创建对话框程序；</li>
-<li>可以直接安装wxWidgets Wizard到VS2005中的安装程序；</li>
-<li>集成wxWidgets Help文档到VS2005中；</li>
-<li>实现代码智能提示功能；</li>
-<li>可以在VS2005中直接编辑和编译XRC资源；</li>
-<li>在向导过程中可以设置一些wxWidgets的高级特性（比如Menu Bar，Status Bar等）。</li>
-</ol>
-
-<p>截图：</p>
-
-<p><img src="/uploads/wxwizard-default.png" title="wxwizard-default" ></p>
-
-<p><img src="/uploads/wxwizard-apptype.png" title="wxwizard-apptype" ></p>
-
-<p><img src="/uploads/wxwizard-generated-classes.png" title="wxwizard-generated-classes" ></p>
-
-<p>代码下载：<a href="https://github.com/dohkoos/wxwizard">https://github.com/dohkoos/wxwizard</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/23">&larr; Older</a>
@@ -893,6 +1073,10 @@
       </li>
     
       <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part28/">ANTLR 4权威参考读书笔记（28）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part27/">ANTLR 4权威参考读书笔记（27）</a>
       </li>
     
@@ -902,10 +1086,6 @@
     
       <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part26/">ANTLR 4权威参考读书笔记（26）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part25/">ANTLR 4权威参考读书笔记（25）</a>
       </li>
     
   </ul>

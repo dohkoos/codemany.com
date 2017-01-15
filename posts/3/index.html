@@ -9,9 +9,10 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="英文原文：http://programmingzen.com/2008/12/30/developers-are-blinded-by-the-light/ Blinded by the light,
-revved up like a deuce,
-another runner in the &hellip;">
+  <meta name="description" content="现在我们准备构建一个工具，用来把ANTLR 4权威参考读书笔记（7）中idata.txt里的数据按group分行显示，就像这样： 1
+2
+2 9 10
+3 1 2 3 我们可以借助语法分析树的监听器机制来对词法分析结束后生成的记号流进行改写，我们不需要实现每一个监听器接口方法， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -75,6 +76,142 @@ another runner in the &hellip;">
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part13/">ANTLR 4权威参考读书笔记（13）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-05-06T18:24:18+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>6</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:24 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>现在我们准备构建一个工具，用来把<a href="/blog/reading-notes-the-definitive-antlr4-reference-part7/">ANTLR 4权威参考读书笔记（7）</a>中idata.txt里的数据按group分行显示，就像这样：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>2 9 10
+</span><span class='line'>3 1 2 3</span></code></pre></td></tr></table></div></figure>
+
+<p>我们可以借助语法分析树的监听器机制来对词法分析结束后生成的记号流进行改写，我们不需要实现每一个监听器接口方法，只需要在捕获到group的时候把换行符插到它末尾就行。实现改写的代码如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class RewriteListener extends IDataBaseListener {
+</span><span class='line'>    TokenStreamRewriter rewriter;
+</span><span class='line'>
+</span><span class='line'>    public RewriteListener(TokenStream tokens) {
+</span><span class='line'>        rewriter = new TokenStreamRewriter(tokens);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void enterGroup(IDataParser.GroupContext ctx) {
+</span><span class='line'>        rewriter.insertAfter(ctx.stop, '\n');
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>接着就是写一个小程序来调用我们上面的改写类：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class IData {
+</span><span class='line'>
+</span><span class='line'>    public static void main(String[] args) throws Exception {
+</span><span class='line'>        InputStream is = args.length &gt; 0 ? new FileInputStream(args[0]) : System.in;
+</span><span class='line'>
+</span><span class='line'>        ANTLRInputStream input = new ANTLRInputStream(is);
+</span><span class='line'>        IDataLexer lexer = new IDataLexer(input);
+</span><span class='line'>        CommonTokenStream tokens = new CommonTokenStream(lexer);
+</span><span class='line'>        IDataParser parser = new IDataParser(tokens);
+</span><span class='line'>        ParseTree tree = parser.file();
+</span><span class='line'>
+</span><span class='line'>        RewriteListener listener = new RewriteListener(tokens);
+</span><span class='line'>
+</span><span class='line'>        System.out.println("Before Rewriting");
+</span><span class='line'>        System.out.println(listener.rewriter.getText());
+</span><span class='line'>
+</span><span class='line'>        ParseTreeWalker walker = new ParseTreeWalker();
+</span><span class='line'>        walker.walk(listener, tree);
+</span><span class='line'>
+</span><span class='line'>        System.out.println("After Rewriting");
+</span><span class='line'>        System.out.println(listener.rewriter.getText());
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>这里的关键是TokenStreamRewriter对象知道如何在不修改流的情况下提供一个记号流的修改过的视图。它把所有的操作方法当作指令并把它们排进队列，等到在遍历记号流把它作为文本渲染回去的时候再执行。每次我们调用getText()时rewriter就会执行那些指令。</p>
+
+<p>最后就是构建和测试应用：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr IData.g
+</span><span class='line'>compile *.java
+</span><span class='line'>run IData idata.txt</span></code></pre></td></tr></table></div></figure>
+
+<p>以下是输出结果：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Before Rewriting
+</span><span class='line'>29103123
+</span><span class='line'>After Rewriting
+</span><span class='line'>2910
+</span><span class='line'>3123</span></code></pre></td></tr></table></div></figure>
+
+<p>仅用几行代码，我们就能够没有任何烦恼地对某些内容做轻微的调整。这种策略对于源代码检测或重构这类一般性的问题是非常有效的。TokenStreamRewriter是一个非常强大且有效的操作记号流的工具。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -788,65 +925,6 @@ another runner in the night<br>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-to-detect-and-prevent-spam-traffic-in-ga/">Google Analytics中如何检测并防止垃圾流量</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-02-27T18:38:18+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>27</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:38 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>使用Google Analytics网站分析工具对博客进行数据统计。在经过一段时间的数据收集后，发现总是会有大量的垃圾流量存在。这里的垃圾流量，指的是对网站毫无作用且会影响网站数据报表质量的流量。通常Google Analytics中的垃圾流量可以分为以下两大类：</p>
-
-<ul>
-<li>一类被称为ghost referral，这些流量事实上从来没有来过你的网站，也不会出现在你网站服务器的日志中，但你可以在数据报表中发现它们，它们影响了Google Analytics中的数据；</li>
-<li>另一类是爬虫流量，包括搜索引擎爬虫流量和非搜索引擎爬虫流量，这些流量会影响Google Analytics中各渠道流量占比及会话次数、跳出率、停留时间等关键指标。</li>
-</ul>
-
-<h3 id="垃圾流量检测方法">垃圾流量检测方法</h3>
-
-<p>打开报告 -&gt; 受众群体 -&gt; 技术 -&gt; 广告网络 -&gt; 主机名，统计报表如下图所示：</p>
-
-<p><img src="/uploads/report-with-spam.png" title="report-with-spam" ></p>
-
-<p>可以看到，只有181个会话的主机名是我的博客域名，即真实来到我博客的流量，也就是说有超过一半的流量属于垃圾流量。并且这些垃圾流量基本都出现了不同程度的数据异常，如新会话百分比为0%、新用户为0、跳出率为100%、平均会话时长为00:00:00。这些垃圾流量的主机名与博客域名无关，说明是第一类垃圾流量。出现这类数据的原因可能是：</p>
-
-<ul>
-<li>别的网站使用了和你网站相同的媒体资源ID，这种情况一般来说不可能，除非恶意为之；</li>
-<li>有人使用Google Analytics中的Measurement Protocol做机器生成的访问流量，而你的媒体资源ID不幸躺枪。</li>
-</ul>
-
-<h3 id="使用过滤器屏蔽垃圾流量">使用过滤器屏蔽垃圾流量</h3>
-
-<p>打开“管理”页面，在博客帐号的“所有过滤器”下添加新的过滤条件，使用预定义或自定义均可，基本配置如下所示：</p>
-
-<p><img src="/uploads/exclude-spam-filter.png" title="exclude-spam-filter" ></p>
-
-<p>然后把“可选择的数据视图”中的选项添加到“选定的数据视图”中，保存即可。</p>
-
-<p>过段时间后再回来查看报表，就会发现垃圾流量消失的干干净净了：</p>
-
-<p><img src="/uploads/report-without-spam.png" title="report-without-spam" ></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/4">&larr; Older</a>
@@ -868,6 +946,10 @@ another runner in the night<br>
       </li>
     
       <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part28/">ANTLR 4权威参考读书笔记（28）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part27/">ANTLR 4权威参考读书笔记（27）</a>
       </li>
     
@@ -877,10 +959,6 @@ another runner in the night<br>
     
       <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part26/">ANTLR 4权威参考读书笔记（26）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part25/">ANTLR 4权威参考读书笔记（25）</a>
       </li>
     
   </ul>
