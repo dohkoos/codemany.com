@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="小时候经常在街头看到有人摆象棋残局，红方无论赢棋还是和棋都算破解成功，否则就是失败。作为象棋低手，也曾尝试过好多次，但从来没有真正破解过哪个残局。有次甚至默记住某个残局的走法去破解，结果在解完所有圈套后还是在接下来的走棋中输掉。 一晃许多年过去了，象棋也很长时间没有再玩过。 &hellip;">
+  <meta name="description" content="界面的实现主要是绘制棋盘和棋子，有纯代码绘制和使用图片两种方式。因为担心图片缩放引起图片质量问题，以及害怕根据缩放计算棋子落点的麻烦，打算采取纯代码绘制方式。不过在编写了部分代码后发觉这不是个好主意。 纯代码绘制棋盘需要画纵横线、斜线、炮兵座线、文字“楚河汉界”以及中文数字两套坐标， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,465 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/chess-mess-master-development-record-part2/">象棋残局大师开发实录（2）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2017-01-17T18:21:40+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>17</span><span class='date-suffix'>th</span>, <span class='date-year'>2017</span></span> <span class='time'>6:21 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>界面的实现主要是绘制棋盘和棋子，有纯代码绘制和使用图片两种方式。因为担心图片缩放引起图片质量问题，以及害怕根据缩放计算棋子落点的麻烦，打算采取纯代码绘制方式。不过在编写了部分代码后发觉这不是个好主意。</p>
+
+<p>纯代码绘制棋盘需要画纵横线、斜线、炮兵座线、文字“楚河汉界”以及中文数字两套坐标，部分线条需要加粗，河界区的竖线不需要画，文字绘制时是以baseline为Y坐标的。这些因素导致文字和棋子在视图中的坐标位置都需要经过细细地计算。如果再考虑让“楚河汉界”这几个字躺着显示，那就更是麻烦。即便这样，绘制完的棋盘背景也只是白色，素素的不是很好看。就这还是没有考虑绘制棋子的结果。当然，好处也是有的，棋子所在的交点坐标很容易计算得到（这个其实不算优点，只是我没深入思考的结果，图片的方式也很容易计算棋子的落点坐标），棋盘也不需要考虑缩放问题，总是适配当前运行的机器的。</p>
+
+<p>既然纯代码绘制的方式问题多多且只有无需屏幕适配这个优势，那采用图片的方式就是必然。</p>
+
+<p>图片方式的实现也有两种，一种是使用View或者SurfaceView显示图片；还有一种是把棋盘和棋子当作ImageView控件处理。使用Layout.addView(View)和Layout.deleteView(View)就可以很容易地放置和消除棋子。经过简单的比较我选用SurfaceView作为绘制的视图。SurfaceView的内容这里不做介绍，因为这不是我们要考虑的重点。以下是SurfaceView的代码骨架：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+<span class='line-number'>72</span>
+<span class='line-number'>73</span>
+<span class='line-number'>74</span>
+<span class='line-number'>75</span>
+<span class='line-number'>76</span>
+<span class='line-number'>77</span>
+<span class='line-number'>78</span>
+<span class='line-number'>79</span>
+<span class='line-number'>80</span>
+<span class='line-number'>81</span>
+<span class='line-number'>82</span>
+<span class='line-number'>83</span>
+<span class='line-number'>84</span>
+<span class='line-number'>85</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class GameView extends SurfaceView implements SurfaceHolder.Callback {
+</span><span class='line'>    private DrawThread drawThread;
+</span><span class='line'>    private SurfaceHolder surfaceHolder;
+</span><span class='line'>
+</span><span class='line'>    public GameView(Context context, AttributeSet attrs) {
+</span><span class='line'>        super(context, attrs);
+</span><span class='line'>
+</span><span class='line'>        surfaceHolder = getHolder();
+</span><span class='line'>        surfaceHolder.addCallback(this);
+</span><span class='line'>
+</span><span class='line'>        // TODO: 加载棋盘棋子图片资源
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    // 自定义的绘制方法
+</span><span class='line'>    private void doDraw(Canvas canvas) {
+</span><span class='line'>        // TODO: 绘制棋盘和棋子
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public boolean onTouchEvent(MotionEvent event) {
+</span><span class='line'>        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+</span><span class='line'>            // TODO: 游戏交互
+</span><span class='line'>        }
+</span><span class='line'>        return super.onTouchEvent(event);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void surfaceCreated(SurfaceHolder holder) {
+</span><span class='line'>        if (drawThread == null) {
+</span><span class='line'>            drawThread = new DrawThread();
+</span><span class='line'>            drawThread.start();
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void surfaceDestroyed(SurfaceHolder holder) {
+</span><span class='line'>        if (drawThread != null) {
+</span><span class='line'>            drawThread.stopThread();
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    private class DrawThread extends Thread {
+</span><span class='line'>        private boolean isRunning = false;
+</span><span class='line'>
+</span><span class='line'>        public DrawThread() {
+</span><span class='line'>            isRunning = true;
+</span><span class='line'>        }
+</span><span class='line'>
+</span><span class='line'>        public void stopThread() {
+</span><span class='line'>            isRunning = false;
+</span><span class='line'>            boolean retry = true;
+</span><span class='line'>            while (retry) {
+</span><span class='line'>                try {
+</span><span class='line'>                    this.join();    // 保证run方法执行完毕
+</span><span class='line'>                    retry = false;
+</span><span class='line'>                } catch (InterruptedException e) {
+</span><span class='line'>                    e.printStackTrace();
+</span><span class='line'>                }
+</span><span class='line'>            }
+</span><span class='line'>        }
+</span><span class='line'>
+</span><span class='line'>        @Override
+</span><span class='line'>        public void run() {
+</span><span class='line'>            while (isRunning) {
+</span><span class='line'>                Canvas canvas = null;
+</span><span class='line'>                try {
+</span><span class='line'>                    canvas = surfaceHolder.lockCanvas();
+</span><span class='line'>                    synchronized (surfaceHolder) {
+</span><span class='line'>                        if (canvas != null) {
+</span><span class='line'>                            doDraw(canvas);
+</span><span class='line'>                        }
+</span><span class='line'>                    }
+</span><span class='line'>                } finally {
+</span><span class='line'>                    if (canvas != null) {
+</span><span class='line'>                        surfaceHolder.unlockCanvasAndPost(canvas);
+</span><span class='line'>                    }
+</span><span class='line'>                }
+</span><span class='line'>            }
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>用图片在视图上绘制棋盘需要考虑不同屏幕尺寸的适配问题，官方推荐的做法是单图片多分辨率，即将不同分辨率的同个图片放在特定的资源目录下。这种做法的缺点是需要维护多套图片，且绘制的棋盘也不可能正好完全匹配屏幕。使用单分辨率图片的话，如果图片尺寸过小，那么在绘制时就必须放大，容易变得模糊；如果图片尺寸太大的话，又会导致资源太大进而引起应用安装包过大的问题。这里使用的是558 * 620像素的图片，既不是太大，又不是太小，恰到好处。其中，棋盘格子是57 * 57像素的正方形，河界的高度和棋盘格子的边长相等，所以两条边线的距离是57 * 8 = 456像素，底线距离是57 * 9 = 513像素。</p>
+
+<p><img src="/uploads/marked-chess-board.png" title="marked-chess-board" ></p>
+
+<p>棋子图片的原始大小是55 * 55像素。连同上面棋盘的那些值可以设置成以下的常量供以后使用：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class ChessBoard {
+</span><span class='line'>    public static final int RAW_IMAGE_WIDTH = 558;
+</span><span class='line'>    public static final int RAW_IMAGE_HEIGHT = 620;
+</span><span class='line'>    public static final int RAW_TILES_WIDTH = 456;
+</span><span class='line'>    public static final int RAW_TILES_HEIGHT = 513;
+</span><span class='line'>    public static final int RAW_TILE_SIZE = 57;
+</span><span class='line'>    public static final int RAW_CHESS_SIZE = 55;
+</span></code></pre></td></tr></table></div></figure>
+
+<p>因为使用的是单张图片，所以在绘制之前还需要知道屏幕的大小，以便在绘制时对图片做等比例的缩放，使图片在填满屏幕的前提下，最大程度地保证图片的缩放效果，确保图片不变形。缩放代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// 计算屏幕的最佳缩放比例
+</span><span class='line'>private float calcBestScale() {
+</span><span class='line'>    DisplayMetrics dm = getResources().getDisplayMetrics();
+</span><span class='line'>    int screenWidth  = dm.widthPixels;
+</span><span class='line'>    int screenHeight = dm.heightPixels;
+</span><span class='line'>
+</span><span class='line'>    float scaleX = (float)screenWidth / RAW_IMAGE_WIDTH;
+</span><span class='line'>    float scaleY = (float)screenHeight / RAW_IMAGE_HEIGHT;
+</span><span class='line'>    return Math.min(scaleX, scaleY);
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>private Bitmap resizeBitmap(Bitmap bitmap, float bestScale) {
+</span><span class='line'>    Matrix matrix = new Matrix();
+</span><span class='line'>    matrix.postScale(bestScale, bestScale);
+</span><span class='line'>    return Bitmap.createBitmap(bitmap, 0, 0,
+</span><span class='line'>            bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>在保证能得到最佳效果的缩放图片后，就可以加载棋盘和棋子的图片资源了。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private void initResources() {
+</span><span class='line'>    board = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.board)), bestScale);
+</span><span class='line'>
+</span><span class='line'>    chesses[0] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.black_jiang)), bestScale);
+</span><span class='line'>    chesses[1] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.black_shi)), bestScale);
+</span><span class='line'>    chesses[2] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.black_xiang)), bestScale);
+</span><span class='line'>    chesses[3] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.black_ma)), bestScale);
+</span><span class='line'>    chesses[4] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.black_ju)), bestScale);
+</span><span class='line'>    chesses[5] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.black_pao)), bestScale);
+</span><span class='line'>    chesses[6] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.black_zu)), bestScale);
+</span><span class='line'>    chesses[7] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.red_shuai)), bestScale);
+</span><span class='line'>    chesses[8] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.red_shi)), bestScale);
+</span><span class='line'>    chesses[9] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.red_xiang)), bestScale);
+</span><span class='line'>    chesses[10] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.red_ma)), bestScale);
+</span><span class='line'>    chesses[11] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.red_ju)), bestScale);
+</span><span class='line'>    chesses[12] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.red_pao)), bestScale);
+</span><span class='line'>    chesses[13] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.red_bing)), bestScale);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>注意，加载图片资源要用openRawResource()配合decodeStream()才能得到原始大小的图片，如果使用decodeResource()的话，得到的图片大小则是<code>原始大小 * 手机密度 / 160</code>。至于R前面的+号则是因为图片在drawable目录下时Android Studio会提示警告，不想加的话就必须要把图片放到raw目录中。</p>
+
+<p>有了棋盘和棋子的图片资源后，我们就可以绘制象棋界面了。当然，在这之前还要先确定表示棋局状态的数据结构，我们用一个10行9列的二维数组来描述。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class ChessBoard {
+</span><span class='line'>    /*
+</span><span class='line'>     * 无子(0)
+</span><span class='line'>     * 黑将(1) 黑士(2) 黑象(3)  黑马(4)  黑车(5)  黑砲(6)  黑卒(7)
+</span><span class='line'>     * 红帅(8) 红仕(9) 红相(10) 红馬(11) 红車(12) 红炮(13) 红兵(14)
+</span><span class='line'>     */
+</span><span class='line'>    private int[][] chessPoints = {
+</span><span class='line'>        /*   1 2 3 4 5 6 7 8 9   */
+</span><span class='line'>        {5, 4, 3, 2, 1, 2, 3, 4, 5},
+</span><span class='line'>        {0, 0, 0, 0, 0, 0, 0, 0, 0},
+</span><span class='line'>        {0, 6, 0, 0, 0, 0, 0, 6, 0},
+</span><span class='line'>        {7, 0, 7, 0, 7, 0, 7, 0, 7},
+</span><span class='line'>        {0, 0, 0, 0, 0, 0, 0, 0, 0},
+</span><span class='line'>        /*       楚河 汉界       */
+</span><span class='line'>        {0, 0, 0, 0, 0, 0, 0, 0, 0},
+</span><span class='line'>        {14, 0, 14, 0, 14, 0, 14, 0, 14},
+</span><span class='line'>        {0, 13, 0, 0, 0, 0, 0, 13, 0},
+</span><span class='line'>        {0, 0, 0, 0, 0, 0, 0, 0, 0},
+</span><span class='line'>        {12, 11, 10, 9, 8, 9, 10, 11, 12}
+</span><span class='line'>        /* 九 八 七 六 五 四 三 二 一 */
+</span><span class='line'>    };
+</span><span class='line'>
+</span><span class='line'>    public int[][] getChessPoints() {
+</span><span class='line'>        return chessPoints;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public int getChess(int row, int col) {
+</span><span class='line'>        return chessPoints[row][col];
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public boolean hasChess(int row, int col) {
+</span><span class='line'>        return chessPoints[row][col] != 0;
+</span><span class='line'>    }</span></code></pre></td></tr></table></div></figure>
+
+<p>接着，我们需要根据适配时图片缩放的比例计算各个棋子绘制时的偏移坐标（假设棋盘的偏移坐标是[0, 0]）。先看下图：</p>
+
+<p><img src="/uploads/chess-piece-offset.png" title="chess-piece-offset" ></p>
+
+<p>通过观察可以知道，两个棋子左边框之间的距离等于棋盘格子的边长。如果把左上角棋子相对棋盘图片边界偏移的变量分为称为chessBaseLeft和chessBaseTop的话，那么它们的值可以通过以下的公式计算得到：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>tileSize = ChessBoard.RAW_TILE_SIZE * bestScale;    // 棋盘格子缩放后的大小
+</span><span class='line'>chessBaseLeft = (ChessBoard.RAW_IMAGE_WIDTH - ChessBoard.RAW_TILES_WIDTH
+</span><span class='line'>        - ChessBoard.RAW_CHESS_SIZE) / 2 * bestScale;
+</span><span class='line'>chessBaseTop = (ChessBoard.RAW_IMAGE_HEIGHT - ChessBoard.RAW_TILES_HEIGHT
+</span><span class='line'>        - ChessBoard.RAW_CHESS_SIZE) / 2 * bestScale;</span></code></pre></td></tr></table></div></figure>
+
+<p>得到棋子相对棋盘的偏移坐标后，我们就可以开始真正的绘制棋盘和棋子了。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>canvas.drawColor(Color.WHITE);
+</span><span class='line'>
+</span><span class='line'>// 绘制棋盘
+</span><span class='line'>canvas.drawBitmap(board, 0, 0, paint);
+</span><span class='line'>
+</span><span class='line'>// 根据points数组绘制棋子
+</span><span class='line'>for (int row = 0; row &lt; chessBoard.getChessPoints().length; row++) {
+</span><span class='line'>    for (int col = 0; col &lt; chessBoard.getChessPoints()[row].length; col++) {
+</span><span class='line'>        if (chessBoard.hasChess(row, col)) {
+</span><span class='line'>            float left = chessBaseLeft + col * tileSize;
+</span><span class='line'>            float top = chessBaseTop + row * tileSize;
+</span><span class='line'>            int index = chessBoard.getChess(row, col) - 1;
+</span><span class='line'>            canvas.drawBitmap(chesses[index], left, top, paint);
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>至此，象棋界面的绘制就算是完成了，接下来要处理的是与玩家的交互。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1767,110 +2226,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part22/">ANTLR 4权威参考读书笔记（22）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-07-24T21:40:28+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>24</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>9:40 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>基于监听器的方法是极好的，因为所有树遍历和方法触发被自动完成。尽管有时候自动树遍历也是一个缺点，因为我们不能控制遍历本身。例如，我们可能想遍历一段C程序的语法分析树，通过跳过函数体子树忽略函数中的一切。监听器事件方法也不能使用方法返回值去传递数据。当我们需要控制遍历或返回带有事件方法返回值的值时，我们使用访问者模式。现在，让我们构建一个基于访问者版本的属性文件加载器去比较这两种方法。</p>
-
-<h3 id="使用访问者实现应用">使用访问者实现应用</h3>
-
-<p>使用访问者代替监听器，我们只需要让ANTLR生成访问者接口和实现接口，然后创建一段测试代码在语法分析树上调用visit()，根本不需要触及到语法。</p>
-
-<p>在命令行使用-visitor参数时，ANTLR生成接口PropertyFileVisitor和类PropertyFileBaseVisitor，后者有如下的默认实现：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class PropertyFileBaseVisitor&lt;T&gt; extends AbstractParseTreeVisitor&lt;T&gt;
-</span><span class='line'>                                        implements PropertyFileVisitor&lt;T&gt; {
-</span><span class='line'>    @Override
-</span><span class='line'>    public T visitFile(PropertyFileParser.FileContext ctx) { ... }
-</span><span class='line'>    @Override
-</span><span class='line'>    public T visitProp(PropertyFileParser.PropContext ctx) { ... }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>我们可以从监听器的exitProp()中拷贝映射功能，然后把它粘贴到与规则prop相关的访问者方法中。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class TestPropertyFileVisitor {
-</span><span class='line'>    public static class PropertyFileVisitor extends PropertyFileBaseVisitor&lt;Void&gt; {
-</span><span class='line'>        Map&lt;String,String&gt; props = new OrderedHashMap&lt;String, String&gt;();
-</span><span class='line'>        public Void visitProp(PropertyFileParser.PropContext ctx) {
-</span><span class='line'>            String id = ctx.ID().getText();    // prop : ID '=' STRING '\n' ;
-</span><span class='line'>            String value = ctx.STRING().getText();
-</span><span class='line'>            props.put(id, value);
-</span><span class='line'>            return null;    // Java says must return something even when Void
-</span><span class='line'>        }
-</span><span class='line'>    }</span></code></pre></td></tr></table></div></figure>
-
-<p>这里是访问者接口和类之间的继承关系：</p>
-
-<p><img src="/uploads/propertyfile-visitor-hierachy.png" title="propertyfile-visitor-hierachy" ></p>
-
-<p>访问者在子节点上通过显式地调用接口ParseTreeVisitor的visit()方法遍历语法分析树。那些方法在AbstractParseTreeVisitor中实现。在这里，为prop调用创建的节点没有子树，因此visitProp()不需要调用visit()。</p>
-
-<p>在监听器和访问者的测试代码（例如TestPropertyFileVisitor）之间最大的不同是访问者的测试代码不需要ParseTreeWalker，它只需要让访问者去访问由语法分析器创建的树。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>PropertyFileVisitor loader = new PropertyFileVisitor();
-</span><span class='line'>loader.visit(tree);
-</span><span class='line'>System.out.println(loader.props);    // print results</span></code></pre></td></tr></table></div></figure>
-
-<p>以下是构建和测试序列：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr -visitor PropertyFile.g  # create visitor as well this time
-</span><span class='line'>compile *.java
-</span><span class='line'>run TestPropertyFileVisitor t.properties</span></code></pre></td></tr></table></div></figure>
-
-<p>这里是输出的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>{user="parrt", machine="maniac"}</span></code></pre></td></tr></table></div></figure>
-
-<p>我们可以使用监听器和访问者构建几乎任何我们想要的。一旦我们处于Java空间，就不再需要学习更多的ANTLR知识。我们只要知道语法、语法分析树、监听器和访问者事件方法之间的关系。除此之外，就是代码。在对识别中的输入短语的回答中，我们可以生成输出、收集信息、以某种方式验证短语，或者执行计算。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/2">&larr; Older</a>
@@ -1884,6 +2239,10 @@
     <section>
   <h1>Recent Posts</h1>
   <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/chess-mess-master-development-record-part2/">象棋残局大师开发实录（2）</a>
+      </li>
     
       <li class="post">
         <a href="/blog/chess-mess-master-development-record-part1/">象棋残局大师开发实录（1）</a>
@@ -1901,10 +2260,6 @@
         <a href="/blog/the-power-of-protocol-analyzers/">协议分析器的威力</a>
       </li>
     
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part26/">ANTLR 4权威参考读书笔记（26）</a>
-      </li>
-    
   </ul>
 </section>
 <section>
@@ -1918,7 +2273,7 @@
   <ul class="tag-cloud">
     <a style="font-size: 142%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 133%" href="/tags/android/">Android</a>
+<a style="font-size: 134%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
 <a style="font-size: 107%" href="/tags/css/">CSS</a>
 <a style="font-size: 110%" href="/tags/crack/">Crack</a>

@@ -4,7 +4,7 @@
   <title><![CDATA[乐者为王]]></title>
   <link href="http://codemany.com/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-01-17T20:18:22+08:00</updated>
+  <updated>2017-01-17T20:26:19+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,445 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[象棋残局大师开发实录（2）]]></title>
+    <link href="http://codemany.com/blog/chess-mess-master-development-record-part2/"/>
+    <updated>2017-01-17T18:21:40+08:00</updated>
+    <id>http://codemany.com/blog/chess-mess-master-development-record-part2</id>
+    <content type="html"><![CDATA[<p>界面的实现主要是绘制棋盘和棋子，有纯代码绘制和使用图片两种方式。因为担心图片缩放引起图片质量问题，以及害怕根据缩放计算棋子落点的麻烦，打算采取纯代码绘制方式。不过在编写了部分代码后发觉这不是个好主意。</p>
+
+<p>纯代码绘制棋盘需要画纵横线、斜线、炮兵座线、文字“楚河汉界”以及中文数字两套坐标，部分线条需要加粗，河界区的竖线不需要画，文字绘制时是以baseline为Y坐标的。这些因素导致文字和棋子在视图中的坐标位置都需要经过细细地计算。如果再考虑让“楚河汉界”这几个字躺着显示，那就更是麻烦。即便这样，绘制完的棋盘背景也只是白色，素素的不是很好看。就这还是没有考虑绘制棋子的结果。当然，好处也是有的，棋子所在的交点坐标很容易计算得到（这个其实不算优点，只是我没深入思考的结果，图片的方式也很容易计算棋子的落点坐标），棋盘也不需要考虑缩放问题，总是适配当前运行的机器的。</p>
+
+<p>既然纯代码绘制的方式问题多多且只有无需屏幕适配这个优势，那采用图片的方式就是必然。</p>
+
+<p>图片方式的实现也有两种，一种是使用View或者SurfaceView显示图片；还有一种是把棋盘和棋子当作ImageView控件处理。使用Layout.addView(View)和Layout.deleteView(View)就可以很容易地放置和消除棋子。经过简单的比较我选用SurfaceView作为绘制的视图。SurfaceView的内容这里不做介绍，因为这不是我们要考虑的重点。以下是SurfaceView的代码骨架：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+<span class='line-number'>72</span>
+<span class='line-number'>73</span>
+<span class='line-number'>74</span>
+<span class='line-number'>75</span>
+<span class='line-number'>76</span>
+<span class='line-number'>77</span>
+<span class='line-number'>78</span>
+<span class='line-number'>79</span>
+<span class='line-number'>80</span>
+<span class='line-number'>81</span>
+<span class='line-number'>82</span>
+<span class='line-number'>83</span>
+<span class='line-number'>84</span>
+<span class='line-number'>85</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class GameView extends SurfaceView implements SurfaceHolder.Callback {
+</span><span class='line'>    private DrawThread drawThread;
+</span><span class='line'>    private SurfaceHolder surfaceHolder;
+</span><span class='line'>
+</span><span class='line'>    public GameView(Context context, AttributeSet attrs) {
+</span><span class='line'>        super(context, attrs);
+</span><span class='line'>
+</span><span class='line'>        surfaceHolder = getHolder();
+</span><span class='line'>        surfaceHolder.addCallback(this);
+</span><span class='line'>
+</span><span class='line'>        // TODO: 加载棋盘棋子图片资源
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    // 自定义的绘制方法
+</span><span class='line'>    private void doDraw(Canvas canvas) {
+</span><span class='line'>        // TODO: 绘制棋盘和棋子
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public boolean onTouchEvent(MotionEvent event) {
+</span><span class='line'>        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+</span><span class='line'>            // TODO: 游戏交互
+</span><span class='line'>        }
+</span><span class='line'>        return super.onTouchEvent(event);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void surfaceCreated(SurfaceHolder holder) {
+</span><span class='line'>        if (drawThread == null) {
+</span><span class='line'>            drawThread = new DrawThread();
+</span><span class='line'>            drawThread.start();
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void surfaceDestroyed(SurfaceHolder holder) {
+</span><span class='line'>        if (drawThread != null) {
+</span><span class='line'>            drawThread.stopThread();
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    private class DrawThread extends Thread {
+</span><span class='line'>        private boolean isRunning = false;
+</span><span class='line'>
+</span><span class='line'>        public DrawThread() {
+</span><span class='line'>            isRunning = true;
+</span><span class='line'>        }
+</span><span class='line'>
+</span><span class='line'>        public void stopThread() {
+</span><span class='line'>            isRunning = false;
+</span><span class='line'>            boolean retry = true;
+</span><span class='line'>            while (retry) {
+</span><span class='line'>                try {
+</span><span class='line'>                    this.join();    // 保证run方法执行完毕
+</span><span class='line'>                    retry = false;
+</span><span class='line'>                } catch (InterruptedException e) {
+</span><span class='line'>                    e.printStackTrace();
+</span><span class='line'>                }
+</span><span class='line'>            }
+</span><span class='line'>        }
+</span><span class='line'>
+</span><span class='line'>        @Override
+</span><span class='line'>        public void run() {
+</span><span class='line'>            while (isRunning) {
+</span><span class='line'>                Canvas canvas = null;
+</span><span class='line'>                try {
+</span><span class='line'>                    canvas = surfaceHolder.lockCanvas();
+</span><span class='line'>                    synchronized (surfaceHolder) {
+</span><span class='line'>                        if (canvas != null) {
+</span><span class='line'>                            doDraw(canvas);
+</span><span class='line'>                        }
+</span><span class='line'>                    }
+</span><span class='line'>                } finally {
+</span><span class='line'>                    if (canvas != null) {
+</span><span class='line'>                        surfaceHolder.unlockCanvasAndPost(canvas);
+</span><span class='line'>                    }
+</span><span class='line'>                }
+</span><span class='line'>            }
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>用图片在视图上绘制棋盘需要考虑不同屏幕尺寸的适配问题，官方推荐的做法是单图片多分辨率，即将不同分辨率的同个图片放在特定的资源目录下。这种做法的缺点是需要维护多套图片，且绘制的棋盘也不可能正好完全匹配屏幕。使用单分辨率图片的话，如果图片尺寸过小，那么在绘制时就必须放大，容易变得模糊；如果图片尺寸太大的话，又会导致资源太大进而引起应用安装包过大的问题。这里使用的是558 * 620像素的图片，既不是太大，又不是太小，恰到好处。其中，棋盘格子是57 * 57像素的正方形，河界的高度和棋盘格子的边长相等，所以两条边线的距离是57 * 8 = 456像素，底线距离是57 * 9 = 513像素。</p>
+
+<p><img src="http://codemany.com/uploads/marked-chess-board.png" title="marked-chess-board" ></p>
+
+<p>棋子图片的原始大小是55 * 55像素。连同上面棋盘的那些值可以设置成以下的常量供以后使用：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class ChessBoard {
+</span><span class='line'>    public static final int RAW_IMAGE_WIDTH = 558;
+</span><span class='line'>    public static final int RAW_IMAGE_HEIGHT = 620;
+</span><span class='line'>    public static final int RAW_TILES_WIDTH = 456;
+</span><span class='line'>    public static final int RAW_TILES_HEIGHT = 513;
+</span><span class='line'>    public static final int RAW_TILE_SIZE = 57;
+</span><span class='line'>    public static final int RAW_CHESS_SIZE = 55;
+</span></code></pre></td></tr></table></div></figure>
+
+<p>因为使用的是单张图片，所以在绘制之前还需要知道屏幕的大小，以便在绘制时对图片做等比例的缩放，使图片在填满屏幕的前提下，最大程度地保证图片的缩放效果，确保图片不变形。缩放代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// 计算屏幕的最佳缩放比例
+</span><span class='line'>private float calcBestScale() {
+</span><span class='line'>    DisplayMetrics dm = getResources().getDisplayMetrics();
+</span><span class='line'>    int screenWidth  = dm.widthPixels;
+</span><span class='line'>    int screenHeight = dm.heightPixels;
+</span><span class='line'>
+</span><span class='line'>    float scaleX = (float)screenWidth / RAW_IMAGE_WIDTH;
+</span><span class='line'>    float scaleY = (float)screenHeight / RAW_IMAGE_HEIGHT;
+</span><span class='line'>    return Math.min(scaleX, scaleY);
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>private Bitmap resizeBitmap(Bitmap bitmap, float bestScale) {
+</span><span class='line'>    Matrix matrix = new Matrix();
+</span><span class='line'>    matrix.postScale(bestScale, bestScale);
+</span><span class='line'>    return Bitmap.createBitmap(bitmap, 0, 0,
+</span><span class='line'>            bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>在保证能得到最佳效果的缩放图片后，就可以加载棋盘和棋子的图片资源了。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private void initResources() {
+</span><span class='line'>    board = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.board)), bestScale);
+</span><span class='line'>
+</span><span class='line'>    chesses[0] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.black_jiang)), bestScale);
+</span><span class='line'>    chesses[1] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.black_shi)), bestScale);
+</span><span class='line'>    chesses[2] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.black_xiang)), bestScale);
+</span><span class='line'>    chesses[3] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.black_ma)), bestScale);
+</span><span class='line'>    chesses[4] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.black_ju)), bestScale);
+</span><span class='line'>    chesses[5] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.black_pao)), bestScale);
+</span><span class='line'>    chesses[6] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.black_zu)), bestScale);
+</span><span class='line'>    chesses[7] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.red_shuai)), bestScale);
+</span><span class='line'>    chesses[8] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.red_shi)), bestScale);
+</span><span class='line'>    chesses[9] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.red_xiang)), bestScale);
+</span><span class='line'>    chesses[10] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.red_ma)), bestScale);
+</span><span class='line'>    chesses[11] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.red_ju)), bestScale);
+</span><span class='line'>    chesses[12] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.red_pao)), bestScale);
+</span><span class='line'>    chesses[13] = resizeBitmap(BitmapFactory.decodeStream(
+</span><span class='line'>            getResources().openRawResource(+R.drawable.red_bing)), bestScale);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>注意，加载图片资源要用openRawResource()配合decodeStream()才能得到原始大小的图片，如果使用decodeResource()的话，得到的图片大小则是<code>原始大小 * 手机密度 / 160</code>。至于R前面的+号则是因为图片在drawable目录下时Android Studio会提示警告，不想加的话就必须要把图片放到raw目录中。</p>
+
+<p>有了棋盘和棋子的图片资源后，我们就可以绘制象棋界面了。当然，在这之前还要先确定表示棋局状态的数据结构，我们用一个10行9列的二维数组来描述。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class ChessBoard {
+</span><span class='line'>    /*
+</span><span class='line'>     * 无子(0)
+</span><span class='line'>     * 黑将(1) 黑士(2) 黑象(3)  黑马(4)  黑车(5)  黑砲(6)  黑卒(7)
+</span><span class='line'>     * 红帅(8) 红仕(9) 红相(10) 红馬(11) 红車(12) 红炮(13) 红兵(14)
+</span><span class='line'>     */
+</span><span class='line'>    private int[][] chessPoints = {
+</span><span class='line'>        /*   1 2 3 4 5 6 7 8 9   */
+</span><span class='line'>        {5, 4, 3, 2, 1, 2, 3, 4, 5},
+</span><span class='line'>        {0, 0, 0, 0, 0, 0, 0, 0, 0},
+</span><span class='line'>        {0, 6, 0, 0, 0, 0, 0, 6, 0},
+</span><span class='line'>        {7, 0, 7, 0, 7, 0, 7, 0, 7},
+</span><span class='line'>        {0, 0, 0, 0, 0, 0, 0, 0, 0},
+</span><span class='line'>        /*       楚河 汉界       */
+</span><span class='line'>        {0, 0, 0, 0, 0, 0, 0, 0, 0},
+</span><span class='line'>        {14, 0, 14, 0, 14, 0, 14, 0, 14},
+</span><span class='line'>        {0, 13, 0, 0, 0, 0, 0, 13, 0},
+</span><span class='line'>        {0, 0, 0, 0, 0, 0, 0, 0, 0},
+</span><span class='line'>        {12, 11, 10, 9, 8, 9, 10, 11, 12}
+</span><span class='line'>        /* 九 八 七 六 五 四 三 二 一 */
+</span><span class='line'>    };
+</span><span class='line'>
+</span><span class='line'>    public int[][] getChessPoints() {
+</span><span class='line'>        return chessPoints;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public int getChess(int row, int col) {
+</span><span class='line'>        return chessPoints[row][col];
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public boolean hasChess(int row, int col) {
+</span><span class='line'>        return chessPoints[row][col] != 0;
+</span><span class='line'>    }</span></code></pre></td></tr></table></div></figure>
+
+<p>接着，我们需要根据适配时图片缩放的比例计算各个棋子绘制时的偏移坐标（假设棋盘的偏移坐标是[0, 0]）。先看下图：</p>
+
+<p><img src="http://codemany.com/uploads/chess-piece-offset.png" title="chess-piece-offset" ></p>
+
+<p>通过观察可以知道，两个棋子左边框之间的距离等于棋盘格子的边长。如果把左上角棋子相对棋盘图片边界偏移的变量分为称为chessBaseLeft和chessBaseTop的话，那么它们的值可以通过以下的公式计算得到：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>tileSize = ChessBoard.RAW_TILE_SIZE * bestScale;    // 棋盘格子缩放后的大小
+</span><span class='line'>chessBaseLeft = (ChessBoard.RAW_IMAGE_WIDTH - ChessBoard.RAW_TILES_WIDTH
+</span><span class='line'>        - ChessBoard.RAW_CHESS_SIZE) / 2 * bestScale;
+</span><span class='line'>chessBaseTop = (ChessBoard.RAW_IMAGE_HEIGHT - ChessBoard.RAW_TILES_HEIGHT
+</span><span class='line'>        - ChessBoard.RAW_CHESS_SIZE) / 2 * bestScale;</span></code></pre></td></tr></table></div></figure>
+
+<p>得到棋子相对棋盘的偏移坐标后，我们就可以开始真正的绘制棋盘和棋子了。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>canvas.drawColor(Color.WHITE);
+</span><span class='line'>
+</span><span class='line'>// 绘制棋盘
+</span><span class='line'>canvas.drawBitmap(board, 0, 0, paint);
+</span><span class='line'>
+</span><span class='line'>// 根据points数组绘制棋子
+</span><span class='line'>for (int row = 0; row &lt; chessBoard.getChessPoints().length; row++) {
+</span><span class='line'>    for (int col = 0; col &lt; chessBoard.getChessPoints()[row].length; col++) {
+</span><span class='line'>        if (chessBoard.hasChess(row, col)) {
+</span><span class='line'>            float left = chessBaseLeft + col * tileSize;
+</span><span class='line'>            float top = chessBaseTop + row * tileSize;
+</span><span class='line'>            int index = chessBoard.getChess(row, col) - 1;
+</span><span class='line'>            canvas.drawBitmap(chesses[index], left, top, paint);
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>至此，象棋界面的绘制就算是完成了，接下来要处理的是与玩家的交互。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[象棋残局大师开发实录（1）]]></title>
@@ -4471,523 +4910,6 @@
 </span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
 
 <p>就像我们前面讨论过的<code>-&gt; skip</code>那样，<code>-&gt; channel(HIDDEN)</code>也是一个词法分析器指令。在这里，它设置那些记号的通道号码以便它们可以被语法分析器忽略。记号流仍然维护着原始的记号序列，但在传递记号给语法分析器时会略过隐藏通道中的记号。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[逻辑题-谁养鱼]]></title>
-    <link href="http://codemany.com/blog/logic-problems-who-owns-the-fish/"/>
-    <updated>2016-05-12T18:06:58+08:00</updated>
-    <id>http://codemany.com/blog/logic-problems-who-owns-the-fish</id>
-    <content type="html"><![CDATA[<ol>
-<li>在一条街上，有5座房子，喷了5种颜色。</li>
-<li>每座房子里住着不同国籍的人。</li>
-<li>每个人喝不同的饮料，抽不同品牌的香烟，养不同的宠物。</li>
-</ol>
-
-<p>问题是：谁养鱼？</p>
-
-<p>提示：</p>
-
-<ol>
-<li>英国人住红色房子。</li>
-<li>瑞典人养狗。</li>
-<li>丹麦人喝茶。</li>
-<li>绿色房子在白色房子左面。</li>
-<li>绿色房子主人喝咖啡。</li>
-<li>抽Pall Mall香烟的人养鸟。</li>
-<li>黄色房子主人抽Dunhill香烟。</li>
-<li>住在中间房子的人喝牛奶。</li>
-<li>挪威人住第一间房子。</li>
-<li>抽Blends香烟的人住在养猫的人隔壁。</li>
-<li>养马的人住抽Dunhill香烟的人隔壁。</li>
-<li>抽Blue Master的人喝啤酒。</li>
-<li>德国人抽Prince香烟。</li>
-<li>挪威人住蓝色房子隔壁。</li>
-<li>抽Blends香烟的人有一个喝水的邻居。</li>
-</ol>
-
-<p>在回答上述问题前先画一个6行5列的表格，从上到下的每一行分别代表房子的顺序（A表示左边第一间房子）、哪国人、房子颜色、饮料、香烟、宠物。下表是问题的初始状态：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">A</th>
-<th style="text-align: center">B</th>
-<th style="text-align: center">C</th>
-<th style="text-align: center">D</th>
-<th style="text-align: center">E</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-</tbody></table>
-
-<p>根据提示8、9和14可以得到：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">A</th>
-<th style="text-align: center">B</th>
-<th style="text-align: center">C</th>
-<th style="text-align: center">D</th>
-<th style="text-align: center">E</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">挪威人</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">蓝色</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">牛奶</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-</tbody></table>
-
-<p>由提示4和5可以判定房子D的颜色是绿色，房子主人喝咖啡，房子E的颜色是白色。如下表所示：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">A</th>
-<th style="text-align: center">B</th>
-<th style="text-align: center">C</th>
-<th style="text-align: center">D</th>
-<th style="text-align: center">E</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">挪威人</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">蓝色</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">绿色</td>
-<td style="text-align: center">白色</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">牛奶</td>
-<td style="text-align: center">咖啡</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-</tbody></table>
-
-<p>结合提示1、7和11可以知道房子C是红色的，住的是英国人，房子A是黄色的。挪威人抽Dunhill香烟。住房子B的人养马。如下表所示：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">A</th>
-<th style="text-align: center">B</th>
-<th style="text-align: center">C</th>
-<th style="text-align: center">D</th>
-<th style="text-align: center">E</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">挪威人</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">英国人</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">黄色</td>
-<td style="text-align: center">蓝色</td>
-<td style="text-align: center">红色</td>
-<td style="text-align: center">绿色</td>
-<td style="text-align: center">白色</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">牛奶</td>
-<td style="text-align: center">咖啡</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">Dunhill</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">马</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-</tbody></table>
-
-<p>依据上表可知，挪威人喝的饮料是水、茶或者啤酒。结合提示3和12可以断定挪威人喝的是水。如下表所示：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">A</th>
-<th style="text-align: center">B</th>
-<th style="text-align: center">C</th>
-<th style="text-align: center">D</th>
-<th style="text-align: center">E</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">挪威人</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">英国人</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">黄色</td>
-<td style="text-align: center">蓝色</td>
-<td style="text-align: center">红色</td>
-<td style="text-align: center">绿色</td>
-<td style="text-align: center">白色</td>
-</tr>
-<tr>
-<td style="text-align: center">水</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">牛奶</td>
-<td style="text-align: center">咖啡</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">Dunhill</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">马</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-</tbody></table>
-
-<p>通过提示15可以得出住房子B的人抽Blends香烟。如下表所示：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">A</th>
-<th style="text-align: center">B</th>
-<th style="text-align: center">C</th>
-<th style="text-align: center">D</th>
-<th style="text-align: center">E</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">挪威人</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">英国人</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">黄色</td>
-<td style="text-align: center">蓝色</td>
-<td style="text-align: center">红色</td>
-<td style="text-align: center">绿色</td>
-<td style="text-align: center">白色</td>
-</tr>
-<tr>
-<td style="text-align: center">水</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">牛奶</td>
-<td style="text-align: center">咖啡</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">Dunhill</td>
-<td style="text-align: center">Blends</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">马</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-</tbody></table>
-
-<p>结合提示12可以推断住房子E的人抽Blue Master香烟、喝啤酒。住房子B的人喝茶。如下表所示：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">A</th>
-<th style="text-align: center">B</th>
-<th style="text-align: center">C</th>
-<th style="text-align: center">D</th>
-<th style="text-align: center">E</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">挪威人</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">英国人</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">黄色</td>
-<td style="text-align: center">蓝色</td>
-<td style="text-align: center">红色</td>
-<td style="text-align: center">绿色</td>
-<td style="text-align: center">白色</td>
-</tr>
-<tr>
-<td style="text-align: center">水</td>
-<td style="text-align: center">茶</td>
-<td style="text-align: center">牛奶</td>
-<td style="text-align: center">咖啡</td>
-<td style="text-align: center">啤酒</td>
-</tr>
-<tr>
-<td style="text-align: center">Dunhill</td>
-<td style="text-align: center">Blends</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">Blue Master</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">马</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-</tbody></table>
-
-<p>由提示3、13得到房子B住的是丹麦人。房子D住的是德国人，抽Prince香烟。如下表所示：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">A</th>
-<th style="text-align: center">B</th>
-<th style="text-align: center">C</th>
-<th style="text-align: center">D</th>
-<th style="text-align: center">E</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">挪威人</td>
-<td style="text-align: center">丹麦人</td>
-<td style="text-align: center">英国人</td>
-<td style="text-align: center">德国人</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">黄色</td>
-<td style="text-align: center">蓝色</td>
-<td style="text-align: center">红色</td>
-<td style="text-align: center">绿色</td>
-<td style="text-align: center">白色</td>
-</tr>
-<tr>
-<td style="text-align: center">水</td>
-<td style="text-align: center">茶</td>
-<td style="text-align: center">牛奶</td>
-<td style="text-align: center">咖啡</td>
-<td style="text-align: center">啤酒</td>
-</tr>
-<tr>
-<td style="text-align: center">Dunhill</td>
-<td style="text-align: center">Blends</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">Prince</td>
-<td style="text-align: center">Blue Master</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">马</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-</tbody></table>
-
-<p>再由提示6和10确定住房子C的人抽Pall Mall香烟、养鸟。挪威人养猫。如下表所示：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">A</th>
-<th style="text-align: center">B</th>
-<th style="text-align: center">C</th>
-<th style="text-align: center">D</th>
-<th style="text-align: center">E</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">挪威人</td>
-<td style="text-align: center">丹麦人</td>
-<td style="text-align: center">英国人</td>
-<td style="text-align: center">德国人</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">黄色</td>
-<td style="text-align: center">蓝色</td>
-<td style="text-align: center">红色</td>
-<td style="text-align: center">绿色</td>
-<td style="text-align: center">白色</td>
-</tr>
-<tr>
-<td style="text-align: center">水</td>
-<td style="text-align: center">茶</td>
-<td style="text-align: center">牛奶</td>
-<td style="text-align: center">咖啡</td>
-<td style="text-align: center">啤酒</td>
-</tr>
-<tr>
-<td style="text-align: center">Dunhill</td>
-<td style="text-align: center">Blends</td>
-<td style="text-align: center">Pall Mall</td>
-<td style="text-align: center">Prince</td>
-<td style="text-align: center">Blue Master</td>
-</tr>
-<tr>
-<td style="text-align: center">猫</td>
-<td style="text-align: center">马</td>
-<td style="text-align: center">鸟</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-</tbody></table>
-
-<p>最后结合提示2推断得到房子E住的是瑞典人，养狗。如下表所示：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">A</th>
-<th style="text-align: center">B</th>
-<th style="text-align: center">C</th>
-<th style="text-align: center">D</th>
-<th style="text-align: center">E</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">挪威人</td>
-<td style="text-align: center">丹麦人</td>
-<td style="text-align: center">英国人</td>
-<td style="text-align: center">德国人</td>
-<td style="text-align: center">瑞典人</td>
-</tr>
-<tr>
-<td style="text-align: center">黄色</td>
-<td style="text-align: center">蓝色</td>
-<td style="text-align: center">红色</td>
-<td style="text-align: center">绿色</td>
-<td style="text-align: center">白色</td>
-</tr>
-<tr>
-<td style="text-align: center">水</td>
-<td style="text-align: center">茶</td>
-<td style="text-align: center">牛奶</td>
-<td style="text-align: center">咖啡</td>
-<td style="text-align: center">啤酒</td>
-</tr>
-<tr>
-<td style="text-align: center">Dunhill</td>
-<td style="text-align: center">Blends</td>
-<td style="text-align: center">Pall Mall</td>
-<td style="text-align: center">Prince</td>
-<td style="text-align: center">Blue Master</td>
-</tr>
-<tr>
-<td style="text-align: center">猫</td>
-<td style="text-align: center">马</td>
-<td style="text-align: center">鸟</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">狗</td>
-</tr>
-</tbody></table>
-
-<p>现在，结果已经出来了：德国人养鱼。</p>
 ]]></content>
   </entry>
   

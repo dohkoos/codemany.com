@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Chess | 乐者为王]]></title>
   <link href="http://codemany.com/tags/chess/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-01-17T20:18:22+08:00</updated>
+  <updated>2017-01-17T20:26:19+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,242 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[象棋残局大师开发实录（2）]]></title>
+    <link href="http://codemany.com/blog/chess-mess-master-development-record-part2/"/>
+    <updated>2017-01-17T18:21:40+08:00</updated>
+    <id>http://codemany.com/blog/chess-mess-master-development-record-part2</id>
+    <content type="html"><![CDATA[<p>界面的实现主要是绘制棋盘和棋子，有纯代码绘制和使用图片两种方式。因为担心图片缩放引起图片质量问题，以及害怕根据缩放计算棋子落点的麻烦，打算采取纯代码绘制方式。不过在编写了部分代码后发觉这不是个好主意。</p>
+
+<p>纯代码绘制棋盘需要画纵横线、斜线、炮兵座线、文字“楚河汉界”以及中文数字两套坐标，部分线条需要加粗，河界区的竖线不需要画，文字绘制时是以baseline为Y坐标的。这些因素导致文字和棋子在视图中的坐标位置都需要经过细细地计算。如果再考虑让“楚河汉界”这几个字躺着显示，那就更是麻烦。即便这样，绘制完的棋盘背景也只是白色，素素的不是很好看。就这还是没有考虑绘制棋子的结果。当然，好处也是有的，棋子所在的交点坐标很容易计算得到（这个其实不算优点，只是我没深入思考的结果，图片的方式也很容易计算棋子的落点坐标），棋盘也不需要考虑缩放问题，总是适配当前运行的机器的。</p>
+
+<p>既然纯代码绘制的方式问题多多且只有无需屏幕适配这个优势，那采用图片的方式就是必然。</p>
+
+<p>图片方式的实现也有两种，一种是使用View或者SurfaceView显示图片；还有一种是把棋盘和棋子当作ImageView控件处理。使用Layout.addView(View)和Layout.deleteView(View)就可以很容易地放置和消除棋子。经过简单的比较我选用SurfaceView作为绘制的视图。SurfaceView的内容这里不做介绍，因为这不是我们要考虑的重点。以下是SurfaceView的代码骨架：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public class GameView extends SurfaceView implements SurfaceHolder.Callback {
+    private DrawThread drawThread;
+    private SurfaceHolder surfaceHolder;
+
+    public GameView(Context context, AttributeSet attrs) {
+        super(context, attrs);
+
+        surfaceHolder = getHolder();
+        surfaceHolder.addCallback(this);
+
+        // TODO: 加载棋盘棋子图片资源
+    }
+
+    // 自定义的绘制方法
+    private void doDraw(Canvas canvas) {
+        // TODO: 绘制棋盘和棋子
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            // TODO: 游戏交互
+        }
+        return super.onTouchEvent(event);
+    }
+
+    @Override
+    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+    }
+
+    @Override
+    public void surfaceCreated(SurfaceHolder holder) {
+        if (drawThread == null) {
+            drawThread = new DrawThread();
+            drawThread.start();
+        }
+    }
+
+    @Override
+    public void surfaceDestroyed(SurfaceHolder holder) {
+        if (drawThread != null) {
+            drawThread.stopThread();
+        }
+    }
+
+    private class DrawThread extends Thread {
+        private boolean isRunning = false;
+
+        public DrawThread() {
+            isRunning = true;
+        }
+
+        public void stopThread() {
+            isRunning = false;
+            boolean retry = true;
+            while (retry) {
+                try {
+                    this.join();    // 保证run方法执行完毕
+                    retry = false;
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        @Override
+        public void run() {
+            while (isRunning) {
+                Canvas canvas = null;
+                try {
+                    canvas = surfaceHolder.lockCanvas();
+                    synchronized (surfaceHolder) {
+                        if (canvas != null) {
+                            doDraw(canvas);
+                        }
+                    }
+                } finally {
+                    if (canvas != null) {
+                        surfaceHolder.unlockCanvasAndPost(canvas);
+                    }
+                }
+            }
+        }
+    }
+}
+</code></pre></div>
+<p>用图片在视图上绘制棋盘需要考虑不同屏幕尺寸的适配问题，官方推荐的做法是单图片多分辨率，即将不同分辨率的同个图片放在特定的资源目录下。这种做法的缺点是需要维护多套图片，且绘制的棋盘也不可能正好完全匹配屏幕。使用单分辨率图片的话，如果图片尺寸过小，那么在绘制时就必须放大，容易变得模糊；如果图片尺寸太大的话，又会导致资源太大进而引起应用安装包过大的问题。这里使用的是558 * 620像素的图片，既不是太大，又不是太小，恰到好处。其中，棋盘格子是57 * 57像素的正方形，河界的高度和棋盘格子的边长相等，所以两条边线的距离是57 * 8 = 456像素，底线距离是57 * 9 = 513像素。</p>
+
+<p><img src="/uploads/marked-chess-board.png" title="marked-chess-board" ></p>
+
+<p>棋子图片的原始大小是55 * 55像素。连同上面棋盘的那些值可以设置成以下的常量供以后使用：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public class ChessBoard {
+    public static final int RAW_IMAGE_WIDTH = 558;
+    public static final int RAW_IMAGE_HEIGHT = 620;
+    public static final int RAW_TILES_WIDTH = 456;
+    public static final int RAW_TILES_HEIGHT = 513;
+    public static final int RAW_TILE_SIZE = 57;
+    public static final int RAW_CHESS_SIZE = 55;
+
+</code></pre></div>
+<p>因为使用的是单张图片，所以在绘制之前还需要知道屏幕的大小，以便在绘制时对图片做等比例的缩放，使图片在填满屏幕的前提下，最大程度地保证图片的缩放效果，确保图片不变形。缩放代码如下：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">// 计算屏幕的最佳缩放比例
+private float calcBestScale() {
+    DisplayMetrics dm = getResources().getDisplayMetrics();
+    int screenWidth  = dm.widthPixels;
+    int screenHeight = dm.heightPixels;
+
+    float scaleX = (float)screenWidth / RAW_IMAGE_WIDTH;
+    float scaleY = (float)screenHeight / RAW_IMAGE_HEIGHT;
+    return Math.min(scaleX, scaleY);
+}
+
+private Bitmap resizeBitmap(Bitmap bitmap, float bestScale) {
+    Matrix matrix = new Matrix();
+    matrix.postScale(bestScale, bestScale);
+    return Bitmap.createBitmap(bitmap, 0, 0,
+            bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+}
+</code></pre></div>
+<p>在保证能得到最佳效果的缩放图片后，就可以加载棋盘和棋子的图片资源了。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">private void initResources() {
+    board = resizeBitmap(BitmapFactory.decodeStream(
+            getResources().openRawResource(+R.drawable.board)), bestScale);
+
+    chesses[0] = resizeBitmap(BitmapFactory.decodeStream(
+            getResources().openRawResource(+R.drawable.black_jiang)), bestScale);
+    chesses[1] = resizeBitmap(BitmapFactory.decodeStream(
+            getResources().openRawResource(+R.drawable.black_shi)), bestScale);
+    chesses[2] = resizeBitmap(BitmapFactory.decodeStream(
+            getResources().openRawResource(+R.drawable.black_xiang)), bestScale);
+    chesses[3] = resizeBitmap(BitmapFactory.decodeStream(
+            getResources().openRawResource(+R.drawable.black_ma)), bestScale);
+    chesses[4] = resizeBitmap(BitmapFactory.decodeStream(
+            getResources().openRawResource(+R.drawable.black_ju)), bestScale);
+    chesses[5] = resizeBitmap(BitmapFactory.decodeStream(
+            getResources().openRawResource(+R.drawable.black_pao)), bestScale);
+    chesses[6] = resizeBitmap(BitmapFactory.decodeStream(
+            getResources().openRawResource(+R.drawable.black_zu)), bestScale);
+    chesses[7] = resizeBitmap(BitmapFactory.decodeStream(
+            getResources().openRawResource(+R.drawable.red_shuai)), bestScale);
+    chesses[8] = resizeBitmap(BitmapFactory.decodeStream(
+            getResources().openRawResource(+R.drawable.red_shi)), bestScale);
+    chesses[9] = resizeBitmap(BitmapFactory.decodeStream(
+            getResources().openRawResource(+R.drawable.red_xiang)), bestScale);
+    chesses[10] = resizeBitmap(BitmapFactory.decodeStream(
+            getResources().openRawResource(+R.drawable.red_ma)), bestScale);
+    chesses[11] = resizeBitmap(BitmapFactory.decodeStream(
+            getResources().openRawResource(+R.drawable.red_ju)), bestScale);
+    chesses[12] = resizeBitmap(BitmapFactory.decodeStream(
+            getResources().openRawResource(+R.drawable.red_pao)), bestScale);
+    chesses[13] = resizeBitmap(BitmapFactory.decodeStream(
+            getResources().openRawResource(+R.drawable.red_bing)), bestScale);
+}
+</code></pre></div>
+<p>注意，加载图片资源要用openRawResource()配合decodeStream()才能得到原始大小的图片，如果使用decodeResource()的话，得到的图片大小则是<code>原始大小 * 手机密度 / 160</code>。至于R前面的+号则是因为图片在drawable目录下时Android Studio会提示警告，不想加的话就必须要把图片放到raw目录中。</p>
+
+<p>有了棋盘和棋子的图片资源后，我们就可以绘制象棋界面了。当然，在这之前还要先确定表示棋局状态的数据结构，我们用一个10行9列的二维数组来描述。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public class ChessBoard {
+    /*
+     * 无子(0)
+     * 黑将(1) 黑士(2) 黑象(3)  黑马(4)  黑车(5)  黑砲(6)  黑卒(7)
+     * 红帅(8) 红仕(9) 红相(10) 红馬(11) 红車(12) 红炮(13) 红兵(14)
+     */
+    private int[][] chessPoints = {
+        /*   1 2 3 4 5 6 7 8 9   */
+        {5, 4, 3, 2, 1, 2, 3, 4, 5},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 6, 0, 0, 0, 0, 0, 6, 0},
+        {7, 0, 7, 0, 7, 0, 7, 0, 7},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0},
+        /*       楚河 汉界       */
+        {0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {14, 0, 14, 0, 14, 0, 14, 0, 14},
+        {0, 13, 0, 0, 0, 0, 0, 13, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {12, 11, 10, 9, 8, 9, 10, 11, 12}
+        /* 九 八 七 六 五 四 三 二 一 */
+    };
+
+    public int[][] getChessPoints() {
+        return chessPoints;
+    }
+
+    public int getChess(int row, int col) {
+        return chessPoints[row][col];
+    }
+
+    public boolean hasChess(int row, int col) {
+        return chessPoints[row][col] != 0;
+    }
+</code></pre></div>
+<p>接着，我们需要根据适配时图片缩放的比例计算各个棋子绘制时的偏移坐标（假设棋盘的偏移坐标是[0, 0]）。先看下图：</p>
+
+<p><img src="/uploads/chess-piece-offset.png" title="chess-piece-offset" ></p>
+
+<p>通过观察可以知道，两个棋子左边框之间的距离等于棋盘格子的边长。如果把左上角棋子相对棋盘图片边界偏移的变量分为称为chessBaseLeft和chessBaseTop的话，那么它们的值可以通过以下的公式计算得到：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">tileSize = ChessBoard.RAW_TILE_SIZE * bestScale;    // 棋盘格子缩放后的大小
+chessBaseLeft = (ChessBoard.RAW_IMAGE_WIDTH - ChessBoard.RAW_TILES_WIDTH
+        - ChessBoard.RAW_CHESS_SIZE) / 2 * bestScale;
+chessBaseTop = (ChessBoard.RAW_IMAGE_HEIGHT - ChessBoard.RAW_TILES_HEIGHT
+        - ChessBoard.RAW_CHESS_SIZE) / 2 * bestScale;
+</code></pre></div>
+<p>得到棋子相对棋盘的偏移坐标后，我们就可以开始真正的绘制棋盘和棋子了。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">canvas.drawColor(Color.WHITE);
+
+// 绘制棋盘
+canvas.drawBitmap(board, 0, 0, paint);
+
+// 根据points数组绘制棋子
+for (int row = 0; row &lt; chessBoard.getChessPoints().length; row++) {
+    for (int col = 0; col &lt; chessBoard.getChessPoints()[row].length; col++) {
+        if (chessBoard.hasChess(row, col)) {
+            float left = chessBaseLeft + col * tileSize;
+            float top = chessBaseTop + row * tileSize;
+            int index = chessBoard.getChess(row, col) - 1;
+            canvas.drawBitmap(chesses[index], left, top, paint);
+        }
+    }
+}
+</code></pre></div>
+<p>至此，象棋界面的绘制就算是完成了，接下来要处理的是与玩家的交互。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[象棋残局大师开发实录（1）]]></title>
