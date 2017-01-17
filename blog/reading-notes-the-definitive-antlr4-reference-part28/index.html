@@ -212,6 +212,29 @@
 <p><img src="/uploads/cymbol-scope-tree.png" title="cymbol-scope-tree" ></p>
 
 <p>沿着从任何作用域到根（全局作用域）的路径的所有节点形成一堆作用域。为了找到一个符号的定义，我们从围绕着引用的作用域开始，并沿着作用域树向上遍历，直到找到它的定义。</p>
+
+<h3 id="验证器架构">验证器架构</h3>
+
+<p>开始构建验证器前，先让我们思考下大方向和总体策略。我们可以根据关键操作——定义和解决——把问题分解。对于定义，我们需要侦听变量和函数定义事件，然后把符号对象插入围绕着定义的作用域。在函数定义的开始处，我们需要压栈一个新的作用域，然后在函数定义的结尾处把它出栈。</p>
+
+<p>为解决和检查符号引用，我们需要侦听在表达式中的变量和函数名字引用。针对每个引用，我们将验证是否有匹配的定义，以及引用是否正确使用符号。</p>
+
+<p>这似乎很直截了当，但有个并发症：在源码文件中，Cymbol程序可以调用在它之后定义的一个函数。我们称它为前向引用。为支持这个特性，我们需要在语法分析树上执行两次遍历。第一遍，或者阶段，定义包含函数的符号，然后第二遍进行解决。用这种方法，第二遍可以看到文件中的所有函数。以下是用于触发在语法分析树上两次遍历的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ParseTreeWalker walker = new ParseTreeWalker();
+</span><span class='line'>DefPhase def = new DefPhase();
+</span><span class='line'>walker.walk(def, tree);
+</span><span class='line'>// create next phase and feed symbol table info from def to ref phase
+</span><span class='line'>RefPhase ref = new RefPhase(def.globals, def.scopes);
+</span><span class='line'>walker.walk(ref, tree);</span></code></pre></td></tr></table></div></figure>
+
+<p>在定义阶段，我们将创建许多作用域。除非我们保持对它们的引用，否则垃圾收集器会回收它们。为了符号表能够度过从定义到解决阶段的转变，我们需要追踪这些作用域。储存它们最合乎逻辑的地方是在语法分析树本身（或者，从技术上讲，使用关联值与树节点的注解映射）。然后引用阶段就可以在它下行语法分析树时很简单地获得当前作用域的指针。与函数和本地块关联的树节点将可以获得它们的作用域的指针。</p>
 </div>
 
 
