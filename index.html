@@ -819,6 +819,122 @@
 </span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
 <p>本地作用域以类似的方式工作。我们在监听器方法enterBlock()中压栈一个作用域，然后在exitBlock()中出栈它。</p>
+
+<p>在处理好作用域和函数定义后，我们就可以开始定义参数和变量。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitFormalParameter(CymbolParser.FormalParameterContext ctx) {
+</span><span class='line'>    defineVar(ctx.type(), ctx.ID().getSymbol());
+</span><span class='line'>}
+</span><span class='line'>public void exitVarDecl(CymbolParser.VarDeclContext ctx) {
+</span><span class='line'>    defineVar(ctx.type(), ctx.ID().getSymbol());
+</span><span class='line'>}
+</span><span class='line'>void defineVar(CymbolParser.TypeContext typeCtx, Token nameToken) {
+</span><span class='line'>    int typeTokenType = typeCtx.start.getType();
+</span><span class='line'>    Symbol.Type type = CheckSymbols.getType(typeTokenType);
+</span><span class='line'>    VariableSymbol var = new VariableSymbol(nameToken.getText(), type);
+</span><span class='line'>    currentScope.define(var); // Define symbol in current scope
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>到此，定义阶段已经完成。</p>
+
+<p>为构建引用阶段，让我们将当前作用域设置为从定义阶段传递过来的全局作用域。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public RefPhase(GlobalScope globals, ParseTreeProperty&lt;Scope&gt; scopes) {
+</span><span class='line'>    this.scopes = scopes;
+</span><span class='line'>    this.globals = globals;
+</span><span class='line'>}
+</span><span class='line'>public void enterFile(CymbolParser.FileContext ctx) {
+</span><span class='line'>    currentScope = globals;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>然后，就像树遍历器触发Cymbol函数和块的进入与退出事件那样，监听器方法通过访问在定义阶段期间存储在树中的值来及时更新currentScope。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void enterFunctionDecl(CymbolParser.FunctionDeclContext ctx) {
+</span><span class='line'>    currentScope = scopes.get(ctx);
+</span><span class='line'>}
+</span><span class='line'>public void exitFunctionDecl(CymbolParser.FunctionDeclContext ctx) {
+</span><span class='line'>    currentScope = currentScope.getEnclosingScope();
+</span><span class='line'>}
+</span><span class='line'>public void enterBlock(CymbolParser.BlockContext ctx) {
+</span><span class='line'>    currentScope = scopes.get(ctx);
+</span><span class='line'>}
+</span><span class='line'>public void exitBlock(CymbolParser.BlockContext ctx) {
+</span><span class='line'>    currentScope = currentScope.getEnclosingScope();
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>随着遍历器的行进恰当地设置作用域，我们可以通过实现变量引用和函数调用的监听器方法解决符号。当遍历器遇到一个变量引用时，它调用exitVar()，该方法使用resolve()试图在当前作用域的符号表中查找变量名。如果resolve()在当前作用域中没有找到符号，它会查找封闭作用域链。如果必要，resolve()将寻找所有方式直到全局作用域。如果找不到一个合适的定义，它会返回null值。如果resolve()找到的符号是一个函数而不是变量，就需要生成一个错误消息。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitVar(CymbolParser.VarContext ctx) {
+</span><span class='line'>    String name = ctx.ID().getSymbol().getText();
+</span><span class='line'>    Symbol var = currentScope.resolve(name);
+</span><span class='line'>    if ( var==null ) {
+</span><span class='line'>        CheckSymbols.error(ctx.ID().getSymbol(), "no such variable: "+name);
+</span><span class='line'>    }
+</span><span class='line'>    if ( var instanceof FunctionSymbol ) {
+</span><span class='line'>        CheckSymbols.error(ctx.ID().getSymbol(), name+" is not a variable");
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>处理函数调用基本上是相同的，如果不能找到一个定义或找到了一个变量，都需要发出一个错误。</p>
+
+<p>最后，是用来显示早先需要的输出的构建和测试序列：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr Cymbol.g
+</span><span class='line'>compile *.java
+</span><span class='line'>run CheckSymbols vars.cymbol</span></code></pre></td></tr></table></div></figure>
+
+<p>输出结果如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>locals:[]
+</span><span class='line'>function&lt;f:tINT&gt;:[&lt;x:tINT&gt;, &lt;y:tFLOAT&gt;]
+</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
 </div>
   
   
