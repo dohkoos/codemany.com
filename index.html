@@ -746,6 +746,79 @@
 </span><span class='line'>walker.walk(ref, tree);</span></code></pre></td></tr></table></div></figure>
 
 <p>在定义阶段，我们将创建许多作用域。除非我们保持对它们的引用，否则垃圾收集器会回收它们。为了符号表能够度过从定义到解决阶段的转变，我们需要追踪这些作用域。储存它们最合乎逻辑的地方是在语法分析树本身（或者，从技术上讲，使用关联值与树节点的注解映射）。然后引用阶段就可以在它下行语法分析树时很简单地获得当前作用域的指针。与函数和本地块关联的树节点将可以获得它们的作用域的指针。</p>
+
+<h3 id="定义和解决符号">定义和解决符号</h3>
+
+<p>考虑到我们的基本策略，让我们从DefPhase开始构建我们的验证器。这个阶段类需要3个字段：一个全局作用域的引用、一个用于追踪我们创建的作用域的语法分析树注解器，以及一个当前作用域的指针。enterFile()的监听器代码在活动开始时创建全局变量。当活动结束时，exitFile()负责打印结果。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class DefPhase extends CymbolBaseListener {
+</span><span class='line'>    ParseTreeProperty&lt;Scope&gt; scopes = new ParseTreeProperty&lt;Scope&gt;();
+</span><span class='line'>    GlobalScope globals;
+</span><span class='line'>    Scope currentScope;    // define symbols in this scope
+</span><span class='line'>    public void enterFile(CymbolParser.FileContext ctx) {
+</span><span class='line'>        globals = new GlobalScope(null);
+</span><span class='line'>        currentScope = globals;
+</span><span class='line'>    }
+</span><span class='line'>    public void exitFile(CymbolParser.FileContext ctx) {
+</span><span class='line'>        System.out.println(globals);
+</span><span class='line'>    }</span></code></pre></td></tr></table></div></figure>
+
+<p>当语法分析器找到函数声明时，应用需要创建一个FunctionSymbol对象。作为一个符号和作为一个包含参数的作用域，FunctionSymbol对象负有双重责任。为把函数作用域嵌套在全局作用域内，我们需要把函数作用域压栈。我们通过设置函数的封闭作用域为当前作用域并重置当前作用域来做到这点。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void enterFunctionDecl(CymbolParser.FunctionDeclContext ctx) {
+</span><span class='line'>    String name = ctx.ID().getText();
+</span><span class='line'>    int typeTokenType = ctx.type().start.getType();
+</span><span class='line'>    Symbol.Type type = CheckSymbols.getType(typeTokenType);
+</span><span class='line'>
+</span><span class='line'>    // push new scope by making new one that points to enclosing scope
+</span><span class='line'>    FunctionSymbol function = new FunctionSymbol(name, type, currentScope);
+</span><span class='line'>    currentScope.define(function);    // Define function in current scope
+</span><span class='line'>    saveScope(ctx, function);         // Push: set function's parent to current
+</span><span class='line'>    currentScope = function;          // Current scope is now function scope
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>void saveScope(ParserRuleContext ctx, Scope s) {
+</span><span class='line'>    scopes.put(ctx, s);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>方法saveScope()使用函数作用域注解functionDecl规则节点，以便在随后的引用阶段可以获得它。当我们离开函数时就出栈函数作用域，因此当前作用域仍然是全局作用域。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitFunctionDecl(CymbolParser.FunctionDeclContext ctx) {
+</span><span class='line'>    System.out.println(currentScope);
+</span><span class='line'>    currentScope = currentScope.getEnclosingScope();    // pop scope
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>本地作用域以类似的方式工作。我们在监听器方法enterBlock()中压栈一个作用域，然后在exitBlock()中出栈它。</p>
 </div>
   
   
