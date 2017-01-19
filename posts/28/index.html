@@ -9,14 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="把webwork-2.1.7.jar、spring-1.2.1.jar以及webwork2-srping.jar复制到WEB-INF/lib目录下。 添加以下内容到web.xml文件中： 1
-2
-3
-4
-5
-6
-7
-&lt;listener&gt; &lt;listener-class&gt; &hellip;">
+  <meta name="description" content="计算机的主板通常装有8253/8254定时与计数器芯片和8255可编程并行接口芯片，由它们组成的硬件电路可用来产生扬声器的声音。目前的计算机由于采用了超大规模集成电路，因而看不到这些芯片，它们均集成在外围电路芯片中。以下是扬声器的电路图： 使用程序对这些电路编程可以控制声音的长短和音调的高低。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -80,6 +73,136 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/speaker-sound-program-in-c-language/">C语言的扬声器发声程序</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2005-10-05T09:55:46+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>5</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>9:55 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>计算机的主板通常装有8253/8254定时与计数器芯片和8255可编程并行接口芯片，由它们组成的硬件电路可用来产生扬声器的声音。目前的计算机由于采用了超大规模集成电路，因而看不到这些芯片，它们均集成在外围电路芯片中。以下是扬声器的电路图：</p>
+
+<p><img src="/uploads/speaker-sound.png" title="speaker-sound" ></p>
+
+<p>使用程序对这些电路编程可以控制声音的长短和音调的高低。在扬声器电路中，定时器的频率决定了扬声器发音的频率，所以可通过设定定时器电路的频率来使扬声器发出不同的声音。对定时器电路进行频率设定时，首先对其命令寄存器端口地址0x43写命令来选择定时器的通道，接着向计数寄存器端口地址0x42发送频率计数值，先送低8位，后送高8位。通过这两步使定时器电路产生一系列的方波信号，此信号能否推动扬声器发音，还要看由8255产生的送数信号和门控信号是否为1，而它们也是可以编程的，端口地址为0x61。以下是完整的实现代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>#include &lt;dos.h&gt;
+</span><span class='line'>#include &lt;conio.h&gt;
+</span><span class='line'>
+</span><span class='line'>#define FREQ 1193180.0
+</span><span class='line'>
+</span><span class='line'>unsigned long getticks()
+</span><span class='line'>{
+</span><span class='line'>    union REGS regs;
+</span><span class='line'>
+</span><span class='line'>    regs.h.ah = 0x00;
+</span><span class='line'>    int86(0x1a, &regs, &regs);
+</span><span class='line'>    return ((unsigned long)regs.x.cx &lt;&lt; 16) + regs.x.dx;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>void beep(int tone)
+</span><span class='line'>{
+</span><span class='line'>    unsigned long ticks;
+</span><span class='line'>    unsigned char bits;
+</span><span class='line'>    unsigned short count;
+</span><span class='line'>
+</span><span class='line'>    count = FREQ / tone;
+</span><span class='line'>    outportb(0x43, 0xb6);    /* 选择定时器的某个通道 */
+</span><span class='line'>    outportb(0x42, (unsigned char)(count & 0xff));    /* 发声频率计数值的低8位 */
+</span><span class='line'>    outportb(0x42, (unsigned char)(count &gt;&gt; 8));    /* 发声频率计数值的高8位 */
+</span><span class='line'>
+</span><span class='line'>    ticks = getticks();
+</span><span class='line'>    while (ticks == getticks())
+</span><span class='line'>        ;
+</span><span class='line'>
+</span><span class='line'>    /*
+</span><span class='line'>     * 当8255的PB端口的第0位和第1位为1时，表示允许发声；
+</span><span class='line'>     * 为0时，表示禁止发声。
+</span><span class='line'>     */
+</span><span class='line'>    bits = inportb(0x61);
+</span><span class='line'>    outportb(0x61, bits | 3);    /* 允许发声 */
+</span><span class='line'>    ticks += 2;
+</span><span class='line'>    while (getticks() &lt; ticks)
+</span><span class='line'>        ;
+</span><span class='line'>    outportb(0x61, bits & 0xfc);    /* 禁止发声 */
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>void main()
+</span><span class='line'>{
+</span><span class='line'>    do
+</span><span class='line'>    {
+</span><span class='line'>        beep(1046.50);
+</span><span class='line'>    } while (!kbhit());
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1168,65 +1291,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/anemic-domain-model/">贫血领域模型</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-05-12T08:33:42+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>8:33 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="http://martinfowler.com/bliki/AnemicDomainModel.html">http://martinfowler.com/bliki/AnemicDomainModel.html</a></p>
-
-<p>贫血领域模型是那些已近存在了相当长时间的反模式中的一份子，然而目前似乎有一个特定的高潮。我和Eric Evans聊过这个，并且我们都注意到它们似乎越来越流行。作为真正的<a href="http://martinfowler.com/eaaCatalog/domainModel.html">领域模型</a>支持者，这不是一件好事。</p>
-
-<p>贫血领域模型的基本症状是乍一看它就像真的领域模型一样。这些对象大多以领域空间中的名词命名，并且它们被真正的领域模型拥有的丰富的关系和结构连接。当你观察行为时问题来了，你意识到这些对象几乎没有任何行为，仅仅只是封装了getter和setter方法。这些模型的设计规则往往说不要把任何领域逻辑放到领域对象里。取而代之的是一组服务对象捕获了所有的领域逻辑。这些在领域对象上层的服务把领域对象当数据使用。</p>
-
-<p>这种反模式最根本的恐怖在于它和面向对象设计的基本理念完全相反，它只是把数据和处理结合在一起。贫血领域模型其实只是一种过程式风格的设计，正是那种像我（和Eric）自Smalltalk早期以来一直在与之作斗争的顽固者。更糟糕的是，许多人认为贫血对象是真正的对象，因此完全没有抓住面向对象设计是怎么回事的要领。</p>
-
-<p>现在面向对象的纯粹主义当然很好，但我意识到我需要更多的基本论据来反对这种贫血症。本质上贫血领域模型的问题是它们承担了领域模型所有的成本，没有产生任何的好处。主要成本是映射到数据库的笨拙，它通常会导致一整层的O/R映射。在而且只有在你使用强大的面向对象技术去组织复杂的逻辑时这才值得。通过把所有的行为拉取到服务中，不管用什么方法，基本上你最后得到的都是<a href="http://martinfowler.com/eaaCatalog/transactionScript.html">事务脚本</a>，从而失去领域模型能带来的优势。正如我在<a href="http://martinfowler.com/books/eaa.html">《企业应用架构模式》</a>中讨论过的，领域模型并不总是最好的工具。</p>
-
-<p>值得强调的是，把行为放进领域对象不应违背利用分层将领域逻辑从诸如持久和表现责任中分离的坚实方法。在领域对象中的逻辑应该是领域逻辑——验证、计算、业务规则——无论你喜欢叫它什么。（某些情况下，你会产生把数据源和表现逻辑放到领域对象里的争论，但它和我对贫血症的看法无关。）</p>
-
-<p>这一切混乱的来源是许多OO专家强烈推荐在领域模型顶部放一层过程式服务，来形成一个<a href="http://martinfowler.com/eaaCatalog/serviceLayer.html">服务层</a>。但这不是让领域模型完全没有行为的一个论据，其实服务层主张服务层要和行为丰富的领域模型一起使用。</p>
-
-<p>Eric Evans的精彩书籍<a href="http://domaindrivendesign.org/books/">《领域驱动设计》</a>有如下的文字谈及这些层：</p>
-
-<blockquote>
-<p>应用层【他对服务层的命名】：定义软件可以完成的工作，并且指挥具有丰富含义的领域对象来解决问题。这个层所负责的任务对业务影响深远，对跟其它系统的应用层进行交互非常必要。这个层要保持简练。它不包括处理业务规则或知识，只是给下一层中相互协作的领域对象协调任务、委托工作。在这个层次中不反映业务情况的状态，但反映用户或程序的任务进度的状态。</p>
-
-<p>领域层（或者模型层）：负责表示业务概念、业务状况的信息以及业务规则。并且保持这些内容的技术细节由基础结构层来完成，反映业务状况的状态在该层中被控制和使用。这一层是业务软件的核心。</p>
-</blockquote>
-
-<p>这里的关键点是服务层是瘦的——所有的关键逻辑存在于领域层。他在服务模式中重申了这个观点：</p>
-
-<blockquote>
-<p>现在，最常犯的错误就是太轻易地放弃把这种行为配置到合适的对象上，逐渐地滑向过程式编程。</p>
-</blockquote>
-
-<p>我不知道为什么这个反模式如此常见。我猜想它是因为大多数人还没有真正地和正确的领域模型工作过，特别是如果他们有数据背景。有些技术鼓励正确的领域模型，例如J2EE的实体Bean，它是我偏爱<a href="http://martinfowler.com/bliki/POJO.html">POJO</a>领域模型的理由之一。</p>
-
-<p>总之，你在服务中发现越多的行为，你就越难体会到领域模型的好处。如果你所有的逻辑都在服务中，那你将得不到任何好处。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/29">&larr; Older</a>
@@ -1252,15 +1316,15 @@
       </li>
     
       <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part29/">ANTLR 4权威参考读书笔记（29）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part28/">ANTLR 4权威参考读书笔记（28）</a>
       </li>
     
       <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part27/">ANTLR 4权威参考读书笔记（27）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/the-power-of-protocol-analyzers/">协议分析器的威力</a>
       </li>
     
   </ul>
@@ -1274,7 +1338,7 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 142%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 143%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 134%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>

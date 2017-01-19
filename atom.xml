@@ -4,7 +4,7 @@
   <title><![CDATA[乐者为王]]></title>
   <link href="http://codemany.com/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-01-18T22:57:41+08:00</updated>
+  <updated>2017-01-19T21:28:27+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -478,6 +478,151 @@
 <p>带有这些特殊需求的游戏原型界面如下图所示：</p>
 
 <p><img src="http://codemany.com/uploads/chess-mess-master.png" title="chess-mess-master" ></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（29）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part29/"/>
+    <updated>2016-10-18T11:22:11+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part29</id>
+    <content type="html"><![CDATA[<p>当我们开发一套语法时，会有很多错误要去修复。在完成语法前，生成的语法分析器不会识别所有有效的句子。在这期间，提供有用信息的错误消息帮助我们追踪到语法问题。一旦我们有了一套正确的语法，然后我们就必须处理用户输入的不合语法的句子，或者甚至由其它程序发生故障生成的不合语法的句子。在这两种情况下，语法分析器对不合语法的输入的响应方式是一个需要重点考虑的问题。</p>
+
+<p>在这里，我们将学习被ANTLR生成的语法分析器使用的自动错误报告和恢复策略。</p>
+
+<h3 id="错误展示">错误展示</h3>
+
+<p>描述ANTLR的错误恢复策略的最好方式是观察由它生成的语法分析器对错误输入的响应。让我们看一个类Java语言的语法，它包含带有字段和方法成员的类定义。该方法有简单的语句和表达式。嵌入动作在语法分析器找到元素时就打印它们。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Simple;
+</span><span class='line'>
+</span><span class='line'>prog: classDef+ ; // match one or more class definitions
+</span><span class='line'>
+</span><span class='line'>classDef
+</span><span class='line'>    : 'class' ID '{' member+ '}' // a class has one or more members
+</span><span class='line'>      {System.out.println("class "+$ID.text);}
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>member
+</span><span class='line'>    : 'int' ID ';'    // field definition
+</span><span class='line'>      {System.out.println("var "+$ID.text);}
+</span><span class='line'>    | 'int' f=ID '(' ID ')' '{' stat '}'    // method definition
+</span><span class='line'>      {System.out.println("method: "+$f.text);}
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>stat: expr ';'
+</span><span class='line'>      {System.out.println("found expr: "+$stat.text);}
+</span><span class='line'>    | ID '=' expr ';'
+</span><span class='line'>      {System.out.println("found assign: "+$stat.text);}
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>expr: INT
+</span><span class='line'>    | ID '(' INT ')'
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>INT : [0-9]+ ;
+</span><span class='line'>ID  : [a-zA-Z]+ ;
+</span><span class='line'>WS  : [ \t\r\n]+ -&gt; skip ;</span></code></pre></td></tr></table></div></figure>
+
+<p>现在，先让我们使用一些有效的输入运行语法分析器，借以观测正常的输出。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr Simple.g
+</span><span class='line'>compile *.java
+</span><span class='line'>grun Simple prog</span></code></pre></td></tr></table></div></figure>
+
+<p>输入以下数据：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class T { int i; }</span></code></pre></td></tr></table></div></figure>
+
+<p>你就会看到：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>var i
+</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
+
+<p>语法分析器没有显示任何错误，它执行打印语句，报告关于变量i和类定义T的正确识别。</p>
+
+<p>接下来，让我们尝试一个带有方法定义的类，该方法含有一个虚假赋值表达式。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grun Simple prog -gui</span></code></pre></td></tr></table></div></figure>
+
+<p>输入测试数据：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class T {
+</span><span class='line'>  int f(x) { a = 3 4 5; }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>然后你就会看到：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>line 2:19 mismatched input '4' expecting ';'
+</span><span class='line'>method: f
+</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
+
+<p>在4记号处，语法分析器没有找到它期待的<code>;</code>，所以它报告一个错误。<code>line 2:19</code>指出有问题的标记是在第2行第19列的字符位置（字符位置从0开始）。因为使用了-gui参数，我们可以看到带有高亮错误节点的语法分析树。</p>
+
+<p><img src="http://codemany.com/uploads/simple-parse-tree.png" title="simple-parse-tree" ></p>
+
+<p>在这里，有两个额外的记号，并且语法分析器给出一个不匹配的通用错误消息。如果只有单个的额外记号，语法分析器可能会智能一点，指出它是一个额外的记号。在接下来的运行测试中，有个额外的<code>;</code>在类名和类体之间：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grun Simple prog</span></code></pre></td></tr></table></div></figure>
+
+<p>输入如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class T ; { int i; }</span></code></pre></td></tr></table></div></figure>
+
+<p>输出结果：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>line 1:8 extraneous input ';' expecting '{'
+</span><span class='line'>var i
+</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
+
+<p>在<code>;</code>处语法分析器报告一个错误，但给出了一个稍微翔实的答案，因为它知道下一个记号就是它实际上在寻找的那个。这个特性被称为单个记号删除（single-token deletion），因为语法分析器可以简单地装作额外的记号不存在并继续执行。</p>
 ]]></content>
   </entry>
   
@@ -5075,30 +5220,6 @@
 归根结底，XML只是嵌在文本中的一对标签，因此它的语法结构是相当直白的。唯一的挑战是如何分别对待什么在标签内以及什么在标签外。</p>
 
 <p>识别语法规则并用伪代码表示它们的右侧部分最初是个挑战，但当你为更多的语言构建语法后它会变得越来越容易。一旦我们有了伪代码，我们就需要把它转换成ANTLR表示法，以便能得到一个可以工作的语法。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（14）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part14/"/>
-    <updated>2016-05-16T20:26:22+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part14</id>
-    <content type="html"><![CDATA[<p>对于大多数语法而言，注释和空格都是语法分析器可以忽略的东西。如果我们不想让注释和空格在语法中到处都是，那么就需要让词法分析器把它们扔掉。不幸的是，这意味着任何后续的处理步骤都不能再访问注释和空格。保留但忽略注释和空格的秘密是把这些发送给语法分析器的记号放到一个“隐藏通道”中。因为语法分析器只能调谐到单个通道，所以我们可以把任何我们想要的东西传递到其它通道中。这里是如何实现的语法：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>COMMENT
-</span><span class='line'>    : '/*' .*? '*/' -&gt; channel(HIDDEN)    // match anything between /* and */
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>WS  : [ \r\t\n]+    -&gt; channel(HIDDEN)
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<p>就像我们前面讨论过的<code>-&gt; skip</code>那样，<code>-&gt; channel(HIDDEN)</code>也是一个词法分析器指令。在这里，它设置那些记号的通道号码以便它们可以被语法分析器忽略。记号流仍然维护着原始的记号序列，但在传递记号给语法分析器时会略过隐藏通道中的记号。</p>
 ]]></content>
   </entry>
   

@@ -9,8 +9,10 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="WinRAR在使用到期后，每次打开都会弹出如下图所示的对话框窗口，十分烦人。 去除Nag窗口常用的几种方法是： 使用资源修改工具将可执行文件中的Nag窗口的属性改成透明、不可见，可以变相的去除Nag窗口；
-找到创建和显示Nag窗口的代码，跳过即可。显示窗口的常用函数有MessageBox、 &hellip;">
+  <meta name="description" content="WebWork是一个非常不错的MVC框架，有着众多的优点，也有着细微的缺陷。在实现一个用户注册验证的例子时，发现在资源文件中不能获取验证字段的值，只能每个字段一个message。 1
+2
+3
+class User { private String username; private String &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -74,6 +76,176 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-obtain-verification-field-value-in-resource-file-of-webwork/">如何在WebWork的资源文件中获取验证字段的值</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2006-03-30T14:56:37+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>30</span><span class='date-suffix'>th</span>, <span class='date-year'>2006</span></span> <span class='time'>2:56 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>WebWork是一个非常不错的MVC框架，有着众多的优点，也有着细微的缺陷。在实现一个用户注册验证的例子时，发现在资源文件中不能获取验证字段的值，只能每个字段一个message。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class User {
+</span><span class='line'>    private String username;
+</span><span class='line'>    private String password;</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;field name="username"&gt;
+</span><span class='line'>    &lt;field-validator type="stringlength" short-circuit="true"&gt;
+</span><span class='line'>        &lt;param name="minLength"&gt;5&lt;/param&gt;
+</span><span class='line'>        &lt;param name="maxLength"&gt;15&lt;/param&gt;
+</span><span class='line'>        &lt;message key="errors.username.range" /&gt;
+</span><span class='line'>    &lt;/field-validator&gt;
+</span><span class='line'>&lt;/field&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;field name="password"&gt;
+</span><span class='line'>    &lt;field-validator type="stringlength" short-circuit="true"&gt;
+</span><span class='line'>        &lt;param name="minLength"&gt;5&lt;/param&gt;
+</span><span class='line'>        &lt;param name="maxLength"&gt;15&lt;/param&gt;
+</span><span class='line'>        &lt;message key="errors.password.range" /&gt;
+</span><span class='line'>    &lt;/field-validator&gt;
+</span><span class='line'>&lt;/field&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>资源文件中的消息内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>errors.username.range=${username} is not in the range ${minLength} through ${maxLength}.
+</span><span class='line'>errors.password.range=${password} is not in the range ${minLength} through ${maxLength}.</span></code></pre></td></tr></table></div></figure>
+
+<p>到xwork的站点上去查找解决方法，在Issue Tracker里看到有人提交了一个<a href="http://jira.opensymphony.com/browse/XW-184">Feature</a>，采用的办法是给message传递参数，看了xwork的代码后，发现这样子的做法要修改的代码量非常大，所以只能另外想办法解决。</p>
+
+<p>在资源文件中可以用${fieldName}来获取要验证的字段变量名，那是否可以用${fieldValue}来得到验证字段的值呢？查看代码后发现这种办法行不通。那么是否可以用${${fieldName}}来获得字段变量的值呢？查看代码发现验证失败后会调用Validator.getMessage()方法，追踪代码来到TextParseUtil.translateVariables()方法中，找到代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>while (start != -1 && x &lt; length && count != 0) {    // 该部分代码负责查找变量，即${}包围的字符串
+</span><span class='line'>    c = expression.charAt(x++);
+</span><span class='line'>    if (c == '{') {
+</span><span class='line'>        count++;
+</span><span class='line'>    } else if (c == '}') {
+</span><span class='line'>        count--;
+</span><span class='line'>    }
+</span><span class='line'>}
+</span><span class='line'>end = x - 1;
+</span><span class='line'>
+</span><span class='line'>if ((start != -1) && (end != -1) && (count == 0)) {
+</span><span class='line'>    String var = expression.substring(start + 2, end);
+</span><span class='line'>
+</span><span class='line'>    Object o = stack.findValue(var, asType);    // 此处就是获取变量值的地方
+</span><span class='line'>
+</span><span class='line'>    String left = expression.substring(0, start);
+</span><span class='line'>    String right = expression.substring(end + 1);</span></code></pre></td></tr></table></div></figure>
+
+<p>由上面的代码可以看出WebWork只处理了最外围的${}，所以要让它处理像${${}}这样的格式就需要在获取变量前再次处理变量。修改后的代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if ((start != -1) && (end != -1) && (count == 0)) {
+</span><span class='line'>    String nestedExpression = expression.substring(start + 2, end);
+</span><span class='line'>    String var = translateVariables(nestedExpression, stack);
+</span><span class='line'>    //String var = expression.substring(start + 2, end);
+</span><span class='line'>
+</span><span class='line'>    Object o = stack.findValue(var, asType);
+</span><span class='line'>
+</span><span class='line'>    String left = expression.substring(0, start);
+</span><span class='line'>    String right = expression.substring(end + 1);</span></code></pre></td></tr></table></div></figure>
+
+<p>现在就可以处理资源文件中的多重嵌套变量了。接着把修改验证文件和资源文件修改一下就可以了。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;field name="username"&gt;
+</span><span class='line'>    &lt;field-validator type="stringlength" short-circuit="true"&gt;
+</span><span class='line'>        &lt;param name="minLength"&gt;5&lt;/param&gt;
+</span><span class='line'>        &lt;param name="maxLength"&gt;15&lt;/param&gt;
+</span><span class='line'>        &lt;message key="errors.range" /&gt;
+</span><span class='line'>    &lt;/field-validator&gt;
+</span><span class='line'>&lt;/field&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;field name="password"&gt;
+</span><span class='line'>    &lt;field-validator type="stringlength" short-circuit="true"&gt;
+</span><span class='line'>        &lt;param name="minLength"&gt;5&lt;/param&gt;
+</span><span class='line'>        &lt;param name="maxLength"&gt;15&lt;/param&gt;
+</span><span class='line'>        &lt;message key="errors.range" /&gt;
+</span><span class='line'>    &lt;/field-validator&gt;
+</span><span class='line'>&lt;/field&gt;</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>errors.range=${${fieldName}} is not in the range ${minLength} through ${maxLength}.</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1303,136 +1475,6 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/speaker-sound-program-in-c-language/">C语言的扬声器发声程序</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-10-05T09:55:46+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>5</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>9:55 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>计算机的主板通常装有8253/8254定时与计数器芯片和8255可编程并行接口芯片，由它们组成的硬件电路可用来产生扬声器的声音。目前的计算机由于采用了超大规模集成电路，因而看不到这些芯片，它们均集成在外围电路芯片中。以下是扬声器的电路图：</p>
-
-<p><img src="/uploads/speaker-sound.png" title="speaker-sound" ></p>
-
-<p>使用程序对这些电路编程可以控制声音的长短和音调的高低。在扬声器电路中，定时器的频率决定了扬声器发音的频率，所以可通过设定定时器电路的频率来使扬声器发出不同的声音。对定时器电路进行频率设定时，首先对其命令寄存器端口地址0x43写命令来选择定时器的通道，接着向计数寄存器端口地址0x42发送频率计数值，先送低8位，后送高8位。通过这两步使定时器电路产生一系列的方波信号，此信号能否推动扬声器发音，还要看由8255产生的送数信号和门控信号是否为1，而它们也是可以编程的，端口地址为0x61。以下是完整的实现代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-<span class='line-number'>44</span>
-<span class='line-number'>45</span>
-<span class='line-number'>46</span>
-<span class='line-number'>47</span>
-<span class='line-number'>48</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>#include &lt;dos.h&gt;
-</span><span class='line'>#include &lt;conio.h&gt;
-</span><span class='line'>
-</span><span class='line'>#define FREQ 1193180.0
-</span><span class='line'>
-</span><span class='line'>unsigned long getticks()
-</span><span class='line'>{
-</span><span class='line'>    union REGS regs;
-</span><span class='line'>
-</span><span class='line'>    regs.h.ah = 0x00;
-</span><span class='line'>    int86(0x1a, &regs, &regs);
-</span><span class='line'>    return ((unsigned long)regs.x.cx &lt;&lt; 16) + regs.x.dx;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>void beep(int tone)
-</span><span class='line'>{
-</span><span class='line'>    unsigned long ticks;
-</span><span class='line'>    unsigned char bits;
-</span><span class='line'>    unsigned short count;
-</span><span class='line'>
-</span><span class='line'>    count = FREQ / tone;
-</span><span class='line'>    outportb(0x43, 0xb6);    /* 选择定时器的某个通道 */
-</span><span class='line'>    outportb(0x42, (unsigned char)(count & 0xff));    /* 发声频率计数值的低8位 */
-</span><span class='line'>    outportb(0x42, (unsigned char)(count &gt;&gt; 8));    /* 发声频率计数值的高8位 */
-</span><span class='line'>
-</span><span class='line'>    ticks = getticks();
-</span><span class='line'>    while (ticks == getticks())
-</span><span class='line'>        ;
-</span><span class='line'>
-</span><span class='line'>    /*
-</span><span class='line'>     * 当8255的PB端口的第0位和第1位为1时，表示允许发声；
-</span><span class='line'>     * 为0时，表示禁止发声。
-</span><span class='line'>     */
-</span><span class='line'>    bits = inportb(0x61);
-</span><span class='line'>    outportb(0x61, bits | 3);    /* 允许发声 */
-</span><span class='line'>    ticks += 2;
-</span><span class='line'>    while (getticks() &lt; ticks)
-</span><span class='line'>        ;
-</span><span class='line'>    outportb(0x61, bits & 0xfc);    /* 禁止发声 */
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>void main()
-</span><span class='line'>{
-</span><span class='line'>    do
-</span><span class='line'>    {
-</span><span class='line'>        beep(1046.50);
-</span><span class='line'>    } while (!kbhit());
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/28">&larr; Older</a>
@@ -1458,15 +1500,15 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
       </li>
     
       <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part29/">ANTLR 4权威参考读书笔记（29）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part28/">ANTLR 4权威参考读书笔记（28）</a>
       </li>
     
       <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part27/">ANTLR 4权威参考读书笔记（27）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/the-power-of-protocol-analyzers/">协议分析器的威力</a>
       </li>
     
   </ul>
@@ -1480,7 +1522,7 @@ WebWork也有自己的ResourceBundle配置方式，而且Struts-Menu也不支持
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 142%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 143%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 134%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>

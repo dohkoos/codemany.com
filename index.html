@@ -587,6 +587,171 @@
       
   <header>
     
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part29/">ANTLR 4权威参考读书笔记（29）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-10-18T11:22:11+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>11:22 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>当我们开发一套语法时，会有很多错误要去修复。在完成语法前，生成的语法分析器不会识别所有有效的句子。在这期间，提供有用信息的错误消息帮助我们追踪到语法问题。一旦我们有了一套正确的语法，然后我们就必须处理用户输入的不合语法的句子，或者甚至由其它程序发生故障生成的不合语法的句子。在这两种情况下，语法分析器对不合语法的输入的响应方式是一个需要重点考虑的问题。</p>
+
+<p>在这里，我们将学习被ANTLR生成的语法分析器使用的自动错误报告和恢复策略。</p>
+
+<h3 id="错误展示">错误展示</h3>
+
+<p>描述ANTLR的错误恢复策略的最好方式是观察由它生成的语法分析器对错误输入的响应。让我们看一个类Java语言的语法，它包含带有字段和方法成员的类定义。该方法有简单的语句和表达式。嵌入动作在语法分析器找到元素时就打印它们。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Simple;
+</span><span class='line'>
+</span><span class='line'>prog: classDef+ ; // match one or more class definitions
+</span><span class='line'>
+</span><span class='line'>classDef
+</span><span class='line'>    : 'class' ID '{' member+ '}' // a class has one or more members
+</span><span class='line'>      {System.out.println("class "+$ID.text);}
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>member
+</span><span class='line'>    : 'int' ID ';'    // field definition
+</span><span class='line'>      {System.out.println("var "+$ID.text);}
+</span><span class='line'>    | 'int' f=ID '(' ID ')' '{' stat '}'    // method definition
+</span><span class='line'>      {System.out.println("method: "+$f.text);}
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>stat: expr ';'
+</span><span class='line'>      {System.out.println("found expr: "+$stat.text);}
+</span><span class='line'>    | ID '=' expr ';'
+</span><span class='line'>      {System.out.println("found assign: "+$stat.text);}
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>expr: INT
+</span><span class='line'>    | ID '(' INT ')'
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>INT : [0-9]+ ;
+</span><span class='line'>ID  : [a-zA-Z]+ ;
+</span><span class='line'>WS  : [ \t\r\n]+ -&gt; skip ;</span></code></pre></td></tr></table></div></figure>
+
+<p>现在，先让我们使用一些有效的输入运行语法分析器，借以观测正常的输出。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr Simple.g
+</span><span class='line'>compile *.java
+</span><span class='line'>grun Simple prog</span></code></pre></td></tr></table></div></figure>
+
+<p>输入以下数据：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class T { int i; }</span></code></pre></td></tr></table></div></figure>
+
+<p>你就会看到：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>var i
+</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
+
+<p>语法分析器没有显示任何错误，它执行打印语句，报告关于变量i和类定义T的正确识别。</p>
+
+<p>接下来，让我们尝试一个带有方法定义的类，该方法含有一个虚假赋值表达式。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grun Simple prog -gui</span></code></pre></td></tr></table></div></figure>
+
+<p>输入测试数据：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class T {
+</span><span class='line'>  int f(x) { a = 3 4 5; }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>然后你就会看到：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>line 2:19 mismatched input '4' expecting ';'
+</span><span class='line'>method: f
+</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
+
+<p>在4记号处，语法分析器没有找到它期待的<code>;</code>，所以它报告一个错误。<code>line 2:19</code>指出有问题的标记是在第2行第19列的字符位置（字符位置从0开始）。因为使用了-gui参数，我们可以看到带有高亮错误节点的语法分析树。</p>
+
+<p><img src="/uploads/simple-parse-tree.png" title="simple-parse-tree" ></p>
+
+<p>在这里，有两个额外的记号，并且语法分析器给出一个不匹配的通用错误消息。如果只有单个的额外记号，语法分析器可能会智能一点，指出它是一个额外的记号。在接下来的运行测试中，有个额外的<code>;</code>在类名和类体之间：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grun Simple prog</span></code></pre></td></tr></table></div></figure>
+
+<p>输入如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class T ; { int i; }</span></code></pre></td></tr></table></div></figure>
+
+<p>输出结果：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>line 1:8 extraneous input ';' expecting '{'
+</span><span class='line'>var i
+</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
+
+<p>在<code>;</code>处语法分析器报告一个错误，但给出了一个稍微翔实的答案，因为它知道下一个记号就是它实际上在寻找的那个。这个特性被称为单个记号删除（single-token deletion），因为语法分析器可以简单地装作额外的记号不存在并继续执行。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
       <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part28/">ANTLR 4权威参考读书笔记（28）</a></h1>
     
     
@@ -2298,123 +2463,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-to-create-effective-icons/">如何创建有效的图标</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-08-06T12:43:17+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>6</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>12:43 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="http://www.awwwards.com/how-to-create-effective-icons.html">http://www.awwwards.com/how-to-create-effective-icons.html</a></p>
-
-<p>我可能就是你所说的图标爱好者。我喜欢图标，而且我更加喜欢制作它们！作为一个艺术家，我的背景在很大程度上是绘画——我喜欢绘画，并且我已经画了一辈子（甚至远远早于我知道什么是图形设计）。我想，这是我理解创建图标的一个关键。绘画教你看——然后把你所看到的转化成纸上的线条和图形——而这正是如何创建有效的图标。</p>
-
-<h3 id="几何图形">几何图形</h3>
-
-<p>因此，对初学者而言，基本上任何东西都可以用这四种图形组合而成：</p>
-
-<p><img src="/uploads/effective-icons-1.png" title="effective-icons-1" ></p>
-
-<p>当我想把某事物转换成一个图标时，我观察它然后尽可能地将其拆分为最简单的图形。例如，水滴可以用一个三角形和一个圆形组成。</p>
-
-<p><img src="/uploads/effective-icons-2.png" title="effective-icons-2" ></p>
-
-<p>心形图标可以由两个圆形和一个三角形构成。</p>
-
-<p><img src="/uploads/effective-icons-3.png" title="effective-icons-3" ></p>
-
-<p>我每次都是在Adobe Illustrator中创建这些图形。使用矢量图形可以让我控制线条的粗细，以及图形和其锚点的相互作用。Illustrator也可以让我自由地把线条转换成图形，反之亦然。这一切也许看起来十分基础，但它是我用于创建最复杂图标的同样的方法。下面是我最近在做的一个略微更加复杂些的《权利法案》图标的示例，在这里我应用了同样的原则。</p>
-
-<p><img src="/uploads/effective-icons-4.png" title="effective-icons-4" ></p>
-
-<h3 id="界面图标">界面图标</h3>
-
-<p>我最近有机会为一款超赞的iPhone应用Parker Planner制作一组图标。我很喜欢做这个项目，这个项目其中最重要的一个方面是创建一组易懂的、私有的、实用的和美观的用户界面图标，可以帮助用户浏览操作这款略微复杂的计划应用。</p>
-
-<p><img src="/uploads/effective-icons-5.png" title="effective-icons-5" ></p>
-
-<p>让我们选取这些图标的其中之一分解看看我如何创建它。例如，垃圾桶图标是由三个圆角矩形和三条线构成。</p>
-
-<p>1、选择圆角矩形工具。</p>
-
-<p><img src="/uploads/effective-icons-6.png" title="effective-icons-6" ></p>
-
-<p>2、拖动出一个图形。</p>
-
-<p><img src="/uploads/effective-icons-7.png" title="effective-icons-7" ></p>
-
-<p>3、调整笔划宽度直到你满意。</p>
-
-<p><img src="/uploads/effective-icons-8.png" title="effective-icons-8" ></p>
-
-<p>我通常选择在整组图标中使用一到两种笔划宽度。</p>
-
-<p><img src="/uploads/effective-icons-9.png" title="effective-icons-9" ></p>
-
-<p>这使它们看起来更一致和感觉更有整体性。</p>
-
-<p>4、用另一个圆角矩形创建盖子。</p>
-
-<p><img src="/uploads/effective-icons-10.png" title="effective-icons-10" ></p>
-
-<p>5、再一个圆角矩形创建盖子的把手。</p>
-
-<p><img src="/uploads/effective-icons-11.png" title="effective-icons-11" ></p>
-
-<p>6、擦除圆角矩形的下半部分。</p>
-
-<p><img src="/uploads/effective-icons-12.png" title="effective-icons-12" ></p>
-
-<p>7、现在，通过添加三条竖线到桶身上给桶添加条纹。</p>
-
-<p><img src="/uploads/effective-icons-13.png" title="effective-icons-13" ></p>
-
-<p>8、然后你就获得了它！一个垃圾桶图标……如果你喜欢，你可以用颜色或线条宽度做进一步调整。</p>
-
-<p><img src="/uploads/effective-icons-14.png" title="effective-icons-14" ></p>
-
-<p>我在创建图标时经常使用的一些其它真正有用的工具是Pathfinder，我使用它来剪切、连接和挖空图形。</p>
-
-<p><img src="/uploads/effective-icons-15.png" title="effective-icons-15" ></p>
-
-<p>Stroke/Fill工具，它帮助你将图形在填满和笔划间切换。</p>
-
-<p><img src="/uploads/effective-icons-16.png" title="effective-icons-16" ></p>
-
-<p>以及我非常喜欢的工具Stroke Panel，它帮助你将拐角和线的末端从直角转换到圆角。</p>
-
-<p><img src="/uploads/effective-icons-17.png" title="effective-icons-17" ></p>
-
-<p>当我完成一组图标，我通常将它们全体紧挨着排成一排，看看是否有哪个看起来很奇怪或不到位。然后我会做任何必要的修改。</p>
-
-<p><img src="/uploads/effective-icons-18.png" title="effective-icons-18" ></p>
-
-<p>最后，我总是在应用中测试它们以确保它们感觉正确和功能良好。</p>
-
-<p><img src="/uploads/effective-icons-19.png" title="effective-icons-19" ></p>
-
-<p>最终，我想说创建优秀图标的方法不仅仅是学习Illustrator技巧，尽管它们也是必需的。最好的做法是练习把你周围看到的事物分解成简单图形。你在这点上越是变得更好，你越是能够成为更高超的图像设计师！加油！</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/2">&larr; Older</a>
@@ -2438,15 +2486,15 @@
       </li>
     
       <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part29/">ANTLR 4权威参考读书笔记（29）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part28/">ANTLR 4权威参考读书笔记（28）</a>
       </li>
     
       <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part27/">ANTLR 4权威参考读书笔记（27）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/the-power-of-protocol-analyzers/">协议分析器的威力</a>
       </li>
     
   </ul>
@@ -2460,7 +2508,7 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 142%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 143%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 134%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
