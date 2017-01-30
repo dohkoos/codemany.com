@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="英文原文：http://www.awwwards.com/how-to-create-effective-icons.html 我可能就是你所说的图标爱好者。我喜欢图标，而且我更加喜欢制作它们！作为一个艺术家，我的背景在很大程度上是绘画——我喜欢绘画，并且我已经画了一辈子（ &hellip;">
+  <meta name="description" content="默认情况下，ANTLR为每个规则生成一个单一的事件类型，而不管语法分析器匹配了哪个选项。这很不方便，因为监听器和访问者方法必须确定哪个选项被语法分析器匹配。在本节中，我们将看到如何得到更细粒度的事件。 为规则选项贴标签以得到精确的事件方法 为阐明事件粒度问题， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,146 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part23/">ANTLR 4权威参考读书笔记（23）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-08-16T18:09:05+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:09 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>默认情况下，ANTLR为每个规则生成一个单一的事件类型，而不管语法分析器匹配了哪个选项。这很不方便，因为监听器和访问者方法必须确定哪个选项被语法分析器匹配。在本节中，我们将看到如何得到更细粒度的事件。</p>
+
+<h3 id="为规则选项贴标签以得到精确的事件方法">为规则选项贴标签以得到精确的事件方法</h3>
+
+<p>为阐明事件粒度问题，让我们为以下的表达式语法构建一个带有监听器的简单计算器：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Expr;
+</span><span class='line'>s : e ;
+</span><span class='line'>e : e op=MULT e    // MULT is '*'
+</span><span class='line'>  | e op=ADD e     // ADD is '+'
+</span><span class='line'>  | INT
+</span><span class='line'>  ;</span></code></pre></td></tr></table></div></figure>
+
+<p>按照上面的语法，规则e会产生一个相当无用的监听器，因为规则e的所有选项导致树遍历器触发相同的enterE()和exitE()方法。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public interface ExprListener extends ParseTreeListener {
+</span><span class='line'>    void enterE(ExprParser.EContext ctx);
+</span><span class='line'>    void exitE(ExprParser.EContext ctx);</span></code></pre></td></tr></table></div></figure>
+
+<p>监听器方法必须使用op记号标签和ctx的方法进行测试以查看语法分析器为每个e子树匹配了哪个选项。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitE(ExprParser.EContext ctx) {
+</span><span class='line'>    if (ctx.getChildCount() == 3) {    // operations have 3 children
+</span><span class='line'>        int left = values.get(ctx.e(0));
+</span><span class='line'>        int right = values.get(ctx.e(1));
+</span><span class='line'>        if (ctx.op.getType() == ExprParser.MULT) {
+</span><span class='line'>            values.put(ctx, left * right);
+</span><span class='line'>        } else {
+</span><span class='line'>            values.put(ctx, left + right);
+</span><span class='line'>        }
+</span><span class='line'>    } else {
+</span><span class='line'>        values.put(ctx, values.get(ctx.getChild(0)));    // an INT
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>在exitE()中引用的MULT字段是在ExprParser中由ANTLR自动生成的：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class ExprParser extends Parser {
+</span><span class='line'>    public static final int MULT=1, ADD=2, INT=3, WS=4;</span></code></pre></td></tr></table></div></figure>
+
+<p>如果我们查看在类ExprParser中的类EContext，我们可以看到ANTLR把来自3个选项的所有元素都塞进了相同的上下文对象。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static class EContext extends ParserRuleContext {
+</span><span class='line'>    public Token op;                     // derived from label op
+</span><span class='line'>    public List&lt;EContext&gt; e() { ... }    // get all e subtrees
+</span><span class='line'>    public EContext e(int i) { ... }     // get ith e subtree
+</span><span class='line'>    public TerminalNode INT() { ... }    // get INT node if alt 3 of e</span></code></pre></td></tr></table></div></figure>
+
+<p>为得到更精确的监听器事件，ANTLR让我们使用#运算符给任何规则最外层的选项打标签。让我们从Expr派生语法LExpr，并给e的选项打上标签，以下是修改后的e规则：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>e : e MULT e  # Mult
+</span><span class='line'>  | e ADD e   # Add
+</span><span class='line'>  | INT       # Int
+</span><span class='line'>  ;</span></code></pre></td></tr></table></div></figure>
+
+<p>现在，ANTLR为e的每个选项生成了单独的监听器方法，因此，我们不再需要op记号标签。对于选项标签X，ANTLR生成方法enterX()和exitX()。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public interface LExprListener extends ParseTreeListener {
+</span><span class='line'>    void enterMult(LExprParser.MultContext ctx);
+</span><span class='line'>    void exitMult(LExprParser.MultContext ctx);
+</span><span class='line'>    void enterAdd(LExprParser.AddContext ctx);
+</span><span class='line'>    void exitAdd(LExprParser.AddContext ctx);
+</span><span class='line'>    void enterInt(LExprParser.IntContext ctx);
+</span><span class='line'>    void exitInt(LExprParser.IntContext ctx);
+</span><span class='line'>    ...
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>注意，ANTLR也为选项生成特定的以标签命名的上下文对象（EContext的子类）。专门的上下文对象的getter方法只限于应用在那些相关的选项。例如，IntContext只有一个INT()方法，我们可以在enterInt()中调用ctx.INT()，但在enterAdd()中就不能。</p>
+
+<p>监听器和访问者是极好的。我们只需要通过充实事件方法就可以得到可复用和可重定目标的语法以及封装的语言应用。ANTLR甚至会为我们自动生成骨架代码。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -3222,79 +3362,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part15/">ANTLR 4权威参考读书笔记（15）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-05-22T17:51:36+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2016</span></span> <span class='time'>5:51 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在聚焦到具体的语法规则内部结构之前，我们要先讨论下语法的整体剖析以及如何形成一套初始的语法骨架。</p>
-
-<p>语法文件通常是由一个命名语法的头和一系列可以彼此调用的规则组成。就像下面这样：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grammar MyG;
-</span><span class='line'>
-</span><span class='line'>rule1 : «stuff» ;
-</span><span class='line'>rule2 : «more stuff» ;
-</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
-
-<p>设计语法就是要搞清楚«stuff»是什么？哪个规则是开始规则。这要求我们需要知道给定语言的一系列代表性的输入例子。当然，从语言参考手册甚至另一个语法分析器生成器格式而来的语法也是有帮助的。</p>
-
-<p>正确设计语法的方法是借鉴功能分解或者自顶向下的设计，从粗粒度级别到细粒度级别逐步定义语言结构并把它们编码为语法规则。所以，我们的第一个任务就是找到粗粒度语言结构的名字，同时它也是开始规则。在英语中我们使用sentence，对于XML文件来说它则是document。</p>
-
-<p>设计开始规则的内容是用英语伪代码描述整个输入格式的问题。例如，“a comma-separated-value (CSV) file is a sequence of rows terminated by newlines.”这段文字，在is a左边的至关重要的单词file是规则名字，在is a右边的所有内容则成为在规则定义右则的«stuff»的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>file : «a sequence of rows terminated by newlines» ;</span></code></pre></td></tr></table></div></figure>
-
-<p>然后我们通过描述在开始规则右侧被确定的元素来进行下一个粒度级别的设计。在规则右侧的名词通常是对记号或尚未定义的规则的引用，这些记号是那些我们在正常情况下视为单词、标点符号、运算符的元素。就像单词是英语句子中的原子成分那样，记号在语法规则中也是如此。规则引用则涉及到像row那样需要被分解为更详细部分的其它语言结构。</p>
-
-<p>进入细节的另外一层，我们可以说row是一系列被逗号分隔的field，而field则是一个数字或字符串。就像以下所示：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>row   : «a sequence of fields separated by commas» ;
-</span><span class='line'>field : «number or string» ;</span></code></pre></td></tr></table></div></figure>
-
-<p>当没有规则再需要定义时，我们就得到了语法的一个粗略的草图。</p>
-
-<p>如果有其它格式的语法作为参考的话设计语法会容易的多，但要小心不要盲目地遵循它，否则你会误入歧途的。非ANTLR格式的语法只是让你知道别人是如何决定分解语言中的短语的，它最大的作用就是可以给我们一份规则名称的列表作为参考。</p>
-
-<p>不推荐从参考手册上复制粘贴语法到ANTLR，然后再通过细微的调整让它工作。把它当作一套指南而不是一段代码是更好的办法。为了清晰地描述语法，参考手册通常是相当松散的。这意味着语法能识别大量不在语言中的句子，或者语法可能不够明确，可以用多种方法匹配相同的输入序列。例如，语法可能会说表达式可以调用一个构建器或者访问一个函数，问题是像T(i)这样的输入可以同时匹配两者。理想情况下，在语法中是不能有这样的二义性的，每个输入句子我们只需要一种解释。</p>
-
-<p>在另一个极端，参考手册中的语法有时过于明确地说明了规则。有些约束是需要在分析完输入后实施的，而不是试图对语法结构实施约束。例如，W3C XML语法就显式地指定标签中什么地方必须要有空格以及什么地方的空格可以省略。但事实是我们可以简单地让词法分析器在把记号发送给语法分析器之前去除空格，不需要在语法中到处测试它。</p>
-
-<p>规格还说&lt;?xml ...&gt;标签可以有两个附加属性encoding和standalone。我们需要知道约束，但它是很容易去允许任何属性名字，然后在语法分析后检查语法分析树，以确保所有这些限制都满足的。
-归根结底，XML只是嵌在文本中的一对标签，因此它的语法结构是相当直白的。唯一的挑战是如何分别对待什么在标签内以及什么在标签外。</p>
-
-<p>识别语法规则并用伪代码表示它们的右侧部分最初是个挑战，但当你为更多的语言构建语法后它会变得越来越容易。一旦我们有了伪代码，我们就需要把它转换成ANTLR表示法，以便能得到一个可以工作的语法。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/3">&larr; Older</a>
@@ -3320,15 +3387,15 @@
       </li>
     
       <li class="post">
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part30/">ANTLR 4权威参考读书笔记（30）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part29/">ANTLR 4权威参考读书笔记（29）</a>
       </li>
     
       <li class="post">
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part28/">ANTLR 4权威参考读书笔记（28）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part27/">ANTLR 4权威参考读书笔记（27）</a>
       </li>
     
   </ul>
@@ -3342,7 +3409,7 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 143%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 144%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 134%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>

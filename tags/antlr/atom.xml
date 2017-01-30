@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: ANTLR | 乐者为王]]></title>
   <link href="http://codemany.com/tags/antlr/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-01-20T20:11:54+08:00</updated>
+  <updated>2017-01-30T20:26:14+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,36 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（30）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part30/"/>
+    <updated>2016-10-26T18:02:32+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part30</id>
+    <content type="html"><![CDATA[<p>有时我们在调试语法时需要ANTLR提供更好的消息提示，为达到这个目的，我们可以改变ANTLR的标准错误报告。</p>
+
+<h3 id="改变和重定向antlr错误消息">改变和重定向ANTLR错误消息</h3>
+
+<p>默认情况下，ANTLR把所有的错误发送给标准错误，但我们可以通过提供ANTLRErrorListener接口的实现来修改目标和内容。该接口有syntaxError()方法可以应用于词法分析器和语法分析器。方法syntaxError()接收各种有关错误的位置以及错误消息的信息。它也接收语法分析器的一个引用，因此我们可以查询关于识别的状态。</p>
+
+<p>例如，这里是一个错误监听器，它打印规则调用栈以及随后的用有问题的记号信息来加强的通常错误消息：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public static class VerboseListener extends BaseErrorListener {
+    @Override
+    public void syntaxError(Recognizer&lt;?, ?&gt; recognizer,
+                            Object offendingSymbol,
+                            int line, int charPositionInLine,
+                            String msg,
+                            RecognitionException e)
+    {
+        List&lt;String&gt; stack = ((Parser)recognizer).getRuleInvocationStack();
+        Collections.reverse(stack);
+        System.err.println(&quot;rule stack: &quot;+stack);
+        System.err.println(&quot;line &quot;+line+&quot;:&quot;+charPositionInLine+&quot; at &quot;+
+        offendingSymbol+&quot;: &quot;+msg);
+    }
+}
+</code></pre></div>]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（29）]]></title>
@@ -628,107 +658,6 @@ run JSON2XML t.json
 </code></pre></div>
 <p>有些转换不总是像JSON到XML那样直白的。但是，这个例子向我们表明如何通过拼凑部分翻译短语处理句子转换问题。</p>
 ]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（25）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part25/"/>
-    <updated>2016-09-03T16:16:56+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part25</id>
-    <content type="html"><![CDATA[<p>这次我们要做的是通过监听器实现CSV文件的加载器，用于建立一个二维列表数据结构。</p>
-
-<h3 id="加载csv数据">加载CSV数据</h3>
-
-<p>我们的目标是构建一个监听器去加载CSV数据到一个映射列表数据结构中，这是任何数据格式阅读器或配置文件阅读器都会做的事。我们会收集每行的字段并放到一个映射中，构成头名-值组合。以下是示例文件t.csv的内容：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">Details,Month,Amount
-Mid Bonus,June,&quot;$2,000&quot;
-,January,&quot;&quot;&quot;zippo&quot;&quot;&quot;
-Total Bonuses,&quot;&quot;,&quot;$5,000&quot;
-</code></pre></div>
-<p>我们想要看到如下的映射列表被打印出：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">[{Details=Mid Bonus, Month=June, Amount=&quot;$2,000&quot;},
- {Details=, Month=January, Amount=&quot;&quot;&quot;zippo&quot;&quot;&quot;},
- {Details=Total Bonuses, Month=&quot;&quot;, Amount=&quot;$5,000&quot;}]
-</code></pre></div>
-<p>为了在监听器中得到精确的方法，我们给CSV语法中field规则的每个选项打上标签：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">grammar CSV;
-
-file : hdr row+ ;
-hdr : row ;
-row : field (&#39;,&#39; field)* &#39;\r&#39;? &#39;\n&#39; ;
-field
-    : TEXT    # text
-    | STRING  # string
-    |         # empty
-    ;
-
-TEXT : ~[,\n\r&quot;]+ ;
-STRING : &#39;&quot;&#39; (&#39;&quot;&quot;&#39;|~&#39;&quot;&#39;)* &#39;&quot;&#39; ;     // quote-quote is an escaped quote
-</code></pre></div>
-<p>我们可以从定义我们需要的数据结构开始监听器的实现。首先，我们需要的数据结构是称为rows的映射列表。我们也需要在头行中找到的列名列表header。为处理数据行，我们需要把字段值读到一个临时列表currentRowFieldValues中，然后把列名映射到那些值上。以下是监听器LoadCSV.java的实现代码：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public static class Loader extends CSVBaseListener {
-    public static final String EMPTY = &quot;&quot;;
-    /** Load a list of row maps that map field name to value */
-    List&lt;Map&lt;String,String&gt;&gt; rows = new ArrayList&lt;Map&lt;String, String&gt;&gt;();
-    /** List of column names */
-    List&lt;String&gt; header;
-    /** Build up a list of fields in current row */
-    List&lt;String&gt; currentRowFieldValues;
-</code></pre></div>
-<p>下面的3个规则方法通过计算适当的字符串处理字段值，并把它添加到currentRowFieldValues中。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitString(CSVParser.StringContext ctx) {
-    currentRowFieldValues.add(ctx.STRING().getText());
-}
-public void exitText(CSVParser.TextContext ctx) {
-    currentRowFieldValues.add(ctx.TEXT().getText());
-}
-public void exitEmpty(CSVParser.EmptyContext ctx) {
-    currentRowFieldValues.add(EMPTY);
-}
-</code></pre></div>
-<p>在我们能处理数据行之前，我们需要从第一行取得列名列表。头行在语法上仅仅是另外的行，但我们在对待它时要不同于常规的数据行，那意味着我们需要检查上下文。暂时让我们假设在exitRow()执行后，currentRowFieldValues包含列名列表。要填充header，我们只需要捕获第一行的字段值。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitHdr(CSVParser.HdrContext ctx) {
-    header = new ArrayList&lt;String&gt;();
-    header.addAll(currentRowFieldValues);
-}
-</code></pre></div>
-<p>谈到行时，我们需要两个操作：一个是当我们开始一行时，另一个是当我们结束一行时。当我们开始一行时，我们需要分配或清除currentRowFieldValues，准备获取一组新的数据。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public void enterRow(CSVParser.RowContext ctx) {
-    currentRowFieldValues = new ArrayList&lt;String&gt;();
-}
-</code></pre></div>
-<p>在行结束的时候，我们必须考虑上下文。如果我们仅仅加载头行，那我们不能改变rows字段，因为列名不是数据。在exitRow()中，我们可以通过查看在语法分析树中的父节点的getRuleIndex()值（或者询问父节点是否是HdrContext类型）测试上下文。如果当前行是数据行，我们将通过同时遍历header中的列名和currentRowFieldValues中的值获取的内容创建映射。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitRow(CSVParser.RowContext ctx) {
-    // If this is the header row, do nothing
-    // if ( ctx.parent instanceof CSVParser.HdrContext ) return; OR:
-    if ( ctx.getParent().getRuleIndex() == CSVParser.RULE_hdr ) {
-        return;
-    }
-    // It&#39;s a data row
-    Map&lt;String, String&gt; m = new LinkedHashMap&lt;String, String&gt;();
-    int i = 0;
-    for (String v : currentRowFieldValues) {
-        m.put(header.get(i), v);
-        i++;
-    }
-    rows.add(m);
-}
-</code></pre></div>
-<p>到这里，加载CSV数据到数据结构中的任务就算已经完成。在使用ParseTreeWalker遍历树后，我们就可以紧接着打印出rows字段：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">ParseTreeWalker walker = new ParseTreeWalker();
-Loader loader = new Loader();
-walker.walk(loader, tree);
-System.out.println(loader.rows);
-</code></pre></div>
-<p>以下是构建和测试序列：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">antlr CSV.g
-compile *.java
-run LoadCSV t.csv
-</code></pre></div>
-<p>下面显示的是输出结果：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">[{Details=Mid Bonus, Month=June, Amount=&quot;$2,000&quot;}, {Details=, Month=January,
-Amount=&quot;&quot;&quot;zippo&quot;&quot;&quot;}, {Details=Total Bonuses, Month=&quot;&quot;, Amount=&quot;$5,000&quot;}]
-</code></pre></div>]]></content>
   </entry>
   
 </feed>
