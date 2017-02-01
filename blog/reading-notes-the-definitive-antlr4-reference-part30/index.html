@@ -174,6 +174,100 @@
 </span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
 
 <p>栈[prog, classDef]指出语法分析器在规则classDef中，且被prog调用。注意，记号信息包含在输入流中的字符位置，这在高亮输入中的错误时是非常有用的。例如，记号[@2,8:8=&#39;T&#39;,<9>,1:8]指出它是记号流中的第3个记号（索引从0开始），字符范围从8到8，记号类型为9，位于第1行，并且在字符位置8（计数从0开始，且TAB被当作一个字符）。</p>
+
+<p>作为另一个示例，让我们构建一个错误监听器TestE_Listener2.java，它打印带有被下划线强调的有错误的记号的行。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>compile *.java
+</span><span class='line'>run TestE_Listener2</span></code></pre></td></tr></table></div></figure>
+
+<p>输入以下数据：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class T XYZ {
+</span><span class='line'>  int ;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>然后就会看如如下错误信息：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>line 1:8 extraneous input 'XYZ' expecting '{'
+</span><span class='line'>class T XYZ {
+</span><span class='line'>        ^^^
+</span><span class='line'>line 2:6 no viable alternative at input 'int;'
+</span><span class='line'>  int ;
+</span><span class='line'>      ^
+</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
+
+<p>为了让事情变得更容易，我们将忽略TAB——charPositionInLine不是列号，因为TAB的大小不是统一定义的。这里是一个错误监听器实现，强调输入中的错误位置。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static class UnderlineListener extends BaseErrorListener {
+</span><span class='line'>    public void syntaxError(Recognizer&lt;?, ?&gt; recognizer,
+</span><span class='line'>                            Object offendingSymbol,
+</span><span class='line'>                            int line, int charPositionInLine,
+</span><span class='line'>                            String msg,
+</span><span class='line'>                            RecognitionException e) {
+</span><span class='line'>        System.err.println("line "+line+":"+charPositionInLine+" "+msg);
+</span><span class='line'>        underlineError(recognizer,(Token)offendingSymbol,
+</span><span class='line'>        line, charPositionInLine);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    protected void underlineError(Recognizer recognizer,
+</span><span class='line'>                                  Token offendingToken, int line,
+</span><span class='line'>                                  int charPositionInLine) {
+</span><span class='line'>        CommonTokenStream tokens =
+</span><span class='line'>            (CommonTokenStream)recognizer.getInputStream();
+</span><span class='line'>        String input = tokens.getTokenSource().getInputStream().toString();
+</span><span class='line'>        String[] lines = input.split("\n");
+</span><span class='line'>        String errorLine = lines[line - 1];
+</span><span class='line'>        System.err.println(errorLine);
+</span><span class='line'>        for (int i=0; i&lt;charPositionInLine; i++) System.err.print(" ");
+</span><span class='line'>        int start = offendingToken.getStartIndex();
+</span><span class='line'>        int stop = offendingToken.getStopIndex();
+</span><span class='line'>        if ( start&gt;=0 && stop&gt;=0 ) {
+</span><span class='line'>            for (int i=start; i&lt;=stop; i++) System.err.print("^");
+</span><span class='line'>        }
+</span><span class='line'>        System.err.println();
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 </div>
 
 

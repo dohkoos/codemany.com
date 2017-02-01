@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: ANTLR | 乐者为王]]></title>
   <link href="http://codemany.com/tags/antlr/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-01-31T19:24:25+08:00</updated>
+  <updated>2017-02-01T19:32:00+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -66,7 +66,56 @@ line 2:6 at [@5,18:18=&#39;;&#39;,&lt;8&gt;,2:6]: no viable alternative at input
 class T
 </code></pre></div>
 <p>栈[prog, classDef]指出语法分析器在规则classDef中，且被prog调用。注意，记号信息包含在输入流中的字符位置，这在高亮输入中的错误时是非常有用的。例如，记号[@2,8:8=&#39;T&#39;,<9>,1:8]指出它是记号流中的第3个记号（索引从0开始），字符范围从8到8，记号类型为9，位于第1行，并且在字符位置8（计数从0开始，且TAB被当作一个字符）。</p>
-]]></content>
+
+<p>作为另一个示例，让我们构建一个错误监听器TestE_Listener2.java，它打印带有被下划线强调的有错误的记号的行。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">compile *.java
+run TestE_Listener2
+</code></pre></div>
+<p>输入以下数据：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">class T XYZ {
+  int ;
+}
+</code></pre></div>
+<p>然后就会看如如下错误信息：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">line 1:8 extraneous input &#39;XYZ&#39; expecting &#39;{&#39;
+class T XYZ {
+        ^^^
+line 2:6 no viable alternative at input &#39;int;&#39;
+  int ;
+      ^
+class T
+</code></pre></div>
+<p>为了让事情变得更容易，我们将忽略TAB——charPositionInLine不是列号，因为TAB的大小不是统一定义的。这里是一个错误监听器实现，强调输入中的错误位置。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">public static class UnderlineListener extends BaseErrorListener {
+    public void syntaxError(Recognizer&lt;?, ?&gt; recognizer,
+                            Object offendingSymbol,
+                            int line, int charPositionInLine,
+                            String msg,
+                            RecognitionException e) {
+        System.err.println(&quot;line &quot;+line+&quot;:&quot;+charPositionInLine+&quot; &quot;+msg);
+        underlineError(recognizer,(Token)offendingSymbol,
+        line, charPositionInLine);
+    }
+
+    protected void underlineError(Recognizer recognizer,
+                                  Token offendingToken, int line,
+                                  int charPositionInLine) {
+        CommonTokenStream tokens =
+            (CommonTokenStream)recognizer.getInputStream();
+        String input = tokens.getTokenSource().getInputStream().toString();
+        String[] lines = input.split(&quot;\n&quot;);
+        String errorLine = lines[line - 1];
+        System.err.println(errorLine);
+        for (int i=0; i&lt;charPositionInLine; i++) System.err.print(&quot; &quot;);
+        int start = offendingToken.getStartIndex();
+        int stop = offendingToken.getStopIndex();
+        if ( start&gt;=0 &amp;&amp; stop&gt;=0 ) {
+            for (int i=start; i&lt;=stop; i++) System.err.print(&quot;^&quot;);
+        }
+        System.err.println();
+    }
+}
+</code></pre></div>]]></content>
   </entry>
   
   <entry>
