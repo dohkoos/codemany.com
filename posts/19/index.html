@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="域名信息的查询原理非常简单，主要是基于RFC 954（RFC 812已被废弃）提供的WHOIS协议。WHOIS服务器是一个基于“查询/响应”的TCP事务服务器，用户程序通过访问WHOIS服务器，从WHOIS数据库中查询得到我们所需要的内容。其主要过程有以下三步： &hellip;">
+  <meta name="description" content="在PowerBuilder中，DataWindow是用来存储和操纵数据的对象。在每个DataWindow对象中都有4个二维表作为数据缓冲区来存储数据。用户在DataWindow中对数据的操作实际上都是将数据在这几个缓冲区中进行修改和移动，最后在用户提交数据库时， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,108 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/datawindows-data-buffer/">DataWindow的数据缓冲区</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2009-10-15T09:03:29+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>15</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>9:03 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在PowerBuilder中，DataWindow是用来存储和操纵数据的对象。在每个DataWindow对象中都有4个二维表作为数据缓冲区来存储数据。用户在DataWindow中对数据的操作实际上都是将数据在这几个缓冲区中进行修改和移动，最后在用户提交数据库时，系统根据这四个缓冲区中的信息形成SQL的INSERT、UPDATE、DELETE等语句。这四个缓冲区是：</p>
+
+<p>Primary Buffer</p>
+
+<p>这个缓冲区是存放填充窗口中DataWindow控件的数据的，调用DataWindow控件的Retrieve()函数和InsertRow()函数可以将数据填入这个缓冲区中。当使用有关DataWindow删除和过滤函数时，相应记录将从这一缓冲区中删除。而在执行DataWindow的Update()函数时，PowerBuilder将查看这一缓冲区中的记录以形成INSERT和UPDATE语句。</p>
+
+<p>Delete Buffer</p>
+
+<p>这个缓冲区保存的是用DeleteRow()函数从Primary Buffer中删除的记录，执行Update()函数时，系统根据这一缓冲区的记录形成DELETE语句。</p>
+
+<p>Filter Buffer</p>
+
+<p>这个缓冲区存储的是从Original Buffer使用Filter()函数过滤到Primary Buffer中后剩余的记录。</p>
+
+<p>Original Buffer</p>
+
+<p>这一缓冲区存储的是DataWindow最初执行Retrieve()函数时得到的全部记录。当提交数据库时，根据Primary Buffer生成的UPDATE语句和根据Delete Buffer生成的DELETE语句都要依据这一缓冲区来构造这些SQL语句中的WHERE子句。</p>
+
+<p>Original Buffer由PowerBuilder内部维护，PowerBuilder所提供的任何函数都无法改变它的值，不过通过PowerBuilder所提供的GetItem系列函数可以读出DataWindow最初从数据库中查到的原始值。通过这些函数我们可以编程实现所谓的Undo功能，并且得到在使用乐观锁时形成提交数据库的WHERE子句。如果你当前使用的DataWindow没有设置修改的权力，你将不能对Delete Buffer和Original Buffer进行操作，而且当调用Update()时也将引起系统错误。</p>
+
+<p>Primary Buffer和Delete Buffer都有行级和列级的状态值，这个状态值是一个枚举类型。在提交时由该行的状态值来决定是否要产生SQL语句，其中Primary Buffer产生的是INSERT和UPDATE语句，而Delete Buffer产生的是DELETE语句。我们用GetItemStatus()函数和SetItemStatus()函数可以对这一状态值进行操纵。这一枚举状态有以下四种：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>NotModified! —— 指定单元的数据和原始数据相同，没有发生改变。
+</span><span class='line'>DataModified! —— 指定单元的数据和原始数据不同，发生了改变。
+</span><span class='line'>New! —— 该数据行是新增加的，但数据没有发生改变（数据为空或缺省值）。
+</span><span class='line'>NewModified! —— 该数据行是新增加的，且数据已发生改变（用户键盘输入或调用SetItem()函数）。</span></code></pre></td></tr></table></div></figure>
+
+<p>在上面的这四个值中，NotModifed!和DataModified!可以表示行和列的状态，而New!和NewModified!只可以表示行的状态。</p>
+
+<p>让我们来看一个实例。有这样一张表，表中有3个字段，其中item是主键。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>item CHAR(5)
+</span><span class='line'>name CHAR(20)
+</span><span class='line'>quantity INT</span></code></pre></td></tr></table></div></figure>
+
+<p>在代码中我们查询这张表的记录，得到以下的这些信息，它们被存储在Primary Buffer和Origianal Buffer中。</p>
+
+<p><img src="/uploads/dwbuffer-1.png" title="dwbuffer-1" ></p>
+
+<p>在窗口中，我们过滤掉数量为0的行，并且加上一个空行：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>dw_1.SetFilter("quantity=0")
+</span><span class='line'>dw_1.Filter()
+</span><span class='line'>dw_1.InsertRow()</span></code></pre></td></tr></table></div></figure>
+
+<p>这时Primary Buffer的状态为：</p>
+
+<p><img src="/uploads/dwbuffer-2.png" title="dwbuffer-2" ></p>
+
+<p>在Filter Buffer中的记录为：</p>
+
+<p><img src="/uploads/dwbuffer-3.png" title="dwbuffer-3" ></p>
+
+<p>用户在新插入行中输入数据，删除了第3行数据，并修改了第2行数据。当他离开这个DataWindow时，Primary Buffer和Delete Buffer的状态如下：</p>
+
+<p><img src="/uploads/dwbuffer-4.png" title="dwbuffer-4" ></p>
+
+<p><img src="/uploads/dwbuffer-5.png" title="dwbuffer-5" ></p>
+
+<p>这时执行dw_1.Update()函数，系统将基于这两个缓冲区生成SQL语句。</p>
+
+<p><img src="/uploads/dwbuffer-6.png" title="dwbuffer-6" ></p>
+
+<p>在Primary Buffer中，状态为NotModified!和New!的行将被忽略而不产生SQL语句。状态为DataModified!的行将产生UPDATE语句，状态为NewModified!的行将产生INSERT语句，在Delete Buffer中的行将产生DELETE语句。使用DataWindow的Reset()函数和Retrieve()函数以及改变DataObject属性时，系统将重置这几个缓冲区。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -612,70 +714,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/git-notes-log/">Git笔记之log</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2009-02-22T16:34:58+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2009</span></span> <span class='time'>4:34 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>最简单的查看开发日志的命令是git log。如果你觉得git log给出的信息太单薄，那么可以使用git log -p，它不但会给出非常详细的开发日志，而且还会显示每次提交实际修改的内容。</p>
-
-<p>git log支持很多的参数，可以将这些参数结合起来使用。下面是经常使用的一些参数：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>-–name-only  # 只显示变更文件的名称
-</span><span class='line'>-–oneline    # 将提交信息压缩到一行显示
-</span><span class='line'>-–graph      # 显示所有提交的依赖树
-</span><span class='line'>-–reverse    # 按照逆序显示提交记录（最先提交的在最前面）
-</span><span class='line'>-–since      # 显示某个日期之后发生的提交
-</span><span class='line'>-–until      # 显示某个日期之前发生的提交
-</span><span class='line'>--decorate   # 显示每个commit的引用</span></code></pre></td></tr></table></div></figure>
-
-<p>如果你曾经与很多小伙伴工作在同一个分支上，也许会有这样的经历，master分支上的大量合并同步到你当前的分支。这使得我们很难分辨哪些变更是发生在master分支，哪些变更是发生在当前分支，且尚未合并到master分支。可以使用git log --no-merges master..查看尚未合并的变更。其中--no-merges选项表示着只显示没有合并到任何分支的变更，master..选项表示只显示没有合并到master分支的变更。</p>
-
-<p>如果想查看文件中指定位置的变更怎么办？可以使用以下命令：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git log -L 1,1:&lt;path&gt;  # -L选项告诉Git只要输出指定文件中指定行的变更日志。</span></code></pre></td></tr></table></div></figure>
-
-<p>你还可以通过如下命令来定位具体的历史记录：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git log v3..v7                 # 显示v3之后直至v7的所有历史记录
-</span><span class='line'>git log v3..                   # 显示所有v3之后的历史记录
-</span><span class='line'>git log -–since="2 weeks ago"  # 显示2周前到现在的所有历史记录</span></code></pre></td></tr></table></div></figure>
-
-<p>如果这些都不够好用的话，还有一个--pretty选项，可以用来创建高级的自定义输出。譬如，你可以使用--pretty=raw查看日志的原始信息。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/20">&larr; Older</a>
@@ -693,6 +731,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/how-to-modify-hosts-in-android/">如何修改Android的hosts文件</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/chess-mess-master-development-record-part2/">象棋残局大师开发实录（2）</a>
       </li>
     
@@ -708,10 +750,6 @@
         <a href="/blog/reading-notes-the-definitive-antlr4-reference-part29/">ANTLR 4权威参考读书笔记（29）</a>
       </li>
     
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part28/">ANTLR 4权威参考读书笔记（28）</a>
-      </li>
-    
   </ul>
 </section>
 <section>
@@ -725,7 +763,7 @@
   <ul class="tag-cloud">
     <a style="font-size: 144%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 134%" href="/tags/android/">Android</a>
+<a style="font-size: 135%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
 <a style="font-size: 107%" href="/tags/css/">CSS</a>
 <a style="font-size: 110%" href="/tags/crack/">Crack</a>

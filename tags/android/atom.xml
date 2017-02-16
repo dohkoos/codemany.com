@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Android | 乐者为王]]></title>
   <link href="http://codemany.com/tags/android/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-02-02T17:59:01+08:00</updated>
+  <updated>2017-02-16T23:01:08+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,132 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[如何修改Android的hosts文件]]></title>
+    <link href="http://codemany.com/blog/how-to-modify-hosts-in-android/"/>
+    <updated>2017-02-16T11:52:56+08:00</updated>
+    <id>http://codemany.com/blog/how-to-modify-hosts-in-android</id>
+    <content type="html"><![CDATA[<p>由于「你懂的」的原因，某些时候我们需要修改Android的hosts文件。Android的hosts文件路径是/system/etc/hosts，在修改该文件前首先需要Android手机获取root权限。至于如何root你的手机，这里就不加详述，可以自行在网络上查找，很多也很简单。</p>
+
+<p>本文将要阐述的是如何在命令行下通过adb程序访问root过的手机，把hosts拖到电脑上修改，然后再复制回手机来实现修改hosts的方法。</p>
+
+<p>下面就开始具体的步骤：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">C:\tools&gt;adb pull /system/etc/hosts hosts.mod
+[100%] /system/etc/hosts
+</code></pre></div>
+<p>上面的命令是把手机上的hosts文件拖到电脑上，[100%]表明文件已经传输完成，可以修改hosts文件了。在修改完成后就使用以下命令上传到手机：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">C:\tools&gt;adb push hosts.mod /system/etc/hosts
+adb: error: failed to copy &#39;hosts.mod&#39; to &#39;/system/etc/hosts&#39;: Read-only file system
+</code></pre></div>
+<p>从回显的消息可以看到，文件系统是只读的，所以不能直接上传。</p>
+
+<p>试试以下的命令看能不能成功？！</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">C:\tools&gt;adb root  # 帮助文档说该命令可以让adbd守护进程获得root权限
+C:\tools&gt;adb push hosts.mod /system/etc/hosts
+adb: error: failed to copy &#39;hosts.mod&#39; to &#39;/system/etc/hosts&#39;: Read-only file system
+</code></pre></div>
+<p>还是不行，看来要重新挂载/system目录才可以。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">C:\tools&gt;adb remount
+remount failed: Operation not permitted
+</code></pre></div>
+<p>没有权限？这是必须祭起shell大法的节奏啊！</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">C:\tools&gt;adb shell
+* daemon not running. starting it now on port 5037 *
+* daemon started successfully *
+shell@maguro:/ $ ls -al /system/etc/hosts
+-rw-r--r-- root     root           25 2013-08-14 07:00 hosts
+</code></pre></div>
+<p>从上面最后一行可以看出hosts这个文件只有它的拥有者能写入，对于其他人来说都是只读的。要想让其他人也能做修改，必须使用以下命令进行提权，再改变hosts文件的属性才行。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">shell@maguro:/ $ su
+</code></pre></div>
+<p>如果是第一次执行这个命令，手机会亮起，SuperSU应用会提示你是否同意权限的分配。这里当然是要同意的！接着你就可以看到终端下的提示符从$变成了#，@前的字符也由shell变成了root。然后我们就可以修改hosts文件的权限属性了。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">root@maguro:/ # chmod +666 /system/etc/hosts
+Bad mode
+root@maguro:/ # chmod 666 /system/etc/hosts
+Unable to chmod /system/etc/hosts: Read-only file system
+</code></pre></div>
+<p>又是Read-only file system！输入以下命令看看/system目录的文件系统详情呢。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">root@maguro:/ # mount | grep system
+/dev/block/platform/omap/omap_hsmmc.0/by-name/system /system ext4 ro,seclabel,relatime...
+</code></pre></div>
+<p>看到ext4后面的ro了吗？它是read only的缩写，即只读的意思。这说明/system目录是只读的。接下来我们要把它改成可以读写。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">root@maguro:/ # mount -o rw,remount /system
+</code></pre></div>
+<p>上面的-o用于指定加载文件系统时的选项。这些选项包括：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">remount 重新加载设备。通常用于改变设备的设置状态。
+ro 以只读模式加载。
+rw 以可读写模式加载。
+</code></pre></div>
+<p>再次查看，可以看到原来ro的位置已经变成rw了。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">root@maguro:/ # mount | grep system
+/dev/block/platform/omap/omap_hsmmc.0/by-name/system /system ext4 rw,seclabel,relatime...
+</code></pre></div>
+<p>不过到这里我们还不能向手机拷贝hosts文件，因为hosts文件的权限属性还没被改过，如果强行上传的话，会得到如下的错误消息：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">C:\tools&gt;adb push hosts.mod /system/etc/hosts
+adb: error: failed to copy &#39;hosts.mod&#39; to &#39;/system/etc/hosts&#39;: Permission denied
+</code></pre></div>
+<p>运行以下命令：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">root@maguro:/ # chmod 666 /system/etc/hosts
+</code></pre></div>
+<p>然后查看hosts文件的属性。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">root@maguro:/ # ls -al /system/etc/hosts
+-rw-rw-rw- root     root           25 2013-08-14 07:00 hosts
+</code></pre></div>
+<p>可以看到所有人都可以读写hosts文件了。</p>
+
+<p>既然一切都准备就绪，那就再来试试上传修改后的hosts文件吧。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">C:\tools&gt;adb push hosts.mod /system/etc/hosts
+adb: error: failed to copy &#39;hosts.mod&#39; to &#39;/system/etc/hosts&#39;: Read-only file system
+</code></pre></div>
+<p>怎么回事，为什么还是拷贝失败呢？不是已经把文件系统改为可读写了吗？</p>
+
+<p>并且在查找原因的过程中还发现一个奇怪的事情。在root模式下/system目录是可读写的，但在shell模式下/system却是只读的。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">root@maguro:/ # mount | grep system
+/dev/block/platform/omap/omap_hsmmc.0/by-name/system /system ext4 rw,seclabel,relatime...
+root@maguro:/ # exit
+shell@maguro:/ # mount | grep system
+/dev/block/platform/omap/omap_hsmmc.0/by-name/system /system ext4 ro,seclabel,relatime...
+</code></pre></div>
+<p>而且在手机上的Terminal Emulator中把/system目录mount成可读写之后，在adb shell的root模式下查看/system的状态仍然显示为只读。</p>
+
+<p>在网上找啊找啊找啊，都快要绝望了，终于找到可能之问题所在。就是这个帖子：<a href="http://android.stackexchange.com/questions/142271/mount-in-shell-as-user-or-root-with-different-output">mount in shell as user or root with different output</a>。有个回答提到mount namespace这样东西。然后才知道：</p>
+
+<blockquote>
+<p>A mount namespace is the set of filesystem mounts that are visible to a process.</p>
+</blockquote>
+
+<p>每个进程的挂载点对其它进程是不可见的。Terminal Emulator中mount后的挂载点属于该进程，而adb shell中shell模式和root模式的挂载点分别属于各自的进程。这就是前面root模式下修改/system目录为可读写后在shell模式下仍显示为只读的原因。</p>
+
+<p>知道问题的原因了，那如何解决呢？</p>
+
+<p>在SuperSu应用的设置中有个mount namespace separation的选项，如下图所示：</p>
+
+<p><img src="/uploads/mount-namespace-separation.png" title="mount-namespace-separation" ></p>
+
+<p>把勾选取消，然后mount的挂载点就是全局性的了，不再为mount它们的进程所独有。不过要记住的是，只有在重启手机后该修改才有效。</p>
+
+<p>下面是取消mount namespace separation后在上传的结果：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">C:\tools&gt;adb push hosts.mod /system/etc/hosts
+[100%] /system/etc/hosts
+</code></pre></div>
+<p>可以看到[100%]的回显，说明文件已经上传完成。</p>
+
+<p>查看hosts文件的属性：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">root@maguro:/ # ls -al /system/etc/hosts
+-rw-rw-rw- root     root       137679 2017-02-16 00:20 hosts
+</code></pre></div>
+<p>文件的大小已经由25变成137679，说明文件已经替换完成。</p>
+
+<p>下面就是恢复手机到原先的状态：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">root@maguro:/ # chmod 644 /system/etc/hosts
+root@maguro:/ # ls -al /system/etc/hosts
+-rw-r--r-- root     root       137679 2017-02-16 00:20 hosts
+root@maguro:/ # mount -o ro,remount /system
+</code></pre></div>
+<p>至此，修改hosts文件的工作就算大功告成。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[象棋残局大师开发实录（2）]]></title>
@@ -380,108 +506,6 @@ TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类
 tabHost.setup();
 </code></pre></div>
 <p>到这边就已经完成了，其它tabHost.addTab的使用方式一模一样。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[扫描ISBN条码实现藏书管理]]></title>
-    <link href="http://codemany.com/blog/manage-books-by-scanning-isbn-barcode/"/>
-    <updated>2013-04-25T12:17:14+08:00</updated>
-    <id>http://codemany.com/blog/manage-books-by-scanning-isbn-barcode</id>
-    <content type="html"><![CDATA[<p>每个程序猿家里都有一堆技术书籍，偶也不例外，因此想写个Android应用来管理自己的藏书以及想买的书籍。在网上找到marshal的<a href="http://marshal.easymorse.com/archives/2745">识别图书ISBN号并输出查询结果的示例</a>和<a href="http://marshal.easymorse.com/archives/2756">完善图书查询原型，增加收藏夹功能</a>两篇文章，写的非常不错，还提供源代码。下载代码研究后发现已基本具备了想要的功能，决定在它的基础上做些修改供自己使用。</p>
-
-<p>把原来uses-sdk的minSdkVersion改成了9，增加android:targetSdkVersion=&quot;17&quot;。然后使用手机测试程序时发现，在连接网络时后台会抛出android.os.NetworkOnMainThreadException，并且应用崩溃打不开。通过查阅相关资料了解到，自从Android 2.3之后，系统增加了一个类StrictMode。这个类对网络的访问方式进行了一定的改变。官方文档给出了这个类设置的目的：</p>
-
-<blockquote>
-<p>StrictMode is a developer tool which detects things you might be doing by accident and brings them to your attention so you can fix them.</p>
-
-<p>StrictMode is most commonly used to catch accidental disk or network access on the application&#39;s main thread, where UI operations are received and animations take place. Keeping disk and network operations off the main thread makes for much smoother, more responsive applications. By keeping your application&#39;s main thread responsive, you also prevent ANR dialogs from being shown to users.</p>
-
-<p>Note that even though an Android device&#39;s disk is often on flash memory, many devices run a filesystem on top of that memory with very limited concurrency. It&#39;s often the case that almost all disk accesses are fast, but may in individual cases be dramatically slower when certain I/O is happening in the background from other processes. If possible, it&#39;s best to assume that such things are not fast.</p>
-</blockquote>
-
-<p>因为marshal把访问网络的代码直接放到UI线程中，造成和主线程的首要工作——UI交互——相矛盾。解决这类问题很容易，把访问网络的代码放到AsyncTask中就行了。</p>
-
-<p>接着发现豆瓣API查询返回的是500错误，在浏览器上访问却又正常，后来给HttpClient加上Agent头就没问题了，不知道是不是期间豆瓣的API在实现上作了改变。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">HttpClient client = new DefaultHttpClient();
-String agent = System.getProperty(&quot;http.agent&quot;);
-client.getParams().setParameter(CoreProtocolPNames.USER_AGENT, agent);
-</code></pre></div>
-<p>解析豆瓣XML查询结果的代码：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
-factory.setNamespaceAware(true);
-XmlPullParser parser = factory.newPullParser();
-parser.setInput(inputStream, &quot;utf-8&quot;);
-
-Book book = new Book();
-book.setIsbn(getIntent().getExtras().getString(&quot;ISBN&quot;));
-
-int eventType = parser.getEventType();
-while (eventType != XmlPullParser.END_DOCUMENT) {
-    switch (eventType) {
-    case XmlPullParser.START_TAG:
-        if (&quot;link&quot;.equals(parser.getName())
-                &amp;&amp; &quot;image&quot;.equals(parser.getAttributeValue(null, &quot;rel&quot;))) {
-            book.setImageUrl(parser.getAttributeValue(null, &quot;href&quot;));
-            eventType = parser.next();
-        } else if (&quot;summary&quot;.equals(parser.getName())) {
-            book.setSummary(parser.nextText());
-        } else if (&quot;attribute&quot;.equals(parser.getName())) {
-            String name = parser.getAttributeValue(null, &quot;name&quot;);
-            if (&quot;title&quot;.equals(name)) {
-                book.setTitle(parser.nextText());
-            } else if (&quot;author&quot;.equals(name)) {
-                book.setAuthor(parser.nextText());
-            } else if (&quot;publisher&quot;.equals(name)) {
-                book.setPublisher(parser.nextText());
-            }
-        }
-        break;
-    case XmlPullParser.END_TAG:
-        break;
-    }
-    eventType = parser.next();
-}
-</code></pre></div>
-<p>然后，然后就是结果页面不显示图书信息。想要找到原因，肿么办？看来要调试WebView了！<a href="http://developer.android.com/guide/webapps/debugging.html">http://developer.android.com/guide/webapps/debugging.html</a> 告诉了我们如何调试。</p>
-
-<p>首先在WebView上设置setWebChromeClient方法：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">webView.setWebChromeClient(new WebChromeClient() {
-    public void onConsoleMessage(String message,
-            int lineNumber, String sourceID) {
-        Log.d(TAG, message + &quot; -- From line &quot;
-                + lineNumber + &quot; of &quot; + sourceID);
-    }
-});
-</code></pre></div>
-<p>然后在JavaScript脚本中使用以下方法就可以在logcat中看到调试信息了。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">console.log(String)
-console.info(String)
-console.warn(String)
-console.error(String)
-</code></pre></div>
-<p>重新运行程序，果然在logcat中看到报如下错误：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">Uncaught TypeError: Object [object Object] has no method &#39;xxx&#39;
-</code></pre></div>
-<p>搜索后在Stack Overflow找到了<a href="http://stackoverflow.com/questions/14031635/android-4-2-1-webview-and-javascript-interface-breaks">问题的答案</a>（Stack Overflow真的非常不错，问题的回答都非常详尽）。<a href="http://developer.android.com/guide/webapps/webview.html#BindingJavaScript">http://developer.android.com/guide/webapps/webview.html#BindingJavaScript</a> 是官方文档的解释。</p>
-
-<p>解决方法就是在要被JavaScript调用的方法上加@JavascriptInterface注解：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public class Book {
-
-    @JavascriptInterface
-    public String getAuthor() {
-        return author;
-    }
-
-    public void setAuthor(String author) {
-        if (this.author != null) {
-            this.author += &quot;, &quot; + author;
-        } else {
-            this.author = author;
-        }
-    }
-</code></pre></div>
-<p>代码下载：<a href="https://github.com/dohkoos/Bookly">https://github.com/dohkoos/Bookly</a></p>
 ]]></content>
   </entry>
   
