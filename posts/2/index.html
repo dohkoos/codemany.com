@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="在本节中，我们准备讲讲有时候事件方法需要传递部分结果或其它信息的问题。 在事件方法间共享信息 无论收集信息还是计算值，传递参数和返回值都是比使用字段和全局变量更方便良好的编程实践。问题是ANTLR自动生成的监听器方法的签名不需要特定应用的返回值或参数， &hellip;">
+  <meta name="description" content="这次我们要做的是通过监听器实现CSV文件的加载器，用于建立一个二维列表数据结构。 加载CSV数据 我们的目标是构建一个监听器去加载CSV数据到一个映射列表数据结构中，这是任何数据格式阅读器或配置文件阅读器都会做的事。我们会收集每行的字段并放到一个映射中，构成头名-值组合。以下是示例文件t. &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,206 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part25/">ANTLR 4权威参考读书笔记（25）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-09-03T16:16:56+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2016</span></span> <span class='time'>4:16 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>这次我们要做的是通过监听器实现CSV文件的加载器，用于建立一个二维列表数据结构。</p>
+
+<h3 id="加载csv数据">加载CSV数据</h3>
+
+<p>我们的目标是构建一个监听器去加载CSV数据到一个映射列表数据结构中，这是任何数据格式阅读器或配置文件阅读器都会做的事。我们会收集每行的字段并放到一个映射中，构成头名-值组合。以下是示例文件t.csv的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Details,Month,Amount
+</span><span class='line'>Mid Bonus,June,"$2,000"
+</span><span class='line'>,January,"""zippo"""
+</span><span class='line'>Total Bonuses,"","$5,000"</span></code></pre></td></tr></table></div></figure>
+
+<p>我们想要看到如下的映射列表被打印出：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>[{Details=Mid Bonus, Month=June, Amount="$2,000"},
+</span><span class='line'> {Details=, Month=January, Amount="""zippo"""},
+</span><span class='line'> {Details=Total Bonuses, Month="", Amount="$5,000"}]</span></code></pre></td></tr></table></div></figure>
+
+<p>为了在监听器中得到精确的方法，我们给CSV语法中field规则的每个选项打上标签：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar CSV;
+</span><span class='line'>
+</span><span class='line'>file : hdr row+ ;
+</span><span class='line'>hdr : row ;
+</span><span class='line'>row : field (',' field)* '\r'? '\n' ;
+</span><span class='line'>field
+</span><span class='line'>    : TEXT    # text
+</span><span class='line'>    | STRING  # string
+</span><span class='line'>    |         # empty
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>TEXT : ~[,\n\r"]+ ;
+</span><span class='line'>STRING : '"' ('""'|~'"')* '"' ;     // quote-quote is an escaped quote</span></code></pre></td></tr></table></div></figure>
+
+<p>我们可以从定义我们需要的数据结构开始监听器的实现。首先，我们需要的数据结构是称为rows的映射列表。我们也需要在头行中找到的列名列表header。为处理数据行，我们需要把字段值读到一个临时列表currentRowFieldValues中，然后把列名映射到那些值上。以下是监听器LoadCSV.java的实现代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static class Loader extends CSVBaseListener {
+</span><span class='line'>    public static final String EMPTY = "";
+</span><span class='line'>    /** Load a list of row maps that map field name to value */
+</span><span class='line'>    List&lt;Map&lt;String,String&gt;&gt; rows = new ArrayList&lt;Map&lt;String, String&gt;&gt;();
+</span><span class='line'>    /** List of column names */
+</span><span class='line'>    List&lt;String&gt; header;
+</span><span class='line'>    /** Build up a list of fields in current row */
+</span><span class='line'>    List&lt;String&gt; currentRowFieldValues;</span></code></pre></td></tr></table></div></figure>
+
+<p>下面的3个规则方法通过计算适当的字符串处理字段值，并把它添加到currentRowFieldValues中。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitString(CSVParser.StringContext ctx) {
+</span><span class='line'>    currentRowFieldValues.add(ctx.STRING().getText());
+</span><span class='line'>}
+</span><span class='line'>public void exitText(CSVParser.TextContext ctx) {
+</span><span class='line'>    currentRowFieldValues.add(ctx.TEXT().getText());
+</span><span class='line'>}
+</span><span class='line'>public void exitEmpty(CSVParser.EmptyContext ctx) {
+</span><span class='line'>    currentRowFieldValues.add(EMPTY);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>在我们能处理数据行之前，我们需要从第一行取得列名列表。头行在语法上仅仅是另外的行，但我们在对待它时要不同于常规的数据行，那意味着我们需要检查上下文。暂时让我们假设在exitRow()执行后，currentRowFieldValues包含列名列表。要填充header，我们只需要捕获第一行的字段值。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitHdr(CSVParser.HdrContext ctx) {
+</span><span class='line'>    header = new ArrayList&lt;String&gt;();
+</span><span class='line'>    header.addAll(currentRowFieldValues);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>谈到行时，我们需要两个操作：一个是当我们开始一行时，另一个是当我们结束一行时。当我们开始一行时，我们需要分配或清除currentRowFieldValues，准备获取一组新的数据。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void enterRow(CSVParser.RowContext ctx) {
+</span><span class='line'>    currentRowFieldValues = new ArrayList&lt;String&gt;();
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>在行结束的时候，我们必须考虑上下文。如果我们仅仅加载头行，那我们不能改变rows字段，因为列名不是数据。在exitRow()中，我们可以通过查看在语法分析树中的父节点的getRuleIndex()值（或者询问父节点是否是HdrContext类型）测试上下文。如果当前行是数据行，我们将通过同时遍历header中的列名和currentRowFieldValues中的值获取的内容创建映射。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitRow(CSVParser.RowContext ctx) {
+</span><span class='line'>    // If this is the header row, do nothing
+</span><span class='line'>    // if ( ctx.parent instanceof CSVParser.HdrContext ) return; OR:
+</span><span class='line'>    if ( ctx.getParent().getRuleIndex() == CSVParser.RULE_hdr ) {
+</span><span class='line'>        return;
+</span><span class='line'>    }
+</span><span class='line'>    // It's a data row
+</span><span class='line'>    Map&lt;String, String&gt; m = new LinkedHashMap&lt;String, String&gt;();
+</span><span class='line'>    int i = 0;
+</span><span class='line'>    for (String v : currentRowFieldValues) {
+</span><span class='line'>        m.put(header.get(i), v);
+</span><span class='line'>        i++;
+</span><span class='line'>    }
+</span><span class='line'>    rows.add(m);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>到这里，加载CSV数据到数据结构中的任务就算已经完成。在使用ParseTreeWalker遍历树后，我们就可以紧接着打印出rows字段：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ParseTreeWalker walker = new ParseTreeWalker();
+</span><span class='line'>Loader loader = new Loader();
+</span><span class='line'>walker.walk(loader, tree);
+</span><span class='line'>System.out.println(loader.rows);</span></code></pre></td></tr></table></div></figure>
+
+<p>以下是构建和测试序列：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr CSV.g
+</span><span class='line'>compile *.java
+</span><span class='line'>run LoadCSV t.csv</span></code></pre></td></tr></table></div></figure>
+
+<p>下面显示的是输出结果：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>[{Details=Mid Bonus, Month=June, Amount="$2,000"}, {Details=, Month=January,
+</span><span class='line'>Amount="""zippo"""}, {Details=Total Bonuses, Month="", Amount="$5,000"}]</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -3454,89 +3654,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part17/">ANTLR 4权威参考读书笔记（17）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-06-07T13:09:54+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>7</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>1:09 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>用自顶向下的语法指定和通过手工的递归下降语法分析器识别表达式一直是个麻烦。首先是因为大部分自然语法是模糊的，其次是因为大部分自然语法规格使用一种被称为左递归的特殊类型递归。所以自顶向下的语法和语法分析器不能处理传统形式上的左递归。</p>
-
-<p>为了阐明这个问题，设想一个算术表达式语言，它只有乘法和加法运算符以及整数。表达式是自相似的。也就是说，一个乘法表达式是由“*”运算符连接的两个子表达式。同样的，一个加法表达式是由“+”运算符连接的两个子表达式。我们也可以把整数看作表达式。整个语法规则看起来就像下面显示的那样：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>expr : expr '*' expr    // 匹配由“*”运算符连接的子表达式
-</span><span class='line'>     | expr '+' expr    // 匹配由“+”运算符连接的子表达式
-</span><span class='line'>     | INT              // 匹配简单整数
-</span><span class='line'>     ;</span></code></pre></td></tr></table></div></figure>
-
-<p>问题是上述规则对于某些输入短语来说是模棱两可的。换句话说，这个规则能用多种方法匹配单个输入流。对于简单的整数和像1+2和1*2这样的单运算符表达式是没问题的，因为只有一种方法能去匹配它们。例如，规则可以仅用第二个选项匹配1+2。就像下图左边所示的那样：</p>
-
-<p><img src="/uploads/ambiguity-parse-tree.png" title="ambiguity-parse-tree" ></p>
-
-<p>问题在于指定的规则可以像中间和右边语法分析树描绘的那样用两种方法解释1+2*3这样的输入。两者的解释是不同的，因为中间的树说1加到2乘3的结果上，而右边的树说1加2的结果乘以3。这是一个运算符优先级的问题，但常规语法根本没有指定优先级的方法。大部分语法工具使用额外的符号来指定运算符优先级。</p>
-
-<p>与此相反的是，ANTLR使用有利于首先给出的选项，隐式地允许我们指定运算符优先级的方法来解决二义性。规则expr有一个乘法选项在加法选项之前，因此，ANTLR解决1+2*3的运算符二义性的方法有利于乘法。</p>
-
-<p>默认情况下，ANTLR是从左到右结合运算符，然而某些像指数这样的运算符则是从右到左。因此，我们必须使用参数assoc手动指定运算符记号上的相关性。这里是一个能正确地把输入<code>2^3^4</code>解释成<code>2^(3^4)</code>的表达式规则：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>expr : expr '^'&lt;assoc=right&gt; expr    // 运算符是右结合的
-</span><span class='line'>     | INT
-</span><span class='line'>     ;</span></code></pre></td></tr></table></div></figure>
-
-<p>下图中的语法分析树阐明了运算符左右结合版本的不同。右边的语法分析树是惯常的解释：</p>
-
-<p><img src="/uploads/power-parse-tree.png" title="power-parse-tree" ></p>
-
-<p>为了把指数、乘法和加法这三个运算符合并成一条规则，我们把指数表达式选项放在其它表达式选项之前，因为它的运算符优先级比乘法和加法都要高。合并后的语法如下所示：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>expr : expr '^'&lt;assoc=right&gt; expr    // 运算符是右结合的
-</span><span class='line'>     | expr '*' expr                 // 匹配由“*”运算符连接的子表达式
-</span><span class='line'>     | expr '+' expr                 // 匹配由“+”运算符连接的子表达式
-</span><span class='line'>     | INT                           // 匹配简单整数
-</span><span class='line'>     ;</span></code></pre></td></tr></table></div></figure>
-
-<p>不像其它常规的语法分析器生成器那样，ANTLR v4是可以处理直接左递归的。左递归规则是指在选项的左边缘直接或者间接调用自身的规则。规则expr是直接左递归的，因为除INT选项外的其它所有选项都开始于规则expr自身的引用。如果规则expr的引用处在某些选项的右边缘，那么它就是右递归的。虽然ANTLR v4可以处理直接左递归，但它不能处理间接左递归。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>expr : expo ;    // 通过expo左递归地间接调用expr
-</span><span class='line'>expo : expr '^'&lt;assoc=right&gt; expr ;</span></code></pre></td></tr></table></div></figure>
-
-<p>ANTLR v4可以简化直接左递归的表达式规则的工作。这种新的机制不仅更有效率，而且表达式规则也更小和更容易理解。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/3">&larr; Older</a>
@@ -3566,11 +3683,11 @@
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part30/">ANTLR 4权威参考读书笔记（30）</a>
+        <a href="/blog/the-perils-of-shared-code/">共享代码的风险</a>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part29/">ANTLR 4权威参考读书笔记（29）</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part30/">ANTLR 4权威参考读书笔记（30）</a>
       </li>
     
   </ul>
@@ -3607,7 +3724,7 @@
 <a style="font-size: 119%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 97%" href="/tags/spring/">Spring</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 136%" href="/tags/translation/">Translation</a>
+<a style="font-size: 137%" href="/tags/translation/">Translation</a>
 <a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 107%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 107%" href="/tags/wxwidgets/">wxWidgets</a>

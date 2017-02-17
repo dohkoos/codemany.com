@@ -801,6 +801,109 @@
       
   <header>
     
+      <h1 class="entry-title"><a href="/blog/the-perils-of-shared-code/">共享代码的风险</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-11-25T18:51:10+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>25</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:51 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>英文原文：<a href="https://www.innoq.com/en/blog/the-perils-of-shared-code/">https://www.innoq.com/en/blog/the-perils-of-shared-code/</a>
+<a href="https://gold.xitu.io/entry/58491d3b8e450a006aae7b4f">https://gold.xitu.io/entry/58491d3b8e450a006aae7b4f</a></p>
+
+<p>通往地狱的道路往往是由良好的意愿铺就。在各种软件项目中，我看到人们走在这样的道路上，他们在微服务间借助于库共享代码。在几乎每个组织支持微服务架构的项目中，各个团队和开发者都期望以某些核心库为基础构建他们的微服务。显然，即使可能带来的问题已经被知道很长时间了，很多人仍然不知道它们。在这篇博文中，我想研究为什么使用这样的库可能起初听起来有吸引力，为什么可能会出现问题，以及如何能够减轻这些问题。</p>
+
+<h3 id="共享代码的目的">共享代码的目的</h3>
+
+<p>通过库来共享代码有两个主要目的：共享领域逻辑和共享基础设施层中的抽象。</p>
+
+<ol>
+<li><p><em>共享的领域模型：</em> A specific part of the domain model is common between two or more Bounded Contexts, so instead of implementing it again and again, you eliminate the need for repetition and the possibility of introducing inconsistent implementations of this domain logic. Usually, the parts of the domain model that people want to share like that are the core domain or one or more generic subdomains. In domain-driven design lingo, this is also called a Shared Kernel. Often, you would find concepts like a Session, and authentication logic, in here, but it’s not limited to that. A related approach is the Canonical Data Model.</p></li>
+<li><p><em>基础设施层抽象：</em> 你想避免一次又一次地实现基础设施层的有用抽象，因此你把它们放进一个库里。通常，这些库在数据库访问、消息传递和序列化等方面提供一套统一的方法。</p></li>
+</ol>
+
+<p>两者的动机是相同的——避免重复，也就是说，遵循DRY原则（Don’t repeat yourself!）。一旦实现这些逻辑有几个好处：</p>
+
+<blockquote>
+<p>你不需要花费宝贵的时间致力于那些已经被解决的问题。</p>
+
+<p>有一套统一的方式做消息传递、数据库访问等。这意味着，当开发者需要去阅读和修改其他开发者最初创建的微服务中的代码时，他们很容易找到他们的方式。</p>
+
+<p>关于彼此行为略有不同的业务逻辑或基础设施关注点，你不想有不同的实现。取而代之的是，有一套做正确事情的规范实现。</p>
+</blockquote>
+
+<h3 id="共享代码的问题">共享代码的问题</h3>
+
+<p>What may sound great in theory doesn’t come without its own problems, and those problems are probably more painful than the ones you are trying to solve with your library. Stefan Tilkov has already explained in detail <a href="https://www.innoq.com/en/blog/thoughts-on-a-canonical-data-model/">why you should avoid a canonical data model</a>. In addition to that, let me point out a few other issues.</p>
+
+<h4 id="分布式单体">分布式单体</h4>
+
+<p>Often, there seems to be an implicit assumption that putting things into a library means that you never have to worry about services using a wrong or outdated implementation, because they simply need to update their dependency on the library to the latest version.</p>
+
+<p>Whenever you rely on being able to change some behaviour consistently across all your microservices by updating them all to the same new version of your library, you introduce a strong coupling between them. You lose one major benefit of microservices, the ability to have them evolve and to deploy them independently from each other.</p>
+
+<p>I have seen cases where all the services had to be deployed together in order for things to still work properly. If you reach this state, there is no denying that you have actually built a distributed monolith.</p>
+
+<p>A popular example is to use code generation based, for instance, on a Swagger description of your service API, in order to provide a client library for your service. More often than you may think, developers are tempted to abuse this for making breaking changes, because dependent services “just” need to use a new version of their client library. This is not how you <a href="http://olivergierke.de/2016/10/evolving-distributed-systems/">evolve a distributed system</a>.</p>
+
+<h4 id="依赖地狱">依赖地狱</h4>
+
+<p>Libraries, especially those that are designed to provide a common solution to infrastructure concerns, often have an additional problem: They come with a whole bag of additional libraries they depend on. The bigger the transitive dependency tree of your library, the higher the probability that it will lead to the nightmare commonly known as dependency hell. Since your microservices will likely need their own additional dependencies, which again have transitive dependencies, it is only a matter of time until some of them transitively pull in conflicting versions of some library, and simply choosing between the different versions will be impossible, because they are binary incompatible.</p>
+
+<p>Of course, your solution might be to simply provide all the libraries your microservices could possibly need as dependencies of your core library. That still means that your microservices cannot evolve independently, for example by upgrading to a later version of only a specific library they depend on – they are all in lockstep with the release cycle of your core library. Apart from that, why would you force a whole bunch of dependencies on every service when in fact they probably only need a few of them?</p>
+
+<h4 id="自上而下的库设计">自上而下的库设计</h4>
+
+<p>More often than not, the libraries I have seen were forced upon the developers by one or more architects, taking a top-down approach to library design.</p>
+
+<p>Usually, what happens in this case is that the APIs that are exposed by the library are too restrictive and inflexible, or use the wrong level of abstraction, because they are designed by people who are not familiar enough with the wide spectrum of different real-world use cases. Such a library often leads to frustration among the developers that have to live with it, and to people trying to work around the limitations of the library.</p>
+
+<h4 id="单语言解决一切">单语言解决一切</h4>
+
+<p>One of the most obvious drawbacks that come with enforcing libraries is that this makes it even harder to switch to a different programming language (or platform, like the JVM or .NET), again losing one advantage of a microservices architecture, the ability to choose the technology that fits best for a given problem. If you later on realise that you need this kind of language or platform diversity after all, you have to do invent all kinds of weird crutches. For instance, Netflix came up with <a href="https://github.com/Netflix/Prana">Prana</a>, a sidecar that runs along side non-JVM services, providing them an HTTP API to the Netflix technology stack.</p>
+
+<h3 id="我们能不能做得更好？">我们能不能做得更好？</h3>
+
+<p>With all the problems introduced by sharing code via libraries, the most extreme solution is to simply have no such library at all. If you do that, you will have to do some copy-and-paste or provide a template project for new microservices in order to liberate your services from the lockstep described above. This can be done both for infrastructure code as well as for the shared kernel of your domain model. In fact, in his classic blue book on domain-driven design, Eric Evans mentioned that usually, “teams make changes on separate copies of the KERNEL, integrating with the other team at intervals”[1]. The shared kernel does not necessarily have to be a library.</p>
+
+<p>If you don’t like the idea of copy and paste, that’s fine as well. After all, as mentioned above, there are definite advantages to sharing code through libraries. Here are some important things to consider in this case:</p>
+
+<h4 id="最少依赖的小型库">最少依赖的小型库</h4>
+
+<p>Try to split up your big shared library into a set of very small, highly focussed libraries, each of them solving one specific problem. Try to make these libraries zero-dependency libraries, only relying on the language’s standard library. Yes, it’s not always enjoyable to program only against your languge’s standard library, but the tremendous benefits for all the teams in your company (or even beyond your company, if your library is open source) clearly outweigh this minor inconvenience.</p>
+
+<p>Of course, zero dependencies is not always possible, especially for infrastructure concerns. For these, minimize the dependencies required by each of your small libraries. Also, sometimes it can make sense to provide a binding or integration with another library as a separate artifact, independently from the core of your library.</p>
+
+<h4 id="留下选择余地">留下选择余地</h4>
+
+<p>Never rely on the fact that services will update to the latest version of your shared library at a specific point in time. In other words, don’t force library updates on teams, but give them the freedom to update at their own pace. This may require you to change your library in backward and forward compatible ways, but it decouples your services, giving you not only the operational costs of a microservices architecture, but also some of the benefits.</p>
+
+<p>If possible, avoid not only forced library upates, but make the usage of your library itself optional.</p>
+
+<h4 id="自下而上的库设计">自下而上的库设计</h4>
+
+<p>Finally, if you want to have shared libraries, successful projects I have seen were using a bottom-up approach. Instead of having ivory tower architects design libraries that are hardly usable in the real-world, have your teams implement their microservices, and when some common patterns emerge that have proven themselves in production in multiple services, extract them into a library.</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
       <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part30/">ANTLR 4权威参考读书笔记（30）</a></h1>
     
     
@@ -2344,206 +2447,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part25/">ANTLR 4权威参考读书笔记（25）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-09-03T16:16:56+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2016</span></span> <span class='time'>4:16 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>这次我们要做的是通过监听器实现CSV文件的加载器，用于建立一个二维列表数据结构。</p>
-
-<h3 id="加载csv数据">加载CSV数据</h3>
-
-<p>我们的目标是构建一个监听器去加载CSV数据到一个映射列表数据结构中，这是任何数据格式阅读器或配置文件阅读器都会做的事。我们会收集每行的字段并放到一个映射中，构成头名-值组合。以下是示例文件t.csv的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Details,Month,Amount
-</span><span class='line'>Mid Bonus,June,"$2,000"
-</span><span class='line'>,January,"""zippo"""
-</span><span class='line'>Total Bonuses,"","$5,000"</span></code></pre></td></tr></table></div></figure>
-
-<p>我们想要看到如下的映射列表被打印出：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>[{Details=Mid Bonus, Month=June, Amount="$2,000"},
-</span><span class='line'> {Details=, Month=January, Amount="""zippo"""},
-</span><span class='line'> {Details=Total Bonuses, Month="", Amount="$5,000"}]</span></code></pre></td></tr></table></div></figure>
-
-<p>为了在监听器中得到精确的方法，我们给CSV语法中field规则的每个选项打上标签：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grammar CSV;
-</span><span class='line'>
-</span><span class='line'>file : hdr row+ ;
-</span><span class='line'>hdr : row ;
-</span><span class='line'>row : field (',' field)* '\r'? '\n' ;
-</span><span class='line'>field
-</span><span class='line'>    : TEXT    # text
-</span><span class='line'>    | STRING  # string
-</span><span class='line'>    |         # empty
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>TEXT : ~[,\n\r"]+ ;
-</span><span class='line'>STRING : '"' ('""'|~'"')* '"' ;     // quote-quote is an escaped quote</span></code></pre></td></tr></table></div></figure>
-
-<p>我们可以从定义我们需要的数据结构开始监听器的实现。首先，我们需要的数据结构是称为rows的映射列表。我们也需要在头行中找到的列名列表header。为处理数据行，我们需要把字段值读到一个临时列表currentRowFieldValues中，然后把列名映射到那些值上。以下是监听器LoadCSV.java的实现代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public static class Loader extends CSVBaseListener {
-</span><span class='line'>    public static final String EMPTY = "";
-</span><span class='line'>    /** Load a list of row maps that map field name to value */
-</span><span class='line'>    List&lt;Map&lt;String,String&gt;&gt; rows = new ArrayList&lt;Map&lt;String, String&gt;&gt;();
-</span><span class='line'>    /** List of column names */
-</span><span class='line'>    List&lt;String&gt; header;
-</span><span class='line'>    /** Build up a list of fields in current row */
-</span><span class='line'>    List&lt;String&gt; currentRowFieldValues;</span></code></pre></td></tr></table></div></figure>
-
-<p>下面的3个规则方法通过计算适当的字符串处理字段值，并把它添加到currentRowFieldValues中。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitString(CSVParser.StringContext ctx) {
-</span><span class='line'>    currentRowFieldValues.add(ctx.STRING().getText());
-</span><span class='line'>}
-</span><span class='line'>public void exitText(CSVParser.TextContext ctx) {
-</span><span class='line'>    currentRowFieldValues.add(ctx.TEXT().getText());
-</span><span class='line'>}
-</span><span class='line'>public void exitEmpty(CSVParser.EmptyContext ctx) {
-</span><span class='line'>    currentRowFieldValues.add(EMPTY);
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>在我们能处理数据行之前，我们需要从第一行取得列名列表。头行在语法上仅仅是另外的行，但我们在对待它时要不同于常规的数据行，那意味着我们需要检查上下文。暂时让我们假设在exitRow()执行后，currentRowFieldValues包含列名列表。要填充header，我们只需要捕获第一行的字段值。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitHdr(CSVParser.HdrContext ctx) {
-</span><span class='line'>    header = new ArrayList&lt;String&gt;();
-</span><span class='line'>    header.addAll(currentRowFieldValues);
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>谈到行时，我们需要两个操作：一个是当我们开始一行时，另一个是当我们结束一行时。当我们开始一行时，我们需要分配或清除currentRowFieldValues，准备获取一组新的数据。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void enterRow(CSVParser.RowContext ctx) {
-</span><span class='line'>    currentRowFieldValues = new ArrayList&lt;String&gt;();
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>在行结束的时候，我们必须考虑上下文。如果我们仅仅加载头行，那我们不能改变rows字段，因为列名不是数据。在exitRow()中，我们可以通过查看在语法分析树中的父节点的getRuleIndex()值（或者询问父节点是否是HdrContext类型）测试上下文。如果当前行是数据行，我们将通过同时遍历header中的列名和currentRowFieldValues中的值获取的内容创建映射。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitRow(CSVParser.RowContext ctx) {
-</span><span class='line'>    // If this is the header row, do nothing
-</span><span class='line'>    // if ( ctx.parent instanceof CSVParser.HdrContext ) return; OR:
-</span><span class='line'>    if ( ctx.getParent().getRuleIndex() == CSVParser.RULE_hdr ) {
-</span><span class='line'>        return;
-</span><span class='line'>    }
-</span><span class='line'>    // It's a data row
-</span><span class='line'>    Map&lt;String, String&gt; m = new LinkedHashMap&lt;String, String&gt;();
-</span><span class='line'>    int i = 0;
-</span><span class='line'>    for (String v : currentRowFieldValues) {
-</span><span class='line'>        m.put(header.get(i), v);
-</span><span class='line'>        i++;
-</span><span class='line'>    }
-</span><span class='line'>    rows.add(m);
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>到这里，加载CSV数据到数据结构中的任务就算已经完成。在使用ParseTreeWalker遍历树后，我们就可以紧接着打印出rows字段：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ParseTreeWalker walker = new ParseTreeWalker();
-</span><span class='line'>Loader loader = new Loader();
-</span><span class='line'>walker.walk(loader, tree);
-</span><span class='line'>System.out.println(loader.rows);</span></code></pre></td></tr></table></div></figure>
-
-<p>以下是构建和测试序列：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr CSV.g
-</span><span class='line'>compile *.java
-</span><span class='line'>run LoadCSV t.csv</span></code></pre></td></tr></table></div></figure>
-
-<p>下面显示的是输出结果：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>[{Details=Mid Bonus, Month=June, Amount="$2,000"}, {Details=, Month=January,
-</span><span class='line'>Amount="""zippo"""}, {Details=Total Bonuses, Month="", Amount="$5,000"}]</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/2">&larr; Older</a>
@@ -2571,11 +2474,11 @@
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part30/">ANTLR 4权威参考读书笔记（30）</a>
+        <a href="/blog/the-perils-of-shared-code/">共享代码的风险</a>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part29/">ANTLR 4权威参考读书笔记（29）</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part30/">ANTLR 4权威参考读书笔记（30）</a>
       </li>
     
   </ul>
@@ -2612,7 +2515,7 @@
 <a style="font-size: 119%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 97%" href="/tags/spring/">Spring</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 136%" href="/tags/translation/">Translation</a>
+<a style="font-size: 137%" href="/tags/translation/">Translation</a>
 <a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 107%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 107%" href="/tags/wxwidgets/">wxWidgets</a>

@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Software Engineering | 乐者为王]]></title>
   <link href="http://codemany.com/tags/software-engineering/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-02-16T23:01:08+08:00</updated>
+  <updated>2017-02-17T14:51:31+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,89 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[共享代码的风险]]></title>
+    <link href="http://codemany.com/blog/the-perils-of-shared-code/"/>
+    <updated>2016-11-25T18:51:10+08:00</updated>
+    <id>http://codemany.com/blog/the-perils-of-shared-code</id>
+    <content type="html"><![CDATA[<p>英文原文：<a href="https://www.innoq.com/en/blog/the-perils-of-shared-code/">https://www.innoq.com/en/blog/the-perils-of-shared-code/</a>
+<a href="https://gold.xitu.io/entry/58491d3b8e450a006aae7b4f">https://gold.xitu.io/entry/58491d3b8e450a006aae7b4f</a></p>
+
+<p>通往地狱的道路往往是由良好的意愿铺就。在各种软件项目中，我看到人们走在这样的道路上，他们在微服务间借助于库共享代码。在几乎每个组织支持微服务架构的项目中，各个团队和开发者都期望以某些核心库为基础构建他们的微服务。显然，即使可能带来的问题已经被知道很长时间了，很多人仍然不知道它们。在这篇博文中，我想研究为什么使用这样的库可能起初听起来有吸引力，为什么可能会出现问题，以及如何能够减轻这些问题。</p>
+
+<h3 id="共享代码的目的">共享代码的目的</h3>
+
+<p>通过库来共享代码有两个主要目的：共享领域逻辑和共享基础设施层中的抽象。</p>
+
+<ol>
+<li><p><em>共享的领域模型：</em> A specific part of the domain model is common between two or more Bounded Contexts, so instead of implementing it again and again, you eliminate the need for repetition and the possibility of introducing inconsistent implementations of this domain logic. Usually, the parts of the domain model that people want to share like that are the core domain or one or more generic subdomains. In domain-driven design lingo, this is also called a Shared Kernel. Often, you would find concepts like a Session, and authentication logic, in here, but it’s not limited to that. A related approach is the Canonical Data Model.</p></li>
+<li><p><em>基础设施层抽象：</em> 你想避免一次又一次地实现基础设施层的有用抽象，因此你把它们放进一个库里。通常，这些库在数据库访问、消息传递和序列化等方面提供一套统一的方法。</p></li>
+</ol>
+
+<p>两者的动机是相同的——避免重复，也就是说，遵循DRY原则（Don’t repeat yourself!）。一旦实现这些逻辑有几个好处：</p>
+
+<blockquote>
+<p>你不需要花费宝贵的时间致力于那些已经被解决的问题。</p>
+
+<p>有一套统一的方式做消息传递、数据库访问等。这意味着，当开发者需要去阅读和修改其他开发者最初创建的微服务中的代码时，他们很容易找到他们的方式。</p>
+
+<p>关于彼此行为略有不同的业务逻辑或基础设施关注点，你不想有不同的实现。取而代之的是，有一套做正确事情的规范实现。</p>
+</blockquote>
+
+<h3 id="共享代码的问题">共享代码的问题</h3>
+
+<p>What may sound great in theory doesn’t come without its own problems, and those problems are probably more painful than the ones you are trying to solve with your library. Stefan Tilkov has already explained in detail <a href="https://www.innoq.com/en/blog/thoughts-on-a-canonical-data-model/">why you should avoid a canonical data model</a>. In addition to that, let me point out a few other issues.</p>
+
+<h4 id="分布式单体">分布式单体</h4>
+
+<p>Often, there seems to be an implicit assumption that putting things into a library means that you never have to worry about services using a wrong or outdated implementation, because they simply need to update their dependency on the library to the latest version.</p>
+
+<p>Whenever you rely on being able to change some behaviour consistently across all your microservices by updating them all to the same new version of your library, you introduce a strong coupling between them. You lose one major benefit of microservices, the ability to have them evolve and to deploy them independently from each other.</p>
+
+<p>I have seen cases where all the services had to be deployed together in order for things to still work properly. If you reach this state, there is no denying that you have actually built a distributed monolith.</p>
+
+<p>A popular example is to use code generation based, for instance, on a Swagger description of your service API, in order to provide a client library for your service. More often than you may think, developers are tempted to abuse this for making breaking changes, because dependent services “just” need to use a new version of their client library. This is not how you <a href="http://olivergierke.de/2016/10/evolving-distributed-systems/">evolve a distributed system</a>.</p>
+
+<h4 id="依赖地狱">依赖地狱</h4>
+
+<p>Libraries, especially those that are designed to provide a common solution to infrastructure concerns, often have an additional problem: They come with a whole bag of additional libraries they depend on. The bigger the transitive dependency tree of your library, the higher the probability that it will lead to the nightmare commonly known as dependency hell. Since your microservices will likely need their own additional dependencies, which again have transitive dependencies, it is only a matter of time until some of them transitively pull in conflicting versions of some library, and simply choosing between the different versions will be impossible, because they are binary incompatible.</p>
+
+<p>Of course, your solution might be to simply provide all the libraries your microservices could possibly need as dependencies of your core library. That still means that your microservices cannot evolve independently, for example by upgrading to a later version of only a specific library they depend on – they are all in lockstep with the release cycle of your core library. Apart from that, why would you force a whole bunch of dependencies on every service when in fact they probably only need a few of them?</p>
+
+<h4 id="自上而下的库设计">自上而下的库设计</h4>
+
+<p>More often than not, the libraries I have seen were forced upon the developers by one or more architects, taking a top-down approach to library design.</p>
+
+<p>Usually, what happens in this case is that the APIs that are exposed by the library are too restrictive and inflexible, or use the wrong level of abstraction, because they are designed by people who are not familiar enough with the wide spectrum of different real-world use cases. Such a library often leads to frustration among the developers that have to live with it, and to people trying to work around the limitations of the library.</p>
+
+<h4 id="单语言解决一切">单语言解决一切</h4>
+
+<p>One of the most obvious drawbacks that come with enforcing libraries is that this makes it even harder to switch to a different programming language (or platform, like the JVM or .NET), again losing one advantage of a microservices architecture, the ability to choose the technology that fits best for a given problem. If you later on realise that you need this kind of language or platform diversity after all, you have to do invent all kinds of weird crutches. For instance, Netflix came up with <a href="https://github.com/Netflix/Prana">Prana</a>, a sidecar that runs along side non-JVM services, providing them an HTTP API to the Netflix technology stack.</p>
+
+<h3 id="我们能不能做得更好？">我们能不能做得更好？</h3>
+
+<p>With all the problems introduced by sharing code via libraries, the most extreme solution is to simply have no such library at all. If you do that, you will have to do some copy-and-paste or provide a template project for new microservices in order to liberate your services from the lockstep described above. This can be done both for infrastructure code as well as for the shared kernel of your domain model. In fact, in his classic blue book on domain-driven design, Eric Evans mentioned that usually, “teams make changes on separate copies of the KERNEL, integrating with the other team at intervals”[1]. The shared kernel does not necessarily have to be a library.</p>
+
+<p>If you don’t like the idea of copy and paste, that’s fine as well. After all, as mentioned above, there are definite advantages to sharing code through libraries. Here are some important things to consider in this case:</p>
+
+<h4 id="最少依赖的小型库">最少依赖的小型库</h4>
+
+<p>Try to split up your big shared library into a set of very small, highly focussed libraries, each of them solving one specific problem. Try to make these libraries zero-dependency libraries, only relying on the language’s standard library. Yes, it’s not always enjoyable to program only against your languge’s standard library, but the tremendous benefits for all the teams in your company (or even beyond your company, if your library is open source) clearly outweigh this minor inconvenience.</p>
+
+<p>Of course, zero dependencies is not always possible, especially for infrastructure concerns. For these, minimize the dependencies required by each of your small libraries. Also, sometimes it can make sense to provide a binding or integration with another library as a separate artifact, independently from the core of your library.</p>
+
+<h4 id="留下选择余地">留下选择余地</h4>
+
+<p>Never rely on the fact that services will update to the latest version of your shared library at a specific point in time. In other words, don’t force library updates on teams, but give them the freedom to update at their own pace. This may require you to change your library in backward and forward compatible ways, but it decouples your services, giving you not only the operational costs of a microservices architecture, but also some of the benefits.</p>
+
+<p>If possible, avoid not only forced library upates, but make the usage of your library itself optional.</p>
+
+<h4 id="自下而上的库设计">自下而上的库设计</h4>
+
+<p>Finally, if you want to have shared libraries, successful projects I have seen were using a bottom-up approach. Instead of having ivory tower architects design libraries that are hardly usable in the real-world, have your teams implement their microservices, and when some common patterns emerge that have proven themselves in production in multiple services, extract them into a library.</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[为什么我们不能用估算房屋同样的方法估算软件项目]]></title>

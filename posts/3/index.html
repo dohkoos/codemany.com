@@ -9,8 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="initializer 初始值设定项
-construct 构造体 现在，我们已经有了一个自顶向下的草拟出语法的通用策略，下面我们要专注于一些常用的语言模式。尽管在过去几十年里有大量的语言被发明，但仍然只有较少的基本语言模式需要被处理。这是因为人们趋向于设计遵循自然语言约束的语言， &hellip;">
+  <meta name="description" content="用自顶向下的语法指定和通过手工的递归下降语法分析器识别表达式一直是个麻烦。首先是因为大部分自然语法是模糊的，其次是因为大部分自然语法规格使用一种被称为左递归的特殊类型递归。所以自顶向下的语法和语法分析器不能处理传统形式上的左递归。 为了阐明这个问题，设想一个算术表达式语言， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -74,6 +73,89 @@ construct 构造体 现在，我们已经有了一个自顶向下的草拟出语
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part17/">ANTLR 4权威参考读书笔记（17）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-06-07T13:09:54+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>7</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>1:09 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>用自顶向下的语法指定和通过手工的递归下降语法分析器识别表达式一直是个麻烦。首先是因为大部分自然语法是模糊的，其次是因为大部分自然语法规格使用一种被称为左递归的特殊类型递归。所以自顶向下的语法和语法分析器不能处理传统形式上的左递归。</p>
+
+<p>为了阐明这个问题，设想一个算术表达式语言，它只有乘法和加法运算符以及整数。表达式是自相似的。也就是说，一个乘法表达式是由“*”运算符连接的两个子表达式。同样的，一个加法表达式是由“+”运算符连接的两个子表达式。我们也可以把整数看作表达式。整个语法规则看起来就像下面显示的那样：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>expr : expr '*' expr    // 匹配由“*”运算符连接的子表达式
+</span><span class='line'>     | expr '+' expr    // 匹配由“+”运算符连接的子表达式
+</span><span class='line'>     | INT              // 匹配简单整数
+</span><span class='line'>     ;</span></code></pre></td></tr></table></div></figure>
+
+<p>问题是上述规则对于某些输入短语来说是模棱两可的。换句话说，这个规则能用多种方法匹配单个输入流。对于简单的整数和像1+2和1*2这样的单运算符表达式是没问题的，因为只有一种方法能去匹配它们。例如，规则可以仅用第二个选项匹配1+2。就像下图左边所示的那样：</p>
+
+<p><img src="/uploads/ambiguity-parse-tree.png" title="ambiguity-parse-tree" ></p>
+
+<p>问题在于指定的规则可以像中间和右边语法分析树描绘的那样用两种方法解释1+2*3这样的输入。两者的解释是不同的，因为中间的树说1加到2乘3的结果上，而右边的树说1加2的结果乘以3。这是一个运算符优先级的问题，但常规语法根本没有指定优先级的方法。大部分语法工具使用额外的符号来指定运算符优先级。</p>
+
+<p>与此相反的是，ANTLR使用有利于首先给出的选项，隐式地允许我们指定运算符优先级的方法来解决二义性。规则expr有一个乘法选项在加法选项之前，因此，ANTLR解决1+2*3的运算符二义性的方法有利于乘法。</p>
+
+<p>默认情况下，ANTLR是从左到右结合运算符，然而某些像指数这样的运算符则是从右到左。因此，我们必须使用参数assoc手动指定运算符记号上的相关性。这里是一个能正确地把输入<code>2^3^4</code>解释成<code>2^(3^4)</code>的表达式规则：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>expr : expr '^'&lt;assoc=right&gt; expr    // 运算符是右结合的
+</span><span class='line'>     | INT
+</span><span class='line'>     ;</span></code></pre></td></tr></table></div></figure>
+
+<p>下图中的语法分析树阐明了运算符左右结合版本的不同。右边的语法分析树是惯常的解释：</p>
+
+<p><img src="/uploads/power-parse-tree.png" title="power-parse-tree" ></p>
+
+<p>为了把指数、乘法和加法这三个运算符合并成一条规则，我们把指数表达式选项放在其它表达式选项之前，因为它的运算符优先级比乘法和加法都要高。合并后的语法如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>expr : expr '^'&lt;assoc=right&gt; expr    // 运算符是右结合的
+</span><span class='line'>     | expr '*' expr                 // 匹配由“*”运算符连接的子表达式
+</span><span class='line'>     | expr '+' expr                 // 匹配由“+”运算符连接的子表达式
+</span><span class='line'>     | INT                           // 匹配简单整数
+</span><span class='line'>     ;</span></code></pre></td></tr></table></div></figure>
+
+<p>不像其它常规的语法分析器生成器那样，ANTLR v4是可以处理直接左递归的。左递归规则是指在选项的左边缘直接或者间接调用自身的规则。规则expr是直接左递归的，因为除INT选项外的其它所有选项都开始于规则expr自身的引用。如果规则expr的引用处在某些选项的右边缘，那么它就是右递归的。虽然ANTLR v4可以处理直接左递归，但它不能处理间接左递归。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>expr : expo ;    // 通过expo左递归地间接调用expr
+</span><span class='line'>expo : expr '^'&lt;assoc=right&gt; expr ;</span></code></pre></td></tr></table></div></figure>
+
+<p>ANTLR v4可以简化直接左递归的表达式规则的工作。这种新的机制不仅更有效率，而且表达式规则也更小和更容易理解。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1348,106 +1430,6 @@ another runner in the night<br>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part9/">ANTLR 4权威参考读书笔记（9）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-03-27T07:10:05+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>27</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>7:10 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><ul>
-<li>predication 断定</li>
-<li>predict 预判</li>
-<li>lookahead 预读</li>
-</ul>
-
-<p>ANTLR工具根据语法规则，例如我们刚才看到的assign，生成递归下降语法分析器。递归下降语法分析器只是递归方法的一个集合，每个规则一个方法。下降这个术语指的是分析从语法分析树的根开始向着叶子进行（记号）。我们首先调用的规则，即stat符号，成为语法分析树的根。那也就意味着对<a href="/blog/reading-notes-the-definitive-antlr4-reference-part8/">ANTLR 4权威参考读书笔记（8）</a>中的语法分析树来说需要调用方法stat()。这类分析更通用的术语是自顶向下分析：递归下降语法分析器仅仅是自顶向下语法分析器实现的一种。</p>
-
-<p>要了解递归下降语法分析器是什么样子，可以看看下面ANTLR为规则assign生成的方法（稍微做过整理）：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>// assign : ID '=' expr ;
-</span><span class='line'>void assign() {    // 根据规则assign生成的方法
-</span><span class='line'>    match(ID);     // 比较ID和当前输入符号然后消费
-</span><span class='line'>    match('=');
-</span><span class='line'>    expr();        // 通过调用expr()匹配表达式
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>递归下降语法分析器最酷的部分是通过跟踪调用方法stat()、assign()和expr()绘制出的调用关系图反映了内部的语法分析树节点。match()的调用对应语法分析树叶子。为了在一个手工构建的语法分析器中手动构建一颗语法分析树，我们需要在每个规则方法的开始处插入“添加新子树根”操作，以及给match()一个“添加新叶子节点”操作。</p>
-
-<p>方法assign()只是检查确保所有必要的记号存在且以正确的顺序。当语法分析器进入assign()时，它不必在多个选项之间进行选择。选项是规则定义右边的选择之一。例如，调用assign的stat规则可能有其它类型的语句。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>/** 匹配起始于当前输入位置的任何语句 */
-</span><span class='line'>stat
-</span><span class='line'>    : assign    // 第一个选项（'|'是选项分隔符）
-</span><span class='line'>    | ifstat    // 第二个选项
-</span><span class='line'>    | whilestat
-</span><span class='line'>    ...
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<p>stat的分析规则看起来像一条switch语句：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>void stat() {
-</span><span class='line'>    switch ( «current input token» ) {
-</span><span class='line'>        CASE ID : assign(); break;
-</span><span class='line'>        CASE IF : ifstat(); break;    // IF是关键字'if'的记号类型
-</span><span class='line'>        CASE WHILE : whilestat(); break;
-</span><span class='line'>        ...
-</span><span class='line'>        default : «raise no viable alternative exception»
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>方法stat()必须通过检查下一个输入记号作出分析决定或断定。分析决定预判哪一个选项将会成功。在本例中，当看到WHILE关键字时会预判是规则stat的第三个选项。规则方法stat()然后就会调用whilestat()。你以前可能听说过术语预读记号，那只是下一个输入记号。预读记号可以是语法分析器在匹配和消费输入记号之前嗅探的任何记号。</p>
-
-<p>有时候，语法分析器需要一些预读记号去预判哪个选项会成功。它甚至必须考虑从当前位置直到文件结尾的所有的记号。ANTLR默默地为你处理所有的这些事情，但是对决策过程有个基本的了解是有帮助的，可以让调试生成的语法分析器更容易。</p>
-
-<p>为更好地理解分析决定，想象有一个单一入口和单一出口的迷宫，有单词写在地板上。每个沿着从入口到出口路径的单词序列表示一个句子。迷宫的结构与定义一门语言的语法规则类似。为测试一个句子在一门语言中的成员身份，我们在穿越迷宫时把句子的单词和沿着地板的单词作比较。如果通过句子的单词我们能到达出口，那么句子就是有效的。</p>
-
-<p>为了通过迷宫，我们必须在每个岔口选择一条有效路径，正如我们必须在语法分析器中选择选项一样。通过把我们句子中下一个单词（们）和沿着来自每个岔口的每条路径上可见的单词比较，我们做出决定该走哪条路。我们能从岔口看到的单词与预读记号类似。当每条路径以唯一的单词开始时决定是相当容易的。在规则stat中，每个选项从唯一的记号开始，因此stat()可以通过查看第一个预读记号识别选项。</p>
-
-<p>当单词从一个岔口重叠部分开始每条路径时，语法分析器需要继续往前看，扫描可以识别选项的单词。ANTLR可以根据需要为每个分析决定自动上下调节预读数量。如果预读的结果是多条同样的到出口的路径，那说明当前的输入短语有多种解释，这会导致二义性。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/4">&larr; Older</a>
@@ -1477,11 +1459,11 @@ another runner in the night<br>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part30/">ANTLR 4权威参考读书笔记（30）</a>
+        <a href="/blog/the-perils-of-shared-code/">共享代码的风险</a>
       </li>
     
       <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part29/">ANTLR 4权威参考读书笔记（29）</a>
+        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part30/">ANTLR 4权威参考读书笔记（30）</a>
       </li>
     
   </ul>
@@ -1518,7 +1500,7 @@ another runner in the night<br>
 <a style="font-size: 119%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 97%" href="/tags/spring/">Spring</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 136%" href="/tags/translation/">Translation</a>
+<a style="font-size: 137%" href="/tags/translation/">Translation</a>
 <a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 107%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 107%" href="/tags/wxwidgets/">wxWidgets</a>
