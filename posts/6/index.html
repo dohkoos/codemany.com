@@ -9,7 +9,8 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="英文原文：http://usabilitypost.com/2008/10/08/fighting-perfection/ 如果你像我一样，你可能经常会发现自己从来没有完全满意你的工作——总是做出调整和修改，总是找到你不太喜欢的事情然后改进他们。这适用于很多创造性的努力—— &hellip;">
+  <meta name="description" content="Java的一个重要优点是通过垃圾收集器（Garbage Collection）自动管理内存的回收，程序员不需要关注它。程序员真的不需要关注内存管理吗？只要你碰到过OutOfMemoryError你就知道它不是真的。 这里我会展示如何使用VisualVM快速定位内存泄漏。先看下面这段代码： 1
+2 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +74,142 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-detect-java-memory-leak-using-visualvm/">如何使用VisualVM检测Java内存泄漏</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2015-10-12T13:08:19+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>1:08 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Java的一个重要优点是通过垃圾收集器（Garbage Collection）自动管理内存的回收，程序员不需要关注它。程序员真的不需要关注内存管理吗？只要你碰到过OutOfMemoryError你就知道它不是真的。</p>
+
+<p>这里我会展示如何使用VisualVM快速定位内存泄漏。先看下面这段代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>import java.util.List;
+</span><span class='line'>import java.util.ArrayList;
+</span><span class='line'>
+</span><span class='line'>public class MemoryLeakDemo {
+</span><span class='line'>    public static void main(String[] args) {
+</span><span class='line'>        new Thread(new MemoryLeak(), "MemoryLeak").start();
+</span><span class='line'>    }
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>class MemoryLeak implements Runnable {
+</span><span class='line'>    public static List&lt;Integer&gt; leakList = new ArrayList&lt;Integer&gt;();
+</span><span class='line'>
+</span><span class='line'>    public void run() {
+</span><span class='line'>        int count = 0;
+</span><span class='line'>        while (true) {
+</span><span class='line'>            try {
+</span><span class='line'>                Thread.sleep(3);
+</span><span class='line'>            } catch (InterruptedException e) {
+</span><span class='line'>            }
+</span><span class='line'>            count++;
+</span><span class='line'>            Integer i = new Integer(count);
+</span><span class='line'>            leakList.add(i);
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>执行下列命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>java -verbose:gc -XX:+PrintGCDetails -Xmx20m MemoryLeakDemo</span></code></pre></td></tr></table></div></figure>
+
+<p>等待一段时间后，你会看到：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Exception in thread "MemoryLeak" java.lang.OutOfMemoryError: Java heap space
+</span><span class='line'>        at java.util.Arrays.copyOf(Arrays.java:3181)
+</span><span class='line'>        at java.util.ArrayList.grow(ArrayList.java:261)
+</span><span class='line'>        at java.util.ArrayList.ensureExplicitCapacity(ArrayList.java:235)
+</span><span class='line'>        at java.util.ArrayList.ensureCapacityInternal(ArrayList.java:227)
+</span><span class='line'>        at java.util.ArrayList.add(ArrayList.java:458)
+</span><span class='line'>        at MemoryLeak.run(MemoryLeakDemo.java:22)
+</span><span class='line'>        at java.lang.Thread.run(Thread.java:745)
+</span><span class='line'>Heap
+</span><span class='line'> PSYoungGen      total 3584K, used 298K [0x00000000ff980000, 0x00000000ffe80000, 0x0000000100000000)
+</span><span class='line'>  eden space 3072K, 9% used [0x00000000ff980000,0x00000000ff9ca908,0x00000000ffc80000)
+</span><span class='line'>  from space 512K, 0% used [0x00000000ffc80000,0x00000000ffc80000,0x00000000ffd00000)
+</span><span class='line'>  to   space 512K, 0% used [0x00000000ffe00000,0x00000000ffe00000,0x00000000ffe80000)
+</span><span class='line'> ParOldGen       total 13824K, used 12156K [0x00000000fec00000, 0x00000000ff980000, 0x00000000ff980000)
+</span><span class='line'>  object space 13824K, 87% used [0x00000000fec00000,0x00000000ff7df3e8,0x00000000ff980000)
+</span><span class='line'> Metaspace       used 7993K, capacity 8164K, committed 8448K, reserved 1056768K
+</span><span class='line'>  class space    used 912K, capacity 954K, committed 1024K, reserved 1048576K</span></code></pre></td></tr></table></div></figure>
+
+<p>打开VisualVM开始监测MemoryLeakDemo，在Monitor标签页我们可以看到实时的程序内存堆的使用情况：</p>
+
+<p><img src="/uploads/visualvm-heap.png" title="visualvm-heap" ></p>
+
+<p>波峰到波谷处是执行了GC的，明显可以看到执行GC后内存曲线仍旧呈上扬趋势，也就是说，内存占用是只升不降。到底是什么原因导致的呢？</p>
+
+<p>打开Sampler标签页，点击Memory按钮启动一个内存分析会话，VisualVM会定期获取所有执行线程的转储，分析栈跟踪信息，实时显示成堆直方图。通过堆直方图，我们就可以知道哪个对象占用了较多的内存，以便做进一步的优化。</p>
+
+<p><img src="/uploads/visualvm-sampler.png" title="visualvm-sampler" ></p>
+
+<p>如上图所示，第1行的Integer对象占用内存最大，已经有41万多实例了，并且还在持续增加中。很显然，罪魁祸首就是它了！</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -933,50 +1070,6 @@ TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-to-disable-virtualbox-time-sync-between-host-and-guest/">如何禁止VirtualBox虚拟机和物理机之间的时间同步</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2014-11-02T10:03:29+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2014</span></span> <span class='time'>10:03 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>主机是Windows Server 2008，虚拟机Windows XP，VirtualBox的版本为4.3.6。</p>
-
-<p>因为某种原因，需要修改XP系统的时间设置。但在设置后不到10秒钟就又和主机的时间自动同步了。</p>
-
-<p>实时同步时间功能是由Guest Additions提供的，把它卸载就可以修改时间，不过这不是好的解决方法。</p>
-
-<p>翻阅<a href="http://www.virtualbox.org/manual/">VirtualBox User Manual</a>，找到“Disabling the Guest Additions time synchronization”章节，说明如何能把时间同步给禁止掉。在主机环境执行以下命令：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>VBoxManage setextradata "YOUR_VM_NAME" "VBoxInternal/Devices/VMMDev/0/Config/GetHostTimeDisabled" 1</span></code></pre></td></tr></table></div></figure>
-
-<p>YOUR_VM_NAME是你的虚拟机名字，可以通过VBoxManage list vms命令查询到。</p>
-
-<p>还有种方法是修改虚拟机的注册表，把HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\VBoxService项下ImagePath值改为system32\VBoxService.exe --disable-timesync，禁止Guest Additions启动时间同步。修改好后重启虚拟机就可以了。</p>
-
-<p>另外就是虚拟机冷启动时都会和主机时间同步先，这意味着关机再开机的话上次的时间修改就失效了，必须再次手动调整。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/7">&larr; Older</a>
@@ -994,6 +1087,10 @@ TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/the-impact-github-is-having-on-your-software-career-right-now/">GitHub对软件职业生涯的影响</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/how-to-modify-hosts-in-android/">如何修改Android的hosts文件</a>
       </li>
     
@@ -1007,10 +1104,6 @@ TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类
     
       <li class="post">
         <a href="/blog/the-perils-of-shared-code/">共享代码的风险</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/reading-notes-the-definitive-antlr4-reference-part30/">ANTLR 4权威参考读书笔记（30）</a>
       </li>
     
   </ul>
