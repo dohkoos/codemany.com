@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="我的环境：主机操作系统是Windows Server 2008，虚拟机操作系统是Ubuntu 8.10，虚拟机是VirtualBox 2.0.4。 安装增强功能包（Guest Additions） 安装好Ubuntu 8.10后，运行Ubuntu并登录。然后在VirtualBox的菜单里选择“ &hellip;">
+  <meta name="description" content="英文原文：http://www.codeproject.com/Articles/31382/Memory-Leak-Detection-Using-WinDbg 简介 内存泄漏是一种费时的bug，通常由C++开发者制造。内存泄漏的检测经常是令人厌烦的。如果代码不是你写的，或者代码库相当巨大， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,357 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/memory-leak-detection-using-windbg/">使用WinDbg检测内存泄漏</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2008-12-27T09:34:17+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>27</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>9:34 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>英文原文：<a href="http://www.codeproject.com/Articles/31382/Memory-Leak-Detection-Using-WinDbg">http://www.codeproject.com/Articles/31382/Memory-Leak-Detection-Using-WinDbg</a></p>
+
+<h3 id="简介">简介</h3>
+
+<p>内存泄漏是一种费时的bug，通常由C++开发者制造。内存泄漏的检测经常是令人厌烦的。如果代码不是你写的，或者代码库相当巨大，事情就会变得很糟糕。</p>
+
+<p>尽管市场上有可用的工具帮助你检测内存泄露，但这些工具大多数不是免费的。我发现WinDbg作为一个免费的强大的工具可以用来解决内存泄漏bug。至少，我们可以知道可能涉嫌引起内存泄漏的代码位置。COM接口泄漏不在这篇文章范围内。</p>
+
+<p>WinDbg是来自Microsoft的一个强大的用户/内核空间调试器，它可以从<a href="http://www.microsoft.com/whdc/devtools/debugging/installx86.mspx">这里</a>下载和安装。</p>
+
+<h3 id="使用windbg">使用WinDbg</h3>
+
+<p>开始使用WinDbg：</p>
+
+<ol>
+<li>配置符号文件路径指向Microsoft符号服务器<code>SRV*d:\symbols*http://msdl.microsoft.com/download/symbols</code>；</li>
+<li>将你的程序EXE/DLL的PDB（程序数据库）路径添加到符号文件路径中；</li>
+<li>你还需要配置操作系统的标记去启用有内存泄漏的进程上的用户栈跟踪。这很简单，可以用gflags.exe做到。gflags.exe在WinDbg安装期间被安装。或者也可以通过命令行来完成，使用命令gflags.exe /i MemoryLeak.exe +ust即可。我的程序名是Test2.exe。因此，为了演示，需要用Test2.exe替换掉MemoryLeak.exe。下面的快照显示了应用Test2.exe的OS标记的设置。</li>
+</ol>
+
+<p><img src="/uploads/cmd.jpg" title="cmd" ></p>
+
+<p>一旦我们配置好WinDbg的符号文件路径，开启泄漏内存的进程，就可以把WinDbg挂载上去。挂载选项可以在WinDbg的File菜单下找到，或者可以使用F6快捷键启动。下面的快照显示了挂载界面：</p>
+
+<p><img src="/uploads/attach.jpg" title="attach" ></p>
+
+<p>WinDbg的!heap命令用来显示堆。在WinDbg帮助文件里有!heap的详尽文档。</p>
+
+<p>我已经开发了一个泄漏内存的小程序，在后面也将使用这个程序来做演示。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>int _tmain(int argc, _TCHAR* argv[])
+</span><span class='line'>{
+</span><span class='line'>    while(1)
+</span><span class='line'>    {
+</span><span class='line'>        AllocateMemory();
+</span><span class='line'>    }
+</span><span class='line'>    return 0;
+</span><span class='line'>}
+</span><span class='line'>void AllocateMemory()
+</span><span class='line'>{
+</span><span class='line'>    int* a = new int[2000];
+</span><span class='line'>    ZeroMemory(a, 8000);
+</span><span class='line'>    Sleep(1);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>上面的程序泄漏一个大小为2000*4字节的整型数组。</p>
+
+<p>把WinDbg挂载到进程上后，执行命令!heap -s。-s代表概要。下面是泄漏进程上!heap -s的输出：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>0:001&gt; !heap -s
+</span><span class='line'>NtGlobalFlag enables following debugging aids for new heaps:
+</span><span class='line'>    validate parameters
+</span><span class='line'>    stack back traces
+</span><span class='line'>  Heap     Flags   Reserv  Commit  Virt   Free  List   UCR  Virt  Lock  Fast
+</span><span class='line'>                    (k)     (k)    (k)     (k) length      blocks cont. heap
+</span><span class='line'>-----------------------------------------------------------------------------
+</span><span class='line'>   00150000 58000062    1024     12     12      1     1     1    0      0   L
+</span><span class='line'>   00250000 58001062      64     24     24     15     1     1    0      0   L
+</span><span class='line'>   00260000 58008060      64     12     12     10     1     1    0      0
+</span><span class='line'>   00330000 58001062   64576  47404  47404     13     4     1    0      0
+</span><span class='line'>-----------------------------------------------------------------------------</span></code></pre></td></tr></table></div></figure>
+
+<p>让进程执行一段时间，然后重新进入进程，再次执行!heap -s。下面显示的是该命令的输出：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>0:001&gt; !heap -s
+</span><span class='line'>NtGlobalFlag enables following debugging aids for new heaps:
+</span><span class='line'>   validate parameters
+</span><span class='line'>   stack back traces
+</span><span class='line'>   Heap     Flags   Reserv  Commit  Virt   Free  List   UCR  Virt  Lock  Fast
+</span><span class='line'>                     (k)     (k)    (k)     (k) length      blocks cont. heap
+</span><span class='line'>   -----------------------------------------------------------------------------
+</span><span class='line'>    00150000 58000062    1024     12     12      1     1     1    0      0   L
+</span><span class='line'>    00250000 58001062      64     24     24     15     1     1    0      0   L
+</span><span class='line'>    00260000 58008060      64     12     12     10     1     1    0      0
+</span><span class='line'>    00330000 58001062  261184 239484 239484     14     4     1    0      0
+</span><span class='line'>   -----------------------------------------------------------------------------</span></code></pre></td></tr></table></div></figure>
+
+<p>第11行显示了增长堆。上面的快照显示一个句柄为00330000的堆在增长。</p>
+
+<p>执行!heap -stat -h 00330000。这个命令用来显示增长堆的堆统计。下面显示的是该命令的输出：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>0:001&gt; !heap -stat -h 00330000
+</span><span class='line'>heap @ 00330000
+</span><span class='line'>group-by: TOTSIZE max-display: 20
+</span><span class='line'>    size     #blocks     total     ( %) (percent of total busy bytes)
+</span><span class='line'>    1f64 76c6 - e905f58  (99.99)
+</span><span class='line'>    1800 1 - 1800  (0.00)
+</span><span class='line'>    824 2 - 1048  (0.00)
+</span><span class='line'>    238 2 - 470  (0.00)
+</span><span class='line'>    244 1 - 244  (0.00)
+</span><span class='line'>    4c 5 - 17c  (0.00)
+</span><span class='line'>    b0 2 - 160  (0.00)
+</span><span class='line'>    86 2 - 10c  (0.00)
+</span><span class='line'>    50 3 - f0  (0.00)
+</span><span class='line'>    74 2 - e8  (0.00)
+</span><span class='line'>    38 4 - e0  (0.00)
+</span><span class='line'>    48 3 - d8  (0.00)
+</span><span class='line'>    c4 1 - c4  (0.00)
+</span><span class='line'>    62 2 - c4  (0.00)
+</span><span class='line'>    be 1 - be  (0.00)
+</span><span class='line'>    b8 1 - b8  (0.00)
+</span><span class='line'>    ae 1 - ae  (0.00)
+</span><span class='line'>    ac 1 - ac  (0.00)
+</span><span class='line'>    55 2 - aa  (0.00)
+</span><span class='line'>    a4 1 - a4  (0.00)</span></code></pre></td></tr></table></div></figure>
+
+<p>上面的快照显示大小为1f64的76c6个块被分配（第5行）。如此巨大的相同大小的块的数量让我们怀疑这些可能是泄漏块。其余的块分配没有在增长的块数字。</p>
+
+<p>下一步是去获得这些块的地址。使用命令!heap -flt s 1f64。这个命令过滤出堆的所有其它块，并且显示大小为1f64的块的详细信息。</p>
+
+<p>下面显示的是该命令的输出：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>0:001&gt; !heap -flt s 1f64
+</span><span class='line'>    _HEAP @ 150000
+</span><span class='line'>    _HEAP @ 250000
+</span><span class='line'>    _HEAP @ 260000
+</span><span class='line'>    _HEAP @ 330000
+</span><span class='line'>      HEAP_ENTRY Size Prev Flags    UserPtr UserSize - state
+</span><span class='line'>        003360e0 03f0 0000  [07]   003360e8    01f64 - (busy)
+</span><span class='line'>        00338060 03f0 03f0  [07]   00338068    01f64 - (busy)
+</span><span class='line'>        00339fe0 03f0 03f0  [07]   00339fe8    01f64 - (busy)
+</span><span class='line'>        0033bf60 03f0 03f0  [07]   0033bf68    01f64 - (busy)
+</span><span class='line'>        0033dee0 03f0 03f0  [07]   0033dee8    01f64 - (busy)
+</span><span class='line'>        01420040 03f0 03f0  [07]   01420048    01f64 - (busy)
+</span><span class='line'>        01421fc0 03f0 03f0  [07]   01421fc8    01f64 - (busy)
+</span><span class='line'>        01423f40 03f0 03f0  [07]   01423f48    01f64 - (busy)
+</span><span class='line'>        01425ec0 03f0 03f0  [07]   01425ec8    01f64 - (busy)
+</span><span class='line'>        01427e40 03f0 03f0  [07]   01427e48    01f64 - (busy)
+</span><span class='line'>        01429dc0 03f0 03f0  [07]   01429dc8    01f64 - (busy)
+</span><span class='line'>        0142bd40 03f0 03f0  [07]   0142bd48    01f64 - (busy)
+</span><span class='line'>        0142dcc0 03f0 03f0  [07]   0142dcc8    01f64 - (busy)
+</span><span class='line'>        0142fc40 03f0 03f0  [07]   0142fc48    01f64 - (busy)
+</span><span class='line'>        01431bc0 03f0 03f0  [07]   01431bc8    01f64 - (busy)
+</span><span class='line'>        01433b40 03f0 03f0  [07]   01433b48    01f64 - (busy)
+</span><span class='line'>        01435ac0 03f0 03f0  [07]   01435ac8    01f64 - (busy)
+</span><span class='line'>        01437a40 03f0 03f0  [07]   01437a48    01f64 - (busy)
+</span><span class='line'>        014399c0 03f0 03f0  [07]   014399c8    01f64 - (busy)
+</span><span class='line'>        0143b940 03f0 03f0  [07]   0143b948    01f64 - (busy)
+</span><span class='line'>        0143d8c0 03f0 03f0  [07]   0143d8c8    01f64 - (busy)
+</span><span class='line'>        0143f840 03f0 03f0  [07]   0143f848    01f64 - (busy)
+</span><span class='line'>        014417c0 03f0 03f0  [07]   014417c8    01f64 - (busy)
+</span><span class='line'>        01443740 03f0 03f0  [07]   01443748    01f64 - (busy)
+</span><span class='line'>        014456c0 03f0 03f0  [07]   014456c8    01f64 - (busy)
+</span><span class='line'>        01447640 03f0 03f0  [07]   01447648    01f64 - (busy)
+</span><span class='line'>        014495c0 03f0 03f0  [07]   014495c8    01f64 - (busy)
+</span><span class='line'>        0144b540 03f0 03f0  [07]   0144b548    01f64 - (busy)
+</span><span class='line'>        0144d4c0 03f0 03f0  [07]   0144d4c8    01f64 - (busy)
+</span><span class='line'>        0144f440 03f0 03f0  [07]   0144f448    01f64 - (busy)
+</span><span class='line'>        014513c0 03f0 03f0  [07]   014513c8    01f64 - (busy)
+</span><span class='line'>        01453340 03f0 03f0  [07]   01453348    01f64 - (busy)
+</span><span class='line'>        014552c0 03f0 03f0  [07]   014552c8    01f64 - (busy)
+</span><span class='line'>        01457240 03f0 03f0  [07]   01457248    01f64 - (busy)
+</span><span class='line'>        014591c0 03f0 03f0  [07]   014591c8    01f64 - (busy)
+</span><span class='line'>        0145b140 03f0 03f0  [07]   0145b148    01f64 - (busy)
+</span><span class='line'>        0145d0c0 03f0 03f0  [07]   0145d0c8    01f64 - (busy)
+</span><span class='line'>        0145f040 03f0 03f0  [07]   0145f048    01f64 - (busy)
+</span><span class='line'>        01460fc0 03f0 03f0  [07]   01460fc8    01f64 - (busy)
+</span><span class='line'>        01462f40 03f0 03f0  [07]   01462f48    01f64 - (busy)
+</span><span class='line'>        01464ec0 03f0 03f0  [07]   01464ec8    01f64 - (busy)
+</span><span class='line'>        01466e40 03f0 03f0  [07]   01466e48    01f64 - (busy)
+</span><span class='line'>        01468dc0 03f0 03f0  [07]   01468dc8    01f64 - (busy)</span></code></pre></td></tr></table></div></figure>
+
+<p>使用任何来自上面输出中的UsrPtr列值，然后使用命令!heap -p -a UsrPtr去显示UsrPtr的调用栈。我选择了第27行的0143d8c8。</p>
+
+<p>执行!heap -p -a 0143d8c8，我们得到下面显示的调用栈：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>0:001&gt; !heap -p -a 0143d8c8
+</span><span class='line'>    address 0143d8c8 found in
+</span><span class='line'>    _HEAP @ 330000
+</span><span class='line'>      HEAP_ENTRY Size Prev Flags    UserPtr UserSize - state
+</span><span class='line'>        0143d8c0 03f0 0000  [07]   0143d8c8    01f64 - (busy)
+</span><span class='line'>        Trace: 0025
+</span><span class='line'>        7c96d6dc ntdll!RtlDebugAllocateHeap+0x000000e1
+</span><span class='line'>        7c949d18 ntdll!RtlAllocateHeapSlowly+0x00000044
+</span><span class='line'>        7c91b298 ntdll!RtlAllocateHeap+0x00000e64
+</span><span class='line'>        102c103e MSVCR90D!_heap_alloc_base+0x0000005e
+</span><span class='line'>        102cfd76 MSVCR90D!_heap_alloc_dbg_impl+0x000001f6
+</span><span class='line'>        102cfb2f MSVCR90D!_nh_malloc_dbg_impl+0x0000001f
+</span><span class='line'>        102cfadc MSVCR90D!_nh_malloc_dbg+0x0000002c
+</span><span class='line'>        102db25b MSVCR90D!malloc+0x0000001b
+</span><span class='line'>        102bd691 MSVCR90D!operator new+0x00000011
+</span><span class='line'>        102bd71f MSVCR90D!operator new[]+0x0000000f
+</span><span class='line'>        4113d8 Test2!AllocateMemory+0x00000028
+</span><span class='line'>        41145c Test2!wmain+0x0000002c
+</span><span class='line'>        411a08 Test2!__tmainCRTStartup+0x000001a8
+</span><span class='line'>        41184f Test2!wmainCRTStartup+0x0000000f
+</span><span class='line'>        7c816fd7 kernel32!BaseProcessStart+0x00000023</span></code></pre></td></tr></table></div></figure>
+
+<p>第16-19行显示了来自我们代码的函数。</p>
+
+<p>注意：有时候，可能发生!heap -s命令不显示增长堆的情况。如果那样的话，使用!heap -stat -h命令列出带有堆的大小和块的数量的所有堆。识别在增长的块的数量，然后使用!heap -flt s SIZE（SIZE = 涉嫌块的大小）命令。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -872,60 +1223,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/install-ubuntu-804-on-thinkpad-x60-with-usb/">使用USB在ThinkPad X60上安装Ubuntu 8.04</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2008-06-16T17:22:03+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>5:22 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>昨天晚上开始在我的本本上安装Ubuntu 8.04。本本是80G的硬盘，自带有一个XP Home操作系统。现在我想把Ubuntu装在C盘下，也就是不要XP了，并且不想再保留ThinkPad出厂时用来做HPA的隐藏分区，因此可以给Ubuntu使用的主分区就有了四个。分区方案如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Device     Type  MountPoint  Size
-</span><span class='line'>/dev/sda1  ext3  /boot       197M
-</span><span class='line'>/dev/sda2  swap  /swap       1028M
-</span><span class='line'>/dev/sda3  ext3  /home       48800M
-</span><span class='line'>/dev/sda4  ext3  /           29997M</span></code></pre></td></tr></table></div></figure>
-
-<p>Linux至少需要两个分区，一个是根分区，一个是交换分区，这样还剩下两个主分区可以使用。因为/home相当于Windows系统中的My Documents，所以准备给它单独分个区。剩下的一个主分区就给/boot挂载点。分配单独的分区给/boot是有必要的，因为/boot包含了操作系统的内核和在启动系统过程中所要用到的文件，这样就算工作分区出了问题，只要这个分区没有问题，系统照样可以启动。</p>
-
-<p>安装步骤：</p>
-
-<ol>
-<li>准备一个至少1G优盘；</li>
-<li>下载<a href="http://www.pendrivelinux.com/downloads/Ub8convert2.exe">Ub8convert2.exe</a>。运行这个文件，将会获得一个Ubuntu8目录；</li>
-<li>下载ubuntu-8.04-desktop-i386.iso，将它放到Ubuntu8目录下；</li>
-<li>运行Ubuntu8目录下的fixu8.bat脚本（注意：fixu.bat采用的是utf-8编码，需要重新编辑该文件中的盘符）；</li>
-<li>现在就可以使用U盘来安装Ubuntu了。</li>
-</ol>
-
-<p>注意：如果内存小于512M，那么最好分配两倍内存容量的swap分区。否则只要2的n次方就可以了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/22">&larr; Older</a>
@@ -943,6 +1240,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/code-coverage-100-percent-tragedy/">100%代码覆盖率的悲剧</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/unconventional-way-of-learning-a-new-programming-language/">学习新编程语言的非传统方式</a>
       </li>
     
@@ -956,10 +1257,6 @@
     
       <li class="post">
         <a href="/blog/chess-mess-master-development-record-part2/">象棋残局大师开发实录（2）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/chess-mess-master-development-record-part1/">象棋残局大师开发实录（1）</a>
       </li>
     
   </ul>
@@ -996,7 +1293,7 @@
 <a style="font-size: 119%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 97%" href="/tags/spring/">Spring</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 139%" href="/tags/translation/">Translation</a>
+<a style="font-size: 140%" href="/tags/translation/">Translation</a>
 <a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 107%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 107%" href="/tags/wxwidgets/">wxWidgets</a>

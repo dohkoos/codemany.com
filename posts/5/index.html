@@ -9,11 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="在ANTLR 4权威参考读书笔记（3）中的计算器是以解释的方式执行的，现在我们想要把它转换成以编译的方式执行。编译执行和解释执行相比，需要依赖于特定的目标机器。在这里我们假设有一台这样的机器，它用堆栈进行运算，支持如下表所示的几种指令： 指令
-说明
-操作数个数
-用途 LDV
-Load &hellip;">
+  <meta name="description" content="在ANTLR 4权威参考读书笔记（3）以及ANTLR 4权威参考读书笔记（4）中我们分别用访问者和监听器机制实现了计算器的解释执行和编译执行。但并没有给出这两种机制的太多细节，这次就来详细地讲讲。 ANTLR在它的运行库中为两种树遍历机制提供支持。默认情况下，ANTLR生成一个语法分析树监听器接口 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -77,6 +73,83 @@ Load &hellip;">
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part5/">ANTLR 4权威参考读书笔记（5）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-01-22T21:18:51+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2016</span></span> <span class='time'>9:18 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在<a href="/blog/reading-notes-the-definitive-antlr4-reference-part3/">ANTLR 4权威参考读书笔记（3）</a>以及<a href="/blog/reading-notes-the-definitive-antlr4-reference-part4/">ANTLR 4权威参考读书笔记（4）</a>中我们分别用访问者和监听器机制实现了计算器的解释执行和编译执行。但并没有给出这两种机制的太多细节，这次就来详细地讲讲。</p>
+
+<p>ANTLR在它的运行库中为两种树遍历机制提供支持。默认情况下，ANTLR生成一个语法分析树监听器接口，在其中定义了回调方法，用于响应被内建的树遍历器触发的事件。</p>
+
+<p>在监听器和访问者机制之间最大的不同是：监听器方法被ANTLR提供的遍历器对象调用；而访问者方法必须显式的调用visit方法遍历它们的子节点，在一个节点的子节点上如果忘记调用visit方法就意味着那些子树没有得到访问。</p>
+
+<p>让我们首先从监听器开始。在我们了解监听器之后，我们也将看到ANTLR如何生成遵循访问者设计模式的树遍历器。</p>
+
+<h3 id="语法分析树监听器">语法分析树监听器</h3>
+
+<p>在Calc.java中有这样两行代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ParseTreeWalker walker = new ParseTreeWalker();
+</span><span class='line'>walker.walk(new DirectiveListener(), tree);</span></code></pre></td></tr></table></div></figure>
+
+<p>类ParseTreeWalker是ANTLR运行时提供的用于遍历语法分析树和触发监听器中回调方法的树遍历器。ANTLR工具根据Calc.g中的语法自动生成ParseTreeListener接口的子接口CalcListener和默认实现CalcBaseListener，其中含有针对语法中每个规则的enter和exit方法。DirectiveListener是我们编写的继承自CalcBaseListener的包含特定应用代码的实现，把它传递给树遍历器后，树遍历器在遍历语法分析树时就会触发DirectiveListener中的回调方法。</p>
+
+<p><img src="/uploads/calc-listener-hierachy.png" title="calc-listener-hierachy" ></p>
+
+<p>下图左边的语法分析树显示ParseTreeWalker执行了一次深度优先遍历，由粗虚线表示，箭头方向代表遍历方向。右边显示的是语法分析树的完整调用序列，它们由ParseTreeWalker触发调用。当树遍历器遇到规则assign的节点时，它触发enterAssign()并且给它传递AssignContext这个语法分析树节点的上下文。在树遍历器访问完assign节点的所有子节点后，它触发exitAssign()。</p>
+
+<p><img src="/uploads/listener-call-sequence.png" title="listener-call-sequence" ></p>
+
+<p>监听器机制的强大之处在于所有都是自动的。我们不必要写语法分析树遍历器，而且我们的监听器方法也不必要显式地访问它们的子节点。</p>
+
+<h3 id="语法分析树访问者">语法分析树访问者</h3>
+
+<p>有些情况下，我们实际想要控制的是遍历本身，在那里我们可以显式地调用visit方法去访问子树节点。参数-visitor告诉ANTLR工具从相应语法生成访问者接口和默认实现，其中含有针对语法中每个规则的visit方法。</p>
+
+<p>下图是我们熟悉的访问者模式操作在语法分析树上。左边部分的粗虚线表示语法分析树的深度优先遍历，箭头方向代表遍历方向。右边部分指明访问者中的方法调用序列。</p>
+
+<p><img src="/uploads/visitor-call-sequence.png" title="visitor-call-sequence" ></p>
+
+<p>下面是Calc.java中的两行代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>EvalVisitor eval = new EvalVisitor();
+</span><span class='line'>// To start walking the parse tree
+</span><span class='line'>eval.visit(tree);</span></code></pre></td></tr></table></div></figure>
+
+<p>我们首先初始化自制的树遍历器EvalVisitor，然后调用visit()去访问整棵语法分析树。ANTLR运行时提供的访问者支持代码会在看到根节点时调用visitProg()。在那里，visitProg()会把子树作为参数调用visit方法继续遍历，如此等等。</p>
+
+<p><img src="/uploads/calc-visitor-hierachy.png" title="calc-visitor-hierachy" ></p>
+
+<p>ANTLR自动生成的访问者接口和默认实现可以让我们为访问者方法编写自己的实现，让我们避免必须覆写接口中的每个方法，仅仅聚焦在我们感兴趣的方法上。这种方式减少了我们学习ANTLR必须要花费的时间，让我们回到我们所熟悉的编程语言领域。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1917,214 +1990,6 @@ Load &hellip;">
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/writing-great-oo-code-day-one/">一开始就编写优质的OO代码</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2015-10-23T13:50:44+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>23</span><span class='date-suffix'>rd</span>, <span class='date-year'>2015</span></span> <span class='time'>1:50 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="https://weblogs.java.net/blog/2008/10/03/writing-great-oo-code-day-one">https://weblogs.java.net/blog/2008/10/03/writing-great-oo-code-day-one</a></p>
-
-<p>没有获取经验的捷径。编写良好的面向对象代码需要经验。尽管如此，这里有三个实践可以帮助你一开始就有个良好的开端：</p>
-
-<ol>
-<li>使用测试驱动开发（TDD）编写你所有的代码</li>
-<li>遵循<a href="http://xp.c2.com/XpSimplicityRules.html">简单的规则</a></li>
-<li>命令代替询问（Tell Don&#39;t Ask）</li>
-</ol>
-
-<h3 id="使用tdd编写你所有的代码">使用TDD编写你所有的代码</h3>
-
-<p><a href="http://ponderingobjectorienteddesign.blogspot.com/2008/09/tdd-is-design-activity.html">测试先行</a>编写的代码和测试后行编写的代码是非常非常不同的代码。测试先行编写的代码是松耦合和高内聚的。测试后行编写的代码往往会破坏封装，当一些属性或私有方法需要被暴露给测试的时候，因为这些类没有被设计成要被测试的。如果你编写的代码测试先行，代码的依赖性会更好，你的代码将是松耦合和高内聚的。稍后详细讨论测试如何帮助你设计更好的代码。</p>
-
-<h3 id="遵循简单的规则">遵循简单的规则</h3>
-
-<p>代码是简洁的，当它：</p>
-
-<ol>
-<li>通过所有的测试</li>
-<li>不包含重复代码</li>
-<li>表达了所有的意图</li>
-<li>使用了最少的类和方法</li>
-</ol>
-
-<p>重要的是注意到我使用了一个有序列表。顺序很重要。带有单一main()方法的单一GodClass并不简单。它可以通过所有的测试，但在比“Hello, world!”更复杂的任何程序里它一定会包含重复代码和没有表达所有的意图。</p>
-
-<p>我与简单的规则的斗争重点围绕在<a href="http://ponderingobjectorienteddesign.blogspot.com/2008/09/if-bugs.html">If Bug</a> 。我不明白遵循简单的规则如何阻止某人编写大量的if代码。有人会说，我试过了，大量的if代码不会表达意图。但是，当你读到这样的代码</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if (mobile.getType() == MobileTypes.STANDARD) {
-</span><span class='line'>    alert();
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>它实在是太容易看出意图了。无论该代码是在哪个方法的上下文中，如果mobile是STANDARD类型，那么警报。你还需要多少意图？</p>
-
-<p>然后我灵光小闪。如果有那样的代码，那么在代码的其它地方肯定还有更多。可能是这样的代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if (mobile.getType() == MobileTypes.GAS) {
-</span><span class='line'>    registerGasReading();
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>和</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if (mobile.getType() == MobileTypes.TEXT) {
-</span><span class='line'>    sendTextMessage();
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>和</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if (mobile.getType() == MobileTypes.LOCATION) {
-</span><span class='line'>    notifyLocation();
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>你看见了吗？我当然知道。违反规则2。许多许多违反规则2。并且是违反规则2的最糟糕的那种。重复代码在许多不同的代码片段中。重复代码将非常非常难被找到。所以为了帮助防止这个，我列出来了。</p>
-
-<h3 id="命令代替询问">命令代替询问</h3>
-
-<p>命令代替询问意味着不要询问一个对象的状态然后做些什么。应该命令那个对象去做些什么。这意味着所有这些if例子变成了：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mobile.alert();</span></code></pre></td></tr></table></div></figure>
-
-<p>和</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mobile.registerGasReading();</span></code></pre></td></tr></table></div></figure>
-
-<p>和</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mobile.sendTextMessage();</span></code></pre></td></tr></table></div></figure>
-
-<p>和</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mobile.notifyLocation();</span></code></pre></td></tr></table></div></figure>
-
-<p>现在假设有一些if子句散落在有重复实现的整个代码中。在那个大量if代码的版本中，它们将非常难被找到，但在命令代替询问版本中，所有的实现都在Mobile类中。所有的都在一个地方寻找和消除。</p>
-
-<p>聆听你的测试也将帮助你保持代码简单。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public interface Alarm {
-</span><span class='line'>    void alert(Mobile mobile);
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>public class Siren implements Alarm {
-</span><span class='line'>    public void alert(Mobile mobile) {
-</span><span class='line'>    if (mobile.getType == MobileTypes.STANDARD) {
-</span><span class='line'>        soundSiren();
-</span><span class='line'>    }
-</span><span class='line'>  }
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>public class SirenTest extends TestCase {
-</span><span class='line'>    public void testAlert() {
-</span><span class='line'>        LocationMobile mobile = new LocationMobile();
-</span><span class='line'>        Siren siren = new Siren();
-</span><span class='line'>        siren.alert(mobile);
-</span><span class='line'>        assert(sirenSounded());
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>如果你仔细聆听你的测试，它会问你，“你为什么需要LocationMobile去测试Siren？”是呀，为什么呢？似乎Siren甚至不应该知道LocationMobile。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class LocationMobile {
-</span><span class='line'>    private Alarm alarm;
-</span><span class='line'>    public LocationMobile(Alarm alarm) {
-</span><span class='line'>        this.alarm = alarm;
-</span><span class='line'>    }
-</span><span class='line'>    public void alert() {
-</span><span class='line'>        alarm.alert();    // alert on Alarm no longer needs a mobile
-</span><span class='line'>    }
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>public class LocationMobileTest extends TestCase {
-</span><span class='line'>    public void testAlert() {
-</span><span class='line'>        Alarm alarm = EasyMock.createMock(Alarm.class);
-</span><span class='line'>        alarm.alert();
-</span><span class='line'>        EasyMock.replay(alarm);
-</span><span class='line'>        Mobile mobile = new LocationMobile(alarm);
-</span><span class='line'>        mobile.alert();
-</span><span class='line'>        EasyMock.verify(alarm);
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>看上去我仅仅互换了依赖。作为Alarm依赖Mobile的替换，现在有了Mobile依赖Alarm。如果你仔细看第一个测试，真正的依赖是Siren知道LocationMobile。一个具体类依赖于另一个具体类。这违反了<a href="http://c2.com/cgi/wiki?DependencyInversionPrinciple">依赖倒置原则 （DIP）</a>。第二个例子是LocationMobile依赖接口Alarm。一个具体类依赖一个抽象。这满足了DIP。</p>
-
-<p>如果你使用TDD编写你所有的代码，遵循简单的规则，以及命令代替询问，那么你会在那条成为一个更好的OO程序员的路上。良好的OO代码容易阅读和维护，但是可能难于编写。至少开始是这样。你写得越多，你将会变得更好，你将得到的经验也越多。与此同时，这些实践会让你在你的路上走得更好。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/6">&larr; Older</a>
@@ -2142,6 +2007,10 @@ Load &hellip;">
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/code-coverage-100-percent-tragedy/">100%代码覆盖率的悲剧</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/unconventional-way-of-learning-a-new-programming-language/">学习新编程语言的非传统方式</a>
       </li>
     
@@ -2155,10 +2024,6 @@ Load &hellip;">
     
       <li class="post">
         <a href="/blog/chess-mess-master-development-record-part2/">象棋残局大师开发实录（2）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/chess-mess-master-development-record-part1/">象棋残局大师开发实录（1）</a>
       </li>
     
   </ul>
@@ -2195,7 +2060,7 @@ Load &hellip;">
 <a style="font-size: 119%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 97%" href="/tags/spring/">Spring</a>
 <a style="font-size: 101%" href="/tags/struts/">Struts</a>
-<a style="font-size: 139%" href="/tags/translation/">Translation</a>
+<a style="font-size: 140%" href="/tags/translation/">Translation</a>
 <a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 107%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 107%" href="/tags/wxwidgets/">wxWidgets</a>
