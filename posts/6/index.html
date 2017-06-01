@@ -632,6 +632,333 @@
       
   <header>
     
+      <h1 class="entry-title"><a href="/blog/testing-async-emails-rails-42/">使用Rails 4.2+ 测试异步邮件</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2015-07-09T13:05:08+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>9</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>1:05 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>英文原文：<a href="https://blog.engineyard.com/2015/testing-async-emails-rails-42">https://blog.engineyard.com/2015/testing-async-emails-rails-42</a></p>
+
+<p>如果你正在构建的应用需要发送邮件，我们都赞同绝不能阻塞控制器，因此异步发送必不可少。为了实现这一点，我们需要借助可以在后台处理任务的异步处理库将邮件发送代码从原始请求/响应周期中移出。</p>
+
+<p>我们如何确信我们的代码在进行此更改时会如预期的那样行事？在这篇博文中，我们将研究测试它的一种方法。我们将使用MiniTest（因为Rails内置了这个框架），但是这里介绍的概念可以很容易地转换为RSpec。</p>
+
+<p>好消息是从Rails 4.2开始，<a href="http://guides.rubyonrails.org/4_2_release_notes.html#asynchronous-mails">异步发送邮件</a>比以前更容易。我们将在我们的示例中使用<a href="https://github.com/mperham/sidekiq">Sidekiq</a>作为队列系统，但是由于ActionMailer＃deliver_later构建在Active Job之上，该接口很干净，使得异步处理库的使用不可知。这意味着如果我刚才没有提到它，作为开发者或者用户的你将不会知情。设置队列系统是另一个话题，你可以在<a href="https://blog.engineyard.com/2014/getting-started-with-active-job">Getting Started With Active Job</a>了解更多。</p>
+
+<h3 id="不要依赖具体">不要依赖具体</h3>
+
+<p>在我们的示例中，我们假设Sidekiq和它的依赖关系已经正确配置，因此特定于此场景的唯一一段代码是声明Active Job将使用哪个队列适配器：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># config/application.rb
+</span><span class='line'>
+</span><span class='line'>module OurApp
+</span><span class='line'>  class Application &lt; Rails::Application
+</span><span class='line'>    ...
+</span><span class='line'>    config.active_job.queue_adapter = :sidekiq
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>Active Job在隐藏所有的实质的队列实现细节上做得很好，使得它对于Resque、Delayed Job或其它队列可以用同样的方式工作。所以如果我们要换用<a href="https://github.com/brandonhilkert/sucker_punch">Sucker Punch</a>，唯一要做的更改就是在引用相应的依赖包后，将队列适配器从:sidekiq切换到:sucker_punch。</p>
+
+<h3 id="基于active-job">基于Active Job</h3>
+
+<p>如果你刚开始使用Rails 4.2，或者对<a href="http://guides.rubyonrails.org/4_2_release_notes.html#active-job">Active Job</a>不太了解，<a href="https://blog.engineyard.com/2014/getting-started-with-active-job">Ben Lewis’ intro to Active Job</a>是一个很好的起点。不过，这篇文章还留给我一个细节去<a href="https://twitter.com/mariusbutuc/status/578585047059599361">盼望</a>，即找到一个干净的、地道的方法来测试一切都如预期的那样工作。</p>
+
+<p>根据本文的目标，我们假设你有：</p>
+
+<ul>
+<li>Rails 4.2+</li>
+<li>已经设置好使用队列后端的Active Job（例如Sidekiq、Resque等）</li>
+<li>一个Mailer</li>
+</ul>
+
+<p>任何Mailer都应该使用这里描述的概念，我们将用以下这封“欢迎邮件”来使我们的示例更实际：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>#app/mailers/user_mailer.rb
+</span><span class='line'>
+</span><span class='line'>class UserMailer &lt; ActionMailer::Base
+</span><span class='line'>  default from: 'email@example.com'
+</span><span class='line'>
+</span><span class='line'>  def welcome_email(user:)
+</span><span class='line'>    mail(
+</span><span class='line'>      to: user.email,
+</span><span class='line'>      subject: "Hi #{user.first_name}, and welcome!"
+</span><span class='line'>    )
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>为了保持事情简单并专注于什么是重要的，我们想在用户注册后给他发送一封“欢迎邮件”。</p>
+
+<p>这就像<a href="http://guides.rubyonrails.org/action_mailer_basics.html#calling-the-mailer">Rails指南邮件程序示例</a>中的那样：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># app/controllers/users_controller.rb
+</span><span class='line'>
+</span><span class='line'>class UsersController &lt; ApplicationController
+</span><span class='line'>  ...
+</span><span class='line'>  def create
+</span><span class='line'>    ...
+</span><span class='line'>    # Yes, Ruby 2.0+ keyword arguments are preferred
+</span><span class='line'>    UserMailer.welcome_email(user: @user).deliver_later
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<h3 id="mailer应该做最后的任务">Mailer应该做最后的任务</h3>
+
+<p>接下来，我们要确保控制器内的任务能完成我们预期的。</p>
+
+<p>在测试指南中，在<a href="http://guides.rubyonrails.org/testing.html#custom-assertions-and-testing-jobs-inside-other-components">Custom Assertions And Testing Jobs Inside Other Components</a>上面的部分教给我们大约半打这样的自定义断言。</p>
+
+<p>或许你的第一本能是立刻使用[assert_enqueued_jobs][assert-enqueued-jobs]来测试每次创建新用户时我们是否将邮件发送任务放入队列。</p>
+
+<p>你可以这样做：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># test/controllers/users_controller_test.rb
+</span><span class='line'>
+</span><span class='line'>require 'test_helper'
+</span><span class='line'>
+</span><span class='line'>class UsersControllerTest &lt; ActionController::TestCase
+</span><span class='line'>  ...
+</span><span class='line'>  test 'email is enqueued to be delivered later' do
+</span><span class='line'>    assert_enqueued_jobs 1 do
+</span><span class='line'>      post :create, {...}
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>即使你这样做，你也会惊讶于测试的失败，被告知assert_enqueued_jobs没有定义而无法使用。</p>
+
+<p>这是因为我们的测试继承自ActionController::TestCase，它在编写时没有包含ActiveJob::TestHelper。</p>
+
+<p>但是我们可以快速地修复这个问题：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># test/test_helper.rb
+</span><span class='line'>
+</span><span class='line'>class ActionController::TestCase
+</span><span class='line'>  include ActiveJob::TestHelper
+</span><span class='line'>  ...
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>假设我们的代码能完成我们预期的，我们的测试现在应该是绿色的。</p>
+
+<p>这是个好消息。我们可以继续重构代码，添加新功能，或者添加新测试。让我们跟随后者，测试我们的邮件是否被发送，以及它是否有预期的内容。</p>
+
+<p>作为delivery_method选项被配置成:test的结果，ActionMailer能给我们提供一个所有发出邮件的数组。我们可以通过ActionMailer::Base.deliveries访问它。当发送的邮件串联时，测试邮件是否被真正发送就非常简单。我们要做的就是在行动完成后，检查交付数量增加1。用MiniTest来写的话，就像下面这样：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>assert_difference 'ActionMailer::Base.deliveries.size', +1 do
+</span><span class='line'>  post :create, {...}
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>我们的测试是实时发生的，但正如我们在本文开头赞同的那样，不能阻塞控制器并在后台任务中发送邮件，所以我们现在需要协调一切，以确保我们的系统是确定的。因此，在我们的异步世界中，我们需要首先执行所有入队的任务，然后才能评估其结果。要执行待处理的Active Job任务，我们将使用<a href="http://api.rubyonrails.org/classes/ActiveJob/TestHelper.html#method-i-perform_enqueued_jobs">perform_enqueued_jobs</a>。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>test 'email is delivered with expected content' do
+</span><span class='line'>  perform_enqueued_jobs do
+</span><span class='line'>    post :create, {...}
+</span><span class='line'>    delivered_email = ActionMailer::Base.deliveries.last
+</span><span class='line'>
+</span><span class='line'>    # assert our email has the expected content, e.g.
+</span><span class='line'>    assert_includes delivered_email.to, @user.email
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<h3 id="缩短反馈循环">缩短反馈循环</h3>
+
+<p>迄今为止，我们都在进行功能性测试以确保我们的控制器如预期的那样行事。但是，当代码中的更改可能会破坏我们发送的邮件时，如何单元测试邮件程序才能缩短反馈循环并获得快速洞察？</p>
+
+<p><a href="http://guides.rubyonrails.org/testing.html#testing-your-mailers">Rails测试指南</a>建议在这里使用fixtures，但我发现它们太过脆弱。特别是在开始的时候，当还在试验邮件的设计或内容时，变化会很快地使它们过时，导致测试变红。相反，我偏向使用assert_match来关注应该是邮件正文部分的关键元素。</p>
+
+<p>为了这个目的和更多（比如抽象处理多部分邮件的逻辑），我们可以构建我们的自定义断言。这使我们能够扩展<a href="http://guides.rubyonrails.org/testing.html#available-assertions">MiniTest标准断言</a>或<a href="http://guides.rubyonrails.org/testing.html#rails-specific-assertions">Rails专用断言</a>。这也是创建我们自己的领域专用语言（DSL）进行测试的一个很好的示例。</p>
+
+<p>让我们在test目录中创建一个shared文件夹来托管我们的SharedMailerTests模块。我们的自定义断言看起来像这样：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># /test/shared/shared_mailer_tests.rb
+</span><span class='line'>
+</span><span class='line'>module SharedMailerTests
+</span><span class='line'>  ...
+</span><span class='line'>  def assert_email_body_matches(matcher:, email:)
+</span><span class='line'>    if email.multipart?
+</span><span class='line'>      %w(text html).each do |part|
+</span><span class='line'>        assert_match matcher, email.send("#{part}_part").body.to_s
+</span><span class='line'>      end
+</span><span class='line'>    else
+</span><span class='line'>      assert_match matcher, email.body.to_s
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>接下来，我们要让邮件程序测试意识到这个自定义断言，所以我们把它混合在ActionMailer::TestCase中。我们可以以类似于我们在ActionController::TestCase中包含ActiveJob::TestHelper的方式来做到这点：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># test/test_helper.rb
+</span><span class='line'>
+</span><span class='line'>require 'shared/shared_mailer_tests'
+</span><span class='line'>...
+</span><span class='line'>class ActionMailer::TestCase
+</span><span class='line'>  include SharedMailerTests
+</span><span class='line'>  ...
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>请注意，我们首先需要在test_helper中依赖我们的shared_mailer_tests。</p>
+
+<p>这些就绪后，我们现在可以确保我们的邮件包含我们预期的关键元素。想象一下，我们想确保我们发送给用户的URL包含一些用于追踪的特定UTM参数。我们现在可以使用我们的自定义断言配合我们的老朋友perform_enqueued_jobs做到这些：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># test/mailers/user_mailer_test.rb
+</span><span class='line'>
+</span><span class='line'>class ToolMailerTest &lt; ActionMailer::TestCase
+</span><span class='line'>  ...
+</span><span class='line'>  test 'emailed URL contains expected UTM params' do
+</span><span class='line'>    UserMailer.welcome_email(user: @user).deliver_later
+</span><span class='line'>
+</span><span class='line'>    perform_enqueued_jobs do
+</span><span class='line'>      refute ActionMailer::Base.deliveries.empty?
+</span><span class='line'>
+</span><span class='line'>      delivered_email = ActionMailer::Base.deliveries.last
+</span><span class='line'>      %W(
+</span><span class='line'>        utm_campaign=#{@campaign}
+</span><span class='line'>        utm_content=#{@content}
+</span><span class='line'>        utm_medium=email
+</span><span class='line'>        utm_source=mandrill
+</span><span class='line'>      ).each do |utm_param|
+</span><span class='line'>        assert_email_body_matches utm_param, delivered_email
+</span><span class='line'>      end
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<h3 id="结论">结论</h3>
+
+<p>让ActionMailer基于Active Job之上，使得从同步发送邮件切换到通过队列发送邮件变得非常简单，就如同从deliver_now切换到deliver_later那样。</p>
+
+<p>由于Active Job使得设置任务基础设施（不需要知道太多你正在使用的队列系统）如此容易，你的测试不再需要关心是否以后会切换到Sidekiq或Resque。</p>
+
+<p>让你的测试设置正确以便于可以充分利用Active Job提供的新的自定义断言可能会有点棘手。希望本教程能使你对整个过程更加明白。</p>
+
+<p>附：你有ActionMailer或Active Job的经验吗？有任何建议吗？有什么陷阱？我们很乐意听到你的经验。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
       <h1 class="entry-title"><a href="/blog/elasticsearch-restful-api/">Elasticsearch的RESTful API</a></h1>
     
     
@@ -1057,70 +1384,6 @@ TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/move-photos-to-folders-based-on-exif-date/">根据Exif时间信息归类照片</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2014-11-20T22:52:37+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>20</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>10:52 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>先要把Exif中的信息解析出来，得到其中的时间，有个<a href="https://github.com/remvee/exifr">exif</a>的gem很不错。然后再根据时间创建目录，把照片移动到对应的目录中。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>require 'rubygems'
-</span><span class='line'>require 'exifr'
-</span><span class='line'>require 'fileutils'
-</span><span class='line'>
-</span><span class='line'>root = ARGV[0] || Dir.pwd
-</span><span class='line'>
-</span><span class='line'>Dir.foreach(root) do |file|
-</span><span class='line'>  next if File.extname(file) != '.jpg'
-</span><span class='line'>
-</span><span class='line'>  obj = EXIFR::JPEG.new(file)
-</span><span class='line'>  date_time_original = obj.exif.date_time_original if obj.exif?
-</span><span class='line'>  next if date_time_original.nil?
-</span><span class='line'>
-</span><span class='line'>  dir = date_time_original.year.to_s
-</span><span class='line'>  Dir.mkdir(dir) unless Dir.exist?(dir)
-</span><span class='line'>  FileUtils.move(file, dir)
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/7">&larr; Older</a>
@@ -1168,31 +1431,31 @@ TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 144%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 143%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 135%" href="/tags/android/">Android</a>
+<a style="font-size: 134%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
 <a style="font-size: 107%" href="/tags/css/">CSS</a>
-<a style="font-size: 110%" href="/tags/crack/">Crack</a>
+<a style="font-size: 109%" href="/tags/crack/">Crack</a>
 <a style="font-size: 107%" href="/tags/database/">Database</a>
-<a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
-<a style="font-size: 115%" href="/tags/git/">Git</a>
-<a style="font-size: 97%" href="/tags/html/">HTML</a>
+<a style="font-size: 96%" href="/tags/eclipse/">Eclipse</a>
+<a style="font-size: 114%" href="/tags/git/">Git</a>
+<a style="font-size: 96%" href="/tags/html/">HTML</a>
 <a style="font-size: 104%" href="/tags/jbookshelf/">JBookShelf</a>
 <a style="font-size: 148%" href="/tags/java/">Java</a>
-<a style="font-size: 101%" href="/tags/javascript/">JavaScript</a>
-<a style="font-size: 97%" href="/tags/listview/">ListView</a>
+<a style="font-size: 100%" href="/tags/javascript/">JavaScript</a>
+<a style="font-size: 96%" href="/tags/listview/">ListView</a>
 <a style="font-size: 104%" href="/tags/mysql/">MySQL</a>
-<a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
-<a style="font-size: 119%" href="/tags/powerbuilder/">PowerBuilder</a>
-<a style="font-size: 101%" href="/tags/powerscript/">PowerScript</a>
-<a style="font-size: 117%" href="/tags/qianbao/">Qianbao</a>
+<a style="font-size: 96%" href="/tags/paperclip/">Paperclip</a>
+<a style="font-size: 118%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 100%" href="/tags/powerscript/">PowerScript</a>
+<a style="font-size: 116%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
-<a style="font-size: 119%" href="/tags/ruby/">Ruby</a>
-<a style="font-size: 97%" href="/tags/spring/">Spring</a>
-<a style="font-size: 101%" href="/tags/struts/">Struts</a>
+<a style="font-size: 118%" href="/tags/ruby/">Ruby</a>
+<a style="font-size: 96%" href="/tags/spring/">Spring</a>
+<a style="font-size: 100%" href="/tags/struts/">Struts</a>
 <a style="font-size: 140%" href="/tags/translation/">Translation</a>
-<a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
+<a style="font-size: 96%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 107%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 107%" href="/tags/wxwidgets/">wxWidgets</a>
 

@@ -9,7 +9,8 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="在使用CheckStyle时用了它提供的checkstyle-frames.xsl作为样式文件，不过checkstyle-frames.xsl生成报告时有些问题，主要是统计数据有点问题，Summary中报告的文件数目比真实的多，所以对xsl文件的summary模板作了小小的一些修改，解决了这个问题 &hellip;">
+  <meta name="description" content="EMMA是一个coverage工具，有on-the-fly和offline两种使用方式，在Ant里通常采用offline方式。 到sourceforge下载了2.0版本的EMMA下来，由于将EMMA的生成文件做了重定向，因此遇到了些问题，比如出现以下错误： 1
+nothing to do: no &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +74,158 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/ant-series-problem-using-emma-measure-test-coverage/">Ant系列之用EMMA测量测试覆盖率的问题</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2006-01-16T09:12:26+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2006</span></span> <span class='time'>9:12 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>EMMA是一个coverage工具，有on-the-fly和offline两种使用方式，在Ant里通常采用offline方式。</p>
+
+<p>到sourceforge下载了2.0版本的EMMA下来，由于将EMMA的生成文件做了重定向，因此遇到了些问题，比如出现以下错误：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>nothing to do: no runtime coverage data found in any of the data files</span></code></pre></td></tr></table></div></figure>
+
+<p>查找EMMA的FAQ 3.7节，只是告诉你可能少了metadata和runtime coverate date（对Ant用户来说一般是少了runtime coveraget date，它的后缀名默认是ec）。</p>
+
+<p>由FAQ 3.15节可以知道runtime coverage data文件默认是生成在user.dir目录下的（即build.xml中的basedir目录下），而由instr指令生成的metadata文件（后缀名默认为em）则已经被重定向到另外的目录（用来生成coverage report的地方），所以必须重新设置coverage.out.file的值，用来重定向生成的runtime coverage data。因为runtime coverage data是在junit任务执行时产生的，所以我们可以在junit任务中添加一行代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;sysproperty key="emma.coverage.out.file" value="${coverage.dir}/coverage.emma" /&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>注意：</p>
+
+<ol>
+<li>metadata和runtime文件的后缀名最好设置相同；</li>
+<li>一定要将junit任务的fork属性设置为true，这是因为EMMA 2.0的runtime coverage data是在JVM退出后生成的；</li>
+<li>instrumented classes必须是第一个被JVM执行的，所以instrumented classes目录必须处在junit任务的classpath的第一行，具体原因不明，如果谁知道还请告知下。</li>
+</ol>
+
+<p>其实EMMA附带的examples目录下的build-offline.xml里已经说明的很详细了，只不过下载后没有仔细看，才遇到了一些问题。下面是build.xml的部分代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;path id="classpath"&gt;
+</span><span class='line'>  &lt;pathelement location="${instrumentedclasses}" /&gt;
+</span><span class='line'>  &lt;pathelement location="${classes}" /&gt;
+</span><span class='line'>  &lt;pathelement location="${testclasses}" /&gt;
+</span><span class='line'>  &lt;fileset dir="${lib}" includes="**/*.jar" /&gt;
+</span><span class='line'>&lt;/path&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;target name="compile" depends="prepare"&gt;
+</span><span class='line'>  &lt;javac srcdir="${src}" destdir="${classes}" debug="on"&gt;
+</span><span class='line'>    &lt;classpath refid="classpath" /&gt;
+</span><span class='line'>  &lt;/javac&gt;
+</span><span class='line'>  &lt;javac srcdir="${test}" destdir="${testclasses}" debug="on"&gt;
+</span><span class='line'>    &lt;classpath refid="classpath" /&gt;
+</span><span class='line'>  &lt;/javac&gt;
+</span><span class='line'>&lt;/target&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;target name="coverage.instrument" depends="compile"&gt;
+</span><span class='line'>  &lt;emma enabled="yes"&gt;
+</span><span class='line'>    &lt;instr instrpath="${classes}" destdir="${instrumentedclasses}"
+</span><span class='line'>        metadatafile="{coveragereports}/metadata.emma" merge="true"&gt;
+</span><span class='line'>    &lt;/instr&gt;
+</span><span class='line'>  &lt;/emma&gt;
+</span><span class='line'>&lt;/target&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;target name="junit" depends="coverage.instrument"&gt;
+</span><span class='line'>  &lt;junit printsummary="yes" haltonfailure="no" fork="true"&gt;
+</span><span class='line'>    &lt;sysproperty key="emma.coverage.out.file" value="${coveragereports}/coverage.emma" /&gt;
+</span><span class='line'>    &lt;classpath refid="classpath" /&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;formatter type="xml" /&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;batchtest fork="yes" todir="${junitreports}"&gt;
+</span><span class='line'>      &lt;fileset dir="${test}"&gt;
+</span><span class='line'>        &lt;include name="**/*Test*.java" /&gt;
+</span><span class='line'>      &lt;/fileset&gt;
+</span><span class='line'>    &lt;/batchtest&gt;
+</span><span class='line'>  &lt;/junit&gt;
+</span><span class='line'>&lt;/target&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;target name="coverage.report" depends="test"&gt;
+</span><span class='line'>  &lt;emma enabled="yes"&gt;
+</span><span class='line'>    &lt;report sourcepath="${src}"&gt;
+</span><span class='line'>      &lt;fileset dir="${coveragereports}"&gt;
+</span><span class='line'>        &lt;include name="*.emma" /&gt;
+</span><span class='line'>      &lt;/fileset&gt;
+</span><span class='line'>
+</span><span class='line'>      &lt;html outfile="${coveragereports}/coverage.html" depth="method" /&gt;
+</span><span class='line'>    &lt;/report&gt;
+</span><span class='line'>  &lt;/emma&gt;
+</span><span class='line'>&lt;/target&gt;</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1391,44 +1544,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/posix-conventions-for-command-line-arguments/">POSIX Conventions for Command Line Arguments</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-09-10T00:03:07+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>10</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>12:03 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><ol>
-<li>An option is a hyphen followed by a single alphanumeric character, like this: -o.</li>
-<li>An option may require an argument (which must appear immediately after the option); for example, -oargument or -o argument.</li>
-<li>Options that do not require arguments can be grouped after a hyphen, so, for example, -lst is equivalent to -t -l -s.</li>
-<li>Options can appear in any order; thus -lst is equivalent to -tls.</li>
-<li>Options can appear multiple times.</li>
-<li>Options precede other nonoption arguments: -lst nonoption.</li>
-<li>The -- argument terminates options.</li>
-<li>The - option is typically used to represent one of the standard input streams.</li>
-</ol>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/29">&larr; Older</a>
@@ -1476,31 +1591,31 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 144%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 143%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 107%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 135%" href="/tags/android/">Android</a>
+<a style="font-size: 134%" href="/tags/android/">Android</a>
 <a style="font-size: 104%" href="/tags/c-plus-plus/">C++</a>
 <a style="font-size: 107%" href="/tags/css/">CSS</a>
-<a style="font-size: 110%" href="/tags/crack/">Crack</a>
+<a style="font-size: 109%" href="/tags/crack/">Crack</a>
 <a style="font-size: 107%" href="/tags/database/">Database</a>
-<a style="font-size: 97%" href="/tags/eclipse/">Eclipse</a>
-<a style="font-size: 115%" href="/tags/git/">Git</a>
-<a style="font-size: 97%" href="/tags/html/">HTML</a>
+<a style="font-size: 96%" href="/tags/eclipse/">Eclipse</a>
+<a style="font-size: 114%" href="/tags/git/">Git</a>
+<a style="font-size: 96%" href="/tags/html/">HTML</a>
 <a style="font-size: 104%" href="/tags/jbookshelf/">JBookShelf</a>
 <a style="font-size: 148%" href="/tags/java/">Java</a>
-<a style="font-size: 101%" href="/tags/javascript/">JavaScript</a>
-<a style="font-size: 97%" href="/tags/listview/">ListView</a>
+<a style="font-size: 100%" href="/tags/javascript/">JavaScript</a>
+<a style="font-size: 96%" href="/tags/listview/">ListView</a>
 <a style="font-size: 104%" href="/tags/mysql/">MySQL</a>
-<a style="font-size: 97%" href="/tags/paperclip/">Paperclip</a>
-<a style="font-size: 119%" href="/tags/powerbuilder/">PowerBuilder</a>
-<a style="font-size: 101%" href="/tags/powerscript/">PowerScript</a>
-<a style="font-size: 117%" href="/tags/qianbao/">Qianbao</a>
+<a style="font-size: 96%" href="/tags/paperclip/">Paperclip</a>
+<a style="font-size: 118%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 100%" href="/tags/powerscript/">PowerScript</a>
+<a style="font-size: 116%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
-<a style="font-size: 119%" href="/tags/ruby/">Ruby</a>
-<a style="font-size: 97%" href="/tags/spring/">Spring</a>
-<a style="font-size: 101%" href="/tags/struts/">Struts</a>
+<a style="font-size: 118%" href="/tags/ruby/">Ruby</a>
+<a style="font-size: 96%" href="/tags/spring/">Spring</a>
+<a style="font-size: 100%" href="/tags/struts/">Struts</a>
 <a style="font-size: 140%" href="/tags/translation/">Translation</a>
-<a style="font-size: 97%" href="/tags/ubuntu/">Ubuntu</a>
+<a style="font-size: 96%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 107%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 107%" href="/tags/wxwidgets/">wxWidgets</a>
 

@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Tag: Resque | 乐者为王]]></title>
+  <link href="http://codemany.com/tags/resque/atom.xml" rel="self"/>
+  <link href="http://codemany.com/"/>
+  <updated>2017-06-01T15:27:12+08:00</updated>
+  <id>http://codemany.com/</id>
+  <author>
+    <name><![CDATA[dohkoos]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[使用Rails 4.2+ 测试异步邮件]]></title>
+    <link href="http://codemany.com/blog/testing-async-emails-rails-42/"/>
+    <updated>2015-07-09T13:05:08+08:00</updated>
+    <id>http://codemany.com/blog/testing-async-emails-rails-42</id>
+    <content type="html"><![CDATA[<p>英文原文：<a href="https://blog.engineyard.com/2015/testing-async-emails-rails-42">https://blog.engineyard.com/2015/testing-async-emails-rails-42</a></p>
+
+<p>如果你正在构建的应用需要发送邮件，我们都赞同绝不能阻塞控制器，因此异步发送必不可少。为了实现这一点，我们需要借助可以在后台处理任务的异步处理库将邮件发送代码从原始请求/响应周期中移出。</p>
+
+<p>我们如何确信我们的代码在进行此更改时会如预期的那样行事？在这篇博文中，我们将研究测试它的一种方法。我们将使用MiniTest（因为Rails内置了这个框架），但是这里介绍的概念可以很容易地转换为RSpec。</p>
+
+<p>好消息是从Rails 4.2开始，<a href="http://guides.rubyonrails.org/4_2_release_notes.html#asynchronous-mails">异步发送邮件</a>比以前更容易。我们将在我们的示例中使用<a href="https://github.com/mperham/sidekiq">Sidekiq</a>作为队列系统，但是由于ActionMailer＃deliver_later构建在Active Job之上，该接口很干净，使得异步处理库的使用不可知。这意味着如果我刚才没有提到它，作为开发者或者用户的你将不会知情。设置队列系统是另一个话题，你可以在<a href="https://blog.engineyard.com/2014/getting-started-with-active-job">Getting Started With Active Job</a>了解更多。</p>
+
+<h3 id="不要依赖具体">不要依赖具体</h3>
+
+<p>在我们的示例中，我们假设Sidekiq和它的依赖关系已经正确配置，因此特定于此场景的唯一一段代码是声明Active Job将使用哪个队列适配器：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text"># config/application.rb
+
+module OurApp
+  class Application &lt; Rails::Application
+    ...
+    config.active_job.queue_adapter = :sidekiq
+  end
+end
+</code></pre></div>
+<p>Active Job在隐藏所有的实质的队列实现细节上做得很好，使得它对于Resque、Delayed Job或其它队列可以用同样的方式工作。所以如果我们要换用<a href="https://github.com/brandonhilkert/sucker_punch">Sucker Punch</a>，唯一要做的更改就是在引用相应的依赖包后，将队列适配器从:sidekiq切换到:sucker_punch。</p>
+
+<h3 id="基于active-job">基于Active Job</h3>
+
+<p>如果你刚开始使用Rails 4.2，或者对<a href="http://guides.rubyonrails.org/4_2_release_notes.html#active-job">Active Job</a>不太了解，<a href="https://blog.engineyard.com/2014/getting-started-with-active-job">Ben Lewis’ intro to Active Job</a>是一个很好的起点。不过，这篇文章还留给我一个细节去<a href="https://twitter.com/mariusbutuc/status/578585047059599361">盼望</a>，即找到一个干净的、地道的方法来测试一切都如预期的那样工作。</p>
+
+<p>根据本文的目标，我们假设你有：</p>
+
+<ul>
+<li>Rails 4.2+</li>
+<li>已经设置好使用队列后端的Active Job（例如Sidekiq、Resque等）</li>
+<li>一个Mailer</li>
+</ul>
+
+<p>任何Mailer都应该使用这里描述的概念，我们将用以下这封“欢迎邮件”来使我们的示例更实际：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">#app/mailers/user_mailer.rb
+
+class UserMailer &lt; ActionMailer::Base
+  default from: &#39;email@example.com&#39;
+
+  def welcome_email(user:)
+    mail(
+      to: user.email,
+      subject: &quot;Hi #{user.first_name}, and welcome!&quot;
+    )
+  end
+end
+</code></pre></div>
+<p>为了保持事情简单并专注于什么是重要的，我们想在用户注册后给他发送一封“欢迎邮件”。</p>
+
+<p>这就像<a href="http://guides.rubyonrails.org/action_mailer_basics.html#calling-the-mailer">Rails指南邮件程序示例</a>中的那样：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text"># app/controllers/users_controller.rb
+
+class UsersController &lt; ApplicationController
+  ...
+  def create
+    ...
+    # Yes, Ruby 2.0+ keyword arguments are preferred
+    UserMailer.welcome_email(user: @user).deliver_later
+  end
+end
+</code></pre></div>
+<h3 id="mailer应该做最后的任务">Mailer应该做最后的任务</h3>
+
+<p>接下来，我们要确保控制器内的任务能完成我们预期的。</p>
+
+<p>在测试指南中，在<a href="http://guides.rubyonrails.org/testing.html#custom-assertions-and-testing-jobs-inside-other-components">Custom Assertions And Testing Jobs Inside Other Components</a>上面的部分教给我们大约半打这样的自定义断言。</p>
+
+<p>或许你的第一本能是立刻使用[assert_enqueued_jobs][assert-enqueued-jobs]来测试每次创建新用户时我们是否将邮件发送任务放入队列。</p>
+
+<p>你可以这样做：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text"># test/controllers/users_controller_test.rb
+
+require &#39;test_helper&#39;
+
+class UsersControllerTest &lt; ActionController::TestCase
+  ...
+  test &#39;email is enqueued to be delivered later&#39; do
+    assert_enqueued_jobs 1 do
+      post :create, {...}
+    end
+  end
+end
+</code></pre></div>
+<p>即使你这样做，你也会惊讶于测试的失败，被告知assert_enqueued_jobs没有定义而无法使用。</p>
+
+<p>这是因为我们的测试继承自ActionController::TestCase，它在编写时没有包含ActiveJob::TestHelper。</p>
+
+<p>但是我们可以快速地修复这个问题：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text"># test/test_helper.rb
+
+class ActionController::TestCase
+  include ActiveJob::TestHelper
+  ...
+end
+</code></pre></div>
+<p>假设我们的代码能完成我们预期的，我们的测试现在应该是绿色的。</p>
+
+<p>这是个好消息。我们可以继续重构代码，添加新功能，或者添加新测试。让我们跟随后者，测试我们的邮件是否被发送，以及它是否有预期的内容。</p>
+
+<p>作为delivery_method选项被配置成:test的结果，ActionMailer能给我们提供一个所有发出邮件的数组。我们可以通过ActionMailer::Base.deliveries访问它。当发送的邮件串联时，测试邮件是否被真正发送就非常简单。我们要做的就是在行动完成后，检查交付数量增加1。用MiniTest来写的话，就像下面这样：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">assert_difference &#39;ActionMailer::Base.deliveries.size&#39;, +1 do
+  post :create, {...}
+end
+</code></pre></div>
+<p>我们的测试是实时发生的，但正如我们在本文开头赞同的那样，不能阻塞控制器并在后台任务中发送邮件，所以我们现在需要协调一切，以确保我们的系统是确定的。因此，在我们的异步世界中，我们需要首先执行所有入队的任务，然后才能评估其结果。要执行待处理的Active Job任务，我们将使用<a href="http://api.rubyonrails.org/classes/ActiveJob/TestHelper.html#method-i-perform_enqueued_jobs">perform_enqueued_jobs</a>。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">test &#39;email is delivered with expected content&#39; do
+  perform_enqueued_jobs do
+    post :create, {...}
+    delivered_email = ActionMailer::Base.deliveries.last
+
+    # assert our email has the expected content, e.g.
+    assert_includes delivered_email.to, @user.email
+  end
+end
+</code></pre></div>
+<h3 id="缩短反馈循环">缩短反馈循环</h3>
+
+<p>迄今为止，我们都在进行功能性测试以确保我们的控制器如预期的那样行事。但是，当代码中的更改可能会破坏我们发送的邮件时，如何单元测试邮件程序才能缩短反馈循环并获得快速洞察？</p>
+
+<p><a href="http://guides.rubyonrails.org/testing.html#testing-your-mailers">Rails测试指南</a>建议在这里使用fixtures，但我发现它们太过脆弱。特别是在开始的时候，当还在试验邮件的设计或内容时，变化会很快地使它们过时，导致测试变红。相反，我偏向使用assert_match来关注应该是邮件正文部分的关键元素。</p>
+
+<p>为了这个目的和更多（比如抽象处理多部分邮件的逻辑），我们可以构建我们的自定义断言。这使我们能够扩展<a href="http://guides.rubyonrails.org/testing.html#available-assertions">MiniTest标准断言</a>或<a href="http://guides.rubyonrails.org/testing.html#rails-specific-assertions">Rails专用断言</a>。这也是创建我们自己的领域专用语言（DSL）进行测试的一个很好的示例。</p>
+
+<p>让我们在test目录中创建一个shared文件夹来托管我们的SharedMailerTests模块。我们的自定义断言看起来像这样：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text"># /test/shared/shared_mailer_tests.rb
+
+module SharedMailerTests
+  ...
+  def assert_email_body_matches(matcher:, email:)
+    if email.multipart?
+      %w(text html).each do |part|
+        assert_match matcher, email.send(&quot;#{part}_part&quot;).body.to_s
+      end
+    else
+      assert_match matcher, email.body.to_s
+    end
+  end
+end
+</code></pre></div>
+<p>接下来，我们要让邮件程序测试意识到这个自定义断言，所以我们把它混合在ActionMailer::TestCase中。我们可以以类似于我们在ActionController::TestCase中包含ActiveJob::TestHelper的方式来做到这点：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text"># test/test_helper.rb
+
+require &#39;shared/shared_mailer_tests&#39;
+...
+class ActionMailer::TestCase
+  include SharedMailerTests
+  ...
+end
+</code></pre></div>
+<p>请注意，我们首先需要在test_helper中依赖我们的shared_mailer_tests。</p>
+
+<p>这些就绪后，我们现在可以确保我们的邮件包含我们预期的关键元素。想象一下，我们想确保我们发送给用户的URL包含一些用于追踪的特定UTM参数。我们现在可以使用我们的自定义断言配合我们的老朋友perform_enqueued_jobs做到这些：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text"># test/mailers/user_mailer_test.rb
+
+class ToolMailerTest &lt; ActionMailer::TestCase
+  ...
+  test &#39;emailed URL contains expected UTM params&#39; do
+    UserMailer.welcome_email(user: @user).deliver_later
+
+    perform_enqueued_jobs do
+      refute ActionMailer::Base.deliveries.empty?
+
+      delivered_email = ActionMailer::Base.deliveries.last
+      %W(
+        utm_campaign=#{@campaign}
+        utm_content=#{@content}
+        utm_medium=email
+        utm_source=mandrill
+      ).each do |utm_param|
+        assert_email_body_matches utm_param, delivered_email
+      end
+    end
+  end
+end
+</code></pre></div>
+<h3 id="结论">结论</h3>
+
+<p>让ActionMailer基于Active Job之上，使得从同步发送邮件切换到通过队列发送邮件变得非常简单，就如同从deliver_now切换到deliver_later那样。</p>
+
+<p>由于Active Job使得设置任务基础设施（不需要知道太多你正在使用的队列系统）如此容易，你的测试不再需要关心是否以后会切换到Sidekiq或Resque。</p>
+
+<p>让你的测试设置正确以便于可以充分利用Active Job提供的新的自定义断言可能会有点棘手。希望本教程能使你对整个过程更加明白。</p>
+
+<p>附：你有ActionMailer或Active Job的经验吗？有任何建议吗？有什么陷阱？我们很乐意听到你的经验。</p>
+]]></content>
+  </entry>
+  
+</feed>
