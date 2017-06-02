@@ -9,10 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="记账应用的基本功能都已经实现了，现在来给它加上个首页。 1
-script/generate controller home index 上面的命令生成了控制器home，它有个动作index，并且在views目录下还生成了home/index.html.erb文件。打开它加入下面的内容： 1
-2
-& &hellip;">
+  <meta name="description" content="这次要给应用加上一个认证系统（注册、激活、登录、登出）。当用户输入注册信息时，必须输入有效的邮箱地址，注册成功后，用户并不能立即登录系统，而是要登录注册时输入的邮箱，通过该邮箱内的激活邮件来激活账户。通过这种方式可以防止用户的恶意注册。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -76,6 +73,150 @@ script/generate controller home index 上面的命令生成了控制器home，�
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/using-rails-23-to-create-a-simple-accounting-app-part3/">用Rails 2.3打造简单记账应用（3）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2009-11-15T16:21:33+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>15</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>4:21 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>这次要给应用加上一个认证系统（注册、激活、登录、登出）。当用户输入注册信息时，必须输入有效的邮箱地址，注册成功后，用户并不能立即登录系统，而是要登录注册时输入的邮箱，通过该邮箱内的激活邮件来激活账户。通过这种方式可以防止用户的恶意注册。</p>
+
+<p><a href="https://github.com/technoweenie/restful-authentication">restful_authentication</a>是一个支持Rails 2.0的认证系统插件，它为你生成REST风格的认证系统模板，除了提供最基本的用户注册登录登出功能外，还有一个可选的邮件激活功能。只要一个命令，它就为你生成了User模型、管理注册和登录的控制器、相应的视图页面、mailer等等。</p>
+
+<p>安装插件和生成框架代码</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>script/plugin install git://github.com/technoweenie/restful-authentication.git restful_authentication
+</span><span class='line'>script/generate authenticated user sessions --include-activation
+</span><span class='line'>rake db:migrate</span></code></pre></td></tr></table></div></figure>
+
+<p>--include-activation选项决定是否生成向新注册用户发送激活码邮件的代码。</p>
+
+<p>如果你想你的URL看起来更符合惯例一些，那么可以在config/routes.rb中添加：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>map.signup '/signup', :controller =&gt; 'users', :action =&gt; 'new'
+</span><span class='line'>map.login '/login', :controller =&gt; 'sessions', :action =&gt; 'new'
+</span><span class='line'>map.logout '/logout', :controller =&gt; 'sessions', :action =&gt; 'destroy'</span></code></pre></td></tr></table></div></figure>
+
+<p>因为使用了--include-activation选项，所以还要在config/routes.rb中增加以下映射：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>map.activate '/activate/:activation_code',
+</span><span class='line'>             :controller =&gt; 'users', :action =&gt; 'activate', :activation_code =&gt; nil</span></code></pre></td></tr></table></div></figure>
+
+<p>最后，还需要添加一个observer到config/environment.rb的Rails::Initializer块中：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>config.active_record.observers = :user_observer</span></code></pre></td></tr></table></div></figure>
+
+<p>设置ActionMailer，在config/environments/development.rb中添加：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># Don't care if the mailer can't send
+</span><span class='line'>config.action_mailer.raise_delivery_errors = true
+</span><span class='line'>config.action_mailer.perform_deliveries = true
+</span><span class='line'>config.action_mailer.delivery_method = :smtp
+</span><span class='line'>config.action_mailer.smtp_settings = {
+</span><span class='line'>  :address =&gt; "smtp.example.com",
+</span><span class='line'>  :port =&gt; 25,
+</span><span class='line'>  :domain =&gt; "example.com",
+</span><span class='line'>  :authentication =&gt; :login,
+</span><span class='line'>  :user_name =&gt; "yourname@example.com",
+</span><span class='line'>  :password =&gt; "yourpassword"
+</span><span class='line'>}
+</span><span class='line'>config.action_mailer.default_charset = "utf-8"
+</span><span class='line'>
+</span><span class='line'>HOST = "localhost:3000"
+</span><span class='line'>ADMINEMAIL = "yourname@example.com"</span></code></pre></td></tr></table></div></figure>
+
+<p>打开app/models/user_mailer.rb，修改</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>@body[:url]  = "http://YOURSITE/activate/#{user.activation_code}"
+</span><span class='line'>@body[:url]  = "http://YOURSITE/"
+</span><span class='line'>@subject     = "[YOURSITE] "
+</span><span class='line'>@from        = "ADMINEMAIL"</span></code></pre></td></tr></table></div></figure>
+
+<p>为以下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>@body[:url]  = "http://#{HOST}/activate/#{user.activation_code}"
+</span><span class='line'>@body[:url]  = "http://#{HOST}/"
+</span><span class='line'>@subject     = "[#{HOST}] "
+</span><span class='line'>@from        = "#{ADMINEMAIL}"</span></code></pre></td></tr></table></div></figure>
+
+<p>如果出现以下错误信息，那么可能是smtp_settings中的domain没有填写：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Net::SMTPSyntaxError (500 Error: bad syntax):
+</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:679:in 'check_response'
+</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:652:in 'getok'
+</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:622:in 'helo'</span></code></pre></td></tr></table></div></figure>
+
+<p>user_mailer.rb中的ADMINEMAIL必须是一个有效的邮件账号，否则会出现：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Net::SMTPFatalError (550 Invalid User):
+</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:679:in 'check_response'
+</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:652:in 'getok'
+</span><span class='line'>  RAILS_HOME/lib/ruby/1.8/net/smtp.rb:630:in 'mailfrom'</span></code></pre></td></tr></table></div></figure>
+
+<p>代码下载：<a href="https://github.com/dohkoos/qianbao">https://github.com/dohkoos/qianbao</a></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -625,69 +766,6 @@ script/generate controller home index 上面的命令生成了控制器home，�
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/git-notes-rebase-onto/">Git笔记之rebase --onto</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2009-06-26T13:41:19+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>1:41 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>有的时候，可能需要修改某个已提交commit。如果是修改最近提交的commit，可以使用git commit --amend命令；如果是修改更早提交的commit，可以使用git rebase -i HEAD~n。不过这个命令有个缺陷，就是不能修改最早提交的那个commit。假设有如下提交历史：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>C1--C2--C3--C4</span></code></pre></td></tr></table></div></figure>
-
-<p>要修改C4可以使用git commit --amend；要修改C2、C3或C4可以使用git rebase -i HEAD~n；但是如果要修改C1呢？这就需要rebase --onto出场了。下面就来实例讲解如何使用rebase --onto命令。</p>
-
-<p>因为要修改C1这个commit，所以先在它之上创建临时分支tb：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git checkout -b tb C1</span></code></pre></td></tr></table></div></figure>
-
-<p>然后就可以在tb分支上做想要的修改，改完之后用下面的命令提交更改的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git commit -a --amend</span></code></pre></td></tr></table></div></figure>
-
-<p>这时查看tb分支的提交历史，可以发现SHA1值已经发生了变化（master分支的SHA1值仍然不变）：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>C1'</span></code></pre></td></tr></table></div></figure>
-
-<p>接着可以把修改后的内容和master分支合并：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git rebase --onto tb C1 master</span></code></pre></td></tr></table></div></figure>
-
-<p>表示把master分支上从C1之后的所有commit重新apply到tb分支最新的commit之后。</p>
-
-<p>这里有两点要注意：一个是C1处的开闭问题，rebase --onto的机制是左开右闭，也就是说上述命令只会apply三个提交C2、C3和C4；第二个是rebase --onto之后tb分支的提交历史没有改变，还是只有一个提交C1’，当前分支也切换到了master，并且所有commit的SHA1值都发生了改变。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>C1'--C2'--C3'--C4'</span></code></pre></td></tr></table></div></figure>
-
-<p>最后就是正常的rebase --continue流程了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/20">&larr; Older</a>
@@ -705,6 +783,10 @@ script/generate controller home index 上面的命令生成了控制器home，�
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/learn-anything-faster-with-the-feynman-technique/">费曼技巧：最好的学习方法</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/code-coverage-100-percent-tragedy/">100%代码覆盖率的悲剧</a>
       </li>
     
@@ -718,10 +800,6 @@ script/generate controller home index 上面的命令生成了控制器home，�
     
       <li class="post">
         <a href="/blog/how-to-modify-hosts-in-android/">如何修改Android的hosts文件</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/chess-mess-master-development-record-part2/">象棋残局大师开发实录（2）</a>
       </li>
     
   </ul>
@@ -758,7 +836,7 @@ script/generate controller home index 上面的命令生成了控制器home，�
 <a style="font-size: 118%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 96%" href="/tags/spring/">Spring</a>
 <a style="font-size: 100%" href="/tags/struts/">Struts</a>
-<a style="font-size: 140%" href="/tags/translation/">Translation</a>
+<a style="font-size: 141%" href="/tags/translation/">Translation</a>
 <a style="font-size: 96%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 107%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 107%" href="/tags/wxwidgets/">wxWidgets</a>

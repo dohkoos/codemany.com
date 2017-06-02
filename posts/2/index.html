@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="前面我们主要处理的是数据，今天我们就来做些编程语言方面的事情。 生成调用关系图 软件很难编写和维护，这就是为什么我们试图构建工具去提高我们的生产力和工作效率。例如，在过去的十年里，我们已经看到测试框架、代码覆盖工具和代码分析器的激增，也很高心看到类层次结构的可视化树，以及大部分开发环境支持这个功能 &hellip;">
+  <meta name="description" content="scope 作用域 为了阐明Cymbol语法是可复用的，本节中我们将在不做修改的基础上再次使用它，用于构建一个完全不同的应用。不仅如此，我们还会在同样的树上使用两个不同的监听器做两次遍历。 验证程序符号的使用情况 为Cymbol这样的编程语言构建解释器、编译器或者转换器， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,366 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part28/">ANTLR 4权威参考读书笔记（28）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-10-06T18:42:25+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>6</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:42 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><ul>
+<li>scope 作用域</li>
+</ul>
+
+<p>为了阐明Cymbol语法是可复用的，本节中我们将在不做修改的基础上再次使用它，用于构建一个完全不同的应用。不仅如此，我们还会在同样的树上使用两个不同的监听器做两次遍历。</p>
+
+<h3 id="验证程序符号的使用情况">验证程序符号的使用情况</h3>
+
+<p>为Cymbol这样的编程语言构建解释器、编译器或者转换器，我们需要验证Cymbol程序是否正确地使用符号（标志符）。接下来，我们将构建一个Cymbol验证器用于检查以下的条件：</p>
+
+<ul>
+<li>可见的变量引用有相应的定义（在作用域内）。</li>
+<li>函数引用有相应的定义（函数可以以任何顺序出现）。</li>
+<li>变量不作为函数使用。</li>
+<li>函数不作为变量使用。</li>
+</ul>
+
+<p>让我们看一下有许多不同引用的Cymbol示例代码，其中有些是无效的。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>int f(int x, float y) {
+</span><span class='line'>    g();      // forward reference is ok
+</span><span class='line'>    i = 3;    // no declaration for i (error)
+</span><span class='line'>    g = 4;    // g is not variable (error)
+</span><span class='line'>    return x + y;    // x, y are defined, so no problem
+</span><span class='line'>}
+</span><span class='line'>void g() {
+</span><span class='line'>    int x = 0;
+</span><span class='line'>    float y;
+</span><span class='line'>    y = 9;    // y is defined
+</span><span class='line'>    f();      // backward reference is ok
+</span><span class='line'>    z();      // no such function (error)
+</span><span class='line'>    y();      // y is not function (error)
+</span><span class='line'>    x = f;    // f is not a variable (error)
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>为验证程序中的一切都没问题，根据前面的条件，我们应该打印出函数列表和本地变量以及全局符号列表（函数和全局变量）。更进一步，当我们发现问题时应该给出一个错误。例如，使用上述输入，让我们构建一个称为CheckSymbols的应用。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>java CheckSymbols vars.cymbol</span></code></pre></td></tr></table></div></figure>
+
+<p>在执行以上命令后会生成如下输出：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>locals:[]
+</span><span class='line'>function&lt;f:tINT&gt;:[&lt;x:tINT&gt;, &lt;y:tFLOAT&gt;]
+</span><span class='line'>locals:[x, y]
+</span><span class='line'>function&lt;g:tVOID&gt;:[]
+</span><span class='line'>globals:[f, g]
+</span><span class='line'>line 3:4 no such variable: i
+</span><span class='line'>line 4:4 g is not a variable
+</span><span class='line'>line 13:4 no such function: z
+</span><span class='line'>line 14:4 y is not a function
+</span><span class='line'>line 15:8 f is not a variable</span></code></pre></td></tr></table></div></figure>
+
+<p>实现这类问题的关键是一个被称为符号表的相应的数据结构。我们的应用会把符号存在符号表中，然后通过在符号表中查找符号引用检查它们的正确性。在接下来的部分，我们将大概看一看数据结构看起来像什么，并且使用它去解决手头的验证问题。</p>
+
+<h3 id="符号表中的速成课">符号表中的速成课</h3>
+
+<p>语言实现者通常称持有符号的数据结构为符号表。语言的实现决定符号表的结构和复杂性，如果一门语言允许相同的标志符在不同的上下文中指向不同的东西，符号表会将那些符号分组到不同的作用域中。作用域只是一组符号，例如函数的参数列表或变量列表以及在全局作用域内的函数。</p>
+
+<p>符号表自身只是一个符号定义的存储库——它不作任何检查。为了验证代码，我们需要检查表达式中违反我们之前设置的规则的变量和函数引用。符号验证有两个基本操作：定义符号和解决符号。定义一个符号意味着把它添加到一个作用域中。解决一个符号意味着计算出符号指向哪个定义。在某种程度上，解决一个符号意味着找到最近的匹配定义。最近的作用域是最近的封闭作用域。例如，让我们看看另一个Cymbol例子，它在不同的作用域有符号定义。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>int x;
+</span><span class='line'>int y;
+</span><span class='line'>void a()
+</span><span class='line'>{
+</span><span class='line'>    int x;
+</span><span class='line'>    x = 1;
+</span><span class='line'>    // x resolves to current scope, not x in global scope
+</span><span class='line'>    y = 2;
+</span><span class='line'>    // y is not found in current scope, but resolves in global
+</span><span class='line'>    { int y = x; }
+</span><span class='line'>}
+</span><span class='line'>void b(int z)
+</span><span class='line'>{ }</span></code></pre></td></tr></table></div></figure>
+
+<p>全局作用域包含变量x和y以及函数a()和b()。函数处于全局作用域，但它们也构成新的作用域用于持有函数的参数，如果有的话。同样嵌套在函数作用域内的是函数本地代码块，它们构成另一个新的作用域。本地变量被约束在嵌套在函数作用域内的本地作用域内。</p>
+
+<p>因为符号x被定义了两次，所以做不到仅把所有标识符都填充进单个集合而没有冲突。这也是作用域出现的原因。我们保留一组作用域，并且一个作用域中的每个标志符只允许有单个定义。我们还保留一个指向父作用域的指针，以便在外层作用域中找到符号定义。这些作用域形成了一棵树。</p>
+
+<p><img src="/uploads/cymbol-scope-tree.png" title="cymbol-scope-tree" ></p>
+
+<p>沿着从任何作用域到根（全局作用域）的路径的所有节点形成一堆作用域。为了找到一个符号的定义，我们从围绕着引用的作用域开始，并沿着作用域树向上遍历，直到找到它的定义。</p>
+
+<h3 id="验证器架构">验证器架构</h3>
+
+<p>开始构建验证器前，先让我们思考下大方向和总体策略。我们可以根据关键操作——定义和解决——把问题分解。对于定义，我们需要侦听变量和函数定义事件，然后把符号对象插入围绕着定义的作用域。在函数定义的开始处，我们需要压栈一个新的作用域，然后在函数定义的结尾处把它出栈。</p>
+
+<p>为解决和检查符号引用，我们需要侦听在表达式中的变量和函数名字引用。针对每个引用，我们将验证是否有匹配的定义，以及引用是否正确使用符号。</p>
+
+<p>这似乎很直截了当，但有个并发症：在源码文件中，Cymbol程序可以调用在它之后定义的一个函数。我们称它为前向引用。为支持这个特性，我们需要在语法分析树上执行两次遍历。第一遍，或者阶段，定义包含函数的符号，然后第二遍进行解决。用这种方法，第二遍可以看到文件中的所有函数。以下是用于触发在语法分析树上两次遍历的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ParseTreeWalker walker = new ParseTreeWalker();
+</span><span class='line'>DefPhase def = new DefPhase();
+</span><span class='line'>walker.walk(def, tree);
+</span><span class='line'>// create next phase and feed symbol table info from def to ref phase
+</span><span class='line'>RefPhase ref = new RefPhase(def.globals, def.scopes);
+</span><span class='line'>walker.walk(ref, tree);</span></code></pre></td></tr></table></div></figure>
+
+<p>在定义阶段，我们将创建许多作用域。除非我们保持对它们的引用，否则垃圾收集器会回收它们。为了符号表能够度过从定义到解决阶段的转变，我们需要追踪这些作用域。储存它们最合乎逻辑的地方是在语法分析树本身（或者，从技术上讲，使用关联值与树节点的注解映射）。然后引用阶段就可以在它下行语法分析树时很简单地获得当前作用域的指针。与函数和本地块关联的树节点将可以获得它们的作用域的指针。</p>
+
+<h3 id="定义和解决符号">定义和解决符号</h3>
+
+<p>考虑到我们的基本策略，让我们从DefPhase开始构建我们的验证器。这个阶段类需要3个字段：一个全局作用域的引用、一个用于追踪我们创建的作用域的语法分析树注解器，以及一个当前作用域的指针。enterFile()的监听器代码在活动开始时创建全局变量。当活动结束时，exitFile()负责打印结果。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class DefPhase extends CymbolBaseListener {
+</span><span class='line'>    ParseTreeProperty&lt;Scope&gt; scopes = new ParseTreeProperty&lt;Scope&gt;();
+</span><span class='line'>    GlobalScope globals;
+</span><span class='line'>    Scope currentScope;    // define symbols in this scope
+</span><span class='line'>    public void enterFile(CymbolParser.FileContext ctx) {
+</span><span class='line'>        globals = new GlobalScope(null);
+</span><span class='line'>        currentScope = globals;
+</span><span class='line'>    }
+</span><span class='line'>    public void exitFile(CymbolParser.FileContext ctx) {
+</span><span class='line'>        System.out.println(globals);
+</span><span class='line'>    }</span></code></pre></td></tr></table></div></figure>
+
+<p>当语法分析器找到函数声明时，应用需要创建一个FunctionSymbol对象。作为一个符号和作为一个包含参数的作用域，FunctionSymbol对象负有双重责任。为把函数作用域嵌套在全局作用域内，我们需要把函数作用域压栈。我们通过设置函数的封闭作用域为当前作用域并重置当前作用域来做到这点。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void enterFunctionDecl(CymbolParser.FunctionDeclContext ctx) {
+</span><span class='line'>    String name = ctx.ID().getText();
+</span><span class='line'>    int typeTokenType = ctx.type().start.getType();
+</span><span class='line'>    Symbol.Type type = CheckSymbols.getType(typeTokenType);
+</span><span class='line'>
+</span><span class='line'>    // push new scope by making new one that points to enclosing scope
+</span><span class='line'>    FunctionSymbol function = new FunctionSymbol(name, type, currentScope);
+</span><span class='line'>    currentScope.define(function);    // Define function in current scope
+</span><span class='line'>    saveScope(ctx, function);         // Push: set function's parent to current
+</span><span class='line'>    currentScope = function;          // Current scope is now function scope
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>void saveScope(ParserRuleContext ctx, Scope s) {
+</span><span class='line'>    scopes.put(ctx, s);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>方法saveScope()使用函数作用域注解functionDecl规则节点，以便在随后的引用阶段可以获得它。当我们离开函数时就出栈函数作用域，因此当前作用域仍然是全局作用域。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitFunctionDecl(CymbolParser.FunctionDeclContext ctx) {
+</span><span class='line'>    System.out.println(currentScope);
+</span><span class='line'>    currentScope = currentScope.getEnclosingScope();    // pop scope
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>本地作用域以类似的方式工作。我们在监听器方法enterBlock()中压栈一个作用域，然后在exitBlock()中出栈它。</p>
+
+<p>在处理好作用域和函数定义后，我们就可以开始定义参数和变量。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitFormalParameter(CymbolParser.FormalParameterContext ctx) {
+</span><span class='line'>    defineVar(ctx.type(), ctx.ID().getSymbol());
+</span><span class='line'>}
+</span><span class='line'>public void exitVarDecl(CymbolParser.VarDeclContext ctx) {
+</span><span class='line'>    defineVar(ctx.type(), ctx.ID().getSymbol());
+</span><span class='line'>}
+</span><span class='line'>void defineVar(CymbolParser.TypeContext typeCtx, Token nameToken) {
+</span><span class='line'>    int typeTokenType = typeCtx.start.getType();
+</span><span class='line'>    Symbol.Type type = CheckSymbols.getType(typeTokenType);
+</span><span class='line'>    VariableSymbol var = new VariableSymbol(nameToken.getText(), type);
+</span><span class='line'>    currentScope.define(var); // Define symbol in current scope
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>到此，定义阶段已经完成。</p>
+
+<p>为构建引用阶段，让我们将当前作用域设置为从定义阶段传递过来的全局作用域。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public RefPhase(GlobalScope globals, ParseTreeProperty&lt;Scope&gt; scopes) {
+</span><span class='line'>    this.scopes = scopes;
+</span><span class='line'>    this.globals = globals;
+</span><span class='line'>}
+</span><span class='line'>public void enterFile(CymbolParser.FileContext ctx) {
+</span><span class='line'>    currentScope = globals;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>然后，就像树遍历器触发Cymbol函数和块的进入与退出事件那样，监听器方法通过访问在定义阶段期间存储在树中的值来及时更新currentScope。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void enterFunctionDecl(CymbolParser.FunctionDeclContext ctx) {
+</span><span class='line'>    currentScope = scopes.get(ctx);
+</span><span class='line'>}
+</span><span class='line'>public void exitFunctionDecl(CymbolParser.FunctionDeclContext ctx) {
+</span><span class='line'>    currentScope = currentScope.getEnclosingScope();
+</span><span class='line'>}
+</span><span class='line'>public void enterBlock(CymbolParser.BlockContext ctx) {
+</span><span class='line'>    currentScope = scopes.get(ctx);
+</span><span class='line'>}
+</span><span class='line'>public void exitBlock(CymbolParser.BlockContext ctx) {
+</span><span class='line'>    currentScope = currentScope.getEnclosingScope();
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>随着遍历器的行进恰当地设置作用域，我们可以通过实现变量引用和函数调用的监听器方法解决符号。当遍历器遇到一个变量引用时，它调用exitVar()，该方法使用resolve()试图在当前作用域的符号表中查找变量名。如果resolve()在当前作用域中没有找到符号，它会查找封闭作用域链。如果必要，resolve()将寻找所有方式直到全局作用域。如果找不到一个合适的定义，它会返回null值。如果resolve()找到的符号是一个函数而不是变量，就需要生成一个错误消息。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitVar(CymbolParser.VarContext ctx) {
+</span><span class='line'>    String name = ctx.ID().getSymbol().getText();
+</span><span class='line'>    Symbol var = currentScope.resolve(name);
+</span><span class='line'>    if ( var==null ) {
+</span><span class='line'>        CheckSymbols.error(ctx.ID().getSymbol(), "no such variable: "+name);
+</span><span class='line'>    }
+</span><span class='line'>    if ( var instanceof FunctionSymbol ) {
+</span><span class='line'>        CheckSymbols.error(ctx.ID().getSymbol(), name+" is not a variable");
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>处理函数调用基本上是相同的，如果不能找到一个定义或找到了一个变量，都需要发出一个错误。</p>
+
+<p>最后，是用来显示早先需要的输出的构建和测试序列：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr Cymbol.g
+</span><span class='line'>compile *.java
+</span><span class='line'>run CheckSymbols vars.cymbol</span></code></pre></td></tr></table></div></figure>
+
+<p>输出结果如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>locals:[]
+</span><span class='line'>function&lt;f:tINT&gt;:[&lt;x:tINT&gt;, &lt;y:tFLOAT&gt;]
+</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1798,128 +2158,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part20/">ANTLR 4权威参考读书笔记（20）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-07-03T18:37:26+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2016</span></span> <span class='time'>6:37 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>单独的语法不是很有用，因为相关的语法分析器只能告诉我们某个输入句子是否遵守语言规格。为构建语言应用，我们需要语法分析器在看到特定的输入句子、短语或者记号时触发特定的动作。这些短语-动作对的集合表示语言应用或者至少是在语法和一个更大的周边应用之间的接口。</p>
-
-<p>我们可以使用语法分析树监听器和访问者构建语言应用。监听器是一个响应规则进入和退出事件的对象，这些短语识别事件在语法分析树遍历器发现和完成节点时触发。为了支持应用必须控制树是如何被遍历的这种情况，ANTLR生成的语法分析树也支持著名的树访问者模式。</p>
-
-<p>监听器和访问者之间最大的不同是，监听器方法不对显式地调用方法去遍历它们的子树负责，而访问者必须显式地触发访问子节点以保持树的遍历继续。通过这些显式的访问子树的调用，访问者控制遍历的顺序以及多少树被访问。为方便起见，我们使用术语“事件方法”来指代监听器回调或者访问者方法。</p>
-
-<p>为了确切地知道ANTLR为我们构建了什么样的树遍历设施以及为什么，让我们首先看看监听器机制的起源以及如何使用监听器和访问者把特定应用的代码和语法分离。</p>
-
-<h3 id="从嵌入动作演化到监听器">从嵌入动作演化到监听器</h3>
-
-<p>监听器和访问者机制将语法从应用代码中解耦，提供了一些令人信服的好处。这种解耦很好地封装了应用程序，而不是把它切割成碎片分散到语法中的各个地方。没有嵌入动作，我们可以在不同的应用中复用相同的语法，甚至不需要重新编译生成的语法分析器。如果没有嵌入动作，ANTLR还可以用相同的语法生成不同编程语言的语法分析器。集成语法缺陷修复或更新也更容易，因为我们不必担心嵌入动作导致的合并冲突。</p>
-
-<p>接下来，我们将探讨从带有嵌入动作的语法到完全解耦的语法和应用的演化。以下含有用«...»描述的嵌入动作的属性文件语法读取属性文件，每行一个属性赋值。像«start file»这样的动作只是Java代码适当的替代。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grammar PropertyFile;
-</span><span class='line'>file : {«start file»} prop+ {«finish file»} ;
-</span><span class='line'>prop : ID '=' STRING '\n' {«process property»} ;
-</span><span class='line'>ID   : [a-z]+ ;
-</span><span class='line'>STRING : '"' .*? '"' ;</span></code></pre></td></tr></table></div></figure>
-
-<p>这样的紧密耦合把语法束缚到一个特定的应用上。一个更好的方法是创建由ANTLR生成的语法分析器PropertyFileParser的子类，然后把嵌入动作转换成方法。重构仅留下不重要的方法调用在语法中触发新创建方法的动作，然后，通过子类化语法分析器，我们可以实现任意数量的不同应用而无需修改语法。这样的重构看起来像：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grammar PropertyFile;
-</span><span class='line'>@members {
-</span><span class='line'>    void startFile() { }    // blank implementations
-</span><span class='line'>    void finishFile() { }
-</span><span class='line'>    void defineProperty(Token name, Token value) { }
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>file : {startFile();} prop+ {finishFile();} ;
-</span><span class='line'>prop : ID '=' STRING '\n' {defineProperty($ID, $STRING)} ;
-</span><span class='line'>ID   : [a-z]+ ;
-</span><span class='line'>STRING : '"' .*? '"' ;</span></code></pre></td></tr></table></div></figure>
-
-<p>解耦可以让语法被不同的应用复用，但语法因为方法调用的关系仍然被绑定在Java上。</p>
-
-<p>为演示已重构语法的复用性，让我们构建两个不同的应用。首先从遇到属性后只是打印它们的那个开始。这个过程只是去扩展由ANTLR生成的语法分析器类和覆盖一个或多个由语法触发的方法。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class PropertyFilePrinter extends PropertyFileParser {
-</span><span class='line'>    void defineProperty(Token name, Token value) {
-</span><span class='line'>        System.out.println(name.getText() + "=" + value.getText());
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>由于ANTLR生成的PropertyFileParser类中的默认实现，我们不需要覆盖startFile()或finishFile()。</p>
-
-<p>为了启动这个应用，我们需要创建一个特定的PropertyFilePrinter语法分析器子类的实例，而不是常规的PropertyFileParser的。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>PropertyFileLexer lexer = new PropertyFileLexer(input);
-</span><span class='line'>CommonTokenStream tokens = new CommonTokenStream(lexer);
-</span><span class='line'>PropertyFilePrinter parser = new PropertyFilePrinter(tokens);
-</span><span class='line'>parser.file();    // launch our special version of the parser</span></code></pre></td></tr></table></div></figure>
-
-<p>作为第二个应用，我们把属性加载到一个映射中而不是打印它们。我们需要做的就是创建一个新的子类并把不同的功能放到defineProperty()中。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class PropertyFileLoader extends PropertyFileParser {
-</span><span class='line'>    Map&lt;String,String&gt; props = new OrderedHashMap&lt;String, String&gt;();
-</span><span class='line'>    void defineProperty(Token name, Token value) {
-</span><span class='line'>        props.put(name.getText(), value.getText());
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>在语法分析器执行完毕后，字段props将会包含名-值对。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/3">&larr; Older</a>
@@ -1937,6 +2175,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/learn-anything-faster-with-the-feynman-technique/">费曼技巧：最好的学习方法</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/code-coverage-100-percent-tragedy/">100%代码覆盖率的悲剧</a>
       </li>
     
@@ -1950,10 +2192,6 @@
     
       <li class="post">
         <a href="/blog/how-to-modify-hosts-in-android/">如何修改Android的hosts文件</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/chess-mess-master-development-record-part2/">象棋残局大师开发实录（2）</a>
       </li>
     
   </ul>
@@ -1990,7 +2228,7 @@
 <a style="font-size: 118%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 96%" href="/tags/spring/">Spring</a>
 <a style="font-size: 100%" href="/tags/struts/">Struts</a>
-<a style="font-size: 140%" href="/tags/translation/">Translation</a>
+<a style="font-size: 141%" href="/tags/translation/">Translation</a>
 <a style="font-size: 96%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 107%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 107%" href="/tags/wxwidgets/">wxWidgets</a>

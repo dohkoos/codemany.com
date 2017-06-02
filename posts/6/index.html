@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="英文原文：https://weblogs.java.net/blog/2008/10/03/writing-great-oo-code-day-one 没有获取经验的捷径。编写良好的面向对象代码需要经验。尽管如此，这里有三个实践可以帮助你一开始就有个良好的开端： 使用测试驱动开发（TDD） &hellip;">
+  <meta name="description" content="看到Don&#39;t Store Data in the Application Object讲，在Application对象中存储共享数据会引起NullPointerException。顿时心里就咯噔了一下，用了四分之三秒，想起自己有个业余项目就干了这样的事。赶紧地测试看看。 打开应用， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,62 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/trap-for-storing-data-in-the-application-object/">在Application对象里存储数据的陷阱</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2015-10-27T20:57:41+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>27</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>8:57 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>看到<a href="http://www.developerphil.com/dont-store-data-in-the-application-object/">Don&#39;t Store Data in the Application Object</a>讲，在Application对象中存储共享数据会引起NullPointerException。顿时心里就咯噔了一下，用了四分之三秒，想起自己有个业余项目就干了这样的事。赶紧地测试看看。</p>
+
+<p>打开应用，从MainActivity进入TxtViewerActivity界面（这里MainActivity主要是读取目录数据，然后保存在继承自Application的MainApp中，供TxtViewerActivity调用）。按手机Home键退出应用，这时你按菜单键可以看到该应用的缩图。然后在Eclipse中打开Window -&gt; Show View -&gt; Other -&gt; Android -&gt; Devices视图，双击窗口内的设备，然后点击设备下对应的进程，点击右上方红色的“Stop Process”图标。</p>
+
+<p><img src="/uploads/android-devices.png" title="android-devices" ></p>
+
+<p>重新按菜单键打开应用，然后……然后果然在LogCat中看到了有NullPointerException的大段红色警告文字。</p>
+
+<h3 id="为什么会crash的？">为什么会Crash的？</h3>
+
+<p>根本原因在于：当应用被kill掉后，通过菜单键重新打开时，应用不会开始重新启动。Android系统会新建一个Application对象，然后启动上次离开时的TxtViewerActivity以造成这个应用从来没有被kill掉的假象。因为没有经过MainActivity的数据读取，所以在TxtViewerActivity中读取数据当然要抛出异常了。</p>
+
+<h3 id="有没有替代方法呢？">有没有替代方法呢？</h3>
+
+<ul>
+<li>直接将数据通过Intent传递给TxtViewerActivity？当然也会碰到上述同样的问题。</li>
+<li>使用SharedPreferences？可惜只能存储boolean、int、long、float和String五种数据类型，不支持List的存储；</li>
+<li>使用持久化存储？也不支持List的存储，而且太笨重了；</li>
+<li>使用Singleton对象保存共享数据，然后通过Intent传递呢？这个想法不错，还可以将读取assets资源等操作移到该对象中，做到单一职责原则，改善设计。不过这样一来Singleton对象会对MainActivity的context有长期引用，容易造成内存泄露。如果不把读取操作放进去……那根本就不可能，你能让一个追求完美的程序猿忍受糟糕的代码设计吗！</li>
+</ul>
+
+<p>幸好早就有人总结出来经验了：使用Application的context代替Activity的context。</p>
+
+<p>创建Singleton对象，在Application对该对象保持引用，把原来存储在Application中共享的数据全部移到Singleton对象中，将Activity中读取assets资源等操作也放入该对象，Activity中原来对Application对象的访问改成通过Application对象对Singleton对象的访问。</p>
+
+<p>这样修改后，不光解决了应用的崩溃，还预防了内存泄漏，更改进代码的设计。</p>
+
+<p>代码下载：<a href="https://github.com/dohkoos/txtReader">https://github.com/dohkoos/txtReader</a></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1251,139 +1307,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/tabactivity-is-deprecated/">TabActivity is deprecated</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2014-12-05T19:29:10+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>5</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>7:29 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>最近在整理<a href="/blog/summary-of-android-tab-navigation/">Android Tab导航总结</a>的代码时发现
-TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类，能尽量满足最小修改的要求。发现可以使用FragmentActivity来替代，Fragment组件作为标签页添加。</p>
-
-<p>Fragment是Android 3.0引入的一个新概念，主要是为了适应各种不同的屏幕大小，它非常类似于Activity，可以像Activity一样包含布局，但是不能单独存在，只能存在于Activity中。下图是Fragment在不同屏幕上的显示以及Fragment与所在Activity的关系：</p>
-
-<p><img src="/uploads/android-fragments.png" title="android-fragments" ></p>
-
-<p>重构前的布局：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>MainActivity extends TabActivity
-</span><span class='line'>    TabHost - tabhost
-</span><span class='line'>        LinearLayout
-</span><span class='line'>            TabWidget - tabs
-</span><span class='line'>            FrameLayout - tabcontent
-</span><span class='line'>                TabSpec (Activity)
-</span><span class='line'>                ...
-</span><span class='line'>                TabSpec (Activity)</span></code></pre></td></tr></table></div></figure>
-
-<p>重构后的布局：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>MainActivity extends FragmentActivity
-</span><span class='line'>    TabHost - tabhost
-</span><span class='line'>        LinearLayout
-</span><span class='line'>            TabWidget - tabs
-</span><span class='line'>            FrameLayout - tabcontent
-</span><span class='line'>                TabSpec (Fragment)
-</span><span class='line'>                ...
-</span><span class='line'>                TabSpec (Fragment)</span></code></pre></td></tr></table></div></figure>
-
-<p>把TabLeftActivity和TabRightActivity分别改成LeftFragment和RightFragment：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class LeftFragment extends Fragment {
-</span><span class='line'>
-</span><span class='line'>    @Override
-</span><span class='line'>    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-</span><span class='line'>            Bundle savedInstanceState) {
-</span><span class='line'>        rootView = inflater.inflate(R.layout.tab_left, container, false);
-</span><span class='line'>
-</span><span class='line'>        // do something
-</span><span class='line'>        // 不能直接使用findViewById()方法，必须加上rootView前缀
-</span><span class='line'>        // 如果要引用当前绑定的Activity实例，使用getActivity()方法
-</span><span class='line'>
-</span><span class='line'>        return rootView;
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>然后在main.xml中的FrameLayout里添加两个Fragment组件：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;fragment android:name="com.example.fragments.LeftFragment"
-</span><span class='line'>    android:id="@+id/fragment_left"
-</span><span class='line'>    android:layout_width="match_parent"
-</span><span class='line'>    android:layout_height="match_parent" /&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;fragment android:name="com.example.fragments.RightFragment"
-</span><span class='line'>    android:id="@+id/fragment_right"
-</span><span class='line'>    android:layout_width="match_parent"
-</span><span class='line'>    android:layout_height="match_parent" /&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>把MainActivity改成从FragmentActivity继承。这里不能像TabActivity一样直接用getTabHost()，需要改成如下代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>TabHost tabHost = (TabHost)findViewById(android.R.id.tabhost);
-</span><span class='line'>tabHost.setup();</span></code></pre></td></tr></table></div></figure>
-
-<p>到这边就已经完成了，其它tabHost.addTab的使用方式一模一样。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/7">&larr; Older</a>
@@ -1401,6 +1324,10 @@ TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/learn-anything-faster-with-the-feynman-technique/">费曼技巧：最好的学习方法</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/code-coverage-100-percent-tragedy/">100%代码覆盖率的悲剧</a>
       </li>
     
@@ -1414,10 +1341,6 @@ TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类
     
       <li class="post">
         <a href="/blog/how-to-modify-hosts-in-android/">如何修改Android的hosts文件</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/chess-mess-master-development-record-part2/">象棋残局大师开发实录（2）</a>
       </li>
     
   </ul>
@@ -1454,7 +1377,7 @@ TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类
 <a style="font-size: 118%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 96%" href="/tags/spring/">Spring</a>
 <a style="font-size: 100%" href="/tags/struts/">Struts</a>
-<a style="font-size: 140%" href="/tags/translation/">Translation</a>
+<a style="font-size: 141%" href="/tags/translation/">Translation</a>
 <a style="font-size: 96%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 107%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 107%" href="/tags/wxwidgets/">wxWidgets</a>

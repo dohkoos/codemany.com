@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="在rebase命令的交互模式下，你可以对历史提交中的任意提交进行分割操作，即把某个提交分割成多个提交。具体做法如下： 使用git rebase -i &lt;commit&gt;^开启rebase的交互模式，这里的&lt;commit&gt;是你想去分割的那个提交； &hellip;">
+  <meta name="description" content="有的时候，可能需要修改某个已提交commit。如果是修改最近提交的commit，可以使用git commit --amend命令；如果是修改更早提交的commit，可以使用git rebase -i HEAD~n。不过这个命令有个缺陷，就是不能修改最早提交的那个commit。假设有如下提交历史： &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,69 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/git-notes-rebase-onto/">Git笔记之rebase --onto</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2009-06-26T13:41:19+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>1:41 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>有的时候，可能需要修改某个已提交commit。如果是修改最近提交的commit，可以使用git commit --amend命令；如果是修改更早提交的commit，可以使用git rebase -i HEAD~n。不过这个命令有个缺陷，就是不能修改最早提交的那个commit。假设有如下提交历史：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>C1--C2--C3--C4</span></code></pre></td></tr></table></div></figure>
+
+<p>要修改C4可以使用git commit --amend；要修改C2、C3或C4可以使用git rebase -i HEAD~n；但是如果要修改C1呢？这就需要rebase --onto出场了。下面就来实例讲解如何使用rebase --onto命令。</p>
+
+<p>因为要修改C1这个commit，所以先在它之上创建临时分支tb：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>git checkout -b tb C1</span></code></pre></td></tr></table></div></figure>
+
+<p>然后就可以在tb分支上做想要的修改，改完之后用下面的命令提交更改的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>git commit -a --amend</span></code></pre></td></tr></table></div></figure>
+
+<p>这时查看tb分支的提交历史，可以发现SHA1值已经发生了变化（master分支的SHA1值仍然不变）：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>C1'</span></code></pre></td></tr></table></div></figure>
+
+<p>接着可以把修改后的内容和master分支合并：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>git rebase --onto tb C1 master</span></code></pre></td></tr></table></div></figure>
+
+<p>表示把master分支上从C1之后的所有commit重新apply到tb分支最新的commit之后。</p>
+
+<p>这里有两点要注意：一个是C1处的开闭问题，rebase --onto的机制是左开右闭，也就是说上述命令只会apply三个提交C2、C3和C4；第二个是rebase --onto之后tb分支的提交历史没有改变，还是只有一个提交C1’，当前分支也切换到了master，并且所有commit的SHA1值都发生了改变。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>C1'--C2'--C3'--C4'</span></code></pre></td></tr></table></div></figure>
+
+<p>最后就是正常的rebase --continue流程了。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -575,74 +638,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/git-notes-reset/">Git笔记之reset</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2009-01-14T21:48:24+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>14</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>9:48 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>git reset的作用是重置当前HEAD到指定状态，它有三个选项：--soft、--mixed和--hard。</p>
-
-<ul>
-<li>--soft选项既不重置索引内容，也不改变工作目录中的任何内容，它仅仅是重置当前HEAD到指定commit。使用该选项后，git diff的返回信息不变，而git diff --cached和git diff HEAD的返回信息有变化。</li>
-<li>--mixed是git reset的默认选项，它的作用是重置索引内容，将其定位到指定的commit，但不改变工作目录中的任何内容。使用该选项后，git diff和git diff HEAD的返回信息有变化，而git diff --cached的返回信息不变。</li>
-<li>--hard选项会重置索引内容，将其定位到指定的commit，并且工作目录中的内容也会完全回退到指定commit时的状态。所以使用该选项后，git diff、git diff --cached和git diff HEAD的返回信息都为空。由于这个选项的杀伤力太大，使用时需要谨慎。</li>
-</ul>
-
-<p>以下是根据三个选项的特性制作的表格：</p>
-
-<table><thead>
-<tr>
-<th></th>
-<th style="text-align: center">是否重置索引</th>
-<th style="text-align: center">是否重置工作目录</th>
-</tr>
-</thead><tbody>
-<tr>
-<td>--soft</td>
-<td style="text-align: center">N</td>
-<td style="text-align: center">N</td>
-</tr>
-<tr>
-<td>--mixed</td>
-<td style="text-align: center">Y</td>
-<td style="text-align: center">N</td>
-</tr>
-<tr>
-<td>--hard</td>
-<td style="text-align: center">Y</td>
-<td style="text-align: center">Y</td>
-</tr>
-</tbody></table>
-
-<p>有时候你可能刚刚把一个文件添加到暂存区里，然后就发现这是错误的，接着你可能想从暂存区中删除该文件，这时你可以使用下面这个命令：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git reset &lt;file&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>它仅从索引中移除文件，但不会触及工作目录。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/21">&larr; Older</a>
@@ -660,6 +655,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/learn-anything-faster-with-the-feynman-technique/">费曼技巧：最好的学习方法</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/code-coverage-100-percent-tragedy/">100%代码覆盖率的悲剧</a>
       </li>
     
@@ -673,10 +672,6 @@
     
       <li class="post">
         <a href="/blog/how-to-modify-hosts-in-android/">如何修改Android的hosts文件</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/chess-mess-master-development-record-part2/">象棋残局大师开发实录（2）</a>
       </li>
     
   </ul>
@@ -713,7 +708,7 @@
 <a style="font-size: 118%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 96%" href="/tags/spring/">Spring</a>
 <a style="font-size: 100%" href="/tags/struts/">Struts</a>
-<a style="font-size: 140%" href="/tags/translation/">Translation</a>
+<a style="font-size: 141%" href="/tags/translation/">Translation</a>
 <a style="font-size: 96%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 107%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 107%" href="/tags/wxwidgets/">wxWidgets</a>
