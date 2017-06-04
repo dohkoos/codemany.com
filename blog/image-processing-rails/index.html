@@ -1,0 +1,712 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>使用Rails进行图像处理 - 乐者为王</title>
+  <meta name="author" content="dohkoos">
+
+  
+  <meta name="description" content="英文原文：https://www.sitepoint.com/image-processing-rails/ 图像是任何应用程序的重要部分。从社交网络到简单的缺陷跟踪器，图像都扮演着重要的角色。不过，管理图像不是件容易的事情，需要提前做大量的规划。 在本文中，我将演示如何用Rails实现这些。 &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://codemany.com/blog/image-processing-rails/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/atom.xml" rel="alternate" title="乐者为王" type="application/atom+xml">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script>!window.jQuery && document.write(unescape('%3Cscript src="/javascripts/libs/jquery.min.js"%3E%3C/script%3E'))</script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  
+  
+  <script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-46570161-1']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">乐者为王</a></h1>
+  
+    <h2>Do one thing, and do it well.</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="https://www.google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="sitesearch" value="codemany.com">
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">使用Rails进行图像处理</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2015-05-12T12:31:25+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>12:31 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>英文原文：<a href="https://www.sitepoint.com/image-processing-rails/">https://www.sitepoint.com/image-processing-rails/</a></p>
+
+<p>图像是任何应用程序的重要部分。从社交网络到简单的缺陷跟踪器，图像都扮演着重要的角色。不过，管理图像不是件容易的事情，需要提前做大量的规划。</p>
+
+<p>在本文中，我将演示如何用Rails实现这些。我将向你展示如何处理你的图像，并在后台创建多个版本。我们还将看到如何通过压缩这些图像来提高页面的性能，而不损失质量。</p>
+
+<h3 id="入门">入门</h3>
+
+<p>本教程中的示例在Rails 4.2上运行，使用MongoDB数据库，以及使用HAML渲染视图。不过，这里使用的代码片段应该能与任何版本的Rails兼容，尽管有轻微的配置差异。</p>
+
+<h4 id="配置环境">配置环境</h4>
+
+<p>ImageMagick是POSIX系统图像处理库。如果你的系统没有安装ImageMagick，它可以用操作系统的软件包管理器安装。</p>
+
+<p>在Ubuntu上：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>sudo apt-get -y install imagemagick
+</span><span class='line'>sudo apt-get -y install libmagic-dev
+</span><span class='line'>sudo apt-get -y install libmagickwand-dev</span></code></pre></td></tr></table></div></figure>
+
+<p>在Mac OS X上，推荐使用Homebrew：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>brew install imagemagick</span></code></pre></td></tr></table></div></figure>
+
+<p>现在，我们需要Ruby适配器来连接本地的ImageMagick库。我个人更偏爱MiniMagick，因为它是轻量级的，含有典型应用程序需要的几乎所有东西：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># Gemfile
+</span><span class='line'>
+</span><span class='line'>gem 'mini_magick'</span></code></pre></td></tr></table></div></figure>
+
+<h3 id="热身运动">热身运动</h3>
+
+<p>在正式构建任何东西之前，让我们先试试MiniMagick的某些功能。打开Rails控制台（rails c）并运行以下命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># Open an image from a website
+</span><span class='line'>
+</span><span class='line'>image = MiniMagick::Image.open("https://s3.amazonaws.com/StartupStockPhotos/20140808_StartupStockPhotos/85.jpg")
+</span><span class='line'>
+</span><span class='line'># Get the Image's width
+</span><span class='line'>image.width  # 4928
+</span><span class='line'>
+</span><span class='line'># Get the image's height
+</span><span class='line'>image.height  #3264</span></code></pre></td></tr></table></div></figure>
+
+<p>我的天哪，这图好大。让我们看看能否调整它的大小以适应我们的iPad：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>image.resize "2048x1536"
+</span><span class='line'>
+</span><span class='line'># Now get the image's new width and height
+</span><span class='line'>
+</span><span class='line'>p "Width is =&gt; #{image.width} and height is =&gt; #{image.height}"</span></code></pre></td></tr></table></div></figure>
+
+<p>调整速度很快，只是修改的文件存储在哪里？</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>image.path  # temp path</span></code></pre></td></tr></table></div></figure>
+
+<p>处理过的图像存储在临时路径中，并且随时可能被清理。要将其持久化到磁盘，只需要调用write方法即可：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>image.write "public/uploads/test.jpg"</span></code></pre></td></tr></table></div></figure>
+
+<h4 id="转换图像">转换图像</h4>
+
+<p>你将要执行的最常用操作之一是将图像转换为不同的格式。MiniMagick使这非常简单：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>image.format "png"
+</span><span class='line'>image.write "public/uploads/test.png"</span></code></pre></td></tr></table></div></figure>
+
+<p>你也可以在单个块中组合多个操作：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>image.combine_options do |i|
+</span><span class='line'>  i.resize "2048x1536"
+</span><span class='line'>  i.flip
+</span><span class='line'>  i.rotate "-45"
+</span><span class='line'>  i.blur "0x15"
+</span><span class='line'>end
+</span><span class='line'>image.write "public/uploads/blur.png"
+</span><span class='line'>
+</span><span class='line'>![Some weird result](blur.png)</span></code></pre></td></tr></table></div></figure>
+
+<p>好吧，在这里我做的有点过火。我要给自己辩解一下，我只是试图给你展示可以用MiniMagick做的所有酷的东西。</p>
+
+<p>现在，让我们来看看如何将其与Rails应用程序相结合。</p>
+
+<h3 id="上传文件">上传文件</h3>
+
+<p>Carrierwave是个奇妙的库，它简化了Ruby中的文件上传。它还可以很好地与MiniMagick互动，使我们的生活更简单。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># Gemfile
+</span><span class='line'>
+</span><span class='line'>gem 'carrierwave'
+</span><span class='line'>gem 'carrierwave-mongoid', :require =&gt; 'carrierwave/mongoid'</span></code></pre></td></tr></table></div></figure>
+
+<p>注意：如果你使用的是ActiveRecord或DataMapper，配置将略有不同，而<a href="https://github.com/carrierwaveuploader/carrierwave">Carrierwave官方文档</a>会告诉你正确的方法。</p>
+
+<p>批量获取所有这些库：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>bundle install</span></code></pre></td></tr></table></div></figure>
+
+<p>创建首个上传程序：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>#app/uploaders/image_uploader.rb
+</span><span class='line'>
+</span><span class='line'>class ImageUploader &lt; CarrierWave::Uploader::Base
+</span><span class='line'>  # Include RMagick or MiniMagick support:
+</span><span class='line'>  include CarrierWave::MiniMagick
+</span><span class='line'>
+</span><span class='line'>  # Choose what kind of storage to use for this Uploader:
+</span><span class='line'>  storage :file
+</span><span class='line'>  # Override the directory where uploaded files will be stored.
+</span><span class='line'>  # This is a sensible default for uploaders that are meant to be mounted:
+</span><span class='line'>  def store_dir
+</span><span class='line'>    "uploads/images"
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>这里的代码是不言自明的。<code>storage：file</code>指示服务器将图像存储在本地服务器上，<code>store_dir</code>指定存储位置。</p>
+
+<p>由于这些文件是通过互联网发送的，因此最佳的做法是始终过滤进来的文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># app/uploaders/image_uploader.rb
+</span><span class='line'>...
+</span><span class='line'># Add a white list of extensions which are allowed to be uploaded.
+</span><span class='line'># For images you might use something like this:
+</span><span class='line'>def extension_white_list
+</span><span class='line'>  %w(jpg jpeg png gif)
+</span><span class='line'>end
+</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
+
+<p>此代码片段过滤掉未在此处指定的文件类型。这绝对不是万无一失的，但它可以作为抵御任何阻碍攻击的第一级过滤器。</p>
+
+<p>将此上传程序添加到我们的图像模型中：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># app/models/image.rb
+</span><span class='line'>
+</span><span class='line'>class Image
+</span><span class='line'>  include Mongoid::Document
+</span><span class='line'>  include Mongoid::Timestamps
+</span><span class='line'>  include Mongoid::Paranoia
+</span><span class='line'>  include Mongoid::Attributes::Dynamic
+</span><span class='line'>  include Rails.application.routes.url_helpers
+</span><span class='line'>
+</span><span class='line'>  mount_uploader :media, ImageUploader, mount_on: :media_filename
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>编辑image_uploader.rb去处理上传的图像：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># app/uploaders/image_uploader.rb
+</span><span class='line'>
+</span><span class='line'>...
+</span><span class='line'>process :resize_to_fill =&gt; [200, 200]
+</span><span class='line'>process :convert =&gt; 'png'
+</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
+
+<p>尝试在Rails控制台创建一个新图像：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>media = File.open("/Users/test/Desktop/image/jpg")
+</span><span class='line'>img = Image.new(:media =&gt; media)
+</span><span class='line'>img.save</span></code></pre></td></tr></table></div></figure>
+
+<p>上传的图像保存在<code>store_dir</code>目录。而且上传的图像将立即被处理并覆写为200x200的图像。我们不会为任何未来的编辑而保有原始文件的副本。为避免这种情况，需要创建文件的多个版本。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># app/uploaders/image_uploader.rb
+</span><span class='line'>
+</span><span class='line'>...
+</span><span class='line'>version :thumb do
+</span><span class='line'>  process :resize_to_fit =&gt; [100, 100]
+</span><span class='line'>  process :convert =&gt; 'jpg'
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>version :cover   do
+</span><span class='line'>  process :resize_to_fit =&gt; [240, 180]
+</span><span class='line'>  process :convert =&gt; 'jpg'
+</span><span class='line'>end
+</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
+
+<p>除原始图像之外，还将创建2个新版本。检查Carrierwave创建的版本：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>img.media.versions[:thumb]  # returns the thumb image instance
+</span><span class='line'>img.media.versions[:cover]  # returns the cover image instance</span></code></pre></td></tr></table></div></figure>
+
+<p>你注意到这些图像是瞬间生成的吗？这意味着图像转换发生在同一个线程中，并且执行被阻塞直到转换完成。在生产应用程序中，在同一个线程中创建图像的多个版本是不应该的。相反，我们应该有条件地处理这个问题。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># app/uploaders/image_uploader/rb
+</span><span class='line'>
+</span><span class='line'>...
+</span><span class='line'>version :cover, :if =&gt; :is_live? do
+</span><span class='line'>  process :resize_to_fit =&gt; [240, 180]
+</span><span class='line'>  process :convert =&gt; 'jpg'
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>def is_live?(img = nil)
+</span><span class='line'>  @is_live
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>def is_live=(value)
+</span><span class='line'>  @is_live = value
+</span><span class='line'>end
+</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
+
+<p>现在，当我们尝试创建一个新图像时，封面版本将不会生成。我们可以在需要时通过简单的运行以下代码来手动触发：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>img.media.is_live = true
+</span><span class='line'>img.save
+</span><span class='line'>img.media.recreate_versions! :cover</span></code></pre></td></tr></table></div></figure>
+
+<p>该代码也在前台运行，是个阻塞操作，但至少是推迟到最后可能的一刻。我们可以再进一步，通过Resque在后台运行这些代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># lib/resque/image_queue.rb
+</span><span class='line'>class ImageQueue
+</span><span class='line'>  @queue = :image_queue
+</span><span class='line'>  def self.perform(image_id)
+</span><span class='line'>    image = Image.find image_id
+</span><span class='line'>    img.media.is_live= true
+</span><span class='line'>    img.save
+</span><span class='line'>    img.media.recreate_versions! :cover
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>然后，把它们放入队列：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Resque.enqueue(ImageQueue, img.id.to_s)</span></code></pre></td></tr></table></div></figure>
+
+<h3 id="提高性能">提高性能</h3>
+
+<p>重量级的图像往往会减慢网站的速度。减少页面大小的一种方法是压缩这些图像。Carrierwave Image Optimizer可以帮助我们轻松地压缩图像，而没有任何麻烦。</p>
+
+<p>将其添加到你的Gemfile中：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>gem 'carrierwave-imageoptimizer'</span></code></pre></td></tr></table></div></figure>
+
+<p>然后编辑image_uploader.rb文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># app/uploaders/image_uploader.rb
+</span><span class='line'>
+</span><span class='line'>...
+</span><span class='line'>include CarrierWave::ImageOptimizer
+</span><span class='line'>process :optimize
+</span><span class='line'>process :quality =&gt; 100
+</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
+
+<p>这段代码压缩所有的图像，没有任何视觉损失。这种方式的做法是所有图像的元信息被剥离。平均而言，这减少了约20-30%的大小。</p>
+
+<h3 id="总结">总结</h3>
+
+<p>图像处理是非常垂直的技术，我们几乎只触及表面。我们可以用它构建这么多酷的东西。我希望我已经用这篇文章引起你的兴趣。请在评论中分享你的想法。</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">dohkoos</span></span>
+
+      
+
+
+
+
+<time class='entry-date' datetime='2015-05-12T12:31:25+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>12:31 pm</span></time>
+      
+
+
+      
+
+<span class="tags">
+  
+    <a class='tag' href='/tags/carrierwave/'>Carrierwave</a>, <a class='tag' href='/tags/rails/'>Rails</a>, <a class='tag' href='/tags/resque/'>Resque</a>, <a class='tag' href='/tags/translation/'>Translation</a>
+  
+</span>
+
+
+    </p>
+    
+  <h3>Related Posts</h3>
+  <ul class="posts">
+  
+    <li class="related">
+      <a href="/blog/testing-async-emails-rails-42/">使用Rails 4.2+ 测试异步邮件</a>
+    </li>
+  
+    <li class="related">
+      <a href="/blog/learn-anything-faster-with-the-feynman-technique/">费曼技巧：最好的学习方法</a>
+    </li>
+  
+    <li class="related">
+      <a href="/blog/code-coverage-100-percent-tragedy/">100%代码覆盖率的悲剧</a>
+    </li>
+  
+    <li class="related">
+      <a href="/blog/unconventional-way-of-learning-a-new-programming-language/">学习新编程语言的非传统方式</a>
+    </li>
+  
+    <li class="related">
+      <a href="/blog/the-impact-github-is-having-on-your-software-career-right-now/">GitHub对软件职业生涯的影响</a>
+    </li>
+  
+  </ul>
+
+
+    
+      <div id="jiathis_style_32x32">
+	<a class="jiathis_button_qzone"></a>
+	<a class="jiathis_button_tsina"></a>
+	<a class="jiathis_button_tqq"></a>
+    <a class="jiathis_button_weixin"></a>
+	<a class="jiathis_button_renren"></a>
+	<a href="http://www.jiathis.com/share/" class="jiathis jiathis_txt jtico jtico_jiathis" target="_blank"></a>
+	<a class="jiathis_counter_style"></a>
+</div>
+<script type="text/javascript" src="http://v2.jiathis.com/code/jia.js" charset="utf-8"></script>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/elasticsearch-restful-api/" title="Previous Post: Elasticsearch的RESTful API">&laquo; Elasticsearch的RESTful API</a>
+      
+      
+        <a class="basic-alignment right" href="/blog/testing-async-emails-rails-42/" title="Next Post: 使用Rails 4.2+ 测试异步邮件">使用Rails 4.2+ 测试异步邮件 &raquo;</a>
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/learn-anything-faster-with-the-feynman-technique/">费曼技巧：最好的学习方法</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/code-coverage-100-percent-tragedy/">100%代码覆盖率的悲剧</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/unconventional-way-of-learning-a-new-programming-language/">学习新编程语言的非传统方式</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/the-impact-github-is-having-on-your-software-career-right-now/">GitHub对软件职业生涯的影响</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/how-to-modify-hosts-in-android/">如何修改Android的hosts文件</a>
+      </li>
+    
+  </ul>
+</section>
+<section>
+  <h1>Recent Comments</h1>
+  <div class="dsq-widget">
+    <script type="text/javascript" src="http://codemany.disqus.com/recent_comments_widget.js"></script>
+  </div>
+</section>
+<section>
+  <h1>Tags</h1>
+  <ul class="tag-cloud">
+    <a style="font-size: 143%" href="/tags/antlr/">ANTLR</a>
+<a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
+<a style="font-size: 134%" href="/tags/android/">Android</a>
+<a style="font-size: 103%" href="/tags/c-plus-plus/">C++</a>
+<a style="font-size: 106%" href="/tags/css/">CSS</a>
+<a style="font-size: 109%" href="/tags/crack/">Crack</a>
+<a style="font-size: 106%" href="/tags/database/">Database</a>
+<a style="font-size: 96%" href="/tags/eclipse/">Eclipse</a>
+<a style="font-size: 114%" href="/tags/git/">Git</a>
+<a style="font-size: 96%" href="/tags/html/">HTML</a>
+<a style="font-size: 103%" href="/tags/jbookshelf/">JBookShelf</a>
+<a style="font-size: 147%" href="/tags/java/">Java</a>
+<a style="font-size: 100%" href="/tags/javascript/">JavaScript</a>
+<a style="font-size: 96%" href="/tags/listview/">ListView</a>
+<a style="font-size: 103%" href="/tags/mysql/">MySQL</a>
+<a style="font-size: 96%" href="/tags/paperclip/">Paperclip</a>
+<a style="font-size: 118%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 100%" href="/tags/powerscript/">PowerScript</a>
+<a style="font-size: 116%" href="/tags/qianbao/">Qianbao</a>
+<a style="font-size: 150%" href="/tags/rails/">Rails</a>
+<a style="font-size: 118%" href="/tags/ruby/">Ruby</a>
+<a style="font-size: 96%" href="/tags/spring/">Spring</a>
+<a style="font-size: 100%" href="/tags/struts/">Struts</a>
+<a style="font-size: 141%" href="/tags/translation/">Translation</a>
+<a style="font-size: 96%" href="/tags/ubuntu/">Ubuntu</a>
+<a style="font-size: 106%" href="/tags/windows-server-2008/">Windows Server 2008</a>
+<a style="font-size: 106%" href="/tags/wxwidgets/">wxWidgets</a>
+
+  </ul>
+</section>
+<section>
+  <h1>Blogroll</h1>
+  <ul>
+    <li><a href="http://mindhacks.cn/">刘未鹏MIND HACKS</a></li>
+    <li><a href="http://www.importnew.com/">ImportNew</a></li>
+    <li><a href="http://ifeve.com/">并发编程网</a></li>
+    <li><a href="http://codingnow.com/">云风的 BLOG</a></li>
+    <li><a href="http://dbanotes.net/">DBA Notes</a></li>
+    <li><a href="http://www.ruanyifeng.com/blog/">阮一峰的网络日志</a></li>
+    <li><a href="http://advdbg.org/">高端调试</a></li>
+    <li><a href="http://www.cs.usfca.edu/~galles/visualization/Algorithms.html">Data Structure Visualization</a></li>
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/dohkoos">@dohkoos</a> on GitHub
+  
+  <script type="text/javascript">
+    $(document).ready(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'dohkoos',
+            count: 5,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+<section>
+  <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nc-sa/4.0/88x31.png" /></a>
+  <div>This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/">Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License</a>.</div>
+</section>
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2017 - dohkoos -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'codemany';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://codemany.com/blog/image-processing-rails/';
+        var disqus_url = 'http://codemany.com/blog/image-processing-rails/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = '//' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+</body>
+</html>

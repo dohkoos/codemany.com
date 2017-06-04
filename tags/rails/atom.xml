@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Rails | 乐者为王]]></title>
   <link href="http://codemany.com/tags/rails/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-06-03T01:02:12+08:00</updated>
+  <updated>2017-06-04T09:00:44+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -268,6 +268,235 @@ end
   </entry>
   
   <entry>
+    <title type="html"><![CDATA[使用Rails进行图像处理]]></title>
+    <link href="http://codemany.com/blog/image-processing-rails/"/>
+    <updated>2015-05-12T12:31:25+08:00</updated>
+    <id>http://codemany.com/blog/image-processing-rails</id>
+    <content type="html"><![CDATA[<p>英文原文：<a href="https://www.sitepoint.com/image-processing-rails/">https://www.sitepoint.com/image-processing-rails/</a></p>
+
+<p>图像是任何应用程序的重要部分。从社交网络到简单的缺陷跟踪器，图像都扮演着重要的角色。不过，管理图像不是件容易的事情，需要提前做大量的规划。</p>
+
+<p>在本文中，我将演示如何用Rails实现这些。我将向你展示如何处理你的图像，并在后台创建多个版本。我们还将看到如何通过压缩这些图像来提高页面的性能，而不损失质量。</p>
+
+<h3 id="入门">入门</h3>
+
+<p>本教程中的示例在Rails 4.2上运行，使用MongoDB数据库，以及使用HAML渲染视图。不过，这里使用的代码片段应该能与任何版本的Rails兼容，尽管有轻微的配置差异。</p>
+
+<h4 id="配置环境">配置环境</h4>
+
+<p>ImageMagick是POSIX系统图像处理库。如果你的系统没有安装ImageMagick，它可以用操作系统的软件包管理器安装。</p>
+
+<p>在Ubuntu上：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">sudo apt-get -y install imagemagick
+sudo apt-get -y install libmagic-dev
+sudo apt-get -y install libmagickwand-dev
+</code></pre></div>
+<p>在Mac OS X上，推荐使用Homebrew：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">brew install imagemagick
+</code></pre></div>
+<p>现在，我们需要Ruby适配器来连接本地的ImageMagick库。我个人更偏爱MiniMagick，因为它是轻量级的，含有典型应用程序需要的几乎所有东西：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text"># Gemfile
+
+gem &#39;mini_magick&#39;
+</code></pre></div>
+<h3 id="热身运动">热身运动</h3>
+
+<p>在正式构建任何东西之前，让我们先试试MiniMagick的某些功能。打开Rails控制台（rails c）并运行以下命令：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text"># Open an image from a website
+
+image = MiniMagick::Image.open(&quot;https://s3.amazonaws.com/StartupStockPhotos/20140808_StartupStockPhotos/85.jpg&quot;)
+
+# Get the Image&#39;s width
+image.width  # 4928
+
+# Get the image&#39;s height
+image.height  #3264
+</code></pre></div>
+<p>我的天哪，这图好大。让我们看看能否调整它的大小以适应我们的iPad：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">image.resize &quot;2048x1536&quot;
+
+# Now get the image&#39;s new width and height
+
+p &quot;Width is =&gt; #{image.width} and height is =&gt; #{image.height}&quot;
+</code></pre></div>
+<p>调整速度很快，只是修改的文件存储在哪里？</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">image.path  # temp path
+</code></pre></div>
+<p>处理过的图像存储在临时路径中，并且随时可能被清理。要将其持久化到磁盘，只需要调用write方法即可：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">image.write &quot;public/uploads/test.jpg&quot;
+</code></pre></div>
+<h4 id="转换图像">转换图像</h4>
+
+<p>你将要执行的最常用操作之一是将图像转换为不同的格式。MiniMagick使这非常简单：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">image.format &quot;png&quot;
+image.write &quot;public/uploads/test.png&quot;
+</code></pre></div>
+<p>你也可以在单个块中组合多个操作：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">image.combine_options do |i|
+  i.resize &quot;2048x1536&quot;
+  i.flip
+  i.rotate &quot;-45&quot;
+  i.blur &quot;0x15&quot;
+end
+image.write &quot;public/uploads/blur.png&quot;
+
+![Some weird result](blur.png)
+</code></pre></div>
+<p>好吧，在这里我做的有点过火。我要给自己辩解一下，我只是试图给你展示可以用MiniMagick做的所有酷的东西。</p>
+
+<p>现在，让我们来看看如何将其与Rails应用程序相结合。</p>
+
+<h3 id="上传文件">上传文件</h3>
+
+<p>Carrierwave是个奇妙的库，它简化了Ruby中的文件上传。它还可以很好地与MiniMagick互动，使我们的生活更简单。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text"># Gemfile
+
+gem &#39;carrierwave&#39;
+gem &#39;carrierwave-mongoid&#39;, :require =&gt; &#39;carrierwave/mongoid&#39;
+</code></pre></div>
+<p>注意：如果你使用的是ActiveRecord或DataMapper，配置将略有不同，而<a href="https://github.com/carrierwaveuploader/carrierwave">Carrierwave官方文档</a>会告诉你正确的方法。</p>
+
+<p>批量获取所有这些库：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">bundle install
+</code></pre></div>
+<p>创建首个上传程序：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">#app/uploaders/image_uploader.rb
+
+class ImageUploader &lt; CarrierWave::Uploader::Base
+  # Include RMagick or MiniMagick support:
+  include CarrierWave::MiniMagick
+
+  # Choose what kind of storage to use for this Uploader:
+  storage :file
+  # Override the directory where uploaded files will be stored.
+  # This is a sensible default for uploaders that are meant to be mounted:
+  def store_dir
+    &quot;uploads/images&quot;
+  end
+end
+</code></pre></div>
+<p>这里的代码是不言自明的。<code>storage：file</code>指示服务器将图像存储在本地服务器上，<code>store_dir</code>指定存储位置。</p>
+
+<p>由于这些文件是通过互联网发送的，因此最佳的做法是始终过滤进来的文件：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text"># app/uploaders/image_uploader.rb
+...
+# Add a white list of extensions which are allowed to be uploaded.
+# For images you might use something like this:
+def extension_white_list
+  %w(jpg jpeg png gif)
+end
+...
+</code></pre></div>
+<p>此代码片段过滤掉未在此处指定的文件类型。这绝对不是万无一失的，但它可以作为抵御任何阻碍攻击的第一级过滤器。</p>
+
+<p>将此上传程序添加到我们的图像模型中：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text"># app/models/image.rb
+
+class Image
+  include Mongoid::Document
+  include Mongoid::Timestamps
+  include Mongoid::Paranoia
+  include Mongoid::Attributes::Dynamic
+  include Rails.application.routes.url_helpers
+
+  mount_uploader :media, ImageUploader, mount_on: :media_filename
+end
+</code></pre></div>
+<p>编辑image_uploader.rb去处理上传的图像：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text"># app/uploaders/image_uploader.rb
+
+...
+process :resize_to_fill =&gt; [200, 200]
+process :convert =&gt; &#39;png&#39;
+...
+</code></pre></div>
+<p>尝试在Rails控制台创建一个新图像：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">media = File.open(&quot;/Users/test/Desktop/image/jpg&quot;)
+img = Image.new(:media =&gt; media)
+img.save
+</code></pre></div>
+<p>上传的图像保存在<code>store_dir</code>目录。而且上传的图像将立即被处理并覆写为200x200的图像。我们不会为任何未来的编辑而保有原始文件的副本。为避免这种情况，需要创建文件的多个版本。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text"># app/uploaders/image_uploader.rb
+
+...
+version :thumb do
+  process :resize_to_fit =&gt; [100, 100]
+  process :convert =&gt; &#39;jpg&#39;
+end
+
+version :cover   do
+  process :resize_to_fit =&gt; [240, 180]
+  process :convert =&gt; &#39;jpg&#39;
+end
+...
+</code></pre></div>
+<p>除原始图像之外，还将创建2个新版本。检查Carrierwave创建的版本：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">img.media.versions[:thumb]  # returns the thumb image instance
+img.media.versions[:cover]  # returns the cover image instance
+</code></pre></div>
+<p>你注意到这些图像是瞬间生成的吗？这意味着图像转换发生在同一个线程中，并且执行被阻塞直到转换完成。在生产应用程序中，在同一个线程中创建图像的多个版本是不应该的。相反，我们应该有条件地处理这个问题。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text"># app/uploaders/image_uploader/rb
+
+...
+version :cover, :if =&gt; :is_live? do
+  process :resize_to_fit =&gt; [240, 180]
+  process :convert =&gt; &#39;jpg&#39;
+end
+
+def is_live?(img = nil)
+  @is_live
+end
+
+def is_live=(value)
+  @is_live = value
+end
+...
+</code></pre></div>
+<p>现在，当我们尝试创建一个新图像时，封面版本将不会生成。我们可以在需要时通过简单的运行以下代码来手动触发：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">img.media.is_live = true
+img.save
+img.media.recreate_versions! :cover
+</code></pre></div>
+<p>该代码也在前台运行，是个阻塞操作，但至少是推迟到最后可能的一刻。我们可以再进一步，通过Resque在后台运行这些代码：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text"># lib/resque/image_queue.rb
+class ImageQueue
+  @queue = :image_queue
+  def self.perform(image_id)
+    image = Image.find image_id
+    img.media.is_live= true
+    img.save
+    img.media.recreate_versions! :cover
+  end
+end
+</code></pre></div>
+<p>然后，把它们放入队列：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">Resque.enqueue(ImageQueue, img.id.to_s)
+</code></pre></div>
+<h3 id="提高性能">提高性能</h3>
+
+<p>重量级的图像往往会减慢网站的速度。减少页面大小的一种方法是压缩这些图像。Carrierwave Image Optimizer可以帮助我们轻松地压缩图像，而没有任何麻烦。</p>
+
+<p>将其添加到你的Gemfile中：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">gem &#39;carrierwave-imageoptimizer&#39;
+</code></pre></div>
+<p>然后编辑image_uploader.rb文件：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text"># app/uploaders/image_uploader.rb
+
+...
+include CarrierWave::ImageOptimizer
+process :optimize
+process :quality =&gt; 100
+...
+</code></pre></div>
+<p>这段代码压缩所有的图像，没有任何视觉损失。这种方式的做法是所有图像的元信息被剥离。平均而言，这减少了约20-30%的大小。</p>
+
+<h3 id="总结">总结</h3>
+
+<p>图像处理是非常垂直的技术，我们几乎只触及表面。我们可以用它构建这么多酷的东西。我希望我已经用这篇文章引起你的兴趣。请在评论中分享你的想法。</p>
+]]></content>
+  </entry>
+  
+  <entry>
     <title type="html"><![CDATA[重构Rails代码]]></title>
     <link href="http://codemany.com/blog/refactoring-rails-code/"/>
     <updated>2014-11-18T19:42:59+08:00</updated>
@@ -391,35 +620,6 @@ Content-Length 112
 <p>form的enctype属性通常有两种：application/x-www-form-urlencoded和multipart/form-data，默认为前者。当method=get时，浏览器用application/x-www-form-urlencoded编码方式把form数据转换成一个字串（name1=value1&amp;name2=value2...），然后把这个字串附加到url后面，用?分割。当method=post的时候，浏览器把form数据封装到post-body中。如果没有type=file的控件，就用默认的application/x-www-form-urlencoded编码。但是如果有type=file的话，就要用到multipart/form-data了。浏览器会把整个表单以控件为单位分割，并为每个部分加上Content-Disposition（form-data或者file），Content-Type（默认为text/plain），name等信息，并加上分割边界（boundary）。</p>
 
 <p>这时才发现原来是把multipart打错成mutlipart了，真是惨痛的教训啊！</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[使用Pry调试Rails应用]]></title>
-    <link href="http://codemany.com/blog/debugging-rails-application-with-pry/"/>
-    <updated>2014-07-07T23:26:08+08:00</updated>
-    <id>http://codemany.com/blog/debugging-rails-application-with-pry</id>
-    <content type="html"><![CDATA[<p>调试Rails程序有更好的工具了，这就是<a href="https://github.com/pry/pry">Pry</a>，它是一套全新的IRB替代方案，最闪亮点是它的语法高亮功能。</p>
-
-<p>首先，在Gemfile中添加以下代码：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">gem &#39;pry&#39;, group: :development
-</code></pre></div>
-<p>然后执行</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">bundle install
-</code></pre></div>
-<p>在需要设置断点的地方添加binding.pry，当程序运行到这行代码时会打开一个窗口，可以在这里操作当前代码的上下文变量。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">def index
-  @articles = Article.all
-  binding.pry
-end
-</code></pre></div>
-<p>退出调试用exit-all，但如果在循环中会遭遇失败，这时可以使用exit-program无条件地退出。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">(1..100).each do |i|
-  binding.pry
-  puts i
-end
-</code></pre></div>
-<p>Pry默认是没有调试中经常用到的上一步，下一步等命令的，可以安装<a href="https://github.com/nixme/pry-nav">pry-nav</a>，然后就可以使用step, next, continue跳来跳去了。</p>
 ]]></content>
   </entry>
   
