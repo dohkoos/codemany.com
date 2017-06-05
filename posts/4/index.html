@@ -9,9 +9,10 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="英文原文：http://programmingzen.com/2008/12/30/developers-are-blinded-by-the-light/ Blinded by the light,
-revved up like a deuce,
-another runner in the &hellip;">
+  <meta name="description" content="现在我们准备构建一个工具，用来把ANTLR 4权威参考读书笔记（7）中idata.txt里的数据按group分行显示，就像这样： 1
+2
+2 9 10
+3 1 2 3 我们可以借助语法分析树的监听器机制来对词法分析结束后生成的记号流进行改写，我们不需要实现每一个监听器接口方法， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -75,6 +76,142 @@ another runner in the &hellip;">
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part13/">ANTLR 4权威参考读书笔记（13）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-05-06T18:24:18+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>6</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:24 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>现在我们准备构建一个工具，用来把<a href="/blog/reading-notes-the-definitive-antlr4-reference-part7/">ANTLR 4权威参考读书笔记（7）</a>中idata.txt里的数据按group分行显示，就像这样：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>2 9 10
+</span><span class='line'>3 1 2 3</span></code></pre></td></tr></table></div></figure>
+
+<p>我们可以借助语法分析树的监听器机制来对词法分析结束后生成的记号流进行改写，我们不需要实现每一个监听器接口方法，只需要在捕获到group的时候把换行符插到它末尾就行。实现改写的代码如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class RewriteListener extends IDataBaseListener {
+</span><span class='line'>    TokenStreamRewriter rewriter;
+</span><span class='line'>
+</span><span class='line'>    public RewriteListener(TokenStream tokens) {
+</span><span class='line'>        rewriter = new TokenStreamRewriter(tokens);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void enterGroup(IDataParser.GroupContext ctx) {
+</span><span class='line'>        rewriter.insertAfter(ctx.stop, '\n');
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>接着就是写一个小程序来调用我们上面的改写类：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class IData {
+</span><span class='line'>
+</span><span class='line'>    public static void main(String[] args) throws Exception {
+</span><span class='line'>        InputStream is = args.length &gt; 0 ? new FileInputStream(args[0]) : System.in;
+</span><span class='line'>
+</span><span class='line'>        ANTLRInputStream input = new ANTLRInputStream(is);
+</span><span class='line'>        IDataLexer lexer = new IDataLexer(input);
+</span><span class='line'>        CommonTokenStream tokens = new CommonTokenStream(lexer);
+</span><span class='line'>        IDataParser parser = new IDataParser(tokens);
+</span><span class='line'>        ParseTree tree = parser.file();
+</span><span class='line'>
+</span><span class='line'>        RewriteListener listener = new RewriteListener(tokens);
+</span><span class='line'>
+</span><span class='line'>        System.out.println("Before Rewriting");
+</span><span class='line'>        System.out.println(listener.rewriter.getText());
+</span><span class='line'>
+</span><span class='line'>        ParseTreeWalker walker = new ParseTreeWalker();
+</span><span class='line'>        walker.walk(listener, tree);
+</span><span class='line'>
+</span><span class='line'>        System.out.println("After Rewriting");
+</span><span class='line'>        System.out.println(listener.rewriter.getText());
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>这里的关键是TokenStreamRewriter对象知道如何在不修改流的情况下提供一个记号流的修改过的视图。它把所有的操作方法当作指令并把它们排进队列，等到在遍历记号流把它作为文本渲染回去的时候再执行。每次我们调用getText()时rewriter就会执行那些指令。</p>
+
+<p>最后就是构建和测试应用：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr IData.g
+</span><span class='line'>compile *.java
+</span><span class='line'>run IData idata.txt</span></code></pre></td></tr></table></div></figure>
+
+<p>以下是输出结果：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Before Rewriting
+</span><span class='line'>29103123
+</span><span class='line'>After Rewriting
+</span><span class='line'>2910
+</span><span class='line'>3123</span></code></pre></td></tr></table></div></figure>
+
+<p>仅用几行代码，我们就能够没有任何烦恼地对某些内容做轻微的调整。这种策略对于源代码检测或重构这类一般性的问题是非常有效的。TokenStreamRewriter是一个非常强大且有效的操作记号流的工具。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -784,168 +921,6 @@ another runner in the night<br>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part6/">ANTLR 4权威参考读书笔记（6）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-02-14T16:16:37+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>14</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>4:16 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><ul>
-<li>action 动作</li>
-<li>clause 子句</li>
-</ul>
-
-<p>监听器和访问者机制是极好的。大多数时候，我们可以用监听器或访问者来构建语言应用，它们让特定应用的代码置身于语法之外，使语法容易被阅读。</p>
-
-<p>但有时候我们需要额外的控制权和灵活性。为了达到这个目的，我们可以直接在语法中嵌入代码片段（这些嵌入的代码片段被称为动作）。这些动作会被注入到由ANTLR工具生成的分析器代码中。这些被注入的代码在分析期间执行，并且能像其它任意代码片段一样收集信息或生成输出。结合语义谓词，我们甚至可以在运行时让我们语法的某部分消失！例如，我们可能想打开或关闭Java语法中的enum关键字，分析语言的不同版本。没有语义谓词，我们就需要两个不同版本的语法。</p>
-
-<p>下面我们将实现一个简单的程序，读入数据行，然后打印出在特定列中找到的值。</p>
-
-<h3 id="在语法中嵌入任意的动作">在语法中嵌入任意的动作</h3>
-
-<p>如果我们不想付出构建语法分析树的开销，或者想要在分析期间动态地计算值或把东西打印出来，那么可以通过在语法中嵌入任意代码来实现。它是比较困难的，因为我们必须明白在语法分析器上的动作的影响，以及在哪里放置这些动作。</p>
-
-<p>为了解释嵌入在语法中的动作，让我们先来看下文件rows.txt中的数据：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>parrt   Terence Parr    101
-</span><span class='line'>tombu   Tom Burns       020
-</span><span class='line'>bke     Kevin Edgar     008</span></code></pre></td></tr></table></div></figure>
-
-<p>这些列是由TAB分隔的，每行以一个换行符结束。匹配这种类型的输入在语法上还是相当简单的。下面是此语法文件Rows.g的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>file : (row NL)+ ;    // NL is newline token: '\r'? '\n'
-</span><span class='line'>row  : STUFF+ ;</span></code></pre></td></tr></table></div></figure>
-
-<p>我们需要创建一个构造器以便我们能传递我们想要的列号（从1开始计数），所以我们需要在规则中添加一些动作来做这个事情：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Rows;
-</span><span class='line'>
-</span><span class='line'>@parser::members {    // add members to generated RowsParser
-</span><span class='line'>    int col;
-</span><span class='line'>
-</span><span class='line'>    public RowsParser(TokenStream input, int col) {    // custom constructor
-</span><span class='line'>        this(input);
-</span><span class='line'>        this.col = col;
-</span><span class='line'>    }
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>file: (row NL)+ ;
-</span><span class='line'>
-</span><span class='line'>row
-</span><span class='line'>locals [int i=0]
-</span><span class='line'>    : ( STUFF
-</span><span class='line'>        {
-</span><span class='line'>            $i++;
-</span><span class='line'>            if ($i == col) System.out.println($STUFF.text);
-</span><span class='line'>        }
-</span><span class='line'>      )+
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>TAB  :  '\t' -&gt; skip ;    // match but don't pass to the parser
-</span><span class='line'>NL   :  '\r'? '\n' ;      // match and pass to the parser
-</span><span class='line'>STUFF:  ~[\t\r\n]+ ;      // match any chars except tab, newline</span></code></pre></td></tr></table></div></figure>
-
-<p>在上述语法中，动作是被花括号括起来的代码片段；members动作的代码将会被注入到生成的语法分析器类中的成员区；在规则row中的动作访问的$i是由locals子句定义的局部变量，该动作也用$STUFF.text获取最近匹配的STUFF记号的文本内容。STUFF词法规则匹配任何非TAB或换行的字符，这意味着在列中可以有空格字符。</p>
-
-<p>现在，是时候去思考如何使用定制的构造器传递一个列号给语法分析器，并且告诉语法分析器不要构建语法分析树了：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class Rows {
-</span><span class='line'>
-</span><span class='line'>    public static void main(String[] args) throws Exception {
-</span><span class='line'>        ANTLRInputStream input = new ANTLRInputStream(System.in);
-</span><span class='line'>        RowsLexer lexer = new RowsLexer(input);
-</span><span class='line'>        CommonTokenStream tokens = new CommonTokenStream(lexer);
-</span><span class='line'>        int col = Integer.valueOf(args[0]);
-</span><span class='line'>        RowsParser parser = new RowsParser(tokens, col);    // pass column number!
-</span><span class='line'>        parser.setBuildParseTree(false);    // don't waste time bulding a tree
-</span><span class='line'>        parser.file();
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>现在，让我们核实下我们的语法分析器能否正确匹配一些示例输入：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr -no-listener Rows.g  # don't need the listener
-</span><span class='line'>compile *.java
-</span><span class='line'>run Rows 1 &lt; rows.txt</span></code></pre></td></tr></table></div></figure>
-
-<p>这时你会看到rows.txt文件的第1列内容被输出：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>parrt
-</span><span class='line'>tombu
-</span><span class='line'>bke</span></code></pre></td></tr></table></div></figure>
-
-<p>如果将上面命令中的1换成2，你会看到文件的第2列内容被输出；如果换成3，那么第3列内容将会被输出。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/5">&larr; Older</a>
@@ -963,6 +938,10 @@ another runner in the night<br>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/the-mythical-10x-programmer/">神秘的10x程序员</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/learn-anything-faster-with-the-feynman-technique/">费曼技巧：最好的学习方法</a>
       </li>
     
@@ -976,10 +955,6 @@ another runner in the night<br>
     
       <li class="post">
         <a href="/blog/the-impact-github-is-having-on-your-software-career-right-now/">GitHub对软件职业生涯的影响</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/how-to-modify-hosts-in-android/">如何修改Android的hosts文件</a>
       </li>
     
   </ul>

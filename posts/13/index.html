@@ -9,14 +9,9 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="建立省市县行政区划代码数据表。 1
+  <meta name="description" content="今天我们讲如何用Rails结合Open Flash Chart II（以下简称OFC2）实现如下的图表： 在项目中安装OFC2插件，生成相关controller： 1
 2
-3
-4
-5
-6
-CREATE TABLE xzqhdm ( _id integer PRIMARY KEY, code numeric, region text, parent_code numeric
-); parent_code指上一级的行政区划代码， &hellip;">
+script/plugin install git://github.com/pullmonkey/ &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -80,6 +75,103 @@ CREATE TABLE xzqhdm ( _id integer PRIMARY KEY, code numeric, region text, parent
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/using-open-flash-chart-ii-in-rails/">在Rails中使用Open Flash Chart II</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2011-09-23T15:08:12+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>23</span><span class='date-suffix'>rd</span>, <span class='date-year'>2011</span></span> <span class='time'>3:08 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>今天我们讲如何用Rails结合Open Flash Chart II（以下简称OFC2）实现如下的图表：</p>
+
+<p><img src="/uploads/ofc2-glassbar.png" title="ofc2-glassbar" ></p>
+
+<p>在项目中安装OFC2插件，生成相关controller：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>script/plugin install git://github.com/pullmonkey/open_flash_chart.git
+</span><span class='line'>script/generate controller stats index</span></code></pre></td></tr></table></div></figure>
+
+<p>在生成的app/controllers/stats_controller.rb中添加以下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class StatsController &lt; ApplicationController
+</span><span class='line'>  def index
+</span><span class='line'>    @graph = open_flash_chart_object(500, 300, "/stats/graph_code")
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  def graph_code
+</span><span class='line'>    title = Title.new("Glass Bar")
+</span><span class='line'>
+</span><span class='line'>    bar = BarGlass.new
+</span><span class='line'>    bar.set_values([-1,2,3,7,8,-7.3])
+</span><span class='line'>
+</span><span class='line'>    y = YAxis.new
+</span><span class='line'>    y.set_range(-10, 10, 5)
+</span><span class='line'>
+</span><span class='line'>    chart = OpenFlashChart.new
+</span><span class='line'>    chart.y_axis = y
+</span><span class='line'>    chart.set_title(title)
+</span><span class='line'>    chart.add_element(bar)
+</span><span class='line'>    render :text =&gt; chart.to_s
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>在config/routes.rb中添加路由：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>match 'stats/graph_code' =&gt; 'stats#graph_code'</span></code></pre></td></tr></table></div></figure>
+
+<p>将插件中的assets/javascripts/swfobject.js拷贝到public/javascripts目录下（可以看到该目录下已经有两个open-flash-chart开头的swf文件，如果没有的话，需要从插件中拷过来）。在相应的app/views/stats/index.html中添加如下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;script src="/javascripts/swfobject.js" type="text/javascript"&gt;&lt;/script&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;%= @graph %&gt;</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -150,7 +242,7 @@ CREATE TABLE xzqhdm ( _id integer PRIMARY KEY, code numeric, region text, parent
 
 <p>如果应用使用到了SQLite数据库，在用户初次使用应用时，需要创建应用使用到的数据表结构及添加一些初始化记录，另外在软件升级的时候，也需要对数据表结构进行更新。Android系统为我们提供了一个名为SQLiteOpenHelper的类，这是一个抽象类，该类用于对数据库版本进行管理，有两个重要的方法，分别是onCreate()和onUpgrade()。</p>
 
-<p>当调用SQLiteOpenHelper的getWritableDatabase()或getReadableDatabase()方法获取数据库实例时，如果数据库不存在，Android系统会自动生成一个数据库文件，接着调用onCreate()方法，onCreate()方法在初次生成数据库时才会被调用，在onCreate()方法里可以生成数据表结构及添加一些应用使用到的初始化数据。onUpgrade()方法在数据库的版本发生变化时会被调用，数据库的版本是由程序员控制的，假设数据库现在的版本是1，由于业务的需要，修改了数据表的结构，这时候就需要升级软件，升级软件时希望更新用户手机里的数据表结构，为了实现这一目的，可以把原来的数据库版本设置为2（或其他数值），并且在onUpgrade()方法里面实现表结构的更新。当软件的版本升级次数比较多，这时在onUpgrade()方法里面可以根据原版号和目标版本号进行判断，然后作出相应的表结构及数据更新。</p>
+<p>当调用SQLiteOpenHelper的getWritableDatabase()或getReadableDatabase()方法获取数据库实例时，如果数据库不存在，Android系统会自动生成一个数据库文件，接着调用onCreate()方法，onCreate()方法在初次生成数据库时才会被调用，在onCreate()方法里可以生成数据表结构及添加一些应用使用到的初始化数据。onUpgrade()方法在数据库的版本发生变化时会被调用，数据库的版本是由程序员控制的，假设数据库现在的版本是1，由于业务的需要，修改了数据表的结构，这时候就需要升级软件，升级软件时希望更新用户手机里的数据表结构，为了实现这一目的，可以把原来的数据库版本设置为2（或其它数值），并且在onUpgrade()方法里面实现表结构的更新。当软件的版本升级次数比较多，这时在onUpgrade()方法里面可以根据原版号和目标版本号进行判断，然后作出相应的表结构及数据更新。</p>
 
 <p>SQLiteDatabase类则封装了一些操作数据库的常用API，使用该类可以完成对数据进行CRUD操作。主要是execSQL()和rawQuery()方法。execSQL()方法可以执行insert、delete、update和CREATE TABLE之类有更改行为的SQL语句； rawQuery()方法可以执行select语句。SQLiteDatabase还专门提供了对应于CRUD的操作方法： insert()、delete()、update()和query()。</p>
 
@@ -1909,321 +2001,6 @@ CREATE TABLE xzqhdm ( _id integer PRIMARY KEY, code numeric, region text, parent
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/adding-checkbox-to-the-listview/">向ListView中添加CheckBox</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2011-06-03T14:30:01+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2011</span></span> <span class='time'>2:30 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>修改list_item.xml文件，添加CheckBox控件：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
-</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-</span><span class='line'>    android:layout_width="fill_parent"
-</span><span class='line'>    android:layout_height="wrap_content"&gt;
-</span><span class='line'>    &lt;ImageView
-</span><span class='line'>        android:id="@+id/app_icon"
-</span><span class='line'>        android:layout_gravity="center_vertical"
-</span><span class='line'>        android:layout_width="32.0dip"
-</span><span class='line'>        android:layout_height="32.0dip"
-</span><span class='line'>        android:layout_marginLeft="3.0dip"
-</span><span class='line'>        android:layout_marginRight="3.0dip" /&gt;
-</span><span class='line'>    &lt;LinearLayout
-</span><span class='line'>        android:orientation="vertical"
-</span><span class='line'>        android:layout_width="fill_parent"
-</span><span class='line'>        android:layout_height="wrap_content"
-</span><span class='line'>        android:layout_weight="1.0"&gt;
-</span><span class='line'>        &lt;TextView
-</span><span class='line'>            android:id="@+id/app_title"
-</span><span class='line'>            android:layout_width="fill_parent"
-</span><span class='line'>            android:layout_height="wrap_content"
-</span><span class='line'>            android:textSize="16.0dip"
-</span><span class='line'>            android:textStyle="bold" /&gt;
-</span><span class='line'>        &lt;TextView
-</span><span class='line'>            android:id="@+id/app_package"
-</span><span class='line'>            android:layout_width="fill_parent"
-</span><span class='line'>            android:layout_height="wrap_content"
-</span><span class='line'>            android:textSize="13.0dip" /&gt;
-</span><span class='line'>    &lt;/LinearLayout&gt;
-</span><span class='line'>    &lt;CheckBox
-</span><span class='line'>        android:id="@+id/app_select"
-</span><span class='line'>        android:layout_width="wrap_content"
-</span><span class='line'>        android:layout_height="wrap_content"
-</span><span class='line'>        android:focusable="false"
-</span><span class='line'>        android:focusableInTouchMode="false"
-</span><span class='line'>        android:clickable="false"
-</span><span class='line'>        android:checkMark="?android:attr/listChoiceIndicatorMultiple" /&gt;
-</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>这三行代码很重要，如果不加会出现一些奇怪的错误。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>android:focusable="false"
-</span><span class='line'>android:focusableInTouchMode="false"
-</span><span class='line'>android:clickable="false"</span></code></pre></td></tr></table></div></figure>
-
-<p>加入CheckBox后，在程序运行过程中会发现整个ListView无法响应onItemClick、onItemLongClick或onCreateContextMenu事件。原因在于CheckBox是拥有焦点的，它的优先级比ListItem的焦点优先级更高，于是ListItem的点击事件被屏蔽了。解决方法是让CheckBox不能获得焦点。android:focusable=&quot;false&quot;就是做这个的。</p>
-
-<p>修改整个SimpleIconAdapter类为以下内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-<span class='line-number'>44</span>
-<span class='line-number'>45</span>
-<span class='line-number'>46</span>
-<span class='line-number'>47</span>
-<span class='line-number'>48</span>
-<span class='line-number'>49</span>
-<span class='line-number'>50</span>
-<span class='line-number'>51</span>
-<span class='line-number'>52</span>
-<span class='line-number'>53</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class SimpleIconAdapter extends BaseAdapter {
-</span><span class='line'>    private LayoutInflater mInflater;
-</span><span class='line'>    private List&lt;? extends Map&lt;String, ?&gt;&gt; mData;
-</span><span class='line'>
-</span><span class='line'>    public SimpleIconAdapter(Context context, List&lt;? extends Map&lt;String, ?&gt;&gt; data) {
-</span><span class='line'>        mInflater = LayoutInflater.from(context);
-</span><span class='line'>        mData = data;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    @Override
-</span><span class='line'>    public int getCount() {
-</span><span class='line'>        return mData.size();
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    @Override
-</span><span class='line'>    public Object getItem(int position) {
-</span><span class='line'>        return mData.get(position);
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    @Override
-</span><span class='line'>    public long getItemId(int position) {
-</span><span class='line'>        return position;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    @SuppressWarnings({ "rawtypes", "unchecked" })
-</span><span class='line'>    @Override
-</span><span class='line'>    public View getView(int position, View convertView, ViewGroup parent) {
-</span><span class='line'>        View view;
-</span><span class='line'>        if (convertView != null) {
-</span><span class='line'>            view = convertView;
-</span><span class='line'>        } else {
-</span><span class='line'>            view = mInflater.inflate(R.layout.list_item, parent, false);
-</span><span class='line'>        }
-</span><span class='line'>
-</span><span class='line'>        Map map = (Map)getItem(position);
-</span><span class='line'>        TextView tv = (TextView)view.findViewById(R.id.app_title);
-</span><span class='line'>        tv.setText((String)map.get("app_title"));
-</span><span class='line'>
-</span><span class='line'>        tv = (TextView)view.findViewById(R.id.app_package);
-</span><span class='line'>        tv.setText((String)map.get("app_package"));
-</span><span class='line'>
-</span><span class='line'>        ImageView iv = (ImageView)view.findViewById(R.id.app_icon);
-</span><span class='line'>        iv.setImageDrawable((Drawable)map.get("app_icon"));
-</span><span class='line'>
-</span><span class='line'>        CheckBox cb = (CheckBox)view.findViewById(R.id.app_select);
-</span><span class='line'>        if ((Boolean)map.get("app_select") ==  null) {
-</span><span class='line'>            map.put("app_select", false);
-</span><span class='line'>        }
-</span><span class='line'>        cb.setChecked((Boolean)map.get("app_select"));
-</span><span class='line'>
-</span><span class='line'>        return view;
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>再就是修改MainActivity类的onCreate()方法：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-<span class='line-number'>44</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>@Override
-</span><span class='line'>public void onCreate(Bundle savedInstanceState) {
-</span><span class='line'>    super.onCreate(savedInstanceState);
-</span><span class='line'>    setContentView(R.layout.main);
-</span><span class='line'>
-</span><span class='line'>    mListView = (ListView)findViewById(R.id.list_view);
-</span><span class='line'>    mListData = new ArrayList&lt;HashMap&lt;String, Object&gt;&gt;();
-</span><span class='line'>    mAdapter = new SimpleIconAdapter(this, mListData);
-</span><span class='line'>    mListView.setAdapter(mAdapter);
-</span><span class='line'>    mListView.setItemsCanFocus(false);
-</span><span class='line'>    mListView.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
-</span><span class='line'>    mListView.setOnItemClickListener(new OnItemClickListener() {
-</span><span class='line'>        @SuppressWarnings({ "unchecked", "rawtypes" })
-</span><span class='line'>        @Override
-</span><span class='line'>        public void onItemClick(AdapterView&lt;?&gt; parent, View view, int position, long id) {
-</span><span class='line'>            // 这里如此处理是因为当选中CheckBox，滚动ListView的时候，会出现一些
-</span><span class='line'>            // CheckBox选择错位的现象，所以在选择CheckBox时，记下其状态，然后在
-</span><span class='line'>            // getView方法中进行设置。
-</span><span class='line'>            //
-</span><span class='line'>            // 原因：
-</span><span class='line'>            // ListView中的getChildCount()并不总是等于Adapter中的数据行数。当手
-</span><span class='line'>            // 机一屏显示不了所有数据时（需要翻页），getChildCount()就等于一屏
-</span><span class='line'>            // 所显示的行数（一般为10），小于Adapter中的数据行数。而ListView的
-</span><span class='line'>            // getCount()与Adapter中的数据行数相等。
-</span><span class='line'>            // 当光标下移到屏幕最底部，新显示出来的View，在调用Adapter的getView
-</span><span class='line'>            // 方法中，会判断convertView为null，而再有新的View显示就会发现
-</span><span class='line'>            // convertView不为空，所以新显示的View其实使用了之前某个View的对象。
-</span><span class='line'>            // 这就造成了状态可能混乱。比如第一行的CheckBox点选时，第11行的也同
-</span><span class='line'>            // 时会被点选。
-</span><span class='line'>            CheckBox cb = (CheckBox)view.findViewById(R.id.app_select);
-</span><span class='line'>            cb.toggle();
-</span><span class='line'>            ((Map)mListData.get(position)).put("app_select", cb.isChecked());
-</span><span class='line'>        }
-</span><span class='line'>    });
-</span><span class='line'>
-</span><span class='line'>    mProgressDialog = ProgressDialog.show(this, "Wait", "loading...");
-</span><span class='line'>    new Thread() {
-</span><span class='line'>        @Override
-</span><span class='line'>        public void run() {
-</span><span class='line'>            mListData.addAll(getInstalledApps(false));
-</span><span class='line'>            mHandler.sendEmptyMessage(0);
-</span><span class='line'>        }
-</span><span class='line'>    }.start();
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/14">&larr; Older</a>
@@ -2241,6 +2018,10 @@ CREATE TABLE xzqhdm ( _id integer PRIMARY KEY, code numeric, region text, parent
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/the-mythical-10x-programmer/">神秘的10x程序员</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/learn-anything-faster-with-the-feynman-technique/">费曼技巧：最好的学习方法</a>
       </li>
     
@@ -2254,10 +2035,6 @@ CREATE TABLE xzqhdm ( _id integer PRIMARY KEY, code numeric, region text, parent
     
       <li class="post">
         <a href="/blog/the-impact-github-is-having-on-your-software-career-right-now/">GitHub对软件职业生涯的影响</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/how-to-modify-hosts-in-android/">如何修改Android的hosts文件</a>
       </li>
     
   </ul>

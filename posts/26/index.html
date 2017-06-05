@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="JPA（Java Persistence API）是EJB 3.0 新引入的一个把Java数据对象映射成关系数据库对象的数据持久化编程模型，它弥补了JDBC、ORM、EJB 2等在Java对象持久化方面的不足之处，并且非常易于使用。JPA可以被当作一个单独的 POJO（Plain Old Java &hellip;">
+  <meta name="description" content="首先，让我们从最简单的做起，先实现一套能正确分析PowerScript注释的词法规则。PowerScript支持两种注释形式：单行注释（//）和多行注释（/* ... */）。 单行注释以双斜杠（//）起头，直到遇到行结束符为止，所以在这里要先明确一下行结束符用什么表示。在DOS系统中行结束符用 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,212 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/using-antlr-to-build-powerscript-parser-part1/">使用ANTLR构建PowerScript语法分析器（1）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-08-22T23:43:04+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2007</span></span> <span class='time'>11:43 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>首先，让我们从最简单的做起，先实现一套能正确分析PowerScript注释的词法规则。PowerScript支持两种注释形式：单行注释（//）和多行注释（/* ... */）。</p>
+
+<p>单行注释以双斜杠（//）起头，直到遇到行结束符为止，所以在这里要先明确一下行结束符用什么表示。在DOS系统中行结束符用“\r\n”表示，在Unix系统中行结束符用“\n”表示，现在的Mac系统也是以“\n”表示行结束符，但早期的Mac系统中行结束符则是以“\r”表示。所以兼容这几种操作系统的行结束符词法规则为：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>fragment
+</span><span class='line'>EndOfLine
+</span><span class='line'>    : '\r' '\n'    // DOS
+</span><span class='line'>    | '\r'         // Mac
+</span><span class='line'>    | '\n'         // Unix
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>现在，有了行结束符词法规则，就可以定义单行注释的词法规则了：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>LINE_COMMENT
+</span><span class='line'>    : '//' ~('\n'|'\r')* EndOfLine
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>通常的多行注释词法规则是这样的：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>BLOCK_COMMENT
+</span><span class='line'>    : '/*' ( options {greedy=false;} : . )* '*/'
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>但由于PowerScript支持嵌套注释，所以上面的规则无效，必须重新定义。当词法分析器遇到<code>“/*”</code>后就进入了多行注释。这时假如遇到了<code>“/”</code>符号，词法分析器必须预取一个字符，看这个字符是不是<code>“*”</code>。如果是的话，就进入了嵌套的多行注释，否则，则还是处在多行注释中。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>BLOCK_COMMENT
+</span><span class='line'>    : '/*'
+</span><span class='line'>      ( options {greedy=false;}
+</span><span class='line'>      : ('/' '*')=&gt; BLOCK_COMMENT    // 在多行注释中遇到“/*”，用语法断言确定是嵌套多行注释
+</span><span class='line'>      | '/' ~('*')                   // 在多行注释中只遇到“/”，而没有紧跟着的“*”
+</span><span class='line'>      | ~('/')                       // 在多行注释中没有遇到“/”
+</span><span class='line'>      )*
+</span><span class='line'>      '*/'
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>当然，我们还希望忽略空格、制表符、回车符、换行符等无意义字符。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>WS
+</span><span class='line'>    : (' '|'\t'|'\r'|'\n') {$channel=HIDDEN;}
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>测试代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>/* This is a comment.   */
+</span><span class='line'>/* /This is a comment. */
+</span><span class='line'>/* *This is a comment. */
+</span><span class='line'>/* This is a comment. /* */*/
+</span><span class='line'>/* This is a comment. /* This is a nested comment. */ */
+</span><span class='line'>/*  The comment starts here.
+</span><span class='line'> /*  The nested comment starts here.
+</span><span class='line'> The nested comment ends here.  */
+</span><span class='line'> The comment ends here.  */
+</span><span class='line'>/* The comment starts here,
+</span><span class='line'> continues to this line,&
+</span><span class='line'> and finally ends here. */
+</span><span class='line'>// This entire line is a comment.
+</span><span class='line'>// This entire line is a comment. //
+</span><span class='line'>// /This entire line is a comment.
+</span><span class='line'>// This entire line is a comment. */
+</span><span class='line'>// This entire line is a comment. /*</span></code></pre></td></tr></table></div></figure>
+
+<p>完整的PowerScript.g的内容如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar PowerScript;
+</span><span class='line'>
+</span><span class='line'>program
+</span><span class='line'>    : LINE_COMMENT+
+</span><span class='line'>    | BLOCK_COMMENT+
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>LINE_COMMENT
+</span><span class='line'>    : '//' ~('\n'|'\r')* EndOfLine
+</span><span class='line'>      {
+</span><span class='line'>          System.out.println("lc&gt;" + getText());
+</span><span class='line'>      }
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>BLOCK_COMMENT
+</span><span class='line'>    : '/*'
+</span><span class='line'>      ( options {greedy=false;}
+</span><span class='line'>      : ('/' '*')=&gt; BLOCK_COMMENT
+</span><span class='line'>      | '/' ~('*')
+</span><span class='line'>      | ~('/')
+</span><span class='line'>      )*
+</span><span class='line'>      '*/'
+</span><span class='line'>      {
+</span><span class='line'>          System.out.println("bc&gt;" + getText());
+</span><span class='line'>      }
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>WS
+</span><span class='line'>    : (' '|'\t'|'\r'|'\n') {$channel=HIDDEN;}
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>fragment
+</span><span class='line'>EndOfLine
+</span><span class='line'>    : '\r' '\n'    // DOS
+</span><span class='line'>    | '\r'         // Mac
+</span><span class='line'>    | '\n'         // Unix
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -555,7 +761,7 @@
 <h3 id="dll的优点">DLL的优点</h3>
 
 <ol>
-<li>使用较少的资源。当多个程序使用同一个函数库时，DLL可以减少在磁盘和物理内存中加载的代码的重复量。这不仅可以大大影响在前台运行的程序，而且可以大大影响其他在Windows操作系统上运行的程序；</li>
+<li>使用较少的资源。当多个程序使用同一个函数库时，DLL可以减少在磁盘和物理内存中加载的代码的重复量。这不仅可以大大影响在前台运行的程序，而且可以大大影响其它在Windows操作系统上运行的程序；</li>
 <li>简化部署和安装。当DLL中的函数需要更新或修复时，只要函数的参数和返回值没有更改，就不需重新编译或重新建立程序与该DLL的链接。此外，如果多个程序使用同一个DLL，那么多个程序都将从该更新或修复中获益；</li>
 <li>支持多语言程序。只要程序遵循函数的调用约定，用不同编程语言编写的程序就可以调用相同的DLL函数。程序与DLL函数在下列方面必须是兼容的：函数期望其参数被推送到堆栈上的顺序，是函数还是应用程序负责清理堆栈，以及寄存器中是否传递了任何参数；</li>
 <li>使国际版本的创建轻松完成。通过将资源放到DLL中，创建应用程序的国际版本变得容易得多。可将用于应用程序的每个语言版本的字符串放到单独的DLL资源文件中，并使不同的语言版本加载合适的资源。</li>
@@ -665,7 +871,7 @@
 
 <h3 id="导出dll函数">导出DLL函数</h3>
 
-<p>DLL文件的布局与EXE文件非常相似，但有一个重要差异：DLL文件包含导出表。导出表包含DLL导出到客户程序的每个函数的名称。只有导出表中的函数可由客户程序访问。DLL中的任何其他函数都是DLL私有的。通过使用带/EXPORTS选项的dumpbin工具，可以查看DLL的导出表。有两种方法可以从DLL导出函数：</p>
+<p>DLL文件的布局与EXE文件非常相似，但有一个重要差异：DLL文件包含导出表。导出表包含DLL导出到客户程序的每个函数的名称。只有导出表中的函数可由客户程序访问。DLL中的任何其它函数都是DLL私有的。通过使用带/EXPORTS选项的dumpbin工具，可以查看DLL的导出表。有两种方法可以从DLL导出函数：</p>
 
 <p>方法1：在定义中使用__declspec(dllexport)关键词。</p>
 
@@ -1104,48 +1310,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/css-box-model/">CSS盒模型</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2007-03-20T17:40:16+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>20</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>5:40 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>平面示意图</p>
-
-<p><img src="/uploads/box-model-01.gif" title="box-model-01" ></p>
-
-<p>3D示意图（原图出自：hicksdesign）</p>
-
-<p><img src="/uploads/box-model-02.gif" title="box-model-02" ></p>
-
-<p>Flash示意模型</p>
-
-<p><object width="640" height="380" data="/uploads/box-model.swf" type="application/x-shockwave-flash">
-<param name="quality" value="high" />
-<param name="src" value="/uploads/box-model.swf" />
-</object></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/27">&larr; Older</a>
@@ -1163,6 +1327,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/the-mythical-10x-programmer/">神秘的10x程序员</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/learn-anything-faster-with-the-feynman-technique/">费曼技巧：最好的学习方法</a>
       </li>
     
@@ -1176,10 +1344,6 @@
     
       <li class="post">
         <a href="/blog/the-impact-github-is-having-on-your-software-career-right-now/">GitHub对软件职业生涯的影响</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/how-to-modify-hosts-in-android/">如何修改Android的hosts文件</a>
       </li>
     
   </ul>
