@@ -9,7 +9,8 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="在工作中，经常会碰到在修改代码以支持新功能时，发现线上版本出现问题需要在本地查错。因为还在进行中，所以并不想将半成品的代码提交，后面再来修改。这样就需要临时保存修改的文件，然后取出线上版本到工作目录。这个问题的解决之道就是使用git stash命令，它会暂存你的当前工作，这样以后随时可以再来修改 &hellip;">
+  <meta name="description" content="当网站出现问题时，让它发送一份错误报告到你的邮箱是件挺不错的事，这样你就不必再担心不能及时发现问题了。 exception_notification插件的功能就是当你的Rails应用出错时，它会向指定的邮箱地址发送错误日志。 使用很简单，安装插件后配置一下邮件接受者就可以了。 1
+script/ &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -79,7 +80,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/git-notes-stash/">Git笔记之stash</a></h1>
+      <h1 class="entry-title"><a href="/blog/using-rails-23-to-create-a-simple-accounting-app-part11/">用Rails 2.3打造简单记账应用（11）</a></h1>
     
     
       <p class="meta">
@@ -88,304 +89,182 @@
 
 
 
-<time class='entry-date' datetime='2009-02-07T09:41:32+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>7</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>9:41 am</span></time>
+<time class='entry-date' datetime='2010-01-05T20:43:29+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>5</span><span class='date-suffix'>th</span>, <span class='date-year'>2010</span></span> <span class='time'>8:43 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>在工作中，经常会碰到在修改代码以支持新功能时，发现线上版本出现问题需要在本地查错。因为还在进行中，所以并不想将半成品的代码提交，后面再来修改。这样就需要临时保存修改的文件，然后取出线上版本到工作目录。这个问题的解决之道就是使用git stash命令，它会暂存你的当前工作，这样以后随时可以再来修改：</p>
+  <div class="entry-content"><p>当网站出现问题时，让它发送一份错误报告到你的邮箱是件挺不错的事，这样你就不必再担心不能及时发现问题了。</p>
+
+<p><a href="https://github.com/rails/exception_notification">exception_notification</a>插件的功能就是当你的Rails应用出错时，它会向指定的邮箱地址发送错误日志。</p>
+
+<p>使用很简单，安装插件后配置一下邮件接受者就可以了。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git stash</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>script/plugin install git://github.com/rails/exception_notification.git</span></code></pre></td></tr></table></div></figure>
 
-<p>现在，工作目录变得干净，可以安全地做些别的事情了。</p>
-
-<p>要查看暂存的修改可以使用以下命令：</p>
+<p>在config/environment.rb中的最后添加邮件接收者的地址：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git stash list</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ExceptionNotifier.exception_recipients = %w(yourname@example.com)</span></code></pre></td></tr></table></div></figure>
 
-<p>稍后，在排除掉线上版本的错误后，你就可以取回所有暂存的修改：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git stash pop</span></code></pre></td></tr></table></div></figure>
-
-<p>现在让我们在脑中想象一个场景：在排除线上版本错误后，没有立即取回暂存的修改，而是做了其它的一些的变更，然后想把暂存的修改并入进来以完成工作。如果两次修改的代码没有冲突，那么事情完美结束；如果后修改的代码和暂存的修改有冲突，那么就会得到Merge conflict的警告。Git没有提供强制pop的功能，所以我们需要一些技巧来解决：</p>
+<p>然后告诉exception_notification哪些controller出错才发送日志，当然是全部啦：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git stash show -p | git apply && git stash drop</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class ApplicationController &lt; ActionController::Base
+</span><span class='line'>  include ExceptionNotifiable</span></code></pre></td></tr></table></div></figure>
 
-<p>git stash的其它一些可用选项如下所示：</p>
+<p>exception_notification采用ActionMailer发送邮件，所以使用的前提是确保ActionMailer可以正常发送邮件。还有就是exception_notification默认只在production环境下才会生效，如果想要在development下也生效，需要将config/environments/development.rb文件中的：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>config.action_mailer.raise_delivery_errors = false</span></code></pre></td></tr></table></div></figure>
+
+<p>修改为</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>config.action_mailer.raise_delivery_errors = true
+</span><span class='line'># Let exception_notification generate email notifications
+</span><span class='line'>config.action_controller.consider_all_requests_local = false</span></code></pre></td></tr></table></div></figure>
+
+<p>代码下载：<a href="https://github.com/dohkoos/qianbao">https://github.com/dohkoos/qianbao</a></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/using-rails-23-to-create-a-simple-accounting-app-part10/">用Rails 2.3打造简单记账应用（10）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2010-01-04T20:34:41+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>4</span><span class='date-suffix'>th</span>, <span class='date-year'>2010</span></span> <span class='time'>8:34 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>从2.2版本起Rails开始内置支持i18n，因此以后实现国际化/本地化就可以不再需要各种各样的插件了。</p>
+
+<p>Rails默认的Locale文件夹是config/locales，假设你要支持中文和英文，那么你需要在这个文件夹下放置zh.yml和en.yml两个文件。</p>
+
+<p>相应的入门教程网上有不少，我也就不多讲了。这里主要说一下如何在记账应用中实现可以让用户指定语言的i18n实现，即当用户选择English，那么界面就切换成英文界面，并且以后打开的页面也是以英文出现，反之亦如此。</p>
+
+<p>首先在header区添加以下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= link_to 'Chinese', :locale =&gt; 'zh' %&gt;
+</span><span class='line'>&lt;%= link_to 'English', :locale =&gt; 'en' %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>点击其中某个链接后，浏览器就会传递对应的参数zh或en到后台。</p>
+
+<p>然后在app/controllers/application_controller.rb中添加以下代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git stash pop --index        # 不仅恢复工作目录，还恢复索引
-</span><span class='line'>git stash save "stash name"  # 使用save可以给暂存的修改添加名字
-</span><span class='line'>git stash save --keep-index  # 仅仅暂存未索引的文件
-</span><span class='line'>git stash clear              # 删除所有暂存的修改</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>before_filter :set_locale
+</span><span class='line'>
+</span><span class='line'>protected
+</span><span class='line'>  def set_locale
+</span><span class='line'>    I18n.locale = params[:locale]
+</span><span class='line'>  end</span></code></pre></td></tr></table></div></figure>
 
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/make-wireless-work-on-ubuntu-810/">Ubuntu 8.10下实现无线上网</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2009-02-05T16:50:49+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>5</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>4:50 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>机器是ThinkPad X60，自带Inter PRO/Wireless 3945ABG网卡。</p>
-
-<h3 id="查看网络设置">查看网络设置</h3>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ifconfig</span></code></pre></td></tr></table></div></figure>
-
-<p><img src="/uploads/ifconfig.png" title="ifconfig" ></p>
-
-<h3 id="打开无线网卡电源">打开无线网卡电源</h3>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sudo iwconfig wlan0 txpower on</span></code></pre></td></tr></table></div></figure>
-
-<h3 id="检索区域内的无线网络">检索区域内的无线网络</h3>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>iwlist wlan0 scan</span></code></pre></td></tr></table></div></figure>
-
-<p><img src="/uploads/iwlist-scan.png" title="iwlist-scan" ></p>
-
-<h3 id="无线网络设置">无线网络设置</h3>
-
-<p>打开System -&gt; Preferences -&gt; Network Connections。在Wireless页上点击Add按钮，然后在SSID栏填写检索到的ESSID字符串NETGEAR。</p>
-
-<p><img src="/uploads/wireless-config.png" title="wireless-config" ></p>
-
-<p>如果无线连接需要输入密钥，那么可以在Wireless Security页上设置。譬如，我在路由器端设置的加密方式是WPA/WPA2-PSK (Wi-Fi Protected Access Pre-Shared Key)，如图：</p>
-
-<p><img src="/uploads/netgear-settings.png" title="netgear-settings" ></p>
-
-<p>所以在Wireless Security页上Securiy栏中选择WPA &amp; WPA2 Personal，然后在Password栏输入设置的密码。然后就点OK，Ubuntu就去寻找网络了，等到状态从Never变为Now的时候就表示已经联网了。</p>
-
-<p>2009/3/19更新</p>
-
-<p>今天早上忽然发现笔记本不能无线上网了，iwlist wlan0 scan后发现结果为No scan result。使用sudo iwlist wlan0 scan命令，然后再执行iwlist wlan scan就可以看到AP了（原因为何还不知道）。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/git-notes-gitignore/">Git笔记之gitignore</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2009-01-25T18:53:36+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>25</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>6:53 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>通常我们会有些文件不希望纳入Git的管理，也不希望它们总是出现在未跟踪文件列表中。这些文件大多是些自动生成的文件，譬如编译过程中生成的临时文件，或者一些本地的配置文件。为解决此类问题，Git提供了文件忽略机制，我们可以创建一个名为.gitignore的文件，在其中列出需要忽略的文件模式。文件.gitignore的格式规范如下：</p>
-
-<ul>
-<li>所有空行或者以#开头的行都会被忽略；</li>
-<li>可以使用标准的glob模式匹配；</li>
-<li>匹配模式可以以“/”开头防止递归；</li>
-<li>匹配模式可以以“/”结尾指定目录；</li>
-<li>要忽略指定模式以外的文件或目录，可以在模式前加上“!”取反。</li>
-</ul>
-
-<p>上面所谓的glob模式是指简化了的正则表达式：<code>“*”</code>匹配零个或多个任意字符；“[abc]”匹配任何一个列在方括号中的字符；“?”匹配一个任意字符；“[a-z]”匹配所有在这两个字符范围内的字符。<code>“**”</code>匹配任意中间目录，比如<code>a/**/z</code>可以匹配a/z，a/b/z或a/b/c/z等。</p>
-
-<p>要养成一开始就设置好.gitignore文件的习惯，避免将来误提交一些无用的文件。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/git-notes-reset/">Git笔记之reset</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2009-01-14T21:48:24+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>14</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>9:48 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>git reset的作用是重置当前HEAD到指定状态，它有三个选项：--soft、--mixed和--hard。</p>
-
-<ul>
-<li>--soft选项既不重置索引内容，也不改变工作目录中的任何内容，它仅仅是重置当前HEAD到指定commit。使用该选项后，git diff的返回信息不变，而git diff --cached和git diff HEAD的返回信息有变化。</li>
-<li>--mixed是git reset的默认选项，它的作用是重置索引内容，将其定位到指定的commit，但不改变工作目录中的任何内容。使用该选项后，git diff和git diff HEAD的返回信息有变化，而git diff --cached的返回信息不变。</li>
-<li>--hard选项会重置索引内容，将其定位到指定的commit，并且工作目录中的内容也会完全回退到指定commit时的状态。所以使用该选项后，git diff、git diff --cached和git diff HEAD的返回信息都为空。由于这个选项的杀伤力太大，使用时需要谨慎。</li>
-</ul>
-
-<p>以下是根据三个选项的特性制作的表格：</p>
-
-<table><thead>
-<tr>
-<th></th>
-<th style="text-align: center">是否重置索引</th>
-<th style="text-align: center">是否重置工作目录</th>
-</tr>
-</thead><tbody>
-<tr>
-<td>--soft</td>
-<td style="text-align: center">N</td>
-<td style="text-align: center">N</td>
-</tr>
-<tr>
-<td>--mixed</td>
-<td style="text-align: center">Y</td>
-<td style="text-align: center">N</td>
-</tr>
-<tr>
-<td>--hard</td>
-<td style="text-align: center">Y</td>
-<td style="text-align: center">Y</td>
-</tr>
-</tbody></table>
-
-<p>有时候你可能刚刚把一个文件添加到暂存区里，然后就发现这是错误的，接着你可能想从暂存区中删除该文件，这时你可以使用下面这个命令：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git reset &lt;file&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>它仅从索引中移除文件，但不会触及工作目录。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/git-notes-create-project/">Git笔记之项目创建</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2009-01-04T13:42:54+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>4</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>1:42 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Git的官网地址：<a href="https://git-scm.com/">https://git-scm.com/</a></p>
-
-<p>学习路线推介：新手请浏览<a href="https://www.kernel.org/pub/software/scm/git/docs/gittutorial.html">gittutorial(7)</a>，然后是<a href="https://www.kernel.org/pub/software/scm/git/docs/giteveryday.html">Everyday Git</a>，接着是“git help command”，需要更全面的了解Git请看<a href="https://www.kernel.org/pub/software/scm/git/docs/user-manual.html">Git User&#39;s Manual</a>。</p>
-
-<p>1、初始化仓库</p>
+<p>不过这里有个问题就是url中必须得带着参数，不然的话用户的选择就会失效。要想使选择达到持续的效果，可以考虑把这些信息保存在session中，改进后的代码如下：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mkdir gittest
-</span><span class='line'>cd gittest
-</span><span class='line'>git init  # 创建.git隐藏目录，即所谓的Git仓库，用来存储项目的所有历史和元信息</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def set_locale
+</span><span class='line'>  I18n.locale = params[:locale] || session[:locale]
+</span><span class='line'>  session[:locale] = I18n.locale
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
 
-<p>2、告诉项目你的信息</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git config --global user.name "yourname"
-</span><span class='line'>git config --global user.email yourname@example.com</span></code></pre></td></tr></table></div></figure>
-
-<p>3、跟踪新文件</p>
+<p>现在这样就基本上差不多了。剩下的就是处理第一次访问时的语言，这个可以从request的ACCEPT_LANGUAGE参数中获取。最终实现的代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>echo 'Hello, Git!' &gt; greeting
-</span><span class='line'>git add greeting</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def set_locale
+</span><span class='line'>  accept_lang = request.env['HTTP_ACCEPT_LANGUAGE'].scan(/^[a-z]{2}/).first
+</span><span class='line'>  I18n.locale = params[:locale] || session[:locale] || accept_lang || 'zh'
+</span><span class='line'>  session[:locale] = I18n.locale
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
 
-<p>这里Git给greeting这个文件的内容生成快照，并把快照存储在Git称之为索引的暂存区。你也可以使用git add .来将当前目录下所有的文件内容加入到暂存区。</p>
-
-<p>4、查看项目当前状态</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git status</span></code></pre></td></tr></table></div></figure>
-
-<p>5、提交内容到仓库</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git commit  # 将暂存区的内容写入仓库</span></code></pre></td></tr></table></div></figure>
-
-<p>在输入git commit后按回车会跳出一个文本编辑器窗口，要求开发者输入这次提交的开发信息。</p>
-
-<p>git commit的选项：</p>
-
-<ul>
-<li>-s 在提交日志信息末尾添加提交者的Signed-off-by行。</li>
-<li>-m 使用给定的信息作为提交信息。没有该选项会自动打开一个编辑器以填写提交信息。</li>
-<li>-a 自动将修改过的文件添到暂存区中（新建但没有git add的文件不会受到影响）。</li>
-</ul>
-
-<p>6、查看项目历史</p>
+<p>不过当用户选择中文后，在新建记录时会报以下错误：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git log</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>can't convert Symbol into String
+</span><span class='line'>
+</span><span class='line'>Extracted source (around line #8):
+</span><span class='line'>
+</span><span class='line'>    6:   &lt;p&gt;
+</span><span class='line'>    7:     &lt;%= t(:effective_date) %&gt;&lt;br /&gt;
+</span><span class='line'>    8:     &lt;%= f.date_select :effective_date %&gt;
+</span><span class='line'>    9:   &lt;/p&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p>如果你想看下每次提交的大致变动情况，可使用以下命令：</p>
+<p>查找资料后发现可以通过在date_select中加入order来解决，不过日期下拉列表中的月份还有问题，出现的是一些随机数，不是正常月份。这个也可以通过添加month_names参数解决。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git log --stat --summary</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= t(:effective_date) %&gt;&lt;br /&gt;
+</span><span class='line'>&lt;%= f.date_select :effective_date, :order =&gt; [:year, :month, :day] %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>更好的办法是把它们放到对应的Locale文件里：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># en.yml
+</span><span class='line'>en:
+</span><span class='line'>  date:
+</span><span class='line'>    month_names: [~, January, February, ..., November, December]
+</span><span class='line'>    order: [:year, :month, :day]</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># zh.yml
+</span><span class='line'>zh:
+</span><span class='line'>  date:
+</span><span class='line'>    month_names: [~, 一月, 二月, ..., 十一月, 十二月]
+</span><span class='line'>    order: [:year, :month, :day]</span></code></pre></td></tr></table></div></figure>
+
+<p>代码下载：<a href="https://github.com/dohkoos/qianbao">https://github.com/dohkoos/qianbao</a></p>
 </div>
   
   
@@ -398,7 +277,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/memory-leak-detection-using-windbg/">使用WinDbg检测内存泄漏</a></h1>
+      <h1 class="entry-title"><a href="/blog/how-to-import-or-export-data-from-the-application-in-heroku/">如何导入/导出Heroku中应用的数据</a></h1>
     
     
       <p class="meta">
@@ -407,131 +286,98 @@
 
 
 
-<time class='entry-date' datetime='2008-12-27T09:34:17+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>27</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>9:34 am</span></time>
+<time class='entry-date' datetime='2009-12-27T20:43:03+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>27</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>8:43 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>英文原文：<a href="http://www.codeproject.com/Articles/31382/Memory-Leak-Detection-Using-WinDbg">http://www.codeproject.com/Articles/31382/Memory-Leak-Detection-Using-WinDbg</a></p>
+  <div class="entry-content"><p>导入/导出Heroku上应用的数据需要安装Taps包：</p>
 
-<h3 id="简介">简介</h3>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>gem install taps</span></code></pre></td></tr></table></div></figure>
 
-<p>内存泄漏是一种费时的bug，通常由C++开发者制造。内存泄漏的检测经常是令人厌烦的。如果代码不是你写的，或者代码库相当巨大，事情就会变得很糟糕。</p>
+<p>导入数据到Heroku里：</p>
 
-<p>尽管市场上有可用的工具帮助你检测内存泄露，但这些工具大多数不是免费的。我发现WinDbg作为一个免费的强大的工具可以用来解决内存泄漏bug。至少，我们可以知道可能涉嫌引起内存泄漏的代码位置。COM接口泄漏不在这篇文章范围内。</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>heroku db:push</span></code></pre></td></tr></table></div></figure>
 
-<p>WinDbg是来自Microsoft的一个强大的用户/内核空间调试器，它可以从<a href="http://www.microsoft.com/whdc/devtools/debugging/installx86.mspx">这里</a>下载和安装。</p>
+<p>导出数据到本地：</p>
 
-<h3 id="使用windbg">使用WinDbg</h3>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>heroku db:pull</span></code></pre></td></tr></table></div></figure>
 
-<p>开始使用WinDbg：</p>
+<p>其中导入/导出数据由config/database.yml配置设定。</p>
 
-<ol>
-<li>配置符号文件路径指向Microsoft符号服务器<code>SRV*d:\symbols*http://msdl.microsoft.com/download/symbols</code>；</li>
-<li>将你的程序EXE/DLL的PDB（程序数据库）路径添加到符号文件路径中；</li>
-<li>你还需要配置操作系统的标记去启用有内存泄漏的进程上的用户栈跟踪。这很简单，可以用gflags.exe做到。gflags.exe在WinDbg安装期间被安装。或者也可以通过命令行来完成，使用命令gflags.exe /i MemoryLeak.exe +ust即可。我的程序名是Test2.exe。因此，为了演示，需要用Test2.exe替换掉MemoryLeak.exe。下面的快照显示了应用Test2.exe的OS标记的设置。</li>
+<p>Heroku还支持主机到主机的数据库传输，具体细节可以查看 <a href="http://docs.heroku.com/taps">http://docs.heroku.com/taps</a> 文档。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-debug-android-app-on-device/">如何联机调试Android应用</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2009-12-26T19:54:41+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>7:54 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><ol>
+<li>首先你需要一台开发手机，如果不是的话可以刷ROM；</li>
+<li>在Settings -&gt; Applications -&gt; Development下激活USB debugging选项；</li>
+<li>下载并安装USB驱动程序；</li>
+<li>用USB数据线连接手机与电脑；</li>
+<li>在AndroidManifest.xml中的<code>&lt;application&gt;</code>里添加android:debuggable=&quot;true&quot;；</li>
+<li>然后你就可以像平常一样调试你的Android代码了。</li>
 </ol>
+</div>
+  
+  
 
-<p><img src="/uploads/cmd.jpg" title="cmd" ></p>
 
-<p>一旦我们配置好WinDbg的符号文件路径，开启泄漏内存的进程，就可以把WinDbg挂载上去。挂载选项可以在WinDbg的File菜单下找到，或者可以使用F6快捷键启动。下面的快照显示了挂载界面：</p>
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/using-rails-23-to-create-a-simple-accounting-app-part9/">用Rails 2.3打造简单记账应用（9）</a></h1>
+    
+    
+      <p class="meta">
+        
 
-<p><img src="/uploads/attach.jpg" title="attach" ></p>
 
-<p>WinDbg的!heap命令用来显示堆。在WinDbg帮助文件里有!heap的详尽文档。</p>
 
-<p>我已经开发了一个泄漏内存的小程序，在后面也将使用这个程序来做演示。</p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>int _tmain(int argc, _TCHAR* argv[])
-</span><span class='line'>{
-</span><span class='line'>    while(1)
-</span><span class='line'>    {
-</span><span class='line'>        AllocateMemory();
-</span><span class='line'>    }
-</span><span class='line'>    return 0;
-</span><span class='line'>}
-</span><span class='line'>void AllocateMemory()
-</span><span class='line'>{
-</span><span class='line'>    int* a = new int[2000];
-</span><span class='line'>    ZeroMemory(a, 8000);
-</span><span class='line'>    Sleep(1);
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+<time class='entry-date' datetime='2009-12-20T20:45:19+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>20</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>8:45 pm</span></time>
+        
+      </p>
+    
+  </header>
 
-<p>上面的程序泄漏一个大小为2000*4字节的整型数组。</p>
 
-<p>把WinDbg挂载到进程上后，执行命令!heap -s。-s代表概要。下面是泄漏进程上!heap -s的输出：</p>
+  <div class="entry-content"><p>没啥多说的，继续开始干活。</p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>0:001&gt; !heap -s
-</span><span class='line'>NtGlobalFlag enables following debugging aids for new heaps:
-</span><span class='line'>    validate parameters
-</span><span class='line'>    stack back traces
-</span><span class='line'>  Heap     Flags   Reserv  Commit  Virt   Free  List   UCR  Virt  Lock  Fast
-</span><span class='line'>                    (k)     (k)    (k)     (k) length      blocks cont. heap
-</span><span class='line'>-----------------------------------------------------------------------------
-</span><span class='line'>   00150000 58000062    1024     12     12      1     1     1    0      0   L
-</span><span class='line'>   00250000 58001062      64     24     24     15     1     1    0      0   L
-</span><span class='line'>   00260000 58008060      64     12     12     10     1     1    0      0
-</span><span class='line'>   00330000 58001062   64576  47404  47404     13     4     1    0      0
-</span><span class='line'>-----------------------------------------------------------------------------</span></code></pre></td></tr></table></div></figure>
-
-<p>让进程执行一段时间，然后重新进入进程，再次执行!heap -s。下面显示的是该命令的输出：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>0:001&gt; !heap -s
-</span><span class='line'>NtGlobalFlag enables following debugging aids for new heaps:
-</span><span class='line'>   validate parameters
-</span><span class='line'>   stack back traces
-</span><span class='line'>   Heap     Flags   Reserv  Commit  Virt   Free  List   UCR  Virt  Lock  Fast
-</span><span class='line'>                     (k)     (k)    (k)     (k) length      blocks cont. heap
-</span><span class='line'>   -----------------------------------------------------------------------------
-</span><span class='line'>    00150000 58000062    1024     12     12      1     1     1    0      0   L
-</span><span class='line'>    00250000 58001062      64     24     24     15     1     1    0      0   L
-</span><span class='line'>    00260000 58008060      64     12     12     10     1     1    0      0
-</span><span class='line'>    00330000 58001062  261184 239484 239484     14     4     1    0      0
-</span><span class='line'>   -----------------------------------------------------------------------------</span></code></pre></td></tr></table></div></figure>
-
-<p>第11行显示了增长堆。上面的快照显示一个句柄为00330000的堆在增长。</p>
-
-<p>执行!heap -stat -h 00330000。这个命令用来显示增长堆的堆统计。下面显示的是该命令的输出：</p>
+<p>修改app/views/entries/index.html.erb为：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -557,36 +403,821 @@
 <span class='line-number'>22</span>
 <span class='line-number'>23</span>
 <span class='line-number'>24</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>0:001&gt; !heap -stat -h 00330000
-</span><span class='line'>heap @ 00330000
-</span><span class='line'>group-by: TOTSIZE max-display: 20
-</span><span class='line'>    size     #blocks     total     ( %) (percent of total busy bytes)
-</span><span class='line'>    1f64 76c6 - e905f58  (99.99)
-</span><span class='line'>    1800 1 - 1800  (0.00)
-</span><span class='line'>    824 2 - 1048  (0.00)
-</span><span class='line'>    238 2 - 470  (0.00)
-</span><span class='line'>    244 1 - 244  (0.00)
-</span><span class='line'>    4c 5 - 17c  (0.00)
-</span><span class='line'>    b0 2 - 160  (0.00)
-</span><span class='line'>    86 2 - 10c  (0.00)
-</span><span class='line'>    50 3 - f0  (0.00)
-</span><span class='line'>    74 2 - e8  (0.00)
-</span><span class='line'>    38 4 - e0  (0.00)
-</span><span class='line'>    48 3 - d8  (0.00)
-</span><span class='line'>    c4 1 - c4  (0.00)
-</span><span class='line'>    62 2 - c4  (0.00)
-</span><span class='line'>    be 1 - be  (0.00)
-</span><span class='line'>    b8 1 - b8  (0.00)
-</span><span class='line'>    ae 1 - ae  (0.00)
-</span><span class='line'>    ac 1 - ac  (0.00)
-</span><span class='line'>    55 2 - aa  (0.00)
-</span><span class='line'>    a4 1 - a4  (0.00)</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;h1&gt;Listing entries&lt;/h1&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;table&gt;
+</span><span class='line'>  &lt;thead&gt;
+</span><span class='line'>    &lt;tr&gt;
+</span><span class='line'>      &lt;th class="center"&gt;Date&lt;/th&gt;
+</span><span class='line'>      &lt;th class="center"&gt;Amount&lt;/th&gt;
+</span><span class='line'>      &lt;th class="center"&gt;Tags&lt;/th&gt;
+</span><span class='line'>      &lt;th class="center"&gt;Comment&lt;/th&gt;
+</span><span class='line'>      &lt;th class="center"&gt;Action&lt;/th&gt;
+</span><span class='line'>    &lt;/tr&gt;
+</span><span class='line'>  &lt;/thead&gt;
+</span><span class='line'>
+</span><span class='line'>  &lt;tbody&gt;
+</span><span class='line'>    &lt;% @entries.each do |entry| %&gt;
+</span><span class='line'>    &lt;tr class="&lt;%= cycle('odd', 'even') %&gt;"&gt;
+</span><span class='line'>      &lt;td class="center"&gt;&lt;%=h entry.effective_date %&gt;&lt;/td&gt;
+</span><span class='line'>      &lt;td class="right"&gt;&lt;%=h number_to_currency(entry.amount) %&gt;&lt;/td&gt;
+</span><span class='line'>      &lt;td&gt;&lt;%=h entry.tags %&gt;&lt;/td&gt;
+</span><span class='line'>      &lt;td&gt;&lt;%=h entry.comment %&gt;&lt;/td&gt;
+</span><span class='line'>      &lt;td class="center"&gt;
+</span><span class='line'>        &lt;%= link_to 'Edit', edit_entry_path(entry) %&gt;
+</span><span class='line'>        &lt;%= link_to 'Destroy', entry, :confirm =&gt; 'Are you sure?', :method =&gt; :delete %&gt;
+</span><span class='line'>      &lt;/td&gt;
+</span><span class='line'>    &lt;/tr&gt;
+</span><span class='line'>    &lt;% end %&gt;
+</span><span class='line'>  &lt;/tbody&gt;
+</span><span class='line'>&lt;/table&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;%= link_to 'New entry', new_entry_path %&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p>上面的快照显示大小为1f64的76c6个块被分配（第5行）。如此巨大的相同大小的块的数量让我们怀疑这些可能是泄漏块。其余的块分配没有在增长的块数字。</p>
+<p>修改app/views/layouts/application.html.erb文件的内容为：</p>
 
-<p>下一步是去获得这些块的地址。使用命令!heap -flt s 1f64。这个命令过滤出堆的所有其它块，并且显示大小为1f64的块的详细信息。</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;!DOCTYPE html PUBLIC
+</span><span class='line'>  "-//W3C//DTD XHTML 1.0 Transitional//EN"
+</span><span class='line'>  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"&gt;
+</span><span class='line'>&lt;head&gt;
+</span><span class='line'>  &lt;meta http-equiv="content-type" content="text/html; charset=utf-8" /&gt;
+</span><span class='line'>  &lt;title&gt;Qianbao: &lt;%= controller.action_name %&gt;&lt;/title&gt;
+</span><span class='line'>  &lt;%= stylesheet_link_tag 'scaffold' %&gt;
+</span><span class='line'>  &lt;%= stylesheet_link_tag 'qianbao' %&gt;
+</span><span class='line'>  &lt;%= stylesheet_link_tag 'table' %&gt;
+</span><span class='line'>&lt;/head&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;body&gt;
+</span><span class='line'>  &lt;div id="container"&gt;
+</span><span class='line'>    &lt;%= render :partial =&gt; 'layouts/header' %&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;div id="content"&gt;
+</span><span class='line'>      &lt;p style="color: green"&gt;&lt;%= flash[:notice] %&gt;&lt;/p&gt;
+</span><span class='line'>
+</span><span class='line'>      &lt;%= yield %&gt;
+</span><span class='line'>    &lt;/div&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;%= render :partial =&gt; 'layouts/footer' %&gt;
+</span><span class='line'>  &lt;/div&gt;
+</span><span class='line'>&lt;/body&gt;
+</span><span class='line'>&lt;/html&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p>下面显示的是该命令的输出：</p>
+<p>新建app/views/layouts/_header.html.erb文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div id="header"&gt;
+</span><span class='line'>  &lt;%= link_to 'Home', root_path %&gt;
+</span><span class='line'>  &lt;% if logged_in? %&gt;
+</span><span class='line'>    &lt;%= link_to 'All entries', entries_path %&gt;
+</span><span class='line'>    &lt;strong&gt;You are logged in as &lt;%= current_user.login %&gt;&lt;/strong&gt;
+</span><span class='line'>    &lt;%= link_to 'Logout', logout_path %&gt;
+</span><span class='line'>  &lt;% else %&gt;
+</span><span class='line'>    &lt;%= link_to 'Login', login_path %&gt;
+</span><span class='line'>    &lt;%= link_to 'Sign Up', signup_path %&gt;
+</span><span class='line'>  &lt;% end %&gt;
+</span><span class='line'>&lt;/div&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>新建app/views/layouts/_footer.html.erb文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div id="footer"&gt;&copy; 2009&lt;/div&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>在public/stylesheets/qianbao.css的末尾添加：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>.center {
+</span><span class='line'>  text-align: center;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.right {
+</span><span class='line'>  text-align: right;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>新建public/stylesheets/table.css，内容为：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>table {
+</span><span class='line'>  border-collapse: collapse;
+</span><span class='line'>  text-align: left;
+</span><span class='line'>  width: 90%;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>thead {
+</span><span class='line'>  height: 30px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>thead th {
+</span><span class='line'>  padding: 5px;
+</span><span class='line'>  background: #efefef;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>tbody td {
+</span><span class='line'>  padding: 5px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>th, td {
+</span><span class='line'>  border: 1px solid #e6e6e6;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>tr.odd {
+</span><span class='line'>  background: #fff;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>tr.even {
+</span><span class='line'>  background: #f9f9f9;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>代码下载：<a href="https://github.com/dohkoos/qianbao">https://github.com/dohkoos/qianbao</a></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-deploy-rails-application-on-heroku/">如何在Heroku上部署Rails应用</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2009-12-18T14:27:21+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>2:27 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>要使用Heroku，必须先在其官网注册一个账号。</p>
+
+<p>1、在本机上安装Heroku的gem包：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>gem install heroku</span></code></pre></td></tr></table></div></figure>
+
+<p>2、提交代码到Heroku需要ssh，可以使用ssh-keygen先产生一个公钥：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ssh-keygen -t rsa</span></code></pre></td></tr></table></div></figure>
+
+<p>3、然后通过下面的命令把公钥加入到Heroku：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>heroku keys:add</span></code></pre></td></tr></table></div></figure>
+
+<p>4、创建Rails项目并加入Git版本控制：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rails appname  # 不要使用MySQL数据库，因为Heroku暂时还不支持它
+</span><span class='line'>cd appname
+</span><span class='line'>git init
+</span><span class='line'>git add .
+</span><span class='line'>git commit -m "Initial project"</span></code></pre></td></tr></table></div></figure>
+
+<p>5、在Heroku上创建这个项目：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>heroku create [appname]</span></code></pre></td></tr></table></div></figure>
+
+<p>注意：在创建项目时会要求输入Email和密码（即注册Heroku时输入的Email和密码），以便创建~/.heroku/credentials文件，这个文件记录了你输入的用户名和密码。</p>
+
+<p>如果已经在Heroku上创建了这个项目，那么可以使用下列命令来增加一个远程服务器端，以后提交代码的时候只需要使用heroku别名即可：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>git remote add heroku git@heroku.com:appname.git</span></code></pre></td></tr></table></div></figure>
+
+<p>6、将本地的代码部署到Heroku上：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>git push heroku master</span></code></pre></td></tr></table></div></figure>
+
+<p>7、最后做一个数据库迁移：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>heroku rake db:migrate</span></code></pre></td></tr></table></div></figure>
+
+<p>现在就可以在浏览器里输入<code>http://appname.herokuapp.com</code>来访问你的应用了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/using-rails-23-to-create-a-simple-accounting-app-part8/">用Rails 2.3打造简单记账应用（8）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2009-12-17T19:40:14+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>17</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>7:40 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>今天发现一个问题，收入/支出金额在储存到数据库后小数点后面的数字不见了，经过检查发现是因为amount字段的类型为decimal(10, 0)。</p>
+
+<p>Rails的迁移任务还真是好用，建一个修改列数据类型的migration就能做到。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>script/generate migration change_amount_on_entries</span></code></pre></td></tr></table></div></figure>
+
+<p>然后修改该迁移任务的内容为：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class ChangeAmountOnEntries &lt; ActiveRecord::Migration
+</span><span class='line'>  def self.up
+</span><span class='line'>    change_column :entries, :amount, :decimal, :precision =&gt; 8, :scale =&gt; 2
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  def self.down
+</span><span class='line'>    change_column :entries, :amount, :decimal
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>最后执行一下迁移任务就可以了：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rake db:migrate</span></code></pre></td></tr></table></div></figure>
+
+<p>代码下载：<a href="https://github.com/dohkoos/qianbao">https://github.com/dohkoos/qianbao</a></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/using-rails-23-to-create-a-simple-accounting-app-part7/">用Rails 2.3打造简单记账应用（7）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2009-12-14T21:48:25+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>14</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>9:48 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>经过这几天的不断完善，记账应用越来越让人心情愉快了。不过要是能给应用加上忘记密码的功能就更好了。</p>
+
+<p>创建迁移任务，在users数据表中加入一个字段用来储存修改密码时的重置码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>script/generate migration add_password_reset_code_to_users</span></code></pre></td></tr></table></div></figure>
+
+<p>执行上面的命令后就可以在db/migrate目录下看到如下格式的迁移文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>20091214171949_add_password_reset_code_to_users.rb</span></code></pre></td></tr></table></div></figure>
+
+<p>打开它，将它的内容改为：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class AddPasswordResetCodeToUsers &lt; ActiveRecord::Migration
+</span><span class='line'>  def self.up
+</span><span class='line'>    add_column :users, :password_reset_code, :string, :limit =&gt; 40
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  def self.down
+</span><span class='line'>    remove_column :users, :password_reset_code
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>执行迁移任务更新数据表users：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rake db:migrate</span></code></pre></td></tr></table></div></figure>
+
+<p>然后打开config/routes.rb文件，在里面增加两个映射：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>map.forgot_password '/forgot_password', :controller =&gt; 'users', :action =&gt; 'forgot_password'
+</span><span class='line'>map.reset_password '/reset_password/:reset_code', :controller =&gt; 'users', :action =&gt; 'reset_password'</span></code></pre></td></tr></table></div></figure>
+
+<p>另外还要创建两个视图文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># app/views/users/forgot_password.html.erb
+</span><span class='line'>&lt;h1&gt;Password Reset Request&lt;/h3&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;p&gt;
+</span><span class='line'>  Enter your email address that we have on our file and click send.&lt;br /&gt;
+</span><span class='line'>  We will send you a password reset link email to your email address.
+</span><span class='line'>&lt;/p&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;% form_for :user, :url =&gt; { :action =&gt; 'forgot_password' } do |f| %&gt;
+</span><span class='line'>  &lt;%= f.error_messages %&gt;
+</span><span class='line'>
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>    &lt;%= f.label :email %&gt;&lt;br /&gt;
+</span><span class='line'>    &lt;%= f.text_field :email %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>    &lt;%= f.submit 'Send' %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>&lt;% end %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># app/views/users/reset_password.html.erb
+</span><span class='line'>&lt;h1&gt;Reset Password&lt;/h1&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;% form_for :user, :url =&gt; { :action =&gt; 'reset_password' } do |f| %&gt;
+</span><span class='line'>  &lt;%= f.error_messages %&gt;
+</span><span class='line'>
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>    &lt;%= f.label :password %&gt;&lt;br /&gt;
+</span><span class='line'>    &lt;%= f.password_field :password %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>    &lt;%= f.label :password_confirmation 'Confirm password' %&gt;&lt;br /&gt;
+</span><span class='line'>    &lt;%= f.password_field :password_confirmation %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>    &lt;%= f.submit 'Reset password' %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>&lt;% end %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>然后就是在app/views/sessions/new.html.erb的最下面加上：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= link_to 'Forgot password?', forgot_password_path %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>在app/controllers/users_controller.rb中添加以下方法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def forgot_password
+</span><span class='line'>  return unless request.post?
+</span><span class='line'>  if @user = User.find_by_email(params[:user][:email])
+</span><span class='line'>    @user.forgot_password
+</span><span class='line'>    @user.save
+</span><span class='line'>    flash[:notice] = "A password reset link has been sent to your email address"
+</span><span class='line'>    redirect_back_or_default('/')
+</span><span class='line'>  else
+</span><span class='line'>    flash[:alert] = "Could not find a user with that email address"
+</span><span class='line'>  end
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>def reset_password
+</span><span class='line'>  @user = User.find_by_password_reset_code(params[:reset_code])
+</span><span class='line'>  return if @user unless params[:user]
+</span><span class='line'>
+</span><span class='line'>  new_password = params[:user][:password]
+</span><span class='line'>  new_password_confirmation = params[:user][:password_confirmation]
+</span><span class='line'>
+</span><span class='line'>  if (new_password && new_password_confirmation &&
+</span><span class='line'>      !new_password.blank? && !new_password_confirmation.blank?)
+</span><span class='line'>    @user.reset_password(new_password, new_password_confirmation)
+</span><span class='line'>    if @user.save
+</span><span class='line'>      flash[:notice] = "Password reset success."
+</span><span class='line'>      redirect_back_or_default('/')
+</span><span class='line'>    else
+</span><span class='line'>      flash[:error] = "Password reset failed."
+</span><span class='line'>    end
+</span><span class='line'>  else
+</span><span class='line'>    flash[:error] = "Password mismatch"
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>再创建两个邮件模板：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># app/views/user_mailer/forgot_password.html.erb
+</span><span class='line'>Dear &lt;%=h @user.login %&gt;,
+</span><span class='line'>
+</span><span class='line'>  We have had a request to reset your password, please visit&lt;br /&gt;
+</span><span class='line'>  &lt;%=h @url %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># app/views/user_mailer/reset_password.html.erb
+</span><span class='line'>Your have reset the password for your account successfully.
+</span><span class='line'>
+</span><span class='line'>  Username: &lt;%=h @user.login %&gt;
+</span><span class='line'>  Password: &lt;%=h @user.password %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>下一步是打开app/models/user.rb，在它底部protected关键字的后面添加下面的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def make_password_reset_code
+</span><span class='line'>  self.password_reset_code = Digest::SHA1.hexdigest(Time.now.to_s.split(//).sort_by {rand}.join)
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>然后在protected关键字的上面添加如下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def forgot_password
+</span><span class='line'>  @forgotten_password = true
+</span><span class='line'>  self.make_password_reset_code
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>def reset_password(new_password, new_password_confirmation)
+</span><span class='line'>  # First update the password_reset_code before setting the
+</span><span class='line'>  # reset_password flag to avoid duplicate email notifications.
+</span><span class='line'>  self.password_reset_code = nil
+</span><span class='line'>  self.password = new_password
+</span><span class='line'>  self.password_confirmation = new_password_confirmation
+</span><span class='line'>  @reset_password = true
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>def recently_forgot_password?
+</span><span class='line'>  @forgotten_password
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>def recently_reset_password?
+</span><span class='line'>  @reset_password
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>接着来配置mailer发送通知邮件，打开app/models/user_mailer.rb加上：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def forgot_password(user)
+</span><span class='line'>  setup_email(user)
+</span><span class='line'>  @subject    += 'You have requested to change your password'
+</span><span class='line'>  @body[:url]  = "http://#{HOST}/reset_password/#{user.password_reset_code}"
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>def reset_password(user)
+</span><span class='line'>  setup_email(user)
+</span><span class='line'>  @subject    += 'Your password has been reset.'
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>最后打开app/models/user_observer.rb修改after_save方法为：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def after_save(user)
+</span><span class='line'>  UserMailer.deliver_activation(user) if user.recently_activated?
+</span><span class='line'>  UserMailer.deliver_forgot_password(user) if user.recently_forgot_password?
+</span><span class='line'>  UserMailer.deliver_reset_password(user) if user.recently_reset_password?
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>代码下载：<a href="https://github.com/dohkoos/qianbao">https://github.com/dohkoos/qianbao</a></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/using-rails-23-to-create-a-simple-accounting-app-part6/">用Rails 2.3打造简单记账应用（6）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2009-12-10T07:17:44+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>10</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>7:17 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>调整后的entries页面就是不一样，感觉清爽多了。现在让我们添加几条测试数据吧！进入new页面，感觉似乎少了点什么。对了，怎么没有消费发生的具体时间呢？还是先把这个给加上吧。</p>
+
+<p>执行下面的命令，创建一个迁移任务，添加date类型的effective_date字段到entries中：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>script/generate migration add_effective_date_to_entries effective_date:date
+</span><span class='line'>rake db:migrate</span></code></pre></td></tr></table></div></figure>
+
+<p>然后修改app/views/entries/index.html.erb以显示该字段：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;h1&gt;Listing entries&lt;/h1&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;table&gt;
+</span><span class='line'>  &lt;tr&gt;
+</span><span class='line'>    &lt;th&gt;Date&lt;/th&gt;
+</span><span class='line'>    &lt;th&gt;Amount&lt;/th&gt;
+</span><span class='line'>    &lt;th&gt;Tags&lt;/th&gt;
+</span><span class='line'>    &lt;th&gt;Comment&lt;/th&gt;
+</span><span class='line'>    &lt;th&gt;Action&lt;/th&gt;
+</span><span class='line'>  &lt;/tr&gt;
+</span><span class='line'>
+</span><span class='line'>  &lt;% @entries.each do |entry| %&gt;
+</span><span class='line'>  &lt;tr&gt;
+</span><span class='line'>    &lt;td&gt;&lt;%=h entry.effective_date %&gt;&lt;/td&gt;
+</span><span class='line'>    &lt;td&gt;&lt;%=h entry.amount %&gt;&lt;/td&gt;
+</span><span class='line'>    &lt;td&gt;&lt;%=h entry.tags %&gt;&lt;/td&gt;
+</span><span class='line'>    &lt;td&gt;&lt;%=h entry.comment %&gt;&lt;/td&gt;
+</span><span class='line'>    &lt;td&gt;
+</span><span class='line'>      &lt;%= link_to 'Edit', edit_entry_path(entry) %&gt;
+</span><span class='line'>      &lt;%= link_to 'Destroy', entry, :confirm =&gt; 'Are you sure?', :method =&gt; :delete %&gt;
+</span><span class='line'>    &lt;/td&gt;
+</span><span class='line'>  &lt;/tr&gt;
+</span><span class='line'>  &lt;% end %&gt;
+</span><span class='line'>&lt;/table&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;%= link_to 'New entry', new_entry_path %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>修改new和edit页面，加上一个effective_date文本字段：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;% form_for(@entry) do |f| %&gt;
+</span><span class='line'>  &lt;%= f.error_messages %&gt;
+</span><span class='line'>
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>    &lt;%= f.label :effective_date %&gt;&lt;br /&gt;
+</span><span class='line'>    &lt;%= f.date_select :effective_date %&gt;
+</span><span class='line'>  &lt;/p&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>录入数据后发现记录是全局的，也就是说A用户添加的记录B用户也能看到，这是个问题。</p>
+
+<p>用户和记录是一对多的关系，可以通过以下步骤把它们关联起来。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>script/generate migration add_user_id_to_entries user_id:integer
+</span><span class='line'>rake db:migrate</span></code></pre></td></tr></table></div></figure>
+
+<p>修改app/models/user.rb，添加以下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>has_many :entries, :dependent =&gt; :destroy</span></code></pre></td></tr></table></div></figure>
+
+<p>修改app/models/entry.rb，加入下面的语句：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>belongs_to :user</span></code></pre></td></tr></table></div></figure>
+
+<p>另外还要修改app/controllers/entries_controller.rb文件，修正由scaffold生成代码所带来的查询问题。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -637,59 +1268,159 @@
 <span class='line-number'>47</span>
 <span class='line-number'>48</span>
 <span class='line-number'>49</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>0:001&gt; !heap -flt s 1f64
-</span><span class='line'>    _HEAP @ 150000
-</span><span class='line'>    _HEAP @ 250000
-</span><span class='line'>    _HEAP @ 260000
-</span><span class='line'>    _HEAP @ 330000
-</span><span class='line'>      HEAP_ENTRY Size Prev Flags    UserPtr UserSize - state
-</span><span class='line'>        003360e0 03f0 0000  [07]   003360e8    01f64 - (busy)
-</span><span class='line'>        00338060 03f0 03f0  [07]   00338068    01f64 - (busy)
-</span><span class='line'>        00339fe0 03f0 03f0  [07]   00339fe8    01f64 - (busy)
-</span><span class='line'>        0033bf60 03f0 03f0  [07]   0033bf68    01f64 - (busy)
-</span><span class='line'>        0033dee0 03f0 03f0  [07]   0033dee8    01f64 - (busy)
-</span><span class='line'>        01420040 03f0 03f0  [07]   01420048    01f64 - (busy)
-</span><span class='line'>        01421fc0 03f0 03f0  [07]   01421fc8    01f64 - (busy)
-</span><span class='line'>        01423f40 03f0 03f0  [07]   01423f48    01f64 - (busy)
-</span><span class='line'>        01425ec0 03f0 03f0  [07]   01425ec8    01f64 - (busy)
-</span><span class='line'>        01427e40 03f0 03f0  [07]   01427e48    01f64 - (busy)
-</span><span class='line'>        01429dc0 03f0 03f0  [07]   01429dc8    01f64 - (busy)
-</span><span class='line'>        0142bd40 03f0 03f0  [07]   0142bd48    01f64 - (busy)
-</span><span class='line'>        0142dcc0 03f0 03f0  [07]   0142dcc8    01f64 - (busy)
-</span><span class='line'>        0142fc40 03f0 03f0  [07]   0142fc48    01f64 - (busy)
-</span><span class='line'>        01431bc0 03f0 03f0  [07]   01431bc8    01f64 - (busy)
-</span><span class='line'>        01433b40 03f0 03f0  [07]   01433b48    01f64 - (busy)
-</span><span class='line'>        01435ac0 03f0 03f0  [07]   01435ac8    01f64 - (busy)
-</span><span class='line'>        01437a40 03f0 03f0  [07]   01437a48    01f64 - (busy)
-</span><span class='line'>        014399c0 03f0 03f0  [07]   014399c8    01f64 - (busy)
-</span><span class='line'>        0143b940 03f0 03f0  [07]   0143b948    01f64 - (busy)
-</span><span class='line'>        0143d8c0 03f0 03f0  [07]   0143d8c8    01f64 - (busy)
-</span><span class='line'>        0143f840 03f0 03f0  [07]   0143f848    01f64 - (busy)
-</span><span class='line'>        014417c0 03f0 03f0  [07]   014417c8    01f64 - (busy)
-</span><span class='line'>        01443740 03f0 03f0  [07]   01443748    01f64 - (busy)
-</span><span class='line'>        014456c0 03f0 03f0  [07]   014456c8    01f64 - (busy)
-</span><span class='line'>        01447640 03f0 03f0  [07]   01447648    01f64 - (busy)
-</span><span class='line'>        014495c0 03f0 03f0  [07]   014495c8    01f64 - (busy)
-</span><span class='line'>        0144b540 03f0 03f0  [07]   0144b548    01f64 - (busy)
-</span><span class='line'>        0144d4c0 03f0 03f0  [07]   0144d4c8    01f64 - (busy)
-</span><span class='line'>        0144f440 03f0 03f0  [07]   0144f448    01f64 - (busy)
-</span><span class='line'>        014513c0 03f0 03f0  [07]   014513c8    01f64 - (busy)
-</span><span class='line'>        01453340 03f0 03f0  [07]   01453348    01f64 - (busy)
-</span><span class='line'>        014552c0 03f0 03f0  [07]   014552c8    01f64 - (busy)
-</span><span class='line'>        01457240 03f0 03f0  [07]   01457248    01f64 - (busy)
-</span><span class='line'>        014591c0 03f0 03f0  [07]   014591c8    01f64 - (busy)
-</span><span class='line'>        0145b140 03f0 03f0  [07]   0145b148    01f64 - (busy)
-</span><span class='line'>        0145d0c0 03f0 03f0  [07]   0145d0c8    01f64 - (busy)
-</span><span class='line'>        0145f040 03f0 03f0  [07]   0145f048    01f64 - (busy)
-</span><span class='line'>        01460fc0 03f0 03f0  [07]   01460fc8    01f64 - (busy)
-</span><span class='line'>        01462f40 03f0 03f0  [07]   01462f48    01f64 - (busy)
-</span><span class='line'>        01464ec0 03f0 03f0  [07]   01464ec8    01f64 - (busy)
-</span><span class='line'>        01466e40 03f0 03f0  [07]   01466e48    01f64 - (busy)
-</span><span class='line'>        01468dc0 03f0 03f0  [07]   01468dc8    01f64 - (busy)</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class EntriesController &lt; ApplicationController
+</span><span class='line'>  before_filter :login_required
+</span><span class='line'>
+</span><span class='line'>  def index
+</span><span class='line'>    @entries = current_user.entries.find(:all)
+</span><span class='line'>
+</span><span class='line'>    respond_to do |format|
+</span><span class='line'>      format.html # index.html.erb
+</span><span class='line'>      format.xml  { render :xml =&gt; @entries }
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  def new
+</span><span class='line'>    @entry = Entry.new
+</span><span class='line'>
+</span><span class='line'>    respond_to do |format|
+</span><span class='line'>      format.html # new.html.erb
+</span><span class='line'>      format.xml  { render :xml =&gt; @entry }
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  def edit
+</span><span class='line'>    @entry = current_user.entries.find(params[:id])
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  def create
+</span><span class='line'>    @entry = Entry.new(params[:entry])
+</span><span class='line'>    @entry.user = current_user
+</span><span class='line'>
+</span><span class='line'>    respond_to do |format|
+</span><span class='line'>      if @entry.save
+</span><span class='line'>        flash[:notice] = 'Entry was successfully created.'
+</span><span class='line'>        format.html { redirect_to(entries_url) }
+</span><span class='line'>        format.xml  { head :ok }
+</span><span class='line'>      else
+</span><span class='line'>        format.html { render :action =&gt; "new" }
+</span><span class='line'>        format.xml  { render :xml =&gt; @entry.errors, :status =&gt; :unprocessable_entity }
+</span><span class='line'>      end
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  def update
+</span><span class='line'>    @entry = current_user.entries.find(params[:id])
+</span><span class='line'>
+</span><span class='line'>    respond_to do |format|
+</span><span class='line'>      if @entry.update_attributes(params[:entry])
+</span><span class='line'>        flash[:notice] = 'Entry was successfully updated.'
+</span><span class='line'>        format.html { redirect_to(entries_url) }
+</span><span class='line'>        format.xml  { head :ok }
+</span><span class='line'>      else
+</span><span class='line'>        format.html { render :action =&gt; "edit" }
+</span><span class='line'>        format.xml  { render :xml =&gt; @entry.errors, :status =&gt; :unprocessable_entity }
+</span><span class='line'>      end
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  def destroy
+</span><span class='line'>    @entry = current_user.entries.find(params[:id])
+</span><span class='line'>    @entry.destroy
+</span><span class='line'>
+</span><span class='line'>    respond_to do |format|
+</span><span class='line'>      format.html { redirect_to(entries_url) }
+</span><span class='line'>      format.xml  { head :ok }
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
 
-<p>使用任何来自上面输出中的UsrPtr列值，然后使用命令!heap -p -a UsrPtr去显示UsrPtr的调用栈。我选择了第27行的0143d8c8。</p>
+<p>代码下载：<a href="https://github.com/dohkoos/qianbao">https://github.com/dohkoos/qianbao</a></p>
+</div>
+  
+  
 
-<p>执行!heap -p -a 0143d8c8，我们得到下面显示的调用栈：</p>
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/using-rails-23-to-create-a-simple-accounting-app-part5/">用Rails 2.3打造简单记账应用（5）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2009-12-08T16:09:59+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>8</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>4:09 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>虽然在前面已经调整了记账应用的页面流程，但在登录系统进入entries页面后却没有登出的链接，这次就来把这个完成。同时也给entries页面加上一个三行两列的布局，使之看上去更像一个应用。</p>
+
+<p>在public/stylesheets下加入qianbao.css，内容如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>#container {
+</span><span class='line'>  width: 960px;
+</span><span class='line'>  margin: 5px auto;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>#header {
+</span><span class='line'>  height: 2.5em;
+</span><span class='line'>  border-bottom: 1px solid #ccc;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>#content {
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>#footer {
+</span><span class='line'>  border-top: 1px solid #ccc;
+</span><span class='line'>  text-align: center;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>将app/views/layouts/目录下的entries.html.erb改名为application.html.erb，并修改文件内容为：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -712,408 +1443,64 @@
 <span class='line-number'>19</span>
 <span class='line-number'>20</span>
 <span class='line-number'>21</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>0:001&gt; !heap -p -a 0143d8c8
-</span><span class='line'>    address 0143d8c8 found in
-</span><span class='line'>    _HEAP @ 330000
-</span><span class='line'>      HEAP_ENTRY Size Prev Flags    UserPtr UserSize - state
-</span><span class='line'>        0143d8c0 03f0 0000  [07]   0143d8c8    01f64 - (busy)
-</span><span class='line'>        Trace: 0025
-</span><span class='line'>        7c96d6dc ntdll!RtlDebugAllocateHeap+0x000000e1
-</span><span class='line'>        7c949d18 ntdll!RtlAllocateHeapSlowly+0x00000044
-</span><span class='line'>        7c91b298 ntdll!RtlAllocateHeap+0x00000e64
-</span><span class='line'>        102c103e MSVCR90D!_heap_alloc_base+0x0000005e
-</span><span class='line'>        102cfd76 MSVCR90D!_heap_alloc_dbg_impl+0x000001f6
-</span><span class='line'>        102cfb2f MSVCR90D!_nh_malloc_dbg_impl+0x0000001f
-</span><span class='line'>        102cfadc MSVCR90D!_nh_malloc_dbg+0x0000002c
-</span><span class='line'>        102db25b MSVCR90D!malloc+0x0000001b
-</span><span class='line'>        102bd691 MSVCR90D!operator new+0x00000011
-</span><span class='line'>        102bd71f MSVCR90D!operator new[]+0x0000000f
-</span><span class='line'>        4113d8 Test2!AllocateMemory+0x00000028
-</span><span class='line'>        41145c Test2!wmain+0x0000002c
-</span><span class='line'>        411a08 Test2!__tmainCRTStartup+0x000001a8
-</span><span class='line'>        41184f Test2!wmainCRTStartup+0x0000000f
-</span><span class='line'>        7c816fd7 kernel32!BaseProcessStart+0x00000023</span></code></pre></td></tr></table></div></figure>
-
-<p>第16-19行显示了来自我们代码的函数。</p>
-
-<p>注意：有时候，可能发生!heap -s命令不显示增长堆的情况。如果那样的话，使用!heap -stat -h命令列出带有堆的大小和块的数量的所有堆。识别在增长的块的数量，然后使用!heap -flt s SIZE（SIZE = 涉嫌块的大小）命令。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/virtualbox-shared-folder-between-ubuntu-guest-and-windows-server-2008-host/">VirtualBox虚拟Ubuntu 8.10时共享文件夹的使用</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2008-12-02T17:24:43+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2008</span></span> <span class='time'>5:24 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>我的环境：主机操作系统是Windows Server 2008，虚拟机操作系统是Ubuntu 8.10，虚拟机是VirtualBox 2.0.4。</p>
-
-<h3 id="安装增强功能包（guest-additions）">安装增强功能包（Guest Additions）</h3>
-
-<p>安装好Ubuntu 8.10后，运行Ubuntu并登录。然后在VirtualBox的菜单里选择“Devices” -&gt; “Install Guest Additions”。如图所示：</p>
-
-<p><img src="/uploads/virtualbox-guest-addtions.png" title="virtualbox-guest-addtions" ></p>
-
-<p>你会发现在Ubuntu桌面上多出一个光盘图标，这张光盘默认被自动加载到了文件夹/media/cdrom0。在命令行下输入：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>cd /media/cdrom0
-</span><span class='line'>sudo ./VboxLinuxAdditions.run</span></code></pre></td></tr></table></div></figure>
-
-<p>开始安装工具包。安装完毕后会提示要重启Ubuntu。</p>
-
-<h3 id="设置共享文件夹">设置共享文件夹</h3>
-
-<p>重启完成后点击“Devices” -&gt; “Shared Folders”菜单，添加一个共享文件夹，选项“Make Permanent”是指该文件夹是否是持久的。共享名可以任取一个自己喜欢的，比如“flamingo”，尽量使用英文名称。</p>
-
-<h3 id="挂载共享文件夹">挂载共享文件夹</h3>
-
-<p>重新进入虚拟Ubuntu，打开命令行窗口输入：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sudo mkdir /mnt/shared
-</span><span class='line'>sudo mount -t vboxsf flamingo /mnt/shared</span></code></pre></td></tr></table></div></figure>
-
-<p>其中“flamingo”是之前创建的共享文件夹的名字。现在Ubuntu和主机可以分享文件了。</p>
-
-<p>假如你不想每一次都手动挂载，可以在/etc/fstab中添加一项：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>flamingo /mnt/shared vboxsf rw,gid=100,uid=1000,auto 0 0</span></code></pre></td></tr></table></div></figure>
-
-<p>这样每次系统启动时就能够自动挂载了。</p>
-
-<p>需要注意的是，共享文件夹的名称千万不要和挂载点的名称相同。比如，上面的挂载点是/mnt/shared，如果共享文件夹的名字也是shared的话，在挂载的时候就会出现如下的错误信息（看 <a href="http://www.virtualbox.org/ticket/2265">http://www.virtualbox.org/ticket/2265</a> ）：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>/sbin/mount.vboxsf: mounting failed with the error: Protocol error</span></code></pre></td></tr></table></div></figure>
-
-<p>原因分析可以看<a href="http://paulsiu.wordpress.com/2007/11/20/tips-on-running-innotek-virtualbox/">Tips on running Sun Virtualbox</a>的Shared Folder on a Linux Guest节。</p>
-
-<p>卸载的话使用下面的命令：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sudo umount -f /mnt/shared</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/cursor-positioning-about-input-text/">关于input[text]里的光标定位</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2008-11-30T18:09:25+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>30</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>6:09 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>当使用Tab键切换时，想把光标定位在input[text]的首部。在网上找了一些光标定位的资料发现大多数都是用createTextRange来实现的，而且都出自一个实例。可惜的是在Firefox下createTextRange无效。</p>
-
-<p>后来在Firefox的开发者站点上发现有个setSelectionRange方法可以实现这样的功能。使用格式：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>o.setSelectionRange(start, end);
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;!DOCTYPE html PUBLIC
+</span><span class='line'>  "-//W3C//DTD XHTML 1.0 Transitional//EN"
+</span><span class='line'>  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"&gt;
 </span><span class='line'>
-</span><span class='line'>o：为文本输入框对象
-</span><span class='line'>start：为字符串的起始位置
-</span><span class='line'>end：为字符串的末位置</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>&lt;html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"&gt;
+</span><span class='line'>&lt;head&gt;
+</span><span class='line'>  &lt;meta http-equiv="content-type" content="text/html; charset=utf-8" /&gt;
+</span><span class='line'>  &lt;title&gt;Qianbao: &lt;%= controller.action_name %&gt;&lt;/title&gt;
+</span><span class='line'>  &lt;%= stylesheet_link_tag 'scaffold' %&gt;
+</span><span class='line'>  &lt;%= stylesheet_link_tag 'qianbao' %&gt;
+</span><span class='line'>&lt;/head&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;body&gt;
+</span><span class='line'>  &lt;div id="container"&gt;
+</span><span class='line'>    &lt;div id="header"&gt;
+</span><span class='line'>      &lt;%= link_to 'Home', root_path %&gt;
+</span><span class='line'>      &lt;% if logged_in? %&gt;
+</span><span class='line'>        &lt;%= link_to 'All entries', entries_path %&gt;
+</span><span class='line'>        &lt;strong&gt;You are logged in as &lt;%=h current_user.login %&gt;&lt;/strong&gt;
+</span><span class='line'>        &lt;%= link_to 'Logout', logout_path %&gt;
+</span><span class='line'>      &lt;% else %&gt;
+</span><span class='line'>        &lt;%= link_to 'Login', login_path %&gt;
+</span><span class='line'>        &lt;%= link_to 'Sign up', signup_path %&gt;
+</span><span class='line'>      &lt;% end %&gt;
+</span><span class='line'>    &lt;/div&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;div id="content"&gt;
+</span><span class='line'>      &lt;p style="color: green"&gt;&lt;%= flash[:notice] %&gt;&lt;/p&gt;
+</span><span class='line'>
+</span><span class='line'>      &lt;%= yield %&gt;
+</span><span class='line'>    &lt;/div&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;div id="footer"&gt;&copy; 2009&lt;/div&gt;
+</span><span class='line'>  &lt;/div&gt;
+</span><span class='line'>&lt;/body&gt;
+</span><span class='line'>&lt;/html&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p>尝试后发现并不能定位到文本首位，总是全选所有的文本内容，在后面加上获的焦点的命令也不管用。最后还是在国外的一个站点上找到了解决的办法。</p>
-
-<p>下面的代码在Firefox下不能定位到首位，只能选中全部：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>function setCaretPosition(aCtrl, aPos) {
-</span><span class='line'>    if (aCtrl.setSelectionRange) {
-</span><span class='line'>        aCtrl.setSelectionRange(aPos, aPos);
-</span><span class='line'>        aCtrl.focus();
-</span><span class='line'>    } else if (aCtrl.createTextRange) {
-</span><span class='line'>        var rng = aCtrl.createTextRange();
-</span><span class='line'>        rng.collapse(true);
-</span><span class='line'>        rng.moveStart('character', aPos);
-</span><span class='line'>        rng.moveEnd('character', aPos);
-</span><span class='line'>        rng.select();
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>经过修改后的代码就可以适用于Firefox，IE，Opera的光标定位了：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>function setCaretPosition(aCtrl, aPos) {
-</span><span class='line'>    if (aCtrl.setSelectionRange) {
-</span><span class='line'>        setTimeout(function() {
-</span><span class='line'>            aCtrl.setSelectionRange(aPos, aPos);
-</span><span class='line'>            aCtrl.focus();
-</span><span class='line'>        }, 0);
-</span><span class='line'>    } else if (aCtrl.createTextRange) {
-</span><span class='line'>        var rng = aCtrl.createTextRange();
-</span><span class='line'>        rng.collapse(true);
-</span><span class='line'>        rng.moveStart('character', aPos);
-</span><span class='line'>        rng.moveEnd('character', aPos);
-</span><span class='line'>        rng.select();
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/install-fcitx-chinese-input-method-under-english-locale-on-ubuntu-810/">Ubuntu 8.10英文Locale下安装Fcitx中文输入法</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2008-11-17T18:13:39+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>17</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>6:13 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>系统装好后首先要做的就是安装中文输入法。在网上找了一些中文输入法的资料，最常用的是Fcitx和SCIM输入法。不过好像SCIM的问题比较多，而且据说Fcitx的功能上也要比SCIM强得多，所以决定采用Fcitx输入法。</p>
-
-<h3 id="卸载scim">卸载SCIM</h3>
-
-<p>为了避免安装中出现一些问题，在这之前先要卸载掉系统自带的SCIM输入法：</p>
+<p>清理app/views/home/index.html.erb的内容，回归原始：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sudo apt-get remove --purge scim*  # 删除SCIM及其配置文件
-</span><span class='line'>sudo apt-get autoremove  # 删除被SCIM依赖的，不再使用的package
-</span><span class='line'>sudo apt-get install -f  # 尝试修正安装过程中出现的依赖性关系</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;h1&gt;Welcom to Qianbao App!&lt;/h1&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p>注：也可以通过“新立得软件包管理器（Synaptic Package Manager）”来卸载SCIM。</p>
-
-<h3 id="安装fcitx">安装Fcitx</h3>
-
-<p>下载最新的稳定的预编译包 <a href="http://www.fcitx.org/download/fcitx-3.4.2-bin.tar.bz2">http://www.fcitx.org/download/fcitx-3.4.2-bin.tar.bz2</a> ，解压到任意目录。启动命令行，进行该目录执行sudo ./fcitx.install进行安装（只是复制了几个文件到目标目录）。反安装也是在该目录下面执行sudo ./fcitx.uninstall（如果知道安装到哪了直接删除也行）。</p>
-
-<p>因为要在英文Locale下启动Fcitx输入法，所以在/etc/X11/xinit/xinput.d/下新建一个文件en_US，文件内容如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>XMODIFIERS="@im=fcitx"
-</span><span class='line'>XIM=fcitx
-</span><span class='line'>XIM_PROGRAM=/usr/bin/fcitx
-</span><span class='line'>XIM_ARGS=""
-</span><span class='line'>GTK_IM_MODULE=XIM
-</span><span class='line'>QT_IM_MODULE=XIM
-</span><span class='line'>DEPENDS="fcitx"</span></code></pre></td></tr></table></div></figure>
-
-<p>执行ls -l /etc/X11/xinit/xinput.d命令，输出以下内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>total 24
-</span><span class='line'>drwxr-xr-x 2 root root 4096 2008-10-30 07:10 .
-</span><span class='line'>drwxr-xr-x 3 root root 4096 2008-10-30 07:03 ..
-</span><span class='line'>lrwxrwxrwx 1 root root   32 2008-11-05 00:31 all_ALL -&gt; /etc/alternatives/xinput-all_ALL
-</span><span class='line'>-rw-r--r-- 1 root root 1152 2008-01-08 18:41 default
-</span><span class='line'>-rw-r--r-- 1 root root  601 2008-01-08 18:41 default-xim
-</span><span class='line'>-rw-r--r-- 1 root root  601 2008-01-08 18:41 en_US
-</span><span class='line'>-rw-r--r-- 1 root root  474 2008-01-08 18:41 none
-</span><span class='line'>-rw-r--r-- 1 root root  451 2008-10-27 05:54 scim-bridge
-</span><span class='line'>lrwxrwxrwx 1 root root   30 2008-11-05 00:31 th_TH -&gt; /etc/alternatives/xinput-th_TH
-</span><span class='line'>-rw-r--r-- 1 root root  610 2008-01-08 18:41 th-xim</span></code></pre></td></tr></table></div></figure>
-
-<p>重启X Window后Fcitx正常启动，输入条位于屏幕顶端，但是按Ctrl+Space无法调出中文输入，用鼠标点小企鹅也不行。这时需要编辑/usr/lib/gtk-2.0/2.10.0/immodule-files.d/libgtk2.0-0.immodules文件，找到：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>"xim" "X Input Method" "gtk20" "/usr/share/locale" "ko:ja:th:zh"</span></code></pre></td></tr></table></div></figure>
-
-<p>将之改成</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>"xim" "X Input Method" "gtk20" "/usr/share/locale" "en:ko:ja:th:zh"</span></code></pre></td></tr></table></div></figure>
-
-<p>使Xim在英文环境下也能启动。保存退出，重启X后中文输入就可以被正常调出了。</p>
-
-<h3 id="安装中文所需的locale包">安装中文所需的Locale包</h3>
-
-<p>现在还有个问题就是输入法尾部出现乱码，输入条下的待选字也是乱码，即只显示一些小方框，如下图：</p>
-
-<p><img src="/uploads/fcitx-invalid-chars.png" title="fcitx-invalid-chars" ></p>
-
-<p>这是因为缺少中文Locale文件导致，需要安装两个中文Locale包。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sudo apt-get install language-pack-zh
-</span><span class='line'>sudo apt-get install language-pack-gnome-zh</span></code></pre></td></tr></table></div></figure>
-
-<p>或者，也可以将~/.fcitx/config中的：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>显示字体(中)=*</span></code></pre></td></tr></table></div></figure>
-
-<p>改成</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>显示字体(中)=AR PL UMing CN  # 填你喜欢的中文字体</span></code></pre></td></tr></table></div></figure>
-
-<p>重新启动后就没有乱码了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/change-sources-list-on-ubuntu-810/">修改Ubuntu 8.10的sources.list</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2008-11-14T18:56:45+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>14</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>6:56 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>系统自带的软件源速度太慢，更新一次安装包竟然要4个多小时，决定换个快点的软件源。这里 <a href="http://wiki.ubuntu.org.cn/Template:8.10source">http://wiki.ubuntu.org.cn/Template:8.10source</a> 列出了选多的选择，我选择了最下面的台湾官方源。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>deb http://tw.archive.ubuntu.com/ubuntu intrepid main restricted universe multiverse
-</span><span class='line'>deb http://tw.archive.ubuntu.com/ubuntu intrepid-security main restricted universe multiverse
-</span><span class='line'>deb http://tw.archive.ubuntu.com/ubuntu intrepid-updates main restricted universe multiverse
-</span><span class='line'>deb http://tw.archive.ubuntu.com/ubuntu intrepid-backports main restricted universe multiverse
-</span><span class='line'>deb http://tw.archive.ubuntu.com/ubuntu intrepid-proposed main restricted universe multiverse
-</span><span class='line'>deb-src http://tw.archive.ubuntu.com/ubuntu intrepid main restricted universe multiverse
-</span><span class='line'>deb-src http://tw.archive.ubuntu.com/ubuntu intrepid-security main restricted universe multiverse
-</span><span class='line'>deb-src http://tw.archive.ubuntu.com/ubuntu intrepid-updates main restricted universe multiverse
-</span><span class='line'>deb-src http://tw.archive.ubuntu.com/ubuntu intrepid-backports main restricted universe multiverse
-</span><span class='line'>deb-src http://tw.archive.ubuntu.com/ubuntu intrepid-proposed main restricted universe multiverse</span></code></pre></td></tr></table></div></figure>
-
-<p>首先备份sources.list</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sudo cp /etc/apt/sources.list /etc/apt/sources.list.original</span></code></pre></td></tr></table></div></figure>
-
-<p>然后用vi打开sources.list，把上面列出的源添加进去：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sudo vi /etc/apt/sources.list</span></code></pre></td></tr></table></div></figure>
-
-<p>接着就是更新源：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sudo apt-get update</span></code></pre></td></tr></table></div></figure>
-
-<p>现在我们就可以更新已安装的软件包了：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>apt-get upgrade</span></code></pre></td></tr></table></div></figure>
-
-<p>升级已安装的包为最新版本，不会安装新的或移除老的安装包。如果一个包因为改变了倚赖关系而需要安装一个新的包，那么它将不会被升级，会被标志为hold。建议使用“-u”选项，这样你就能看到哪些安装包将会被升级。</p>
+<p>代码下载：<a href="https://github.com/dohkoos/qianbao">https://github.com/dohkoos/qianbao</a></p>
 </div>
   
   
@@ -1138,23 +1525,23 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/test/">test</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/test/">test</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/test/">test</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/test/">test</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/the-mythical-10x-programmer/">神秘的10x程序员</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/learn-anything-faster-with-the-feynman-technique/">费曼技巧：最好的学习方法</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/code-coverage-100-percent-tragedy/">100%代码覆盖率的悲剧</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/unconventional-way-of-learning-a-new-programming-language/">学习新编程语言的非传统方式</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/the-impact-github-is-having-on-your-software-career-right-now/">GitHub对软件职业生涯的影响</a>
       </li>
     
   </ul>
@@ -1168,31 +1555,31 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 142%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 145%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 103%" href="/tags/c-plus-plus/">C++</a>
 <a style="font-size: 106%" href="/tags/css/">CSS</a>
-<a style="font-size: 109%" href="/tags/crack/">Crack</a>
+<a style="font-size: 108%" href="/tags/crack/">Crack</a>
 <a style="font-size: 106%" href="/tags/database/">Database</a>
-<a style="font-size: 96%" href="/tags/eclipse/">Eclipse</a>
-<a style="font-size: 114%" href="/tags/git/">Git</a>
-<a style="font-size: 96%" href="/tags/html/">HTML</a>
+<a style="font-size: 95%" href="/tags/eclipse/">Eclipse</a>
+<a style="font-size: 113%" href="/tags/git/">Git</a>
+<a style="font-size: 95%" href="/tags/html/">HTML</a>
 <a style="font-size: 103%" href="/tags/jbookshelf/">JBookShelf</a>
-<a style="font-size: 147%" href="/tags/java/">Java</a>
-<a style="font-size: 100%" href="/tags/javascript/">JavaScript</a>
-<a style="font-size: 96%" href="/tags/listview/">ListView</a>
+<a style="font-size: 146%" href="/tags/java/">Java</a>
+<a style="font-size: 99%" href="/tags/javascript/">JavaScript</a>
+<a style="font-size: 95%" href="/tags/listview/">ListView</a>
 <a style="font-size: 103%" href="/tags/mysql/">MySQL</a>
-<a style="font-size: 100%" href="/tags/paperclip/">Paperclip</a>
+<a style="font-size: 103%" href="/tags/paperclip/">Paperclip</a>
 <a style="font-size: 117%" href="/tags/powerbuilder/">PowerBuilder</a>
-<a style="font-size: 100%" href="/tags/powerscript/">PowerScript</a>
-<a style="font-size: 116%" href="/tags/qianbao/">Qianbao</a>
+<a style="font-size: 99%" href="/tags/powerscript/">PowerScript</a>
+<a style="font-size: 115%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
 <a style="font-size: 117%" href="/tags/ruby/">Ruby</a>
-<a style="font-size: 96%" href="/tags/spring/">Spring</a>
-<a style="font-size: 100%" href="/tags/struts/">Struts</a>
-<a style="font-size: 142%" href="/tags/translation/">Translation</a>
-<a style="font-size: 96%" href="/tags/ubuntu/">Ubuntu</a>
+<a style="font-size: 95%" href="/tags/spring/">Spring</a>
+<a style="font-size: 99%" href="/tags/struts/">Struts</a>
+<a style="font-size: 143%" href="/tags/translation/">Translation</a>
+<a style="font-size: 95%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 106%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 106%" href="/tags/wxwidgets/">wxWidgets</a>
 

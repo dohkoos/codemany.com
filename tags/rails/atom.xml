@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Rails | 乐者为王]]></title>
   <link href="http://codemany.com/tags/rails/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-06-06T00:47:25+08:00</updated>
+  <updated>2017-06-13T00:37:09+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -265,6 +265,284 @@ end
 
 <p>附：你有ActionMailer或Active Job的经验吗？有任何建议吗？有什么陷阱？我们很乐意听到你的经验。</p>
 ]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[保护你的Paperclip下载]]></title>
+    <link href="http://codemany.com/blog/protecting-your-paperclip-downloads/"/>
+    <updated>2015-06-01T17:54:45+08:00</updated>
+    <id>http://codemany.com/blog/protecting-your-paperclip-downloads</id>
+    <content type="html"><![CDATA[<p>英文原文：<a href="https://thewebfellas.com/blog/protecting-your-paperclip-downloads">https://thewebfellas.com/blog/protecting-your-paperclip-downloads</a></p>
+
+<p>去年11月份，当我首次在博客上<a href="https://thewebfellas.com/blog/goodbye-attachment_fu-hello-paperclip">谈到Paperclip</a>时，我简要介绍了在控制器后面隐藏文件，而不是简单地将它们放在公共目录中展示给大家看。从那时起，我就注意到如何真正做到这点的问题定期地在<a href="http://www.railsforum.com/">Rails论坛</a>上出现。几周前，我不得不弄清楚如何更新我们的某些代码来保护我们已经从本地文件系统迁移到<a href=http://aws.amazon.com/s3/">Amazon S3</a>的资产。所以我认为这可能是一个值得分享的技巧。</p>
+
+<h3 id="模型">模型</h3>
+
+<p>我将使用来自我原先的Paperclip博文中的<a href="https://thewebfellas.com/blog/goodbye-attachment_fu-hello-paperclip#getting-clever-with-validations">Getting clever with validations</a>部分的Track模型的一个轻微更新版本。以下是代码：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">class Track &lt; ActiveRecord::Base
+
+  has_attached_file :mp3,
+                    :url =&gt; &#39;/:class/:id/:style.:extension&#39;,
+                    :path =&gt; &#39;:rails_root/assets/:class/:id_partition/:style.:extension&#39;
+
+  validates_attachment_presence :mp3
+  validates_attachment_content_type :mp3, :content_type =&gt; [&#39;application/mp3&#39;, &#39;application/x-mp3&#39;, &#39;audio/mpeg&#39;, &#39;audio/mp3&#39;]
+  validates_attachment_size :mp3, :less_than =&gt; 20.megabytes
+
+  def downloadable?(user)
+    user != :guest
+  end
+
+end
+</code></pre></div>
+<p>这段代码执行以下操作：</p>
+
+<ul>
+<li>定义含有名为mp3的Paperclip附件的Track模型。</li>
+<li>配置用于访问mp3资源的URL，例如/track/1/original.mp3。在URL中留下样式属性可以使未来版本的代码去做像生成轨道的10秒预览这样的事情（使用自定义的Paperclip处理器），这些预览可以使用像/track/1/preview.mp3这样的URL访问。</li>
+<li>配置Paperclip存储上传文件的路径（例如RAILS_ROOT/assets/tracks/000/000/001/original.mp3，其中RAILS_ROOT是Rails应用程序根目录的路径）——这里重要的是，文件存储在/public目录之外。</li>
+<li>定义验证器以确保是mp3文件被上传，该验证器包含有效的内容类型并且限制文件不能太大。</li>
+<li>定义downloadable?方法，可用于实现对轨道的用户访问权限。为简单起见，它只允许所有登录的用户访问轨道，不过你可以用应用程序需要的任何逻辑来替换它。</li>
+</ul>
+
+<h3 id="路由和控制器">路由和控制器</h3>
+
+<p>现在，如果你尝试在视图中提供像下面这样的链接来下载mp3：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">link_to(&#39;Listen&#39;, track.mp3.url)
+</code></pre></div>
+<p>当你点击它的时候将得到这样的路由错误：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">Routing Error
+No route matches &quot;/tracks/1/original.mp3&quot; with {:method=&gt;:get}
+</code></pre></div>
+<p>我通常在routes.rb文件中使用map.connect将Paperclip URL映射到控制器中的download动作，就像下面这样：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">ActionController::Routing::Routes.draw do |map|
+  map.connect &#39;tracks/:id/:style.:format&#39;, :controller =&gt; &#39;tracks&#39;, :action =&gt; &#39;download&#39;, :conditions =&gt; { :method =&gt; :get }
+end
+</code></pre></div>
+<p>不需要使用命名路由，因为你不太可能需要通过名称引用路由。如果需要的话，通过映射到自定义的download动作，你还可以在控制器中提供标准的资源丰富的CRUD动作。清教徒式的REST粉丝可能会坚持将下载映射到单独的资源，并且使用POST请求创建一个新的下载资源：如果你打算做更多而不仅仅是将文件流传输到客户端（例如日志统计，更新账单信息），这可能值得考虑，否则为什么要复杂化事情？</p>
+
+<p>然后，TracksController需要一个download动作：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">class TracksController &lt; ApplicationController
+
+  SEND_FILE_METHOD = :default
+
+  def download
+    head(:not_found) and return if (track = Track.find_by_id(params[:id])).nil?
+    head(:forbidden) and return unless track.downloadable?(current_user)
+
+    path = track.mp3.path(params[:style])
+    head(:bad_request) and return unless File.exist?(path) &amp;&amp; params[:format].to_s == File.extname(path).gsub(/^\.+/, &#39;&#39;)
+
+    send_file_options = { :type =&gt; File.mime_type?(path) }
+
+    case SEND_FILE_METHOD
+      when :apache then send_file_options[:x_sendfile] = true
+      when :nginx then head(:x_accel_redirect =&gt; path.gsub(Rails.root, &#39;&#39;), :content_type =&gt; send_file_options[:type]) and return
+    end
+
+    send_file(path, send_file_options)
+  end
+
+end
+</code></pre></div>
+<p>控制器中有很多事情发生，这里是download动作的细节：</p>
+
+<ol>
+<li>尝试使用:id参数找到Track模型，如果轨道不存在则返回404 Not Found响应。</li>
+<li>把当前用户传递给downloadable?方法，决定是否允许用户下载轨道。
+
+<ul>
+<li>这里假设current_user是应用程序的身份验证代码提供的方法，如果没有用户登录则返回:guest符号，否则返回User对象。这里以及downloadable?方法中使用的实际代码可能需要修改以适应你自己的身份验证代码。</li>
+<li>如果不允许用户下载轨道，控制器将返回403 Forbidden响应。</li>
+</ul></li>
+<li>然后为传递的:style参数生成服务器上的mp3文件的路径。</li>
+<li>然后，控制器确保文件存在（如果使用无效的:style参数则不会），并且请求的文件扩展名与文件的实际扩展名相匹配。如果需要，它返回400 Bad Request。</li>
+<li>被用于<a href="http://apidock.com/rails/ActionController/Streaming/send_file">send_file</a>方法的哈希选项将与mp3文件的MIME类型一起被初始化。
+
+<ul>
+<li>我在这里使用<a href="https://github.com/mattetti/mimetype-fu">mimetype-fu插件</a>（使用ruby script/plugin install git://github.com/mattetti/mimetype-fu.git安装），而不是mp3附件的content_type属性，以允许将来不同的样式可能会使用不同的文件类型的功能。</li>
+</ul></li>
+<li>控制器支持标准流传输，使用Lighttpd/Apache <a href="http://blog.lighttpd.net/articles/2006/07/02/x-sendfile">X-Sendfile</a>或Nginx <a href="https://www.nginx.com/resources/wiki/start/topics/examples/xsendfile/">X-Accel-Redirect</a>方法下载文件。
+
+<ul>
+<li>为简单起见，这里使用SEND_FILE_METHOD常量来配置要使用的方法，但是在实际的应用程序中，应该将其存储在某种配置设置中（我推荐使用Luke Redpath的<a href="https://github.com/lukeredpath/simpleconfig">SimpleConfig</a>插件进行此类操作）。</li>
+<li>取决于配置的流传输方法，控制器既可以使用send_file（用于标准和X-Sendfile流传输）也可以使用带报头的响应（用于X-Accel-Redirect流传输）。</li>
+<li>在Rails应用程序中我们通常使用Nginx，因此我们借助如下的Nginx配置以使用X-Accel-Redirect方法进行文件的流传输：</li>
+</ul></li>
+</ol>
+<div class="highlight"><pre><code class="language-text" data-lang="text">location /assets/ {
+  root /path/to/rails_root;
+  internal;
+}
+</code></pre></div>
+<p>其中/path/to/rails_root包含我们的Rails应用程序根目录的完整路径。</p>
+
+<h3 id="视图">视图</h3>
+
+<p>Track模型通过downloadable?方法提供访问控制逻辑，而在TracksController中的download动作处理mp3文件流传输，这两者使得使用带有Paperclip提供的url方法的link_to帮助器在视图中提供下载链接成为可能。例如，index视图可能如下所示：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;ul&gt;
+&lt;% @tracks.each do |track| %&gt;
+  &lt;li&gt;&lt;%= link_to(&#39;Listen&#39;, track.mp3.url) %&gt;&lt;/li&gt;
+&lt;% end %&gt;
+&lt;/ul&gt;
+</code></pre></div>
+<h3 id="扩展到amazon-s3">扩展到Amazon S3</h3>
+
+<p><em>更新！Paperclip的最新版本包含到期的<a href="https://github.com/thoughtbot/paperclip/wiki/Restricting-Access-to-Objects-Stored-on-Amazon-S3">URL support</a></em>。</p>
+
+<p>如果你的mp3存储在本地文件系统上，上面的代码可以正常地工作，但如果你的站点开始增长，并且你需要在存储空间和下载容量方面进行扩展，那么你可能需要迁移到S3。</p>
+
+<p>Paperclip提供的S3存储模块目前使用<a href="https://github.com/rightscale/right_aws">RightAWS</a>，而2.3.1+版已经开始使用AWS::S3作为替代。请注意，如果要使用位于欧洲的S3存储桶，则此更改确实会<a href="https://github.com/thoughtbot/paperclip/commit/ac86bb9dfbe3ed8dabe2f76cd4a3199966a1899f#comments">导致一些问题</a>，因此如果这对你来说是个问题的话，你可能需要继续使用2.3.0版本。我将在下面的代码中覆盖这两个版本。</p>
+
+<h4 id="更改存储模块">更改存储模块</h4>
+
+<p>首先要更改的是Track模型中的has_attached_file定义：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">has_attached_file :mp3,
+                  :url =&gt; &#39;:s3_domain_url&#39;,
+                  :path =&gt; &#39;assets/:class/:id/:style.:extension&#39;,
+                  :storage =&gt; :s3,
+                  :s3_credentials =&gt; File.join(Rails.root, &#39;config&#39;, &#39;s3.yml&#39;),
+                  :s3_permissions =&gt; &#39;authenticated-read&#39;,
+                  :s3_protocol =&gt; &#39;http&#39;
+</code></pre></div>
+<p>这里最明显的更改分别依次为指定存储模块，凭据文件位置，上传文件权限和通信协议方面的:storage、:s3_credentials、:s3_permissions和:s3_protocol选项。</p>
+
+<p>凭据YAML文件用于指定你的S3帐户的访问密钥、私有访问密钥和存储桶名称，应该如下所示：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">common: &amp;common
+  access_key_id: your_access_key_id_goes_here
+  secret_access_key: your_secret_access_key_goes_here
+
+development:
+  &lt;&lt;: *common
+  bucket: app-name-development
+
+test:
+  &lt;&lt;: *common
+  bucket: app-name-test
+
+production:
+  &lt;&lt;: *common
+  bucket: app-name-production
+</code></pre></div>
+<p>为每个环境配置单独的<a href="http://docs.aws.amazon.com/AmazonS3/latest/dev/UsingBucket.html">S3桶</a>是个好主意，可以防止意外混淆测试文件与生产文件！</p>
+
+<p>:s3_permissions选项允许你指定四个<a href="http://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#canned-acl">固定访问策略</a>中的一个，在这种情况下，authenticated-read被用于设置读取访问仅限于对象所有者或经过身份验证的用户。</p>
+
+<p>对:url和:path选项的更改略微不那么明显：:url被设置为“:s3_domain_url”，它是使用<a href="http://docs.aws.amazon.com/AmazonS3/latest/dev/VirtualHosting.html">虚拟托管风格</a>的桶访问的Paperclip插补（如果使用欧洲桶这尤其重要，因为这是首选的访问方式）；:path被Paperclip用于生成存储在S3上的对象的密钥名称。</p>
+
+<p>通过这些更改，上传到Track模型的新文件将使用从:path选项生成的密钥存储在相应的S3桶中，例如<a href="http://app-name-development.s3.amazonaws.com/assets/tracks/1/original.mp3%E3%80%82">http://app-name-development.s3.amazonaws.com/assets/tracks/1/original.mp3。</a></p>
+
+<h4 id="重定向不再有流传输和时间">重定向不再有流传输和时间</h4>
+
+<p>迁移到S3的好处之一是，你的服务器不再需要自己涉及将数据流传输到客户端（使用X-SendFile和X-Accel-Redirect等技术可以帮助你给Rails进程解除负担，但服务器仍然必须做所有的工作）。作为将文件数据发送给客户端的替代，控制器中的download动作现在需要处理权限检查，然后将客户端重定向到S3上的文件以进行下载。</p>
+
+<p>然而，这会有个问题，因为上传文件正在使用阻止公开访问它们的authenticated-read固定访问策略。幸运的是，S3提供一种方法，可以为仅在特定时间段内运行的私有内容生成已验证的URL：然后我们的控制器可以将客户端重定向到此临时URL以启动下载，但如果有人获取URL的详细信息并尝试在以后访问该文件，那么他们将被告知该URL已经过期。</p>
+
+<p>更新的代码如下所示：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">def download
+  head(:not_found) and return if (track = Track.find_by_id(params[:id])).nil?
+  head(:forbidden) and return unless track.downloadable?(current_user)
+
+  path = track.mp3.path(params[:style])
+  head(:bad_request) and return unless params[:format].to_s == File.extname(path).gsub(/^\.+/, &#39;&#39;)
+
+  redirect_to(AWS::S3::S3Object.url_for(path, track.mp3.bucket_name, :expires_in =&gt; 10.seconds))
+end
+</code></pre></div>
+<p>在控制器中有两个主要区别：</p>
+
+<ul>
+<li>没有检查以确保对象存在，因为这将增加到S3的额外请求的开销——让S3去为不存在的对象返回适当的响应吧。</li>
+<li>作为流传输文件的替代，它重定向到使用<a href="http://amazon.rubyforge.org/doc/classes/AWS/S3/S3Object.html#M000045">url_for</a>方法生成的临时URL。临时URL设置为在10秒后过期，该时间应足够长，以便重定向去启动下载：如果下载时间超过10秒，只要已经开始，它将继续下去，直到完成为止。</li>
+</ul>
+
+<p>如果你正在使用Paperclip 2.3.0或更旧的版本，因为RightAWS的缘故，控制器重定向代码应如下所示：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">redirect_to(track.mp3.s3.interface.get_link(track.mp3.s3_bucket.to_s, path, 10.seconds))
+</code></pre></div>
+<h4 id="重新考虑视图">重新考虑视图</h4>
+
+<p>当使用本地文件系统存储时，Paperclip附件的url方法可被用于链接到TracksController的download动作，但现在文件托管在S3上，url方法返回的是S3桶的URL，这不是我们想要的。</p>
+
+<p>这里有几个选择，路由可以被更改为命名路由，然后视图可以使用如下所示的代码：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">link_to(&#39;Listen&#39;, download_track_path(track.id, &#39;original&#39;, &#39;mp3&#39;)
+</code></pre></div>
+<p>我认为更好的方法是在Track模型中添加一个新方法，使用Paperclip插补来生成下载URL。与此同时，还可以将验证S3 URL的代码从控制器中移到模型中。这里是完整的Track模型：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">class Track &lt; ActiveRecord::Base
+
+  has_attached_file :mp3,
+                    :url =&gt; &#39;:s3_domain_url&#39;,
+                    :path =&gt; &#39;assets/:class/:id/:style.:extension&#39;,
+                    :storage =&gt; :s3,
+                    :s3_credentials =&gt; File.join(Rails.root, &#39;config&#39;, &#39;s3.yml&#39;),
+                    :s3_permissions =&gt; &#39;authenticated-read&#39;,
+                    :s3_protocol =&gt; &#39;http&#39;
+
+  validates_attachment_presence :mp3
+  validates_attachment_content_type :mp3, :content_type =&gt; [&#39;application/mp3&#39;, &#39;application/x-mp3&#39;, &#39;audio/mpeg&#39;, &#39;audio/mp3&#39;]
+  validates_attachment_size :mp3, :less_than =&gt; 20.megabytes
+
+  def downloadable?(user)
+    user != :guest
+  end
+
+  def download_url(style = nil, include_updated_timestamp = true)
+    url = Paperclip::Interpolations.interpolate(&#39;/:class/:id/:style.:extension&#39;, mp3, style || mp3.default_style)
+    include_updated_timestamp &amp;&amp; mp3.updated_at ? [url, mp3.updated_at].compact.join(url.include?(&quot;?&quot;) ? &quot;&amp;&quot; : &quot;?&quot;) : url
+  end
+
+  def authenticated_url(style = nil, expires_in = 10.seconds)
+    AWS::S3::S3Object.url_for(mp3.path(style || mp3.default_style), mp3.bucket_name, :expires_in =&gt; expires_in, :use_ssl =&gt; mp3.s3_protocol == &#39;https&#39;)
+  end
+
+end
+</code></pre></div>
+<p>对于RightAWS (Paperclip &lt;= 2.3.0)，验证URL的代码略有不同：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">def authenticated_url(style = nil, expires_in = 10.seconds)
+  mp3.s3.interface.get_link(mp3.s3_bucket.to_s, mp3.path(style || mp3.default_style), expires_in)
+end
+</code></pre></div>
+<p>然后整理download动作，将重定向更改为：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">redirect_to(track.authenticated_url(params[:style]))
+</code></pre></div>
+<p>现在视图可以链接到下载了：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">link_to(&#39;Listen&#39;, track.download_url)
+</code></pre></div>
+<h4 id="结束">结束</h4>
+
+<p>希望这里我给了你足够的信息，以便你开始在自己的Rails应用程序中实施受保护的下载。但是请不要忘记，如果你使用的是欧洲S3桶，需要<a href="https://github.com/thoughtbot/paperclip/commit/ac86bb9dfbe3ed8dabe2f76cd4a3199966a1899f#comments">进行一些修补</a>，否则会出现以下错误：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">AWS::S3::PermanentRedirect: The bucket you are attempting to access must be addressed using the specified endpoint. Please send all future requests to this endpoint.
+</code></pre></div>
+<p>当你尝试并且上传时——彻底地修复将是另一天的工作！</p>
+
+<h3 id="faq">FAQ</h3>
+
+<h4 id="如何强制下载文件，而不是在浏览器中显示？">如何强制下载文件，而不是在浏览器中显示？</h4>
+
+<p>如果你使用的是文件系统存储模块，那么当使用send_file方法时，Rails会给attachment设置Content-Disposition报头，你不需要做任何事情。IE可能仍然会坚持在线显示文件，所以你可能需要用点蛮力，在控制器中给application/octet-stream设置Content-Type报头：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">send_file_options = { :type =&gt; &#39;application/octet-stream&#39; }
+</code></pre></div>
+<p>当然你也可以使用一些简单的浏览器嗅探来为智能浏览器返回正确的Content-Type，以及为IE返回application/octet-stream报头。</p>
+
+<p>如果使用S3存储模块，那么你需要将s3_headers选项添加到模型的has_attached_file定义中：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">has_attached_file :mp3,
+            :url =&gt; &#39;:s3_domain_url&#39;,
+            :path =&gt; &#39;assets/:class/:id/:style.:extension&#39;,
+            :storage =&gt; :s3,
+            :s3_credentials =&gt; File.join(Rails.root, &#39;config&#39;, &#39;s3.yml&#39;),
+            :s3_permissions =&gt; &#39;authenticated-read&#39;,
+            :s3_protocol =&gt; &#39;http&#39;,
+            :s3_headers =&gt; { :content_disposition =&gt; &#39;attachment&#39; }
+</code></pre></div>
+<p>当控制器重定向到S3 URL时，Amazon将发送你在此处指定的报头，强制下载。就像使用文件系统存储一样，你也可以使用这种方法强制Content-Type报头，尽管你将无法基于用户浏览器使用任何类型的浏览器嗅探来选择内容类型：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">has_attached_file :mp3,
+            :url =&gt; &#39;:s3_domain_url&#39;,
+            :path =&gt; &#39;assets/:class/:id/:style.:extension&#39;,
+            :storage =&gt; :s3,
+            :s3_credentials =&gt; File.join(Rails.root, &#39;config&#39;, &#39;s3.yml&#39;),
+            :s3_permissions =&gt; &#39;authenticated-read&#39;,
+            :s3_protocol =&gt; &#39;http&#39;,
+            :s3_headers =&gt; { :content_type =&gt; &#39;application/octet-stream&#39;, :content_disposition =&gt; &#39;attachment&#39; }
+</code></pre></div>]]></content>
   </entry>
   
   <entry>
@@ -575,52 +853,6 @@ class Stock &lt; ActiveRecord::Base
   end
 end
 </code></pre></div>]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[打错multipart引发的血案]]></title>
-    <link href="http://codemany.com/blog/multipart-misspelling-cause-bug/"/>
-    <updated>2014-11-13T09:27:17+08:00</updated>
-    <id>http://codemany.com/blog/multipart-misspelling-cause-bug</id>
-    <content type="html"><![CDATA[<p>浪费几个小时，杀死无数脑细胞，最终发现是单词打错了。不过错有错招，这个问题也让我重新温习了一遍关于form数据编码的知识。</p>
-
-<p>在做上传表单时，一直报告如下错误：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">undefined method &#39;original_filename&#39; for &quot;example.csv&quot;:String
-</code></pre></div>
-<p>在 <a href="http://guides.rubyonrails.org/form_helpers.html#what-gets-uploaded">http://guides.rubyonrails.org/form_helpers.html#what-gets-uploaded</a> 有这样一段文字：</p>
-
-<blockquote>
-<p>The object in the params hash is an instance of a subclass of IO. Depending on the size of the uploaded file it may in fact be a StringIO or an instance of File backed by a temporary file. In both cases the object will have an original_filename attribute containing the name the file had on the user&#39;s computer and a content_type attribute containing the MIME type of the uploaded file.</p>
-</blockquote>
-
-<p>说明example.csv应该是IO类型的，这里怎么显示是String呢？</p>
-
-<p>表单代码为</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;%= form_tag import_stocks_path, mutlipart: true do %&gt;
-</code></pre></div>
-<p>或</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;%= form_tag import_stocks_path, method: :post, mutlipart: true do %&gt;
-</code></pre></div>
-<p>生成后的HTML代码都是：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;form action=&quot;/stocks/import&quot; method=&quot;post&quot; mutlipart=&quot;true&quot;&gt;
-</code></pre></div>
-<p>正确的HTML代码应该是：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;form action=&quot;/stocks/import&quot; method=&quot;post&quot; enctype=&quot;multipart/form-data&quot;&gt;
-</code></pre></div>
-<p>使用HttpFox工具抓取表单提交信息如下：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">POST /stocks/import HTTP/1.1
-Host localhost:3000
-Referer http://localhost:3000/stocks/import
-Connection keep-alive
-Content-Type application/x-www-form-urlencoded
-Content-Length 112
-</code></pre></div>
-<p>什么是application/x-www-form-urlencoded？含有file类型字段的表单编码不应该是multipart/form-data吗。</p>
-
-<p>form的enctype属性通常有两种：application/x-www-form-urlencoded和multipart/form-data，默认为前者。当method=get时，浏览器用application/x-www-form-urlencoded编码方式把form数据转换成一个字串（name1=value1&amp;name2=value2...），然后把这个字串附加到url后面，用?分割。当method=post的时候，浏览器把form数据封装到post-body中。如果没有type=file的控件，就用默认的application/x-www-form-urlencoded编码。但是如果有type=file的话，就要用到multipart/form-data了。浏览器会把整个表单以控件为单位分割，并为每个部分加上Content-Disposition（form-data或者file），Content-Type（默认为text/plain），name等信息，并加上分割边界（boundary）。</p>
-
-<p>这时才发现原来是把multipart打错成mutlipart了，真是惨痛的教训啊！</p>
-]]></content>
   </entry>
   
 </feed>

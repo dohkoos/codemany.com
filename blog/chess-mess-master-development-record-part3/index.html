@@ -1,0 +1,537 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>象棋残局大师开发实录（3） - 乐者为王</title>
+  <meta name="author" content="dohkoos">
+
+  
+  <meta name="description" content="象棋界面已经绘制完成，接下来进行游戏交互的实现。 象棋残局与正常棋局在游戏规则上稍许有些不同。在正常棋局中，红方或黑方都可以是先手，但在残局里，只有红方才能做先手。这种细微的差别给编程带来的不是麻烦，反而是简单，因为我们不需要在游戏开始时判断谁是先手了。当然，无论是正常棋局还是残局， &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://codemany.com/blog/chess-mess-master-development-record-part3/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/atom.xml" rel="alternate" title="乐者为王" type="application/atom+xml">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script>!window.jQuery && document.write(unescape('%3Cscript src="/javascripts/libs/jquery.min.js"%3E%3C/script%3E'))</script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  
+  
+  <script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-46570161-1']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">乐者为王</a></h1>
+  
+    <h2>Do one thing, and do it well.</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="https://www.google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="sitesearch" value="codemany.com">
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">象棋残局大师开发实录（3）</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2017-02-18T09:42:20+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2017</span></span> <span class='time'>9:42 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>象棋界面已经绘制完成，接下来进行游戏交互的实现。</p>
+
+<p>象棋残局与正常棋局在游戏规则上稍许有些不同。在正常棋局中，红方或黑方都可以是先手，但在残局里，只有红方才能做先手。这种细微的差别给编程带来的不是麻烦，反而是简单，因为我们不需要在游戏开始时判断谁是先手了。当然，无论是正常棋局还是残局，我们都必须保证交互是发生在游戏运行的状态下。判断代码如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if (status == GameStatus.RUNNING) {
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>GameStatus是个枚举类型，有RUNNING、WIN和LOSE三个值。status表示游戏的当前状态。除游戏结束时是WIN或LOSE状态外，其它时间都处于RUNNING状态，所以在GameView初始化时就可以设置status的值为RUNNING。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>enum GameStatus {RUNNING, WIN, LOSE}
+</span><span class='line'>private GameStatus status = GameStatus.RUNNING;</span></code></pre></td></tr></table></div></figure>
+
+<p>现在，我们要分析具体的交互过程。让我们闭上眼睛想象下：你正在破解一盘残局，在某个时刻你点击屏幕，背后会发生什么？</p>
+
+<ol>
+<li>如果点击的是己方的棋子，那么无论是哪个，被点击多少次，都只有一个动作，就是把被点击的棋子设置为选中。</li>
+<li>否则，即没有点击到棋子或者点击到的是对方的棋子，这时有两种情况：
+
+<ul>
+<li>点击前没有己方的棋子被选中，所以不会有任何反应。</li>
+<li>点击前已经有己方的棋子被选中，这其实是个走子或吃子的动作，所以也有两种情况：
+
+<ul>
+<li>己方棋子的移动不符合象棋规则，即己方棋子不能移动，因此不会有任何反应。</li>
+<li>己方的棋子能移动，这时也会有两种情况：
+
+<ul>
+<li>被点击的棋子是对手的“将”，游戏结束，设置游戏状态为WIN。</li>
+<li>否则，移动棋子。接着，电脑自动走一步棋。电脑走棋也有两种情况：
+
+<ul>
+<li>如果目标位置是对方的“帅”，游戏结束，设置游戏状态为LOSE。</li>
+<li>否则，移动棋子。</li>
+</ul></li>
+</ul></li>
+</ul></li>
+</ul></li>
+</ol>
+
+<p>以上就是下棋时某个回合中可能遇到的所有情况的描述。象棋游戏的交互就是由无数个这样的回合组成。根据这些描述，我们可以画出对应的流程图。</p>
+
+<p><img src="/uploads/cmm-flowchart.png" title="cmm-flowchart" ></p>
+
+<p>然后，根据流程图编写出交互代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if (chessBoard.isPlayerChesses(row, col)) {
+</span><span class='line'>    chessBoard.takeChess(row, col);    // 选中当前点击的棋子，无论之前是否选中过
+</span><span class='line'>    fromRow = row;
+</span><span class='line'>    fromCol = col;
+</span><span class='line'>} else if (chessBoard.hasTaken()) {
+</span><span class='line'>    // 点击的不是自己的棋子，并且之前有选中过棋子
+</span><span class='line'>    toRow = row;
+</span><span class='line'>    toCol = col;
+</span><span class='line'>    if (ChessRule.canMove(chessBoard.getChessPoints(), fromRow, fromCol, toRow, toCol)) {
+</span><span class='line'>        if (chessBoard.isJiangChess(toRow, toCol)) {    // 如果是黑方的“将”
+</span><span class='line'>            status = GameStatus.WIN;
+</span><span class='line'>        } else {
+</span><span class='line'>            chessBoard.moveChess(fromRow, fromCol, toRow, toCol);
+</span><span class='line'>            chessBoard.untakeChess(row, col);
+</span><span class='line'>            fromRow = -1;
+</span><span class='line'>            fromCol = -1;
+</span><span class='line'>            toRow = -1;
+</span><span class='line'>            toCol = -1;
+</span><span class='line'>
+</span><span class='line'>            ChessMove cm = chessRule.searchAGoodMove(chessBoard.getChessPoints());
+</span><span class='line'>            if (chessBoard.isShuaiChess(cm.toRow, cm.toCol)) {    // 如果是红方的“帅”
+</span><span class='line'>                status = GameStatus.LOSE;
+</span><span class='line'>            } else {
+</span><span class='line'>                chessBoard.moveChess(cm.fromRow, cm.fromCol, cm.toRow, cm.toCol);
+</span><span class='line'>            }
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>其中，ChessBoard类相关的方法代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private boolean taken = false;    // 当前是否有选中的棋子
+</span><span class='line'>
+</span><span class='line'>public boolean isPlayerChesses(int row, int col) {
+</span><span class='line'>    return chessPoints[row][col] &gt; 7 && chessPoints[row][col] &lt; 15;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>public boolean isJiangChess(int row, int col) {
+</span><span class='line'>    return chessPoints[row][col] == 1;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>public boolean isShuaiChess(int row, int col) {
+</span><span class='line'>    return chessPoints[row][col] == 8;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>public void moveChess(int fromRow, int fromCol, int toRow, int toCol) {
+</span><span class='line'>    chessPoints[toRow][toCol] = chessPoints[fromRow][fromCol];
+</span><span class='line'>    chessPoints[fromRow][fromCol] = 0;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>public void takeChess(int row, int col) {
+</span><span class='line'>    taken = true;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>public void untakeChess(int row, int col) {
+</span><span class='line'>    taken = false;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>public boolean hasTaken() {
+</span><span class='line'>    return taken;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>在前面的交互代码中，处理棋子时使用的是棋局状态数组的索引值row和col。但实际上，当我们点击屏幕时，方法onTouchEvent获得的是点击位置的像素值，所以在上述交互代码的开始处必须先把像素值转换成行列值。为提高代码执行的效率和容错性，还要先判断点击的位置是否在棋盘内：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if (contains(event.getX(), event.getY())) {    // 点击的位置在棋盘内
+</span><span class='line'>    int[] point = convertScreenToPoint(event.getX(), event.getY());
+</span><span class='line'>    int row = point[0];
+</span><span class='line'>    int col = point[1];</span></code></pre></td></tr></table></div></figure>
+
+<p>先判断点击位置是否在棋盘内，如果是的话，就把像素值转换成棋局状态数组的行列值。具体代码如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private boolean contains(float x, float y) {
+</span><span class='line'>    return x &gt; baseLeft && x &lt; baseRight && y &gt; baseTop && y &lt; baseBottom;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>// 将屏幕坐标换算成棋局状态数组的索引
+</span><span class='line'>private int[] convertScreenToPoint(float x, float y) {
+</span><span class='line'>    int[] point = new int[2];
+</span><span class='line'>    point[0] = (int)((y - baseTop) / tileSize);
+</span><span class='line'>    point[1] = (int)((x - baseLeft) / tileSize);
+</span><span class='line'>    return point;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">dohkoos</span></span>
+
+      
+
+
+
+
+<time class='entry-date' datetime='2017-02-18T09:42:20+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2017</span></span> <span class='time'>9:42 am</span></time>
+      
+
+
+      
+
+<span class="tags">
+  
+    <a class='tag' href='/tags/ai/'>AI</a>, <a class='tag' href='/tags/android/'>Android</a>, <a class='tag' href='/tags/chess/'>Chess</a>
+  
+</span>
+
+
+    </p>
+    
+  <h3>Related Posts</h3>
+  <ul class="posts">
+  
+    <li class="related">
+      <a href="/blog/chess-mess-master-development-record-part2/">象棋残局大师开发实录（2）</a>
+    </li>
+  
+    <li class="related">
+      <a href="/blog/chess-mess-master-development-record-part1/">象棋残局大师开发实录（1）</a>
+    </li>
+  
+    <li class="related">
+      <a href="/blog/how-to-modify-hosts-in-android/">如何修改Android的hosts文件</a>
+    </li>
+  
+    <li class="related">
+      <a href="/blog/trap-for-storing-data-in-the-application-object/">在Application对象里存储数据的陷阱</a>
+    </li>
+  
+    <li class="related">
+      <a href="/blog/tabactivity-is-deprecated/">TabActivity is deprecated</a>
+    </li>
+  
+  </ul>
+
+
+    
+      <div id="jiathis_style_32x32">
+	<a class="jiathis_button_qzone"></a>
+	<a class="jiathis_button_tsina"></a>
+	<a class="jiathis_button_tqq"></a>
+    <a class="jiathis_button_weixin"></a>
+	<a class="jiathis_button_renren"></a>
+	<a href="http://www.jiathis.com/share/" class="jiathis jiathis_txt jtico jtico_jiathis" target="_blank"></a>
+	<a class="jiathis_counter_style"></a>
+</div>
+<script type="text/javascript" src="http://v2.jiathis.com/code/jia.js" charset="utf-8"></script>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/how-to-modify-hosts-in-android/" title="Previous Post: 如何修改Android的hosts文件">&laquo; 如何修改Android的hosts文件</a>
+      
+      
+        <a class="basic-alignment right" href="/blog/test/" title="Next Post: test">test &raquo;</a>
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/test/">test</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/test/">test</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/test/">test</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/test/">test</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/the-mythical-10x-programmer/">神秘的10x程序员</a>
+      </li>
+    
+  </ul>
+</section>
+<section>
+  <h1>Recent Comments</h1>
+  <div class="dsq-widget">
+    <script type="text/javascript" src="http://codemany.disqus.com/recent_comments_widget.js"></script>
+  </div>
+</section>
+<section>
+  <h1>Tags</h1>
+  <ul class="tag-cloud">
+    <a style="font-size: 145%" href="/tags/antlr/">ANTLR</a>
+<a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
+<a style="font-size: 133%" href="/tags/android/">Android</a>
+<a style="font-size: 103%" href="/tags/c-plus-plus/">C++</a>
+<a style="font-size: 106%" href="/tags/css/">CSS</a>
+<a style="font-size: 108%" href="/tags/crack/">Crack</a>
+<a style="font-size: 106%" href="/tags/database/">Database</a>
+<a style="font-size: 95%" href="/tags/eclipse/">Eclipse</a>
+<a style="font-size: 113%" href="/tags/git/">Git</a>
+<a style="font-size: 95%" href="/tags/html/">HTML</a>
+<a style="font-size: 103%" href="/tags/jbookshelf/">JBookShelf</a>
+<a style="font-size: 146%" href="/tags/java/">Java</a>
+<a style="font-size: 99%" href="/tags/javascript/">JavaScript</a>
+<a style="font-size: 95%" href="/tags/listview/">ListView</a>
+<a style="font-size: 103%" href="/tags/mysql/">MySQL</a>
+<a style="font-size: 103%" href="/tags/paperclip/">Paperclip</a>
+<a style="font-size: 117%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 99%" href="/tags/powerscript/">PowerScript</a>
+<a style="font-size: 115%" href="/tags/qianbao/">Qianbao</a>
+<a style="font-size: 150%" href="/tags/rails/">Rails</a>
+<a style="font-size: 117%" href="/tags/ruby/">Ruby</a>
+<a style="font-size: 95%" href="/tags/spring/">Spring</a>
+<a style="font-size: 99%" href="/tags/struts/">Struts</a>
+<a style="font-size: 143%" href="/tags/translation/">Translation</a>
+<a style="font-size: 95%" href="/tags/ubuntu/">Ubuntu</a>
+<a style="font-size: 106%" href="/tags/windows-server-2008/">Windows Server 2008</a>
+<a style="font-size: 106%" href="/tags/wxwidgets/">wxWidgets</a>
+
+  </ul>
+</section>
+<section>
+  <h1>Blogroll</h1>
+  <ul>
+    <li><a href="http://mindhacks.cn/">刘未鹏MIND HACKS</a></li>
+    <li><a href="http://www.importnew.com/">ImportNew</a></li>
+    <li><a href="http://ifeve.com/">并发编程网</a></li>
+    <li><a href="http://codingnow.com/">云风的 BLOG</a></li>
+    <li><a href="http://dbanotes.net/">DBA Notes</a></li>
+    <li><a href="http://www.ruanyifeng.com/blog/">阮一峰的网络日志</a></li>
+    <li><a href="http://advdbg.org/">高端调试</a></li>
+    <li><a href="http://www.cs.usfca.edu/~galles/visualization/Algorithms.html">Data Structure Visualization</a></li>
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/dohkoos">@dohkoos</a> on GitHub
+  
+  <script type="text/javascript">
+    $(document).ready(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'dohkoos',
+            count: 5,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+<section>
+  <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nc-sa/4.0/88x31.png" /></a>
+  <div>This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/">Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License</a>.</div>
+</section>
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2017 - dohkoos -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'codemany';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://codemany.com/blog/chess-mess-master-development-record-part3/';
+        var disqus_url = 'http://codemany.com/blog/chess-mess-master-development-record-part3/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = '//' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+</body>
+</html>
