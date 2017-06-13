@@ -9,7 +9,10 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="使用的是EDUP EP-N1556这款无线网卡，体积小巧，支持300M速率，买回来插在RPi上直接就能识别了。 输入lsusb命令，可以见到设备列表中有RTL8192CU 802.11n WLAN Adapter字样，说明网卡已经被系统识别，芯片是RTL8192。 下面就给无线网卡设置静态IP地址 &hellip;">
+  <meta name="description" content="Struts 2有三种校验方式： 使用Annotation进行校验。
+使用XML配置校验。
+使用覆盖validate方法校验。 使用XML配置时validation.xml的命名规则和放置路径： 1
+&lt;ActionClassName&gt;-validation.xml &lt; &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -79,7 +82,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/using-wifi-on-raspberry-pi/">在Raspberry Pi上使用无线网卡</a></h1>
+      <h1 class="entry-title"><a href="/blog/validate-login-with-struts2-validation-framework/">使用Struts 2 Validation框架校验登录</a></h1>
     
     
       <p class="meta">
@@ -88,20 +91,34 @@
 
 
 
-<time class='entry-date' datetime='2014-07-06T20:25:08+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>6</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>8:25 pm</span></time>
+<time class='entry-date' datetime='2012-09-08T14:42:17+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>8</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>2:42 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>使用的是EDUP EP-N1556这款无线网卡，体积小巧，支持300M速率，买回来插在RPi上直接就能识别了。</p>
+  <div class="entry-content"><p>Struts 2有三种校验方式：</p>
 
-<p>输入lsusb命令，可以见到设备列表中有RTL8192CU 802.11n WLAN Adapter字样，说明网卡已经被系统识别，芯片是RTL8192。</p>
+<ol>
+<li>使用Annotation进行校验。</li>
+<li>使用XML配置校验。</li>
+<li>使用覆盖validate方法校验。</li>
+</ol>
 
-<p>下面就给无线网卡设置静态IP地址：</p>
+<p>使用XML配置时validation.xml的命名规则和放置路径：</p>
 
-<p>修改/etc/wpa_supplicant/wpa_supplicant.conf</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;ActionClassName&gt;-validation.xml</span></code></pre></td></tr></table></div></figure>
+
+<p><code>&lt;ActionClassName&gt;</code>就是要验证的Action类的名字，将此文件放在与Action类文件相同的目录下即可。如果该Action类在struts.xml配置中有多个action实例，那么对应某个action实例的校验文件命名规则如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;ActionClassName&gt;-&lt;aliasName&gt;-validation.xml</span></code></pre></td></tr></table></div></figure>
+
+<p>例如：UserAction-login-validation.xml。注意，这里的<code>&lt;aliasName&gt;</code>并不是方法名，而是struts.xml中配置的action实例的名字。</p>
+
+<p>既然用框架来校验了，那么在LoginAction.java中判断用户名和密码是否为空的代码就可以删除了。还要记得加上username和passowrd的getter方法，不然校验器（validator）会因为取不到field而报错。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -113,18 +130,152 @@
 <span class='line-number'>8</span>
 <span class='line-number'>9</span>
 <span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
-</span><span class='line'>update_config=1
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public String execute() throws Exception {
+</span><span class='line'>    User u = userService.getUser(username);
+</span><span class='line'>    if (u == null || !password.equals(u.getPassword())) {
+</span><span class='line'>        return INPUT;
+</span><span class='line'>    }
 </span><span class='line'>
-</span><span class='line'>network={
-</span><span class='line'>  ssid="NETGEAR"
-</span><span class='line'>  psk="12345678"
-</span><span class='line'>  proto=RSN  # 也可以写成WPA2
-</span><span class='line'>  key_mgmt=WPA-PSK  # 一定不要写成WPA2-PSK
-</span><span class='line'>  id_str="edup1556"
+</span><span class='line'>    ActionContext.getContext().getSession().put("logined", true);
+</span><span class='line'>    return SUCCESS;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>public String getUsername() {
+</span><span class='line'>    return username;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>public String getPassword() {
+</span><span class='line'>    return password;
 </span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>修改/etc/network/interfaces</p>
+<p>同时在LoginAction.java相同目录下创建LoginAction-validation.xml，内容如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;!DOCTYPE validators PUBLIC
+</span><span class='line'>    "-//OpenSymphony Group//XWork Validator 1.0.2//EN"
+</span><span class='line'>    "http://www.opensymphony.com/xwork/xwork-validator-1.0.2.dtd"&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;validators&gt;
+</span><span class='line'>    &lt;field name="username"&gt;
+</span><span class='line'>        &lt;field-validator type="requiredstring"&gt;
+</span><span class='line'>            &lt;message&gt;Username is required&lt;/message&gt;
+</span><span class='line'>        &lt;/field-validator&gt;
+</span><span class='line'>    &lt;/field&gt;
+</span><span class='line'>    &lt;field name="password"&gt;
+</span><span class='line'>        &lt;field-validator type="requiredstring"&gt;
+</span><span class='line'>            &lt;message&gt;Password is required&lt;/message&gt;
+</span><span class='line'>        &lt;/field-validator&gt;
+</span><span class='line'>    &lt;/field&gt;
+</span><span class='line'>&lt;/validators&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>message提供了校验出错的信息，在其中可以使用${}来引用被校验的对象。如果未出现异常，则转入用户请求的处理方法；出现异常则转入input所指定的视图。所以，对于校验的action实例，必须要在配置文件中为其指定input视图。</p>
+
+<p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/struts2-spring3-hibernate4-login-sample/">Struts 2 + Spring 3 + Hibernate 4登录实例</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2012-09-04T06:54:27+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>4</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>6:54 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在pom.xml中添加Spring的依赖包：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;dependency&gt;
+</span><span class='line'>    &lt;groupId&gt;org.springframework&lt;/groupId&gt;
+</span><span class='line'>    &lt;artifactId&gt;spring-orm&lt;/artifactId&gt;
+</span><span class='line'>    &lt;version&gt;3.1.2.RELEASE&lt;/version&gt;
+</span><span class='line'>&lt;/dependency&gt;
+</span><span class='line'>&lt;dependency&gt;
+</span><span class='line'>    &lt;groupId&gt;org.springframework&lt;/groupId&gt;
+</span><span class='line'>    &lt;artifactId&gt;spring-web&lt;/artifactId&gt;
+</span><span class='line'>    &lt;version&gt;3.1.2.RELEASE&lt;/version&gt;
+</span><span class='line'>&lt;/dependency&gt;
+</span><span class='line'>&lt;!-- 注意：没有这个plugin包会导致Spring无法注入bean到Struts 2的Action中 --&gt;
+</span><span class='line'>&lt;dependency&gt;
+</span><span class='line'>    &lt;groupId&gt;org.apache.struts&lt;/groupId&gt;
+</span><span class='line'>    &lt;artifactId&gt;struts2-spring-plugin&lt;/artifactId&gt;
+</span><span class='line'>    &lt;version&gt;2.3.4.1&lt;/version&gt;
+</span><span class='line'>&lt;/dependency&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>配置web.xml文件，加上Spring的监听器：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;context-param&gt;
+</span><span class='line'>    &lt;param-name&gt;contextConfigLocation&lt;/param-name&gt;
+</span><span class='line'>    &lt;param-value&gt;classpath:applicationContext.xml&lt;/param-value&gt;
+</span><span class='line'>&lt;/context-param&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;listener&gt;
+</span><span class='line'>    &lt;listener-class&gt;org.springframework.web.context.ContextLoaderListener&lt;/listener-class&gt;
+</span><span class='line'>&lt;/listener&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>删除hibernate.cfg.xml，添加applicationContext.xml，内容为：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -146,548 +297,70 @@
 <span class='line-number'>18</span>
 <span class='line-number'>19</span>
 <span class='line-number'>20</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>auto lo
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;beans xmlns="http://www.springframework.org/schema/beans"
+</span><span class='line'>       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+</span><span class='line'>       xsi:schemaLocation="http://www.springframework.org/schema/beans
+</span><span class='line'>                           http://www.springframework.org/schema/beans/spring-beans.xsd"&gt;
 </span><span class='line'>
-</span><span class='line'>iface lo inet loopback
+</span><span class='line'>    &lt;!-- DriverManagerDataSource在每个连接请求时都新建一个connection。
+</span><span class='line'>         与DBCP的BasicDataSource不同，DriverManagerDataSource提供的连接没有进行池管理 --&gt;
+</span><span class='line'>    &lt;bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource"&gt;
+</span><span class='line'>        &lt;property name="driverClassName" value="com.mysql.jdbc.Driver" /&gt;
+</span><span class='line'>        &lt;property name="url" value="jdbc:mysql://localhost:3306/jbookshelf" /&gt;
+</span><span class='line'>        &lt;property name="username" value="root" /&gt;
+</span><span class='line'>        &lt;property name="password" value="123456" /&gt;
+</span><span class='line'>    &lt;/bean&gt;
 </span><span class='line'>
-</span><span class='line'>iface eth0 inet static
-</span><span class='line'>  address 192.168.0.100
-</span><span class='line'>  netmask 255.255.255.0
-</span><span class='line'>  gateway 192.168.0.1
-</span><span class='line'>  dns-nameservers 8.8.8.8
+</span><span class='line'>    &lt;bean id="sessionFactory" class="org.springframework.orm.hibernate4.LocalSessionFactoryBean"&gt;
+</span><span class='line'>        &lt;property name="dataSource" ref="dataSource" /&gt;
+</span><span class='line'>        &lt;property name="hibernateProperties"&gt;
+</span><span class='line'>            &lt;props&gt;
+</span><span class='line'>                &lt;prop key="hibernate.connection.pool_size"&gt;1&lt;/prop&gt;
+</span><span class='line'>                &lt;prop key="hibernate.dialect"&gt;org.hibernate.dialect.MySQLDialect&lt;/prop&gt;
+</span><span class='line'>                &lt;prop key="hibernate.cache.provider_class"&gt;org.hibernate.cache.internal.NoCacheProvider&lt;/prop&gt;
+</span><span class='line'>                &lt;prop key="show_sql"&gt;true&lt;/prop&gt;
+</span><span class='line'>            &lt;/props&gt;
+</span><span class='line'>        &lt;/property&gt;
+</span><span class='line'>        &lt;property name="mappingResources"&gt;
+</span><span class='line'>            &lt;list&gt;
+</span><span class='line'>                &lt;value&gt;com/codemany/account/model/User.hbm.xml&lt;/value&gt;
+</span><span class='line'>            &lt;/list&gt;
+</span><span class='line'>        &lt;/property&gt;
+</span><span class='line'>    &lt;/bean&gt;
 </span><span class='line'>
-</span><span class='line'>allow-hotplug wlan0
-</span><span class='line'>iface wlan0 inet manual
-</span><span class='line'>  wpa-roam /etc/wpa_supplicant/wpa_supplicant.conf
-</span><span class='line'>iface edup1556 inet static
-</span><span class='line'>  address 192.168.0.200
-</span><span class='line'>  netmask 255.255.255.0
-</span><span class='line'>  gateway 192.168.0.1
-</span><span class='line'>  dns-nameservers 8.8.8.8
+</span><span class='line'>    &lt;bean id="userDao" class="com.codemany.account.dao.UserDao"&gt;
+</span><span class='line'>        &lt;property name="sessionFactory" ref="sessionFactory" /&gt;
+</span><span class='line'>    &lt;/bean&gt;
 </span><span class='line'>
-</span><span class='line'>iface default inet dhcp</span></code></pre></td></tr></table></div></figure>
-
-<p>然后用ifconfig命令列出所有的网络设备，可以看到wlan0的IP是192.168.0.200了。</p>
-
-<p>你的树莓派自由了，不再需要网线拖着了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-i-made-ruby-script-156x-faster/">我是如何让Ruby脚本速度提升156倍的</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2014-06-28T13:04:08+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>28</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>1:04 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>以前写过<a href="/blog/using-ruby-to-batch-rename-filename-from-traditional-to-simplified/">使用Ruby批量修改繁体文件名为简体</a>，可惜脚本的性能很有问题，批量重命名时运行速度非常慢。这次准备优化下代码，提升脚本的执行效率。</p>
-
-<p>profile.rb是为Ruby程序准备的profiler，它可以统计并输出各方法的运行时间，以便于找到程序执行的性能瓶颈。这次就用它来剖析脚本的运行时间。使用方法很简单，加上命令行选项-r profile就可以：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ruby -r profile rename.rb</span></code></pre></td></tr></table></div></figure>
-
-<p>运行结束后，会把统计信息输出到标准错误输出中。如下图所示：</p>
-
-<p><img src="/uploads/profile-before-tuning.png" title="profile-before-tuning" ></p>
-
-<p>profile统计的是各方法的运行时间，分为两类。一类是计算的是从方法调用到方法返回之间的时间，称为整体时间；另一类则是从整体时间中扣除在该方法中调用其它方法所耗费时间之后得到的时间，称为实际时间。</p>
-
-<p>上图输出信息每行中各字段含义如下（从左到右）：</p>
-
-<ul>
-<li>该方法执行时间占整体时间的百分比，比例越高越说明这行代码可能需要优化</li>
-<li>整体时间的总和</li>
-<li>实际时间的总和</li>
-<li>被调用的次数</li>
-<li>每次调用的平均实际时间（毫秒）</li>
-<li>每次调用的平均整体时间（毫秒）</li>
-<li>方法名</li>
-</ul>
-
-<p>由上图可以看出，脚本执行的时间大部分耗在了循环上。解决方法有两个：消除循环或减少循环次数。前者很难实现，暂且还没有想到办法，也许根本就没有可能。脚本中mapping的大小为2685，所以每修改一个文件名需要执行2685次循环，且循环中的encode和gsub!都是耗时操作。通常文件名的长度不超过30个字符，通过遍历文件名中每个字符的方式重命名就可以把循环次数缩减到不超过30次。</p>
-
-<p>修改代码后重新执行分析命令，得到的结果是脚本运行时间从379395秒变成2418秒，性能整整提升了156倍，达到2个数量级的效果。</p>
-
-<p><img src="/uploads/profile-after-tuning.png" title="profile-after-tuning" ></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/using-raspberry-pi-to-monitor-home-humiture/">使用Raspberry Pi监控室内温湿度</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2014-06-24T14:19:44+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>24</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>2:19 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>机房没有温湿度监控系统，只有温湿度计，还不是数字的，只能得到个大概的读数，不是非常精确。怎么办？自己动手DIY个在线的温湿度监控系统吧！</p>
-
-<p>物品清单：</p>
-
-<ul>
-<li>金士顿16G的SDHC卡1张</li>
-<li>SDHC读卡器1个（可选）</li>
-<li>网线1条</li>
-<li>手机充电器（5V/1A）1个</li>
-<li>MicroUSB数据线1条</li>
-<li>电脑1台</li>
-<li>1P-1P双头母杜邦线3条</li>
-<li>10K电位器一个</li>
-<li>DHT11或DHT22温湿度传感器一个（可以购买已经焊好电阻的传感器模块）</li>
-</ul>
-
-<h3 id="让树莓派（raspberry-pi）工作起来">让树莓派（Raspberry Pi）工作起来</h3>
-
-<p>从 <a href="http://www.raspberrypi.org/downloads">http://www.raspberrypi.org/downloads</a> 下载基于debian的wheezy镜像Raspbian。如果使用Windows系统，官方建议使用<a href="http://sourceforge.net/projects/win32diskimager/">Win32DiskImager</a>来复制image文件到SD卡（如果是Linux系统可以用工具dd）。写入系统后，把卡插到板子上，接上网线、电源，然后就启动了。等个20多秒，板上3个小灯都亮了，表明系统已经启动成功。</p>
-
-<p>登录路由器后台找到raspberrypi设备分配到的IP。然后使用SSH或VNC（前者是命令行界面，后者是图形界面）连接刚才从路由器找到的IP地址。登录的默认账号是pi，密码是raspberry。登录RPi之后输入ping qq.com测试上网是否正常。</p>
-
-<h3 id="使用固定的ip访问rpi">使用固定的IP访问RPi</h3>
-
-<p>默认情况下RPi使用的是自动分配的IP地址，每次登录都需要在路由器中查找对应IP，实在太麻烦，可以把它设置成静态的。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sudo vi /etc/network/interfaces</span></code></pre></td></tr></table></div></figure>
-
-<p>打开配置文件，看到如下内容</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>auto lo
-</span><span class='line'>
-</span><span class='line'>iface lo inet loopback
-</span><span class='line'>iface eth0 inet dhcp
-</span><span class='line'>
-</span><span class='line'>allow-hotplug wlan0
-</span><span class='line'>iface wlan0 inet manual
-</span><span class='line'>wpa-roam /etc/wpa_supplicant/wpa_supplicant.conf
-</span><span class='line'>iface default inet dhcp</span></code></pre></td></tr></table></div></figure>
-
-<p>将之修改成</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>auto lo
-</span><span class='line'>
-</span><span class='line'>iface lo inet loopback
-</span><span class='line'>
-</span><span class='line'>iface eth0 inet static
-</span><span class='line'>  address 192.168.0.100
-</span><span class='line'>  netmask 255.255.255.0
-</span><span class='line'>  gateway 192.168.0.1
-</span><span class='line'>  dns-nameservers 8.8.8.8
-</span><span class='line'>
-</span><span class='line'>allow-hotplug wlan0
-</span><span class='line'>iface wlan0 inet manual
-</span><span class='line'>  wpa-roam /etc/wpa_supplicant/wpa_supplicant.conf
-</span><span class='line'>
-</span><span class='line'>iface default inet dhcp</span></code></pre></td></tr></table></div></figure>
-
-<p>然后存盘退出。以后就可以通过192.168.0.100来登录RPi了。</p>
-
-<h3 id="把温湿度传感器接到rpi上">把温湿度传感器接到RPi上</h3>
-
-<p><img src="/uploads/rpi-dht22.png" title="rpi-dht22" ></p>
-
-<p>DHT11/DHT22共有4根引脚：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>1 -&gt; 3.3v 接左边第1个GPIO针脚
-</span><span class='line'>2 -&gt; GPIO 数据接口，可随意连接1个GPIO针脚（第7个针脚对应的是GPIO Pin #4）
-</span><span class='line'>3 -&gt; NC 不接
-</span><span class='line'>4 -&gt; GND 接地（第14个针脚）</span></code></pre></td></tr></table></div></figure>
-
-<p>注意：在1脚和2脚间还需要并联10K的电阻，以保持读数稳定。</p>
-
-<p>安装好的样子：</p>
-
-<p><img src="/uploads/rpi-actual.png" title="rpi-actual" ></p>
-
-<h3 id="用c代码读取当前的温度和湿度值">用C代码读取当前的温度和湿度值</h3>
-
-<p>用的是树莓派2红色B型，它采用Broadcom BCM2835 (CPU, GPU, DSP, and SDRAM)芯片。所以读取GPIO口需要到 <a href="http://www.open.com.au/mikem/bcm2835/index.html">http://www.open.com.au/mikem/bcm2835/index.html</a> 获取最新的BCM2835 C语言库，然后下载，编译和安装。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>wget http://www.open.com.au/mikem/bcm2835/bcm2835-1.36.tar.gz
-</span><span class='line'>tar -zxvf bcm2835-1.36.tar.gz
-</span><span class='line'>cd bcm2835-1.36
-</span><span class='line'>./configure
-</span><span class='line'>make
-</span><span class='line'>sudo make install</span></code></pre></td></tr></table></div></figure>
-
-<p>从GitHub库中获取DHT11/DHT22温湿度程序，编译测试。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>cd /home/pi
-</span><span class='line'>git clone https://github.com/dohkoos/Raspberry-Pi-Code.git
-</span><span class='line'>cd Raspberry-Pi-Code/DHT22
-</span><span class='line'>make
-</span><span class='line'>sudo ./dht 22 4 # 数据接口接在第7针脚，所以这里是4</span></code></pre></td></tr></table></div></figure>
-
-<h3 id="记录曲线图到云端">记录曲线图到云端</h3>
-
-<p>这里使用<a href="http://www.yeelink.net/">Yeelink</a>的服务，Yeelink是国内比较知名的免费物联网数据平台。根据它的API规则，提交的数据必须为JSON格式：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>{"timestamp": "2012-03-15 16:13:14", "value": 294.34}</span></code></pre></td></tr></table></div></figure>
-
-<p>将温湿度值提交到Yeelink的Ruby代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># Capture temperature & humidity value from the console
-</span><span class='line'>output = `sudo ./dht 22 4`
-</span><span class='line'>mt = /Temp =\s+([0-9.]+)/.match(output)
-</span><span class='line'>temperature = mt[1]
-</span><span class='line'>
-</span><span class='line'>mt = /Hum =\s+([0-9.]+)/.match(output)
-</span><span class='line'>humidity = mt[1]
-</span><span class='line'>
-</span><span class='line'># Combined temperature & humidity value into json format
-</span><span class='line'>json_temperature = %Q[{\\"timestamp\\": \\"#{Time.now}\\", \\"value\\": #{temperature}}]
-</span><span class='line'>json_humidity = %Q[{\\"timestamp\\": \\"#{Time.now}\\", \\"value\\": #{humidity}}]
-</span><span class='line'>
-</span><span class='line'># Post json data to Yeelink
-</span><span class='line'>`curl -X POST -d "#{json_temperature}" -H "Content-Type: application/json" -H "U-ApiKey:XXXXXXXXXXXXXXXX" http://api.yeelink.net/v1.0/device/&lt;device_id&gt;/sensor/&lt;sensor_id&gt;/datapoints`
-</span><span class='line'>`curl -X POST -d "#{json_humidity}" -H "Content-Type: application/json" -H "U-ApiKey:XXXXXXXXXXXXXXXX" http://api.yeelink.net/v1.0/device/&lt;device_id&gt;/sensor/&lt;sensor_id&gt;/datapoints`</span></code></pre></td></tr></table></div></figure>
-
-<p>将U-ApiKey:XXXXXXXXXXXXXXXX替换为自已账户的API Key，后面的URL也需要替换为自己申请的传感器URL。</p>
-
-<h3 id="添加到计划任务">添加到计划任务</h3>
-
-<p>使用crontab命令将以下内容添加到计划任务中：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># m h dom mon dow command
-</span><span class='line'>*/10 * * * * cd /home/pi/Raspberry-Pi-Code/DHT22/ && ruby yeelink.rb</span></code></pre></td></tr></table></div></figure>
-
-<p>重启计划任务，然后每隔10分钟就会上传一次数据到云端。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sudo /etc/init.d/cron restart</span></code></pre></td></tr></table></div></figure>
-
-<p>下面是我的曲线图：</p>
-
-<p><img src="/uploads/rpi-yeelink.png" title="rpi-yeelink" ></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/rebuild-ebook-website-with-responsive-design/">使用响应式设计改造电子书网站</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2014-06-19T11:55:16+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>19</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>11:55 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>因为要在其它设备上测试响应式设计的效果，需要先对开发环境做些简单的配置。</p>
-
-<p>启动服务器时需加上本机的IP地址和访问端口（通常是80）：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>rails s -b 192.168.0.100 -p 80</span></code></pre></td></tr></table></div></figure>
-
-<p>配置Windows系统的内置防火墙，开启80端口以供其它设备访问：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>netsh advfirewall firewall add rule name="Open Port 80" dir=in action=allow protocol=TCP localport=80</span></code></pre></td></tr></table></div></figure>
-
-<p>查看和删除防火墙规则的命令：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>netsh advfirewall firewall delete rule name="Open Port 80" protocol=TCP localport=80
-</span><span class='line'>netsh advfirewall firewall show rule name="Open Port 80"</span></code></pre></td></tr></table></div></figure>
-
-<p>响应式设计的优缺点就不多说了，已经有太多的文章讲过这些。这里主要讲如何使用响应式设计改造现有的电子书网站。</p>
-
-<p>首先，需要使用viewport标签设置屏幕宽度为设备宽度，使网站内容可以适应响应式变化。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;meta name="viewport" content="width=device-width, initial-scale=1" /&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>因为这是一个非常简陋，并且以内容为主的网站。在上述设置后几乎不用再修改就能适应不同屏幕分辨率下的信息呈现，除了导航栏因为导航选项较多，在手机等设备上打开会出现后面部分选项被挤下去。抽屉样式的导航是解决这个问题的好方法。在网上找到一个横向导航栏切换成抽屉式导航栏的库<a href="http://srobbin.github.io/jquery-pageslide/">jQuery PageSlide</a>，它使用图片实现三明治图标，所以对它做了些修改，用标签来实现：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;ul class="burger"&gt;
-</span><span class='line'>  &lt;li&gt;&lt;/li&gt;&lt;li&gt;&lt;/li&gt;&lt;li&gt;&lt;/li&gt;
-</span><span class='line'>&lt;/ul&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>对应的CSS代码如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>.burger {
-</span><span class='line'>  li {
-</span><span class='line'>    height: 4px;
-</span><span class='line'>    width: 30px;
-</span><span class='line'>    background: #000;
-</span><span class='line'>    border-radius: 3px;
-</span><span class='line'>    margin: 5px 0;
-</span><span class='line'>  }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>要实现响应式的话，只要让它在正常情况下隐藏，屏幕变小时显现即可：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>.burger {
-</span><span class='line'>  display: none;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>@media screen and (max-width: 480px) {
-</span><span class='line'>  .burger {
-</span><span class='line'>    display: block;
-</span><span class='line'>  }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>还需要在application.html.erb的底部开启点击三明治图标时的响应事件：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= javascript_include_tag "jquery.pageslide", "data-turbolinks-track" =&gt; true %&gt;
-</span><span class='line'>&lt;script&gt;
-</span><span class='line'>  $(".burger").pageslide();
-</span><span class='line'>&lt;/script&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>导航条的CSS也需要做些修改，使之能在屏幕变小时转换成抽屉式导航条：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>@media screen and (max-width: 480px) {
-</span><span class='line'>  nav ul {
-</span><span class='line'>    display: none;
-</span><span class='line'>  }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>至此，网站的响应式改造就基本完成了。如果你觉得对你有所帮助，请将此文发送给你的朋友，如果你还有更好的建议也可以在下面的评论中分享你的经验。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/multiple-file-upload-with-jquery-rails-4-and-paperclip/">使用jQuery、Rails 4和Paperclip进行多文件上传</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2013-10-27T08:21:48+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>27</span><span class='date-suffix'>th</span>, <span class='date-year'>2013</span></span> <span class='time'>8:21 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="https://5minutenpause.com/blog/2013/09/04/multiple-file-upload-with-jquery-rails-4-and-paperclip/">https://5minutenpause.com/blog/2013/09/04/multiple-file-upload-with-jquery-rails-4-and-paperclip/</a></p>
-
-<p>在最近的项目中，我需要一个方便的文件上传器。我想要多文件上传和进度条。我想要它们都能与<a href="http://getbootstrap.com/">Bootstrap</a>一起工作。<a href="http://blueimp.github.io/jQuery-File-Upload/">jQuery File Upload</a>能够满足这些需求。初看上去它似乎不容易使用，在研究后我发现Ryan Bates做过一个关于<a href="http://railscasts.com/episodes/381-jquery-file-upload">jQuery文件上传</a>的<a href="http://railscasts.com/">railscast</a>。不幸的是，这个railscast使用了Rails 3和旧的jQuery版本。所以我必须调整它。涉及这个主题的其它博文都开始于2012年甚至更早，在这里是新的Rails 4版本。</p>
-
-<p>我们不是生活在真空中，所以会经常性地使用已有的想法（<a href="http://everythingisaremix.info/blog/everything-is-a-remix-the-ted-talk">一切都是混合</a>），因此我没有试图去提出一个完全原创的解决方案，下面我的实现是基于Ryans的工作。</p>
-
-<p><strong>更新：</strong>我为这篇文章创建了一个<a href="https://github.com/5minpause/multiple-file-upload">GitHub仓库</a>。你可以将其用作本文中我使用的所有内容的完整工作副本。我使用这些提交来跟踪博客文章，以便你可以使用它们“重播”我的实现。如果有任何问题，请<a href="https://github.com/5minpause/multiple-file-upload/issues">在GitHub打开一个issue</a>，并在那里询问，或者就在本文后面发布你的评论。谢谢。</p>
-
-<p><strong>更新2：</strong>Paul Walker在评论中指出了如何解决Turbolinks的问题。如果你也有这种情况，请看<a href="http://5minutenpause.com/blog/2013/09/04/multiple-file-upload-with-jquery-rails-4-and-paperclip/#comment-1595778720">他对Turbolinks的评论</a>。</p>
-
-<p><strong>更新3：</strong>如果你想知道如何在后台完成图片处理，请参阅<a href="http://5minutenpause.com/blog/2014/10/24/comprehensive-guide-to-background-processing-of-uploads-with-activejob-and-rails-4-dot-2">我的这个主题的新帖子</a>。我会给你展示如何使用Rails 4.2的Active Job和Delayed Job来实现后台处理。</p>
-
-<h3 id="gem和资源文件">Gem和资源文件</h3>
-
-<p>我们从Gemfile开始，添加<code>jquery-fileupload-rails</code>这个gem。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>gem 'jquery-fileupload-rails'</span></code></pre></td></tr></table></div></figure>
-
-<p>使用<code>bundle install</code>安装所有gem。</p>
-
-<p>安装后，你需要在你的application.js中引入以下这些文件：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>//= require jquery
-</span><span class='line'>//= require jquery_ujs
-</span><span class='line'>//= require jquery-fileupload/basic
-</span><span class='line'>//= require jquery-fileupload/vendor/tmpl
-</span><span class='line'>//= require_tree .</span></code></pre></td></tr></table></div></figure>
-
-<p>我们在这里使用基本版本，并且包含<code>jquery-fileupload/vendor/tmpl</code>，所以我们可以选择渲染我们自己的模板。</p>
-
-<h3 id="视图">视图</h3>
-
-<p>我们有个表单用于上传文件，并将JavaScript模板包含在文件的底部。有件事要注意：模板脚本必须是没有换行或空格的单行程序。否则jQuery会抱怨：<code>Uncaught Syntax error, unrecognized expression: [object Object]</code>。另一个解决方案是使用<code>$.parseHTML();</code>。接下来我会给你展示如何在uploads.js.coffee中做到这点。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= form_for Upload.new, :url =&gt; uploads_path, html: { multipart: true } do |f| %&gt;
-</span><span class='line'>  &lt;%= f.label :uploaded_file, t('.upload_new_file') %&gt;
-</span><span class='line'>  &lt;%= f.file_field :uploaded_file, multiple: true, name: 'upload[uploaded_file]' %&gt;
-</span><span class='line'>  &lt;%= f.submit t(:save), class: 'btn' %&gt;
-</span><span class='line'>&lt;% end %&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;% # jquery upload template # %&gt;
-</span><span class='line'>&lt;script id="template-upload" type="text/x-tmpl"&gt;
-</span><span class='line'>  &lt;div class="upload"&gt;
-</span><span class='line'>    { %=o.name % }&lt;div class="progress"&gt;&lt;div class="bar" style="width: 0%"&gt;&lt;/div&gt;&lt;/div&gt;
-</span><span class='line'>  &lt;/div&gt;
-</span><span class='line'>&lt;/script&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>因为要返回JavaScript脚本，所以:create成功后要渲染的文件如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;% if @upload.new_record? %&gt;
-</span><span class='line'>  alert('Failed');
-</span><span class='line'>&lt;% else %&gt;
-</span><span class='line'>  $('ul.thumbnails').append("&lt;%=j render partial: 'photosets/upload', locals: { upload: @upload } %&gt;");
-</span><span class='line'>&lt;% end %&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>当你点击提交以上传你的图片时，实际发生的是你上传的每张图片都有多次提交。现在我们需要处理这些提交。我们在CoffeeScript文件里面做这些：</p>
+</span><span class='line'>    &lt;!-- Struts 2的action是有状态的，必须显式设置scope为prototype，这样每次请求过来都会创建新的action --&gt;
+</span><span class='line'>    &lt;bean id="loginAction" class="com.codemany.account.action.LoginAction" scope="prototype"&gt;
+</span><span class='line'>        &lt;property name="userDao" ref="userDao" /&gt;
+</span><span class='line'>    &lt;/bean&gt;
+</span><span class='line'>&lt;/beans&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>删除HibernateUtil.java，修改UserDao.java为以下内容：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -706,166 +379,60 @@
 <span class='line-number'>15</span>
 <span class='line-number'>16</span>
 <span class='line-number'>17</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>jQuery -&gt;
-</span><span class='line'>  $('#upload_uploaded_file').attr('name','upload[uploaded_file]')
-</span><span class='line'>  $('#new_upload').fileupload
-</span><span class='line'>    dataType: 'script'
-</span><span class='line'>    add: (e, data) -&gt;
-</span><span class='line'>      types = /(\.|\/)(gif|jpe?g|png|mov|mpeg|mpeg4|avi)$/i
-</span><span class='line'>      file = data.files[0]
-</span><span class='line'>      if types.test(file.type) || types.test(file.name)
-</span><span class='line'>        data.context = $(tmpl("template-upload", file))
-</span><span class='line'>        $('#new_upload').append(data.context)
-</span><span class='line'>        data.submit()
-</span><span class='line'>      else
-</span><span class='line'>        alert("#{file.name} is not a gif, jpg or png image file")
-</span><span class='line'>    progress: (e, data) -&gt;
-</span><span class='line'>      if data.context
-</span><span class='line'>        progress = parseInt(data.loaded / data.total * 100, 10)
-</span><span class='line'>        data.context.find('.bar').css('width', progress + '%')</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.account.dao;
+</span><span class='line'>
+</span><span class='line'>import org.hibernate.Query;
+</span><span class='line'>import org.hibernate.Session;
+</span><span class='line'>import org.hibernate.SessionFactory;
+</span><span class='line'>
+</span><span class='line'>import com.codemany.account.model.User;
+</span><span class='line'>
+</span><span class='line'>public class UserDao {
+</span><span class='line'>    // Spring 3集成Hibernate 4不再需要HibernateDaoSupport或HibernateTemplate了，
+</span><span class='line'>    // 直接使用原生API即可。
+</span><span class='line'>    private SessionFactory sessionFactory;
+</span><span class='line'>
+</span><span class='line'>    public void setSessionFactory(SessionFactory sessionFactory) {
+</span><span class='line'>        this.sessionFactory = sessionFactory;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public User getUser(String username) {
+</span><span class='line'>        Session session = sessionFactory.openSession();
+</span><span class='line'>        try {
+</span><span class='line'>            Query query = session.createQuery("from User u where u.username = ?");
+</span><span class='line'>            query.setString(0, username);
+</span><span class='line'>            query.setMaxResults(1);
+</span><span class='line'>            return (User)query.uniqueResult();
+</span><span class='line'>        } finally {
+</span><span class='line'>            session.close();
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>这里我们检查文件的类型是图片还是电影。否则，我们将向用户显示不允许该文件的警告。如果文件被允许，我们使用文件的数据渲染模板，并将其附加到我们的图片列表中（这里没有显示代码——你可以很容易地弄明白）。然后我们提交文件进行实际上传并保存到数据库。此外，我们显示每个上传文件的进度条。</p>
-
-<p>upload.js.coffee中的第2行用于将upload_file的名称从数组改为单个上传（从<code>upload[uploaded_file][]</code>到<code>upload[uploaded_file]</code>）。否则，上传数组会使Paperclip抛出错误<code>Paperclip::AdapterRegistry::NoHandlerError</code>。你可以使用file_field的name属性设置值，但那对我来说无法可靠地工作。</p>
-
-<p>我在之前说过，你必须避免模板中的换行符。如果你将第9行改为：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>data.context = $($.parseHTML($(tmpl("template-upload", file)))[1])</span></code></pre></td></tr></table></div></figure>
-
-<p>应该可以保持你的换行。我在<a href="http://stackoverflow.com/a/15563364/299781">Stack Overflow</a>发现这个，但没有尝试过。但它看起来应该没问题。</p>
-
-<p>控制器动作很简单：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>def create
-</span><span class='line'>  @upload = Upload.create(upload_params)
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<p>这是个简单的实现。你可以做的更多。仔细看看<a href="http://blueimp.github.io/jQuery-File-Upload/">jQuery File Upload</a>的文档。如果你有任何问题，可以在twitter或app.net上询问我，我很乐意为你提供帮助。谢谢阅读。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/rails-insecure-defaults/">Rails的不安全默认配置——需要知道的13个安全陷阱</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2013-07-02T18:19:40+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2013</span></span> <span class='time'>6:19 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="http://blog.codeclimate.com/blog/2013/03/27/rails-insecure-defaults/">http://blog.codeclimate.com/blog/2013/03/27/rails-insecure-defaults/</a></p>
-
-<p><a href="http://www.oschina.net/translate/rails-insecure-defaults">http://www.oschina.net/translate/rails-insecure-defaults</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/create-ebook-website-with-html5/">使用HTML5创建电子书网站</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2013-05-24T15:04:32+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>24</span><span class='date-suffix'>th</span>, <span class='date-year'>2013</span></span> <span class='time'>3:04 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在项目开始前，先要了解下HTML5规范包含的一些有用的新的语义标签，用于提供HTML页面的各个区域或部分的意义，例如页眉、页脚、导航栏、边栏等等。在以前的HTML版本中，这些部分通常使用<code>&lt;div&gt;</code>标签来创建，通过id或class属性来区分。</p>
-
-<p>HTML5引入的主要标签包括：</p>
-
-<table><thead>
-<tr>
-<th>标签</th>
-<th>说明</th>
-</tr>
-</thead><tbody>
-<tr>
-<td>header</td>
-<td>此标签用于定义页面某些部分的页眉，可以是整个页面、article标签或section标签</td>
-</tr>
-<tr>
-<td>nav</td>
-<td>这是页面上主要导航链接的容器。此标签不应用于所有链接组，而是应仅用于主要导航块。如果你有一个footer标签包含导航链接，不需要将这些链接封装在nav标签中，因为footer标签将可以独自包括这些链接</td>
-</tr>
-<tr>
-<td>footer</td>
-<td>此标签定义页面的某些部分的页脚。页脚不一定是在页面、文章或区域的结尾，但是它通常是在那个位置</td>
-</tr>
-<tr>
-<td>article</td>
-<td>定义文档或页面上的独立区块，例如新闻、杂志、博文或评论</td>
-</tr>
-<tr>
-<td>section</td>
-<td>此标签表示文档的一部分，例如，文章或教程的一章或一节。该标签通常具有一个页眉，虽然严格来说是不需要的</td>
-</tr>
-<tr>
-<td>aside</td>
-<td>用于标记边栏或一些将认为与其周围内容有点无关的内容。此项的一个例子就是广告块</td>
-</tr>
-<tr>
-<td>hgroup</td>
-<td>在某些情况下，页面、文章或区域可能需要多个标题，例如，你有一个标题和一个副标题。你可以在hgroup标签中封装这些标题，使用h1标签表示主标题，h2标签表示副标题</td>
-</tr>
-</tbody></table>
-
-<p>这些标签的基础结构遵循以下大纲：</p>
+<p>在struts.xml中将action元素中login的class属性改为applicationContext.xml配置文件中的loginAction：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>header
-</span><span class='line'>  hgroup
-</span><span class='line'>nav
-</span><span class='line'>article
-</span><span class='line'>  header
-</span><span class='line'>  section
-</span><span class='line'>    header
-</span><span class='line'>footer</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;action name="login" class="loginAction"&gt;
+</span><span class='line'>    &lt;result name="success"&gt;/index.jsp&lt;/result&gt;
+</span><span class='line'>    &lt;result name="input"&gt;/index.jsp&lt;/result&gt;
+</span><span class='line'>&lt;/action&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p><img src="/uploads/html5-ebook-layout.png" title="html5-ebook-layout" ></p>
-
-<p>上面是网站的布局设计，主要有header、navigation、footer和main四个区块，实现代码如下：</p>
+<p>修改LoginAction.java的代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -910,53 +477,896 @@
 <span class='line-number'>41</span>
 <span class='line-number'>42</span>
 <span class='line-number'>43</span>
-<span class='line-number'>44</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;!-- HTML5的DOCTYPE声明模式，它可以向后兼容，
-</span><span class='line'>     再也不用记忆XHTML中复杂的DOCTYPE了！--&gt;
+</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.account.action;
+</span><span class='line'>
+</span><span class='line'>import com.codemany.account.dao.UserDao;
+</span><span class='line'>import com.codemany.account.model.User;
+</span><span class='line'>
+</span><span class='line'>import com.opensymphony.xwork2.ActionContext;
+</span><span class='line'>import com.opensymphony.xwork2.ActionSupport;
+</span><span class='line'>
+</span><span class='line'>public class LoginAction extends ActionSupport {
+</span><span class='line'>    private static final long serialVersionUID = -389833745243649130L;
+</span><span class='line'>
+</span><span class='line'>    private String username;
+</span><span class='line'>    private String password;
+</span><span class='line'>
+</span><span class='line'>    private UserDao userDao;
+</span><span class='line'>
+</span><span class='line'>    public String execute() throws Exception {
+</span><span class='line'>        if (username == null || username.length() == 0
+</span><span class='line'>                || password == null || password.length() == 0) {
+</span><span class='line'>            return INPUT;
+</span><span class='line'>        }
+</span><span class='line'>
+</span><span class='line'>        User u = userDao.getUser(username);
+</span><span class='line'>        if (u == null || !password.equals(u.getPassword())) {
+</span><span class='line'>            return INPUT;
+</span><span class='line'>        }
+</span><span class='line'>
+</span><span class='line'>        ActionContext.getContext().getSession().put("logined", true);
+</span><span class='line'>        return SUCCESS;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public void setUsername(String username) {
+</span><span class='line'>        this.username = username;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public void setPassword(String password) {
+</span><span class='line'>        this.password = password;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public void setUserDao(UserDao userDao) {
+</span><span class='line'>        this.userDao = userDao;
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/struts2-hibernate4-login-sample/">Struts 2 + Hibernate 4登录实例</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2012-08-31T07:41:05+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>31</span><span class='date-suffix'>st</span>, <span class='date-year'>2012</span></span> <span class='time'>7:41 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>使用以下代码创建数据库：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>CREATE DATABASE IF NOT EXISTS jbookshelf;
+</span><span class='line'>
+</span><span class='line'>USE jbookshelf;
+</span><span class='line'>
+</span><span class='line'>DROP TABLE IF EXISTS users;
+</span><span class='line'>
+</span><span class='line'>CREATE TABLE users (
+</span><span class='line'>    id int NOT NULL AUTO_INCREMENT,
+</span><span class='line'>    username varchar(20) NOT NULL,
+</span><span class='line'>    password varchar(50) NOT NULL,
+</span><span class='line'>    PRIMARY KEY (id)
+</span><span class='line'>) ENGINE=InnoDB DEFAULT CHARSET=utf-8;</span></code></pre></td></tr></table></div></figure>
+
+<p>在pom.xml中添加Hibernate的依赖配置：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;dependency&gt;
+</span><span class='line'>    &lt;groupId&gt;org.hibernate&lt;/groupId&gt;
+</span><span class='line'>    &lt;artifactId&gt;hibernate-core&lt;/artifactId&gt;
+</span><span class='line'>    &lt;version&gt;4.1.6.Final&lt;/version&gt;
+</span><span class='line'>&lt;/dependency&gt;
+</span><span class='line'>&lt;dependency&gt;
+</span><span class='line'>    &lt;groupId&gt;mysql&lt;/groupId&gt;
+</span><span class='line'>    &lt;artifactId&gt;mysql-connector-java&lt;/artifactId&gt;
+</span><span class='line'>    &lt;version&gt;5.1.21&lt;/version&gt;
+</span><span class='line'>&lt;/dependency&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>创建User.java类：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.account.model;
+</span><span class='line'>
+</span><span class='line'>public class User {
+</span><span class='line'>    private Long id;
+</span><span class='line'>
+</span><span class='line'>    private String username;
+</span><span class='line'>    private String password;
+</span><span class='line'>
+</span><span class='line'>    public Long getId() {
+</span><span class='line'>        return id;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public void setId(Long id) {
+</span><span class='line'>        this.id = id;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public String getUsername() {
+</span><span class='line'>        return username;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public void setUsername(String username) {
+</span><span class='line'>        this.username = username;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public String getPassword() {
+</span><span class='line'>        return password;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public void setPassword(String password) {
+</span><span class='line'>        this.password = password;
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>在同一目录下创建User.hbm.xml文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;!DOCTYPE hibernate-mapping PUBLIC
+</span><span class='line'>    "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+</span><span class='line'>    "http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd"&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;hibernate-mapping package="com.codemany.account.model"&gt;
+</span><span class='line'>    &lt;class name="User" table="users"&gt;
+</span><span class='line'>        &lt;id name="id"&gt;
+</span><span class='line'>            &lt;generator class="increment" /&gt;
+</span><span class='line'>        &lt;/id&gt;
+</span><span class='line'>
+</span><span class='line'>        &lt;property name="username" length="20" /&gt;
+</span><span class='line'>        &lt;property name="password" length="50" /&gt;
+</span><span class='line'>    &lt;/class&gt;
+</span><span class='line'>&lt;/hibernate-mapping&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>在resources目录下创建hibernate.cfg.xml配置文件，内容如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version='1.0' encoding='utf-8'?&gt;
+</span><span class='line'>&lt;!DOCTYPE hibernate-configuration PUBLIC
+</span><span class='line'>    "-//Hibernate/Hibernate Configuration DTD 3.0//EN"
+</span><span class='line'>    "http://www.hibernate.org/dtd/hibernate-configuration-3.0.dtd"&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;hibernate-configuration&gt;
+</span><span class='line'>    &lt;session-factory&gt;
+</span><span class='line'>        &lt;!-- MySQL connection settings --&gt;
+</span><span class='line'>        &lt;property name="connection.driver_class"&gt;com.mysql.jdbc.Driver&lt;/property&gt;
+</span><span class='line'>        &lt;property name="connection.url"&gt;jdbc:mysql://localhost:3306/jbookshelf&lt;/property&gt;
+</span><span class='line'>        &lt;property name="connection.username"&gt;yourname&lt;/property&gt;
+</span><span class='line'>        &lt;property name="connection.password"&gt;yourpassword&lt;/property&gt;
+</span><span class='line'>
+</span><span class='line'>        &lt;!-- JDBC connection pool (use the built-in) --&gt;
+</span><span class='line'>        &lt;property name="connection.pool_size"&gt;1&lt;/property&gt;
+</span><span class='line'>
+</span><span class='line'>        &lt;!-- SQL dialect --&gt;
+</span><span class='line'>        &lt;property name="dialect"&gt;org.hibernate.dialect.MySQLDialect&lt;/property&gt;
+</span><span class='line'>
+</span><span class='line'>        &lt;!-- Disable the second-level cache  --&gt;
+</span><span class='line'>        &lt;property name="cache.provider_class"&gt;org.hibernate.cache.internal.NoCacheProvider&lt;/property&gt;
+</span><span class='line'>
+</span><span class='line'>        &lt;!-- Echo all executed SQL to stdout --&gt;
+</span><span class='line'>        &lt;property name="show_sql"&gt;true&lt;/property&gt;
+</span><span class='line'>
+</span><span class='line'>        &lt;mapping resource="com/codemany/account/model/User.hbm.xml" /&gt;
+</span><span class='line'>    &lt;/session-factory&gt;
+</span><span class='line'>&lt;/hibernate-configuration&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>建立管理Session的HibernateUtil.java类：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.account.dao.hibernate;
+</span><span class='line'>
+</span><span class='line'>import org.hibernate.Session;
+</span><span class='line'>import org.hibernate.SessionFactory;
+</span><span class='line'>import org.hibernate.cfg.Configuration;
+</span><span class='line'>
+</span><span class='line'>public class HibernateUtil {
+</span><span class='line'>    private static final SessionFactory sessionFactory;
+</span><span class='line'>
+</span><span class='line'>    static {
+</span><span class='line'>        try {
+</span><span class='line'>            // Create the SessionFactory from hibernate.cfg.xml
+</span><span class='line'>            Configuration configuration = new Configuration();
+</span><span class='line'>            configuration.configure();
+</span><span class='line'>            Properties props = configuration.getProperties();
+</span><span class='line'>
+</span><span class='line'>            ServiceRegistry serviceRegistry =
+</span><span class='line'>                    new ServiceRegistryBuilder().applySettings(props).buildServiceRegistry();
+</span><span class='line'>
+</span><span class='line'>            sessionFactory = configuration.buildSessionFactory(serviceRegistry);
+</span><span class='line'>        } catch (Throwable ex) {
+</span><span class='line'>            // Make sure you log the exception, as it might be swallowed
+</span><span class='line'>            System.err.println("Initial SessionFactory creation failed." + ex);
+</span><span class='line'>            throw new ExceptionInInitializerError(ex);
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public static Session getSession() {
+</span><span class='line'>        return sessionFactory.openSession();
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>在dao包创建数据访问对象：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.account.dao;
+</span><span class='line'>
+</span><span class='line'>import org.hibernate.Query;
+</span><span class='line'>import org.hibernate.Session;
+</span><span class='line'>import org.hibernate.Transaction;
+</span><span class='line'>
+</span><span class='line'>import com.codemany.account.model.User;
+</span><span class='line'>
+</span><span class='line'>public class UserDao {
+</span><span class='line'>    public static User getUser(String username) {
+</span><span class='line'>        Session session = HibernateUtil.getSession();
+</span><span class='line'>        try {
+</span><span class='line'>            Query query = session.createQuery("from User u where u.username = ?");
+</span><span class='line'>            query.setMaxResults(1);
+</span><span class='line'>            query.setString(0, username);
+</span><span class='line'>            return (User)query.uniqueResult();
+</span><span class='line'>        } finally {
+</span><span class='line'>            session.close();
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>现在可以访问数据库了，所以要修改LoginAction.java的execute方法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public String execute() throws Exception {
+</span><span class='line'>    if (username == null || username.length() == 0
+</span><span class='line'>            || password == null || password.length() == 0) {
+</span><span class='line'>        return INPUT;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    User u = UserDao.getUser(username);
+</span><span class='line'>    if (u == null) {
+</span><span class='line'>        return INPUT;
+</span><span class='line'>    }
+</span><span class='line'>    if (username.equals(u.getUsername()) && password.equals(u.getPassword())) {
+</span><span class='line'>        ActionContext.getContext().getSession().put("logined", true);
+</span><span class='line'>        return SUCCESS;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    return INPUT;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>如果显示jta-1.0.1b.jar缺失的错误，可以在pom.xml中添加以下语句：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;repositories&gt;
+</span><span class='line'>    &lt;repository&gt;
+</span><span class='line'>        &lt;id&gt;java.net&lt;/id&gt;
+</span><span class='line'>        &lt;url&gt;http://download.java.net/maven/2/&lt;/url&gt;
+</span><span class='line'>    &lt;/repository&gt;
+</span><span class='line'>&lt;/repositories&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/struts2-login-sample/">Struts 2登录实例</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2012-08-24T06:33:20+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>24</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>6:33 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>新的Eclipse已经包含Maven插件了，不过还需要到Eclipse Marketplace中去安装一个m2-wtp（Maven Integeration for Eclipse WTP）插件，不然启动Tomcat时会报错。</p>
+
+<p>安装好后创建新Maven项目，填写groupId和artifactId。</p>
+
+<p>在pom.xml中加入Struts 2的依赖配置：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;dependencies&gt;
+</span><span class='line'>    &lt;dependency&gt;
+</span><span class='line'>        &lt;groupId&gt;org.apache.struts&lt;/groupId&gt;
+</span><span class='line'>        &lt;artifactId&gt;struts2-core&lt;/artifactId&gt;
+</span><span class='line'>        &lt;version&gt;2.3.4&lt;/version&gt;
+</span><span class='line'>    &lt;/dependency&gt;
+</span><span class='line'>&lt;/dependencies&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>在web.xml文件中添加Struts 2的Filter：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;filter&gt;
+</span><span class='line'>    &lt;filter-name&gt;struts2&lt;/filter-name&gt;
+</span><span class='line'>    &lt;filter-class&gt;
+</span><span class='line'>        org.apache.struts2.dispatcher.ng.filter.StrutsPrepareAndExecuteFilter
+</span><span class='line'>    &lt;/filter-class&gt;
+</span><span class='line'>&lt;/filter&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;filter-mapping&gt;
+</span><span class='line'>    &lt;filter-name&gt;struts2&lt;/filter-name&gt;
+</span><span class='line'>    &lt;url-pattern&gt;/*&lt;/url-pattern&gt;
+</span><span class='line'>&lt;/filter-mapping&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>配置resources/struts.xml文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;struts&gt;
+</span><span class='line'>    &lt;package name="default" extends="struts-default"&gt;
+</span><span class='line'>        &lt;action name="login" class="com.codemany.account.action.LoginAction"&gt;
+</span><span class='line'>            &lt;result name="success"&gt;/index.jsp&lt;/result&gt;
+</span><span class='line'>            &lt;result name="input"&gt;/index.jsp&lt;/result&gt;
+</span><span class='line'>        &lt;/action&gt;
+</span><span class='line'>
+</span><span class='line'>        &lt;action name="logout" class="com.codemany.account.action.LogoutAction"&gt;
+</span><span class='line'>            &lt;result name="success" type="redirect"&gt;/index.jsp&lt;/result&gt;
+</span><span class='line'>        &lt;/action&gt;
+</span><span class='line'>    &lt;/package&gt;
+</span><span class='line'>&lt;/struts&gt;</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.account.action;
+</span><span class='line'>
+</span><span class='line'>import com.codemany.account.model.User;
+</span><span class='line'>
+</span><span class='line'>import com.opensymphony.xwork2.ActionContext;
+</span><span class='line'>import com.opensymphony.xwork2.ActionSupport;
+</span><span class='line'>
+</span><span class='line'>public class LoginAction extends ActionSupport {
+</span><span class='line'>    private static final long serialVersionUID = -389833745243649130L;
+</span><span class='line'>
+</span><span class='line'>    private String username;
+</span><span class='line'>    private String password;
+</span><span class='line'>
+</span><span class='line'>    public String execute() throws Exception {
+</span><span class='line'>        if (username == null || username.length() != 0
+</span><span class='line'>                || password == null || password.length() != 0) {
+</span><span class='line'>            return INPUT;
+</span><span class='line'>        }
+</span><span class='line'>
+</span><span class='line'>        if ("test".equals(username) && "test".equals(password)) {
+</span><span class='line'>            ActionContext.getContext().getSession().put("logined", true);
+</span><span class='line'>            return SUCCESS;
+</span><span class='line'>        }
+</span><span class='line'>
+</span><span class='line'>        return INPUT;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public void setUsername(String username) {
+</span><span class='line'>        this.username = username;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public void setPassword(String password) {
+</span><span class='line'>        this.password = password;
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.account.action;
+</span><span class='line'>
+</span><span class='line'>import com.opensymphony.xwork2.ActionContext;
+</span><span class='line'>import com.opensymphony.xwork2.ActionSupport;
+</span><span class='line'>
+</span><span class='line'>public class LogoutAction extends ActionSupport {
+</span><span class='line'>    private static final long serialVersionUID = -518996422060716751L;
+</span><span class='line'>
+</span><span class='line'>    public String execute() throws Exception {
+</span><span class='line'>        ActionContext.getContext().getSession().put("logined", false);
+</span><span class='line'>        return SUCCESS;
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>index.jsp内容如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%@ page contentType="text/html; charset=utf-8" pageEncoding="utf-8" %&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;%@ taglib uri="/struts-tags" prefix="s" %&gt;
+</span><span class='line'>
 </span><span class='line'>&lt;!DOCTYPE html&gt;
 </span><span class='line'>&lt;html&gt;
 </span><span class='line'>&lt;head&gt;
-</span><span class='line'>  &lt;!-- 指定文档字符编码的写法，该写法在所有浏览器上都有效。--&gt;
-</span><span class='line'>  &lt;meta charset="utf-8" /&gt;
-</span><span class='line'>  &lt;title&gt;HTML5 Demo&lt;/title&gt;
-</span><span class='line'>  &lt;!-- link和script标签也无需提供type属性（No More Types for Scripts and Links），
-</span><span class='line'>       因为CSS和JavaScript是目前惟一受支持的样式表和脚本类型 --&gt;
-</span><span class='line'>  &lt;link href="style.css" rel="stylesheet" /&gt;
-</span><span class='line'>  &lt;!-- 因为IE浏览器（甚至版本8）不支持新的HTML5标签，处理此问题的一个已知方法是使用
-</span><span class='line'>       JavaScript函数document.createElement()为每个标记创建虚拟标签。html5.js文件将
-</span><span class='line'>       为每个新的HTML标签进行此操作 --&gt;
-</span><span class='line'>  &lt;!--[if lt IE 9]&gt;
-</span><span class='line'>    &lt;script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"&gt;&lt;/script&gt;
-</span><span class='line'>  &lt;![endif]--&gt;
+</span><span class='line'>    &lt;meta charset="utf-8"&gt;
+</span><span class='line'>    &lt;title&gt;Struts2 Login Sample&lt;/title&gt;
 </span><span class='line'>&lt;/head&gt;
 </span><span class='line'>
 </span><span class='line'>&lt;body&gt;
-</span><span class='line'>  &lt;header&gt;
-</span><span class='line'>    &lt;hgroup&gt;
-</span><span class='line'>      &lt;h1&gt;Logo&lt;/h1&gt;
-</span><span class='line'>      &lt;h2&gt;Here is the slogan&lt;/h2&gt;
-</span><span class='line'>    &lt;/hgroup&gt;
-</span><span class='line'>  &lt;/header&gt;
-</span><span class='line'>
-</span><span class='line'>  &lt;nav&gt;
-</span><span class='line'>    &lt;ul&gt;
-</span><span class='line'>      &lt;li&gt;&lt;a href="#"&gt;Home&lt;/a&gt;&lt;/li&gt;
-</span><span class='line'>      &lt;li&gt;&lt;a href="#"&gt;Business&lt;/a&gt;&lt;/li&gt;
-</span><span class='line'>      &lt;li&gt;&lt;a href="#"&gt;History&lt;/a&gt;&lt;/li&gt;
-</span><span class='line'>      &lt;li&gt;&lt;a href="#"&gt;Religion&lt;/a&gt;&lt;/li&gt;
-</span><span class='line'>      &lt;li&gt;&lt;a href="#"&gt;Health&lt;/a&gt;&lt;/li&gt;
-</span><span class='line'>      &lt;li&gt;&lt;a href="#"&gt;Science&lt;/a&gt;&lt;/li&gt;
-</span><span class='line'>    &lt;/ul&gt;
-</span><span class='line'>  &lt;/nav&gt;
-</span><span class='line'>
-</span><span class='line'>  &lt;!-- main block begin --&gt;
-</span><span class='line'>  &lt;!-- main block end --&gt;
-</span><span class='line'>
-</span><span class='line'>  &lt;footer&gt;&copy; 2013&lt;/footer&gt;
+</span><span class='line'>    &lt;s:if test="#session.logined"&gt;
+</span><span class='line'>        Welcome, you have logined. &lt;a href="&lt;%= request.getContextPath() %&gt;/logout.action"&gt;Logout&lt;/a&gt;
+</span><span class='line'>    &lt;/s:if&gt;
+</span><span class='line'>    &lt;s:else&gt;
+</span><span class='line'>        &lt;p&gt;User: test/test&lt;/p&gt;
+</span><span class='line'>        &lt;s:form action="login"&gt;
+</span><span class='line'>            &lt;s:textfield key="username" label="Username" /&gt;
+</span><span class='line'>            &lt;s:password key="password" label="Password" /&gt;
+</span><span class='line'>            &lt;s:submit value="Login" /&gt;
+</span><span class='line'>        &lt;/s:form&gt;
+</span><span class='line'>    &lt;/s:else&gt;
 </span><span class='line'>&lt;/body&gt;
 </span><span class='line'>&lt;/html&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p>对应的CSS文件内容：</p>
+<p>在项目上点击右键 -&gt; Run As -&gt; Maven build运行项目。在Goals栏中填写tomcat:run，Maven会自动下载Tomcat到项目的target目录下后启动服务器。</p>
+
+<p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/using-ruby-to-batch-rename-filename-from-traditional-to-simplified/">使用Ruby批量修改繁体文件名为简体</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2012-08-08T14:44:13+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>8</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>2:44 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>首先是遍历目录所有文件，使用了 <a href="http://beike.iteye.com/blog/361108">http://beike.iteye.com/blog/361108</a> 的代码，稍微做了下修改。主要是在Windows下处理系统目录时会停止遍历，加上了异常处理。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def traverse(path)
+</span><span class='line'>  begin
+</span><span class='line'>    if File.directory?(path)
+</span><span class='line'>      Dir.foreach(path) do |file|
+</span><span class='line'>        if file != "." and file != ".."
+</span><span class='line'>          traverse(path + "/" + file) {|x| yield x}
+</span><span class='line'>        end
+</span><span class='line'>      end
+</span><span class='line'>    else
+</span><span class='line'>      yield path
+</span><span class='line'>    end
+</span><span class='line'>  rescue
+</span><span class='line'>    puts "Error: #{$!}"
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>如果不输入文件夹路径，就使用当前目录作为根目录：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>root = ARGV[0] || Dir.pwd</span></code></pre></td></tr></table></div></figure>
+
+<p>将繁体中文改成简体的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>mapping = {}
+</span><span class='line'>mapping["無"] = "无"
+</span><span class='line'>mapping["龍"] = "龙"
+</span><span class='line'>
+</span><span class='line'>mapping.each do |key, value|
+</span><span class='line'>  file.gsub!(key.encode('gbk', 'utf-8'), value.encode('gbk', 'utf-8'))
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>文件重命名：
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>File.rename(old_file_name, new_file_name)</span></code></pre></td></tr></table></div></figure></p>
+
+<p>代码下载：<a href="https://github.com/dohkoos/big2gb">https://github.com/dohkoos/big2gb</a></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/css-naming-conventions/">CSS命名规范</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2012-07-28T18:27:06+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>28</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>6:27 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>收集了网上的一些CSS命名规范，根据自己的理解和需求整理了一遍。</p>
+
+<h3 id="布局（layout）">布局（layout）</h3>
+
+<ul>
+<li>container 就是将页面中的所有元素包在一起的部分</li>
+<li>header 页面的头部区域，包含站点的logo和一些其它元素</li>
+<li>navbar 横向导航栏，最典型的网页元素</li>
+<li>breadcrumbs 即页面所处位置的导航提示</li>
+<li>content 是站点的主要区域</li>
+<li>sidebar</li>
+<li>footer</li>
+</ul>
+
+<h3 id="头部（header）">头部（header）</h3>
+
+<ul>
+<li>logo</li>
+<li>slogan</li>
+</ul>
+
+<h3 id="导航栏（navbar）">导航栏（navbar）</h3>
+
+<ul>
+<li>mainnav</li>
+<li>subnav</li>
+<li>topnav</li>
+</ul>
+
+<h3 id="侧边栏（sidebar）">侧边栏（sidebar）</h3>
+
+<ul>
+<li>menu 包含一般的链接。sidebar中可以包含多个menu</li>
+</ul>
+
+<h3 id="常用">常用</h3>
+
+<ul>
+<li>userbar 登录注册条</li>
+<li>copyright</li>
+<li>banner</li>
+<li>feature</li>
+</ul>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/binary-search-algorithm-i-wrote-has-a-bug/">我写的二分查找算法有bug！</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2012-07-25T08:07:17+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>25</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>8:07 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>看完 <a href="http://reprog.wordpress.com/2010/04/19/are-you-one-of-the-10-percent/">http://reprog.wordpress.com/2010/04/19/are-you-one-of-the-10-percent/</a> 觉得很不服气，写个二分查找算法还不简单吗？分分钟搞定的事情。</p>
+
+<p>按照它的要求，用Java写出以下代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -974,193 +1384,80 @@
 <span class='line-number'>14</span>
 <span class='line-number'>15</span>
 <span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-<span class='line-number'>44</span>
-<span class='line-number'>45</span>
-<span class='line-number'>46</span>
-<span class='line-number'>47</span>
-<span class='line-number'>48</span>
-<span class='line-number'>49</span>
-<span class='line-number'>50</span>
-<span class='line-number'>51</span>
-<span class='line-number'>52</span>
-<span class='line-number'>53</span>
-<span class='line-number'>54</span>
-<span class='line-number'>55</span>
-<span class='line-number'>56</span>
-<span class='line-number'>57</span>
-<span class='line-number'>58</span>
-<span class='line-number'>59</span>
-<span class='line-number'>60</span>
-<span class='line-number'>61</span>
-<span class='line-number'>62</span>
-<span class='line-number'>63</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>* {
-</span><span class='line'>  font-family: Lucida Sans, Arial, Helvetica, sans-serif;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>body {
-</span><span class='line'>  width: 768px;
-</span><span class='line'>  margin: 0px auto;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>header h1 {
-</span><span class='line'>  font-size: 36px;
-</span><span class='line'>  margin: 0px;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>header h2 {
-</span><span class='line'>  font-size: 18px;
-</span><span class='line'>  margin: 0px;
-</span><span class='line'>  color: #888;
-</span><span class='line'>  font-style: italic;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>nav ul {
-</span><span class='line'>  list-style: none;
-</span><span class='line'>  margin: 0;
-</span><span class='line'>  padding: 0;
-</span><span class='line'>  width: 100%;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>nav ul:after {
-</span><span class='line'>  content: "\0020";
-</span><span class='line'>  display: block;
-</span><span class='line'>  height: 0;
-</span><span class='line'>  clear: both;
-</span><span class='line'>  visibility: hidden;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>nav ul  li {
-</span><span class='line'>  float: left;
-</span><span class='line'>  width: 16.66%;
-</span><span class='line'>  text-align: center;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>nav ul li a {
-</span><span class='line'>  display: block;
-</span><span class='line'>  background: #000;
-</span><span class='line'>  color: #fff;
-</span><span class='line'>  font-weight: bold;
-</span><span class='line'>  padding: 10px;
-</span><span class='line'>  border-right: 1px solid #fff;
-</span><span class='line'>  text-decoration: none;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>nav ul li a:hover {
-</span><span class='line'>  background: #333;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>footer {
-</span><span class='line'>  border-top: 1px solid #ccc;
-</span><span class='line'>  text-align: center;
-</span><span class='line'>  font-size: 12px;
-</span><span class='line'>  color: #888;
-</span><span class='line'>  margin-top: 24px;
+</pre></td><td class='code'><pre><code class=''><span class='line'>public int binarySearch(int[] array, int value) {
+</span><span class='line'>    int low = 0;
+</span><span class='line'>    int high = array.length - 1;
+</span><span class='line'>    int mid;
+</span><span class='line'>    while (low &lt;= high) {
+</span><span class='line'>        mid = (low + high) / 2;
+</span><span class='line'>        if (array[mid] &lt; value) {
+</span><span class='line'>            low = mid + 1;
+</span><span class='line'>        } else if (array[mid] &gt; value) {
+</span><span class='line'>            high = mid - 1;
+</span><span class='line'>        } else {
+</span><span class='line'>            return mid;
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>    return -1;
 </span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>整个网站主要有这么几个页面：首页、分类页、书目页、内容页，这些页面共用一个布局，主要区别在于main区块的不同。首页、分类页和书目页相似，都是由列表组成。</p>
+<p>把代码贴到评论区参加测试。</p>
 
-<p>首页中有多个无序列表，列出网站中最新、最多被访问、最多被分享等的图书：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;h3&gt;Latest&lt;/h3&gt;
-</span><span class='line'>&lt;ul&gt;
-</span><span class='line'>  &lt;li&gt;Book's title&lt;/li&gt;
-</span><span class='line'>  &lt;li&gt;Book's title&lt;/li&gt;
-</span><span class='line'>  &lt;li&gt;Book's title&lt;/li&gt;
-</span><span class='line'>&lt;/ul&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;h3&gt;Most Viewed&lt;/h3&gt;
-</span><span class='line'>&lt;ul&gt;
-</span><span class='line'>  &lt;li&gt;Book's title&lt;/li&gt;
-</span><span class='line'>  &lt;li&gt;Book's title&lt;/li&gt;
-</span><span class='line'>  &lt;li&gt;Book's title&lt;/li&gt;
-</span><span class='line'>&lt;/ul&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;h3&gt;Most Shared&lt;/h3&gt;
-</span><span class='line'>&lt;ul&gt;
-</span><span class='line'>  &lt;li&gt;Book's title&lt;/li&gt;
-</span><span class='line'>  &lt;li&gt;Book's title&lt;/li&gt;
-</span><span class='line'>  &lt;li&gt;Book's title&lt;/li&gt;
-</span><span class='line'>&lt;/ul&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>分类页是单个无序列表，列出当前被访问分类下所有的图书：</p>
+<p>写代码和检查总共花费20分钟，75%的时间是用来在脑袋里模拟运算，防止数组索引溢出。然后编译2次，消除了两个语法错误（好久没写Java代码和使用Ruby的关系，竟然连个数组初始化都不会写了）。也想过数值溢出的问题，但是没想到点子上。结果恰恰倒在了这个地方。具体原因在 <a href="http://googleresearch.blogspot.com/2006/06/extra-extra-read-all-about-it-nearly.html">http://googleresearch.blogspot.com/2006/06/extra-extra-read-all-about-it-nearly.html</a> 有描述。因为low + high的和会形成数值溢出，解决方法是采用：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;h3&gt;Business&lt;/h3&gt;
-</span><span class='line'>&lt;ul&gt;
-</span><span class='line'>  &lt;li&gt;Book's title&lt;/li&gt;
-</span><span class='line'>  &lt;li&gt;Book's title&lt;/li&gt;
-</span><span class='line'>  &lt;li&gt;Book's title&lt;/li&gt;
-</span><span class='line'>&lt;/ul&gt;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>int mid = low + ((high - low) / 2);</span></code></pre></td></tr></table></div></figure>
 
-<p>书目页是单个有序列表，列出某本书所有的章节：</p>
+<p>或</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;h3&gt;Book's title&lt;/h3&gt;
-</span><span class='line'>&lt;ol&gt;
-</span><span class='line'>  &lt;li&gt;Chapter 1&lt;/li&gt;
-</span><span class='line'>  &lt;li&gt;Chapter 2&lt;/li&gt;
-</span><span class='line'>  &lt;li&gt;Chapter 3&lt;/li&gt;
-</span><span class='line'>&lt;/ol&gt;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>int mid = (low + high) &gt;&gt;&gt; 1;</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
 
-<p>内容页，顾名思义就是显示具体内容的页面。文章内容用<code>&lt;article&gt;</code>标签表示，其中的标题、作者、发表时间等信息被包含在<code>&lt;header&gt;</code>标签中。主要代码如下：</p>
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-crack-zte-zxa10-f460-v30-for-superuser-password/">如何破解中兴ZXA10-F460 v3.0获取超级管理员密码</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2012-07-20T14:12:59+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>20</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>2:12 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>破解前的系统情况：</p>
+
+<ul>
+<li>硬件版本号 V3.0</li>
+<li>软件版本号 F460_IMS_V2.30.10P1T6_JS1111</li>
+<li>BOOT版本号 V1.1.0P1T1</li>
+<li>版本日期 2012-02-29 16:29:07</li>
+</ul>
+
+<p>中兴ZXA10-F460光猫（E8-C）在第一次安装的时候，超级管理员帐号是telecomadmin，密码为nE7jA%5m，这个是默认的，由安装人员设置好相关设置后，会自动下载配置，这时候这个超级管理员密码会被修改为telecomadminXXXXXXXX（8个X是8位数字，每个用户是不同的）这种格式。因为很多设置需要在超级管理员下才能设置，所以破解这个超级管理员密码是非常必要的。</p>
+
+<p>其中V1.0和V2.0版本网上有破解方法，大家可以自己搜索。</p>
+
+<p>在命令行下输入telnet 192.168.1.1，帐号和密码都是root。连接成功后，会出现“F460 login:”这样的提示。</p>
+
+<p>注意：目前网上流传的查看/tmp目录下db_backup_cfg.xml文件内容的破解方法已经无效了。另外在/userconfig/cfg目录下有两个加密的配置文件db_backup_cfg.xml和db_user_cfg.xml，同目录下还有个db_default_cfg.xml是不加密的（该文件是出厂设置的配置文件），但是大家不要用这个文件去替换db_user_cfg.xml，否则会出现不可预知的后果。</p>
+
+<p>实际上只要修改一下/home/httpd/login.gch这个文件，就能看到密码了。patch文件内容如下：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1188,57 +1485,86 @@
 <span class='line-number'>24</span>
 <span class='line-number'>25</span>
 <span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;article&gt;
-</span><span class='line'>  &lt;header&gt;
-</span><span class='line'>    &lt;h1&gt;&lt;a href="#"&gt;Chapter 1&lt;/a&gt;&lt;/h1&gt;
-</span><span class='line'>    &lt;p&gt;By &lt;a href="#"&gt;author&lt;/a&gt; on &lt;time&gt;2013-05-24 14:54&lt;/time&gt;&lt;/p&gt;
-</span><span class='line'>  &lt;/header&gt;
-</span><span class='line'>  &lt;p&gt;
-</span><span class='line'>  Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed
-</span><span class='line'>  diam nonummy nibh euismod tincidunt ut laoreet dolore magna
-</span><span class='line'>  aliquam erat volutpat. Ut wisi enim ad minim veniam, quis
-</span><span class='line'>  nostrud exerci tation ullamcorper suscipit lobortis nisl ut
-</span><span class='line'>  aliquip ex ea commodo consequat.
-</span><span class='line'>  &lt;/p&gt;
-</span><span class='line'>  &lt;section&gt;
-</span><span class='line'>    &lt;header&gt;
-</span><span class='line'>      &lt;h1&gt;Section heading&lt;/h1&gt;
-</span><span class='line'>    &lt;/header&gt;
-</span><span class='line'>    &lt;p&gt;
-</span><span class='line'>    Duis autem vel eum iriure dolor in hendrerit in vulputate velit
-</span><span class='line'>    esse molestie consequat, vel illum dolore eu feugiat nulla
-</span><span class='line'>    facilisis at vero eros et accumsan et iusto odio dignissim qui
-</span><span class='line'>    blandit praesent luptatum zzril delenit augue duis dolore te
-</span><span class='line'>    feugait nulla facilisi.
-</span><span class='line'>    &lt;/p&gt;
-</span><span class='line'>  &lt;/section&gt;
-</span><span class='line'>  &lt;footer&gt;
-</span><span class='line'>    &lt;a href="#"&gt;Back&lt;/a&gt;
-</span><span class='line'>    &lt;a href="#"&gt;TOC&lt;/a&gt;
-</span><span class='line'>    &lt;a href="#"&gt;Forward&lt;/a&gt;
-</span><span class='line'>  &lt;/footer&gt;
-</span><span class='line'>&lt;/article&gt;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>--- /home/httpd/login.gch 2012-07-03 14:05:16.000000000 +0800
+</span><span class='line'>+++ login.gch 2012-07-03 14:03:37.000000000 +0800
+</span><span class='line'>@@ -152,6 +152,17 @@
+</span><span class='line'>set_language("langcn.conf");
+</span><span class='line'>langclass = "login_title_centeren";
+</span><span class='line'>}
+</span><span class='line'>+var CK_HANDLE = create_paralist();
+</span><span class='line'>+var login_name = "telecomadmin";
+</span><span class='line'>+set_para(CK_HANDLE, "Username", login_name);
+</span><span class='line'>+qeury_list_bycond("OBJ_USERINFO_ID", "IGD", CK_HANDLE);
+</span><span class='line'>+destroy_paralist(CK_HANDLE);
+</span><span class='line'>+CK_HANDLE = create_paralist();
+</span><span class='line'>+var CK_IDENTITY = query_identity(0);
+</span><span class='line'>+get_inst(CK_HANDLE, "OBJ_USERINFO_ID", CK_IDENTITY);
+</span><span class='line'>+var now_pwd = get_para(CK_HANDLE, "Password");
+</span><span class='line'>+now_pwd = delMoreSlash(now_pwd);
+</span><span class='line'>+destroy_paralist(CK_HANDLE);
+</span><span class='line'>%&gt;
+</span><span class='line'>&lt;head&gt;
+</span><span class='line'>&lt;META HTTP-EQUIV="pragma" CONTENT="no-cache&gt;
+</span><span class='line'>@@ -239,4 +250,5 @@
+</span><span class='line'>&lt;/script&gt;
+</span><span class='line'>&lt;/head&gt;
+</span><span class='line'>&lt;body onload="onFocus();"&gt;
+</span><span class='line'>+&lt;div&gt;&lt;%=now_pwd;%&gt;&lt;/div&gt;
+</span><span class='line'>&lt;div id="container" class="content"&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p>在上面的代码里，<code>&lt;header&gt;</code>标签中我们仅使用了<code>&lt;h1&gt;</code>标签，这是因为HTML5会根据上下文计算出heading元素的层级，因此会有：</p>
+<p>效果是浏览器登录192.168.1.1的时候，超级管理员密码会显示在首页界面的左上角。</p>
+
+<p>到这儿有人想了，怎么把上面的patch更新到/home/httpd/login.gch中呢？总结了三种方法：</p>
+
+<p>第一种方法是telent到F460上后，执行下面的命令即可：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;body&gt;&lt;h1&gt;  &lt;!-- 相当于heading 1 --&gt;
-</span><span class='line'>&lt;body&gt;&lt;section&gt;&lt;h1&gt;  &lt;!-- 相当于heading 2 --&gt;
-</span><span class='line'>&lt;body&gt;&lt;section&gt;&lt;section&gt;&lt;h1&gt;  &lt;!-- 相当于heading 3 --&gt;</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>sed -i '155 s/^/var CK_HANDLE = create_paralist();\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '156 s/^/var login_name = "telecomadmin";\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '157 s/^/set_para(CK_HANDLE, "Username", login_name);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '158 s/^/qeury_list_bycond("OBJ_USERINFO_ID", "IGD", CK_HANDLE);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '159 s/^/destroy_paralist(CK_HANDLE);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '160 s/^/CK_HANDLE = create_paralist();\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '161 s/^/var CK_IDENTITY = query_identity(0);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '162 s/^/get_inst(CK_HANDLE, "OBJ_USERINFO_ID", CK_IDENTITY);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '163 s/^/var now_pwd = get_para(CK_HANDLE, "Password");\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '164 s/^/now_pwd = delMoreSlash(now_pwd);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '165 s/^/destroy_paralist(CK_HANDLE);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '253 s/^/&lt;div&gt;&lt;%=now_pwd;%&gt;&lt;\/div&gt;\n/' /home/httpd/login.gch</span></code></pre></td></tr></table></div></figure>
 
-<p>最后顺便说一句，HTML5支持已存在的各种写法：xhtml1.0、xhtml1.1和html4.0，但建议使用xhtml1.1规范，即：</p>
+<p>第二种方法是telent到F460上后，执行cp /home/httpd/login.gch /home/httpd/login_gch.xml，通过浏览器把login_gch.xml保存到电脑上，然后再把patch更新进去。可以在电脑上架设ftp服务器，在F460上执行以下命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>cd /home/httpd/
+</span><span class='line'>wget ftp://&lt;YOUR_COMPUTER_IP&gt;/login.gch  # 把&lt;YOUR_COMPUTER_IP&gt;替换成你自己的</span></code></pre></td></tr></table></div></figure>
+
+<p>第三种方法是telent到F460上后，执行df命令，查看是否有usb1_1或usb2_1，如果有就可以进行下一步操作。输入cp /home/httpd/login.gch /mnt/usb1_1/login.gch把文件拷贝到优盘上，修改后使用cp /mnt/usb1_1/login.gch /home/httpd/login.gch把文件更新到猫上就可以。</p>
+
+<p>2013/6/16更新</p>
+
+<p>其实还有种更简便的方法，中兴的光猫有个sendcmd命令，下面是该命令的简单用法：</p>
 
 <ol>
-<li>所有标签/属性都使用小写字母;</li>
-<li>所有属性值都必须加引号;</li>
-<li>使用闭合标签。</li>
+<li>读取全部表名 sendcmd 1 DB all；</li>
+<li>读取指定表信息 sendcmd 1 DB p 表名。比如sendcmd 1 DB p UserInfo，查看路由器帐号和密码，超级管理员密码也在这里查看；</li>
+<li>查看当前系统运行的服务状态 sendcmd -pc show；</li>
+<li>修改某个表的某个字段的值 sendcmd 1 DB set 表名 行数 字段名 字段值。比如要修改超级管理员密码，可以使用sendcmd 1 DB set UserInfo 0 Password 123456；</li>
+<li>保存对配置文件的修改 sendcmd 1 DB save。</li>
 </ol>
+
+<p>当然还有其它的命令，但是就修改光猫配置来说，这几条命令足够了。</p>
 </div>
   
   
@@ -1251,7 +1577,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/problem-when-deploying-application-to-heroku/">部署应用到Heroku时的问题</a></h1>
+      <h1 class="entry-title"><a href="/blog/summary-of-sql-join/">SQL连接总结</a></h1>
     
     
       <p class="meta">
@@ -1260,62 +1586,92 @@
 
 
 
-<time class='entry-date' datetime='2013-05-21T06:25:33+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>21</span><span class='date-suffix'>st</span>, <span class='date-year'>2013</span></span> <span class='time'>6:25 am</span></time>
+<time class='entry-date' datetime='2012-07-02T09:44:51+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2012</span></span> <span class='time'>9:44 am</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>Heroku现在已经是纯粹的只读PaaS了，也就是说以前还支持的SQlite现在也不能使用了。因此部署到Heroku上的Rails应用需要把使用的数据库改成PostgreSQL，并且要关闭assets的预编译功能。</p>
+  <div class="entry-content"><p>连接（join）可以在SELECT语句的FROM子句或WHERE子句中建立，在FROM子句中指出连接时有助于将连接操作与WHERE子句中的搜索条件区分开来。连接可以对同一个表操作，也可以对多个表操作，对同一个表操作的连接称为自连接（self join）。</p>
 
-<p>修改Gemfile，将SQLite换成PostgreSQL：</p>
+<p>连接类型（join type）分为三种：内连接、外连接和交叉连接。</p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># gem 'sqlite3'
-</span><span class='line'>gem 'pg'</span></code></pre></td></tr></table></div></figure>
+<ul>
+<li>内连接（inner join）：使用比较运算符进行表间某（些）列数据的比较操作，并列出这些表中与连接条件相匹配的数据行。</li>
+<li>外连接（outer join）：与内连接不同的是外连接不只列出与连接条件相匹配的行，而且列出左表（左外连接时）、右表（右外连接时）或两个表（全外连接时）中所有符合条件的数据行。</li>
+<li>交叉连接（cross join）：返回连接表中所有数据行的笛卡尔积。</li>
+</ul>
 
-<p>在config/application.rb中添加：</p>
+<p>内/外链接可以分为等值连接和不等连接：</p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>config.assets.initialize_on_precompile = false</span></code></pre></td></tr></table></div></figure>
+<ul>
+<li>等值连接（equijoin）：在连接条件中使用等于（=）运算符比较被连接列的列值，其查询结果中列出被连接表中的所有列，包括其中的重复列。</li>
+<li>不等连接（non-equijoin）：在连接条件使用除等于运算符以外的其它比较运算符比较被连接的列的列值。</li>
+</ul>
 
-<p>股票功能需要导入交割单文件，因为导入后的文本文件不再使用，可以把上传路径由public/uploads改为tmp，这样就避免了Heroku不能写文件的问题。</p>
+<p>注意：自然连接（natural join）是一种特殊的等值连接。它使用选择列表指出查询结果中所包括的列，由此删除连接表中的重复列。</p>
 
-<p>应用上传后运行时出现异常，使用heroku logs -t查看日志发现有如下错误：</p>
+<p>books数据表：</p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Error: column "stocks.share_name" must appear in the GROUP BY clause or be used in an aggregate function</span></code></pre></td></tr></table></div></figure>
+<p><img src="/uploads/books-table.png" title="books-table" ></p>
 
-<p>这是因为在controller中有这么一行代码：</p>
+<p>publishers数据表：</p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>current_user.stocks.select("share_code, share_name, sum(actual_amount) as amount").group("share_code")</span></code></pre></td></tr></table></div></figure>
+<p><img src="/uploads/publishers-table.png" title="publishers-table" ></p>
 
-<p>在PostgreSQL中这会有问题。比如下面的数据表：</p>
-
-<p><img src="/uploads/stocks-table.png" title="stocks-table" ></p>
-
-<p>执行上面的SQL语句后，share_name的值到底是取Ruby呢还是ST Ruby？解决这个问题的方法是使用aggregate函数。</p>
+<p>自连接查询：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>current_user.stocks.select("share_code, max(share_name) as share_name, sum(actual_amount) as amount").group("share_code")</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SELECT * FROM books b1 [INNER] JOIN books b2 ON b1.price = b2.price</span></code></pre></td></tr></table></div></figure>
 
-<p>使用PostgreSQL还有个问题，就是decimal类型的字段，取出来的值是字符串类型。例如：</p>
+<p><img src="/uploads/self-join.png" title="self-join" ></p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if stock.amount &lt; 0</span></code></pre></td></tr></table></div></figure>
-
-<p>它会报错误：</p>
+<p>内连接（简称连接）查询：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ArgumentError (comparison of String with 0 failed)</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SELECT * FROM books b [INNER] JOIN publishers p ON b.publisher_id = p.publisher_id</span></code></pre></td></tr></table></div></figure>
 
-<p>这个可以使用to_f函数解决：</p>
+<p><img src="/uploads/inner-join.png" title="inner-join" ></p>
+
+<p>自然连接查询：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if stock.amount.to_f &lt; 0</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SELECT b.*, p.name FROM books b [INNER] JOIN publishers p ON b.publisher_id = p.publisher_id</span></code></pre></td></tr></table></div></figure>
+
+<p><img src="/uploads/natural-join.png" title="natural-join" ></p>
+
+<p>左外连接（简称左连接）查询：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SELECT * FROM books b LEFT [OUTER] JOIN publishers p ON b.publisher_id = p.publisher_id</span></code></pre></td></tr></table></div></figure>
+
+<p><img src="/uploads/left-outer-join.png" title="left-outer-join" ></p>
+
+<p>右外连接（简称右连接）查询：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SELECT * FROM books b RIGHT [OUTER] JOIN publishers p ON b.publisher_id = p.publisher_id</span></code></pre></td></tr></table></div></figure>
+
+<p><img src="/uploads/right-outer-join.png" title="right-outer-join" ></p>
+
+<p>全外连接（简称全连接）查询：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SELECT * FROM books b FULL [OUTER] JOIN publishers p ON b.publisher_id = p.publisher_id</span></code></pre></td></tr></table></div></figure>
+
+<p><img src="/uploads/full-outer-join.png" title="full-outer-join" ></p>
+
+<p>交叉连接查询：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SELECT * FROM books CROSS JOIN publishers</span></code></pre></td></tr></table></div></figure>
+
+<p><img src="/uploads/cross-join.png" title="cross-join" ></p>
+
+<p>下图是由Moffatt在2008年制作的连接集合表示：</p>
+
+<p><img src="/uploads/sql-joins.jpg" title="sql-joins" ></p>
 </div>
   
   
@@ -1328,7 +1684,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/agile-development-going-downhill/">敏捷开发走下坡路了吗？</a></h1>
+      <h1 class="entry-title"><a href="/blog/in-startups-and-life-you-need-plan-a-b-and-z/">在创业和生活中间你需要计划A、B和Z</a></h1>
     
     
       <p class="meta">
@@ -1337,219 +1693,40 @@
 
 
 
-<time class='entry-date' datetime='2013-05-19T12:36:14+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>19</span><span class='date-suffix'>th</span>, <span class='date-year'>2013</span></span> <span class='time'>12:36 pm</span></time>
+<time class='entry-date' datetime='2012-06-11T18:20:17+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>11</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>6:20 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>英文原文：<a href="http://thatextramile.be/blog/2008/11/agile-development-going-downhill">http://thatextramile.be/blog/2008/11/agile-development-going-downhill</a></p>
+  <div class="entry-content"><p>英文原文：<a href="https://techcrunch.com/2012/02/14/in-startups-and-life-you-need-plan-a-b-and-z/">https://techcrunch.com/2012/02/14/in-startups-and-life-you-need-plan-a-b-and-z/</a></p>
 
-<p>James Shore（非常精彩的书《<a href="http://thatextramile.be/blog/2008/05/the-art-of-agile-development/">The Art Of Agile Development</a>》的作者）在他的博客上写了一篇很有趣的帖子：<a href="http://jamesshore.com/Blog/The-Decline-and-Fall-of-Agile.html">The Decline And Fall Of Agile</a>。你绝对应该读读它。</p>
+<p>创业者总会从真正聪明的、有经验的人士那里得到很多矛盾的建议。例如，你可能被告知既要坚持又要灵活；要有一个你不懈地追求的清晰愿景，但是也要随着市场的变化而改变你的愿景。简单，对吧？</p>
 
-<p>我想我同意James的观点。在过去的几年里，我已经听到了很多的人说他们在做敏捷开发，实际上，他们几乎都不是。引用James的话：</p>
+<p>同样的矛盾在职业咨询当中盛行。有些人会告诉你，要想清楚十年后你希望在哪里，然后通过逆向推导，建立一个实现你的雄心的长期职业规划。其他人告诉你，坚定的计划就像一种桎梏：它们会让你错失意想不到的突破机会。他们说，最好是保持随机应变。</p>
 
-<blockquote>
-<p>But guess which part people adopt? That&#39;s right--Sprints and Scrums. Rapid cycles, but none of the good stuff that makes rapid cycles sustainable.</p>
-</blockquote>
+<p>谁是对的呢？两者不仅都是对的，而且至关重要。创业者需要灵活性地坚持。我曾经共事过的优秀创业者忙于重要的规划与战略，但他们不会设置固定的计划。在我和Ben Casnocha的新书<a href="https://www.amazon.com/Start-up-You-Future-Yourself-Transform/dp/0307888908/">《The Start-Up of You: Adapt to the Future, Invest in Yourself, and Transform Your Career》</a>中，我们展示了任何专业人士如何将创业技巧应用于他们的职业，即使你从未计划去求职于一家公司。</p>
 
-<p>不幸的是，这是非常真实的。现在许多团队都在进行短迭代工作，很多团队也在做每日例会，或Scrum，或站立会议。但是，有多少人事实上致力于使敏捷开发成功的技术实践和原则呢？老实说，我一个也没见过。</p>
+<p>我参与过一些在它们初创时你不会认可的公司。尤其是作为很好例子的两个，因为它们都有着巨大的影响力：Flickr和PayPal。Flickr开始时是一个多玩家在线游戏，之后渐变为最广泛使用的照片托管和分享网站之一。PayPal开始时是移动电话的加密平台，然后成为Palm Pilot之间的转钱服务，最终成为领先的在线支付公司。两者都坚持它们最初的愿景，以求学习和成长：Flickr作为一种社交体验和PayPal是安全的现金。然而，正是因为有着极大的弹性和锲而不舍，两家公司都彻底地改变了产品的类型并最终获得用户的青睐。</p>
 
-<p>我是一个真正的敏捷开发的铁杆迷，但即使在我现在的工作中，我最近的两个团队也没有完全正确地实现它。我们的研究结果虽然还不错，但我认为我们仍然可以做得更好。我逐渐尝试引入更多的原则和实践，但它确实需要一些时间。但是，所有这些关于敏捷开发的误解，所以很多人（开发人员，项目经理等）有没有真正帮助。在我当前的工作中，这些误解是非常小的，他们并不真正有不良影响。以前在客户那里，我确实注意到这些误解是如何导致异常低效的情况。其实这是非常伤心的，因为迟早经理可能会对敏捷方法持怀疑态度。如果这导致人们放弃一些技术实践和原则，对这个事业来说将会是一个相当大的损失。</p>
+<p>在创业或职业生涯中，你是如何做到灵活地坚持的？这里是我使用的一个框架：ABZ计划。在事业和生活中，你应该有3个计划：A计划、B计划和Z计划。</p>
 
-<p>我觉得有更多的理由去读James的那本出色的书。如果我可以合法地迫使人们去阅读这本书，我会的:)</p>
-</div>
-  
-  
+<p><strong>A计划</strong>是你当前的计划，你目前的重点是怎样赢得市场。对于Flickr的联合创始人<a href="http://www.linkedin.com/in/cefake">Caterina Fake</a>和<a href="http://ca.linkedin.com/in/butterfield">Stewart Butterfield</a>而言，最初的A计划是Game Neverending，一个多玩家在线游戏。不同于当时的大多数游戏只能通过固定的体验在几个对手之间进行，他们希望他们的游戏能有数以百计的用户同时玩，并且永远地在游戏中创造新的事物。为了吸引住用户，他们构建了像群组、即时通讯这样的社交功能，最关键的功能是允许玩家彼此之间分享照片。</p>
 
+<p>我最初的职业A计划是致力于学术界，因为我认为传播什么是造就一个良好社会的思想是对这个世界造成影响的最好方式。当我在牛津学习时，我学到很多关于人们如何聚在一起，在群组间互动和与社会产生关联。但是我也了解到，学术界的职业成功往往意味着写出只有50多人读过的专业著作。</p>
 
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/manage-books-by-scanning-isbn-barcode/">扫描ISBN条码实现藏书管理</a></h1>
-    
-    
-      <p class="meta">
-        
+<p><strong>B计划</strong>是当你意识到一个新机会比你所从事的事情拥有更多潜力时转向的计划。有时候你转变为B计划是因为A计划并不奏效，这是大多数人听到“B计划”时所想的。但有时候A计划还能正常工作，然而B计划似乎拥有更多潜力。不管转移的原因是什么，最好的B计划是虽有不同，但却和你现在正在做的事情有关。这样，你可以把你已经学到的经验和教训用于新计划。</p>
 
+<p>对照到Flickr，出乎意料地，照片分享功能受欢迎的程度超越了游戏本身。Caterina和Stewart面临一个抉择：他们应该坚持他们的A计划还是暂时中止游戏（和2万狂热用户）以便完全专注于照片分享功能？最终他们转移到B计划。当然，Caterina和Stewart仍然遵循最初的想法来构建一个在线的社交空间——他们只是看到照片分享比游戏有更大的潜力。</p>
 
+<p>在我的职业生涯中，我对学术界的认识导致我转向B计划，找到具有更广泛影响力的职业路径。我的B计划是创建新的软件。软件行业的成功也意味着“影响力”——但是比学术界有更广泛的规模。在某些情况下，它意味着构建一种每天改善数百万人生活的产品。为追求这条替代路线，我首先通过在苹果和富士通的在线部门工作来专注于建立相关技能和关系。其次，我与可以共同创建一家我自己的公司的人联系。然后，当我开始我的第一家公司时，我招募了许多聪明的顾问和参与者，以便快速地学习和调整。而且，就公司规划方面来说，由于我的第一家公司（SocialNet）不成功，PayPal和LinkedIn都是我自己转向的新的B计划。</p>
 
+<p>请记住，你应该很少写下一个明确的B计划，但是你应该总是在你执行你的A计划时注意你的动态参数。你应该考虑“临近可能性”。你的可转换的技能。在视野内的其它机会。</p>
 
-<time class='entry-date' datetime='2013-04-25T12:17:14+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>25</span><span class='date-suffix'>th</span>, <span class='date-year'>2013</span></span> <span class='time'>12:17 pm</span></time>
-        
-      </p>
-    
-  </header>
+<p><strong>Z计划</strong>有两个关键的部分。首先，确认如何衡量你正在朝着最坏的情况发展，其次，它是告诉你最坏的情况发生时应该做什么。也许当你的信用卡债务膨胀到一定数量时，你会提前支取你的401k养老金，或者在星巴克找份工作。Z计划最后担保的确定性就是让你在职业生涯中承担各种不确定性和风险。当我开始我的第一家公司SocialNet时，我的父母在他们的住宅为我提供了一间屋子，以防事情没有成功。住在那里然后找其它的工作是我的Z计划。它让我有信心全身心地投入到事业中，因为我知道就算一切都没有了，我也不至于沦落街头。为了可以重新开始，你需要在失败中存活。</p>
 
-
-  <div class="entry-content"><p>每个程序猿家里都有一堆技术书籍，偶也不例外，因此想写个Android应用来管理自己的藏书以及想买的书籍。在网上找到marshal的<a href="http://marshal.easymorse.com/archives/2745">识别图书ISBN号并输出查询结果的示例</a>和<a href="http://marshal.easymorse.com/archives/2756">完善图书查询原型，增加收藏夹功能</a>两篇文章，写的非常不错，还提供源代码。下载代码研究后发现已基本具备了想要的功能，决定在它的基础上做些修改供自己使用。</p>
-
-<p>把原来uses-sdk的minSdkVersion改成了9，增加android:targetSdkVersion=&quot;17&quot;。然后使用手机测试程序时发现，在连接网络时后台会抛出android.os.NetworkOnMainThreadException，并且应用崩溃打不开。通过查阅相关资料了解到，自从Android 2.3之后，系统增加了一个类StrictMode。这个类对网络的访问方式进行了一定的改变。官方文档给出了这个类设置的目的：</p>
-
-<blockquote>
-<p>StrictMode is a developer tool which detects things you might be doing by accident and brings them to your attention so you can fix them.</p>
-
-<p>StrictMode is most commonly used to catch accidental disk or network access on the application&#39;s main thread, where UI operations are received and animations take place. Keeping disk and network operations off the main thread makes for much smoother, more responsive applications. By keeping your application&#39;s main thread responsive, you also prevent ANR dialogs from being shown to users.</p>
-
-<p>Note that even though an Android device&#39;s disk is often on flash memory, many devices run a filesystem on top of that memory with very limited concurrency. It&#39;s often the case that almost all disk accesses are fast, but may in individual cases be dramatically slower when certain I/O is happening in the background from other processes. If possible, it&#39;s best to assume that such things are not fast.</p>
-</blockquote>
-
-<p>因为marshal把访问网络的代码直接放到UI线程中，造成和主线程的首要工作——UI交互——相矛盾。解决这类问题很容易，把访问网络的代码放到AsyncTask中就行了。</p>
-
-<p>接着发现豆瓣API查询返回的是500错误，在浏览器上访问却又正常，后来给HttpClient加上Agent头就没问题了，不知道是不是期间豆瓣的API在实现上作了改变。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>HttpClient client = new DefaultHttpClient();
-</span><span class='line'>String agent = System.getProperty("http.agent");
-</span><span class='line'>client.getParams().setParameter(CoreProtocolPNames.USER_AGENT, agent);</span></code></pre></td></tr></table></div></figure>
-
-<p>解析豆瓣XML查询结果的代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
-</span><span class='line'>factory.setNamespaceAware(true);
-</span><span class='line'>XmlPullParser parser = factory.newPullParser();
-</span><span class='line'>parser.setInput(inputStream, "utf-8");
-</span><span class='line'>
-</span><span class='line'>Book book = new Book();
-</span><span class='line'>book.setIsbn(getIntent().getExtras().getString("ISBN"));
-</span><span class='line'>
-</span><span class='line'>int eventType = parser.getEventType();
-</span><span class='line'>while (eventType != XmlPullParser.END_DOCUMENT) {
-</span><span class='line'>    switch (eventType) {
-</span><span class='line'>    case XmlPullParser.START_TAG:
-</span><span class='line'>        if ("link".equals(parser.getName())
-</span><span class='line'>                && "image".equals(parser.getAttributeValue(null, "rel"))) {
-</span><span class='line'>            book.setImageUrl(parser.getAttributeValue(null, "href"));
-</span><span class='line'>            eventType = parser.next();
-</span><span class='line'>        } else if ("summary".equals(parser.getName())) {
-</span><span class='line'>            book.setSummary(parser.nextText());
-</span><span class='line'>        } else if ("attribute".equals(parser.getName())) {
-</span><span class='line'>            String name = parser.getAttributeValue(null, "name");
-</span><span class='line'>            if ("title".equals(name)) {
-</span><span class='line'>                book.setTitle(parser.nextText());
-</span><span class='line'>            } else if ("author".equals(name)) {
-</span><span class='line'>                book.setAuthor(parser.nextText());
-</span><span class='line'>            } else if ("publisher".equals(name)) {
-</span><span class='line'>                book.setPublisher(parser.nextText());
-</span><span class='line'>            }
-</span><span class='line'>        }
-</span><span class='line'>        break;
-</span><span class='line'>    case XmlPullParser.END_TAG:
-</span><span class='line'>        break;
-</span><span class='line'>    }
-</span><span class='line'>    eventType = parser.next();
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>然后，然后就是结果页面不显示图书信息。想要找到原因，肿么办？看来要调试WebView了！<a href="http://developer.android.com/guide/webapps/debugging.html">http://developer.android.com/guide/webapps/debugging.html</a> 告诉了我们如何调试。</p>
-
-<p>首先在WebView上设置setWebChromeClient方法：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>webView.setWebChromeClient(new WebChromeClient() {
-</span><span class='line'>    public void onConsoleMessage(String message,
-</span><span class='line'>            int lineNumber, String sourceID) {
-</span><span class='line'>        Log.d(TAG, message + " -- From line "
-</span><span class='line'>                + lineNumber + " of " + sourceID);
-</span><span class='line'>    }
-</span><span class='line'>});</span></code></pre></td></tr></table></div></figure>
-
-<p>然后在JavaScript脚本中使用以下方法就可以在logcat中看到调试信息了。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>console.log(String)
-</span><span class='line'>console.info(String)
-</span><span class='line'>console.warn(String)
-</span><span class='line'>console.error(String)</span></code></pre></td></tr></table></div></figure>
-
-<p>重新运行程序，果然在logcat中看到报如下错误：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Uncaught TypeError: Object [object Object] has no method 'xxx'</span></code></pre></td></tr></table></div></figure>
-
-<p>搜索后在Stack Overflow找到了<a href="http://stackoverflow.com/questions/14031635/android-4-2-1-webview-and-javascript-interface-breaks">问题的答案</a>（Stack Overflow真的非常不错，问题的回答都非常详尽）。<a href="http://developer.android.com/guide/webapps/webview.html#BindingJavaScript">http://developer.android.com/guide/webapps/webview.html#BindingJavaScript</a> 是官方文档的解释。</p>
-
-<p>解决方法就是在要被JavaScript调用的方法上加@JavascriptInterface注解：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class Book {
-</span><span class='line'>
-</span><span class='line'>    @JavascriptInterface
-</span><span class='line'>    public String getAuthor() {
-</span><span class='line'>        return author;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void setAuthor(String author) {
-</span><span class='line'>        if (this.author != null) {
-</span><span class='line'>            this.author += ", " + author;
-</span><span class='line'>        } else {
-</span><span class='line'>            this.author = author;
-</span><span class='line'>        }
-</span><span class='line'>    }</span></code></pre></td></tr></table></div></figure>
-
-<p>代码下载：<a href="https://github.com/dohkoos/Bookly">https://github.com/dohkoos/Bookly</a></p>
+<p>TechCrunch读者每天都会看到一些成功公司的适应性路径。然而，很少有人会将这种适应性手册应用于自己的生活。像ABZ规划这样的框架可以帮助你掌控你的职业生涯。我们应该记住的是，无论我们开始创业，在初创公司工作，或者在大公司工作：最终的创业者都是你。</p>
 </div>
   
   
@@ -1574,23 +1751,23 @@
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/test/">test</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/test/">test</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/test/">test</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/test/">test</a>
-      </li>
-    
-      <li class="post">
         <a href="/blog/the-mythical-10x-programmer/">神秘的10x程序员</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/learn-anything-faster-with-the-feynman-technique/">费曼技巧：最好的学习方法</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/code-coverage-100-percent-tragedy/">100%代码覆盖率的悲剧</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/unconventional-way-of-learning-a-new-programming-language/">学习新编程语言的非传统方式</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/the-impact-github-is-having-on-your-software-career-right-now/">GitHub对软件职业生涯的影响</a>
       </li>
     
   </ul>
@@ -1604,9 +1781,9 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 145%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 141%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 133%" href="/tags/android/">Android</a>
+<a style="font-size: 132%" href="/tags/android/">Android</a>
 <a style="font-size: 103%" href="/tags/c-plus-plus/">C++</a>
 <a style="font-size: 106%" href="/tags/css/">CSS</a>
 <a style="font-size: 108%" href="/tags/crack/">Crack</a>

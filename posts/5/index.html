@@ -9,10 +9,8 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="今天准备做的是把JSON文本文件转换成XML文本文件。 把JSON转换成XML 许多Web服务返回的是JSON数据，但是我们可能会遇到一种情况，需要把JSON数据送给那些只接受XML数据的代码。这就需要我们构建一个JSON到XML的转换器。我们的目标是读入像下面这样的JSON数据： 1
-2
-3
-4 &hellip;">
+  <meta name="description" content="action 动作
+clause 子句 监听器和访问者机制是极好的。大多数时候，我们可以用监听器或访问者来构建语言应用，它们让特定应用的代码置身于语法之外，使语法容易被阅读。 但有时候我们需要额外的控制权和灵活性。为了达到这个目的，我们可以直接在语法中嵌入代码片段（这些嵌入的代码片段被称为动作 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -82,7 +80,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part26/">ANTLR 4权威参考读书笔记（26）</a></h1>
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part6/">ANTLR 4权威参考读书笔记（6）</a></h1>
     
     
       <p class="meta">
@@ -91,555 +89,45 @@
 
 
 
-<time class='entry-date' datetime='2016-09-09T22:22:47+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>9</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>10:22 pm</span></time>
+<time class='entry-date' datetime='2016-02-14T16:16:37+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>14</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>4:16 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>今天准备做的是把JSON文本文件转换成XML文本文件。</p>
+  <div class="entry-content"><ul>
+<li>action 动作</li>
+<li>clause 子句</li>
+</ul>
 
-<h3 id="把json转换成xml">把JSON转换成XML</h3>
+<p>监听器和访问者机制是极好的。大多数时候，我们可以用监听器或访问者来构建语言应用，它们让特定应用的代码置身于语法之外，使语法容易被阅读。</p>
 
-<p>许多Web服务返回的是JSON数据，但是我们可能会遇到一种情况，需要把JSON数据送给那些只接受XML数据的代码。这就需要我们构建一个JSON到XML的转换器。我们的目标是读入像下面这样的JSON数据：</p>
+<p>但有时候我们需要额外的控制权和灵活性。为了达到这个目的，我们可以直接在语法中嵌入代码片段（这些嵌入的代码片段被称为动作）。这些动作会被注入到由ANTLR工具生成的分析器代码中。这些被注入的代码在分析期间执行，并且能像其它任意代码片段一样收集信息或生成输出。结合语义谓词，我们甚至可以在运行时让我们语法的某部分消失！例如，我们可能想打开或关闭Java语法中的enum关键字，分析语言的不同版本。没有语义谓词，我们就需要两个不同版本的语法。</p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>{
-</span><span class='line'>"description" : "An imaginary server config file",
-</span><span class='line'>"logs" : {"level":"verbose", "dir":"/var/log"},
-</span><span class='line'>"host" : "antlr.org",
-</span><span class='line'>"admin": ["parrt", "tombu"],
-</span><span class='line'>"aliases": []
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+<p>下面我们将实现一个简单的程序，读入数据行，然后打印出在特定列中找到的值。</p>
 
-<p>放出等价的XML数据，就像下面这样的：</p>
+<h3 id="在语法中嵌入任意的动作">在语法中嵌入任意的动作</h3>
+
+<p>如果我们不想付出构建语法分析树的开销，或者想要在分析期间动态地计算值或把东西打印出来，那么可以通过在语法中嵌入任意代码来实现。它是比较困难的，因为我们必须明白在语法分析器上的动作的影响，以及在哪里放置这些动作。</p>
+
+<p>为了解释嵌入在语法中的动作，让我们先来看下文件rows.txt中的数据：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;description&gt;An imaginary server config file&lt;/description&gt;
-</span><span class='line'>&lt;logs&gt;
-</span><span class='line'>  &lt;level&gt;verbose&lt;/level&gt;
-</span><span class='line'>  &lt;dir&gt;/var/log&lt;/dir&gt;
-</span><span class='line'>&lt;/logs&gt;
-</span><span class='line'>&lt;host&gt;antlr.org&lt;/host&gt;
-</span><span class='line'>&lt;admin&gt;
-</span><span class='line'>  &lt;element&gt;parrt&lt;/element&gt;
-</span><span class='line'>  &lt;element&gt;tombu&lt;/element&gt;
-</span><span class='line'>&lt;/admin&gt;
-</span><span class='line'>&lt;aliases&gt;&lt;/aliases&gt;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>parrt   Terence Parr    101
+</span><span class='line'>tombu   Tom Burns       020
+</span><span class='line'>bke     Kevin Edgar     008</span></code></pre></td></tr></table></div></figure>
 
-<p>正如我们对CSV做的那样，让我们给JSON语法中的一些选项打上标签，以便让ANTLR生成更精确的监听器方法。</p>
+<p>这些列是由TAB分隔的，每行以一个换行符结束。匹配这种类型的输入在语法上还是相当简单的。下面是此语法文件Rows.g的内容：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>object
-</span><span class='line'>    : '{' pair (',' pair)* '}'    # AnObject
-</span><span class='line'>    | '{' '}'                     # EmptyObject
-</span><span class='line'>    ;
-</span><span class='line'>array
-</span><span class='line'>    : '[' value (',' value)* ']'  # ArrayOfValues
-</span><span class='line'>    | '[' ']'                     # EmptyArray
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>file : (row NL)+ ;    // NL is newline token: '\r'? '\n'
+</span><span class='line'>row  : STUFF+ ;</span></code></pre></td></tr></table></div></figure>
 
-<p>我们将对规则value做同样的事，但是稍有不同。除3个选项外的其它所有选项只需要返回被匹配的值的文本，所以我们可以为其它所有选项使用相同的标签，使语法分析树遍历器为那些选项触发相同的监听器方法。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>value
-</span><span class='line'>    : STRING    # String
-</span><span class='line'>    | NUMBER    # Atom
-</span><span class='line'>    | object    # ObjectValue
-</span><span class='line'>    | array     # ArrayValue
-</span><span class='line'>    | 'true'    # Atom
-</span><span class='line'>    | 'false'   # Atom
-</span><span class='line'>    | 'null'    # Atom
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<p>为构建这样的转换器，明智的做法是让每个规则返回被它匹配的输入短语的XML等价物。为追踪部分结构，我们使用字段xml和两个帮助方法来注解语法分析树。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public static class XMLEmitter extends JSONBaseListener {
-</span><span class='line'>    ParseTreeProperty&lt;String&gt; xml = new ParseTreeProperty&lt;String&gt;();
-</span><span class='line'>    String getXML(ParseTree ctx) { return xml.get(ctx); }
-</span><span class='line'>    void setXML(ParseTree ctx, String s) { xml.put(ctx, s); }</span></code></pre></td></tr></table></div></figure>
-
-<p>我们把每棵子树转换后的字符串挂载到该子树的根节点。在语法分析树更高节点上工作的方法可以捕获这些值以便计算更大的字符串。然后挂载在根节点上的字符串完成计算。</p>
-
-<p>让我们从最简单的转换开始。value的Atom选项返回匹配记号的文本。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitAtom(JSONParser.AtomContext ctx) {
-</span><span class='line'>    setXML(ctx, ctx.getText());
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>字符串基本上是相同的，只是我们必须去除双引号。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitString(JSONParser.StringContext ctx) {
-</span><span class='line'>    setXML(ctx, stripQuotes(ctx.getText()));
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>如果value()规则方法找到一个对象或数组，它可以把组合元素的部分转换拷贝到它自己的语法分析树节点。以下代码是找到对象时的处理：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitObjectValue(JSONParser.ObjectValueContext ctx) {
-</span><span class='line'>    // analogous to String value() {return object();}
-</span><span class='line'>    setXML(ctx, getXML(ctx.object()));
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>一旦我们可以转换所有的值，我们需要担心名-值对以及把它们转换成标签和文本。生成的XML的标签名字来源于STRING &#39;:&#39; value选项中的STRING。在左右尖括号之间的文本来源于挂载在value子节点上的文本。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitPair(JSONParser.PairContext ctx) {
-</span><span class='line'>    String tag = stripQuotes(ctx.STRING().getText());
-</span><span class='line'>    JSONParser.ValueContext vctx = ctx.value();
-</span><span class='line'>    String x = String.format("&lt;%s&gt;%s&lt;/%s&gt;\n", tag, getXML(vctx), tag);
-</span><span class='line'>    setXML(ctx, x);
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>JSON对象由名-值对组成。因此，对于被选项中标记为AnObject的object找到的每个对，我们把计算后的结果追加在语法分析树。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitAnObject(JSONParser.AnObjectContext ctx) {
-</span><span class='line'>    StringBuilder buf = new StringBuilder();
-</span><span class='line'>    buf.append("\n");
-</span><span class='line'>    for (JSONParser.PairContext pctx : ctx.pair()) {
-</span><span class='line'>        buf.append(getXML(pctx));
-</span><span class='line'>    }
-</span><span class='line'>    setXML(ctx, buf.toString());
-</span><span class='line'>}
-</span><span class='line'>public void exitEmptyObject(JSONParser.EmptyObjectContext ctx) {
-</span><span class='line'>    setXML(ctx, "");
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>处理数组遵循相似的模式，只是简单地连接来自子节点的结果列表，然后把它们包裹在<code>&lt;element&gt;</code>标签中。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitArrayOfValues(JSONParser.ArrayOfValuesContext ctx) {
-</span><span class='line'>    StringBuilder buf = new StringBuilder();
-</span><span class='line'>    buf.append("\n");
-</span><span class='line'>    for (JSONParser.ValueContext vctx : ctx.value()) {
-</span><span class='line'>        buf.append("&lt;element&gt;"); // conjure up element for valid XML
-</span><span class='line'>        buf.append(getXML(vctx));
-</span><span class='line'>        buf.append("&lt;/element&gt;");
-</span><span class='line'>        buf.append("\n");
-</span><span class='line'>    }
-</span><span class='line'>    setXML(ctx, buf.toString());
-</span><span class='line'>}
-</span><span class='line'>public void exitEmptyArray(JSONParser.EmptyArrayContext ctx) {
-</span><span class='line'>    setXML(ctx, "");
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>最后，我们需要使用从一个对象或数组收集来的全部转换注解语法分析树的根节点。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>json: object
-</span><span class='line'>    | array
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<p>我们可以在监听器里用一个集合运算做到这点。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitJson(JSONParser.JsonContext ctx) {
-</span><span class='line'>    setXML(ctx, getXML(ctx.getChild(0)));
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>以下是构建和测试序列：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr JSON.g
-</span><span class='line'>compile *.java
-</span><span class='line'>run JSON2XML t.json</span></code></pre></td></tr></table></div></figure>
-
-<p>下面的是部分的输出结果：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;description&gt;An imaginary server config file&lt;/description&gt;
-</span><span class='line'>&lt;logs&gt;
-</span><span class='line'>&lt;level&gt;verbose&lt;/level&gt;
-</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
-
-<p>有些转换不总是像JSON到XML那样直白的。但是，这个例子向我们表明如何通过拼凑部分翻译短语处理句子转换问题。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part25/">ANTLR 4权威参考读书笔记（25）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-09-03T16:16:56+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2016</span></span> <span class='time'>4:16 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>这次我们要做的是通过监听器实现CSV文件的加载器，用于建立一个二维列表数据结构。</p>
-
-<h3 id="加载csv数据">加载CSV数据</h3>
-
-<p>我们的目标是构建一个监听器去加载CSV数据到一个映射列表数据结构中，这是任何数据格式阅读器或配置文件阅读器都会做的事。我们会收集每行的字段并放到一个映射中，构成头名-值组合。以下是示例文件t.csv的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Details,Month,Amount
-</span><span class='line'>Mid Bonus,June,"$2,000"
-</span><span class='line'>,January,"""zippo"""
-</span><span class='line'>Total Bonuses,"","$5,000"</span></code></pre></td></tr></table></div></figure>
-
-<p>我们想要看到如下的映射列表被打印出：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>[{Details=Mid Bonus, Month=June, Amount="$2,000"},
-</span><span class='line'> {Details=, Month=January, Amount="""zippo"""},
-</span><span class='line'> {Details=Total Bonuses, Month="", Amount="$5,000"}]</span></code></pre></td></tr></table></div></figure>
-
-<p>为了在监听器中得到精确的方法，我们给CSV语法中field规则的每个选项打上标签：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grammar CSV;
-</span><span class='line'>
-</span><span class='line'>file : hdr row+ ;
-</span><span class='line'>hdr : row ;
-</span><span class='line'>row : field (',' field)* '\r'? '\n' ;
-</span><span class='line'>field
-</span><span class='line'>    : TEXT    # text
-</span><span class='line'>    | STRING  # string
-</span><span class='line'>    |         # empty
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>TEXT : ~[,\n\r"]+ ;
-</span><span class='line'>STRING : '"' ('""'|~'"')* '"' ;     // quote-quote is an escaped quote</span></code></pre></td></tr></table></div></figure>
-
-<p>我们可以从定义我们需要的数据结构开始监听器的实现。首先，我们需要的数据结构是称为rows的映射列表。我们也需要在头行中找到的列名列表header。为处理数据行，我们需要把字段值读到一个临时列表currentRowFieldValues中，然后把列名映射到那些值上。以下是监听器LoadCSV.java的实现代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public static class Loader extends CSVBaseListener {
-</span><span class='line'>    public static final String EMPTY = "";
-</span><span class='line'>    /** Load a list of row maps that map field name to value */
-</span><span class='line'>    List&lt;Map&lt;String,String&gt;&gt; rows = new ArrayList&lt;Map&lt;String, String&gt;&gt;();
-</span><span class='line'>    /** List of column names */
-</span><span class='line'>    List&lt;String&gt; header;
-</span><span class='line'>    /** Build up a list of fields in current row */
-</span><span class='line'>    List&lt;String&gt; currentRowFieldValues;</span></code></pre></td></tr></table></div></figure>
-
-<p>下面的3个规则方法通过计算适当的字符串处理字段值，并把它添加到currentRowFieldValues中。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitString(CSVParser.StringContext ctx) {
-</span><span class='line'>    currentRowFieldValues.add(ctx.STRING().getText());
-</span><span class='line'>}
-</span><span class='line'>public void exitText(CSVParser.TextContext ctx) {
-</span><span class='line'>    currentRowFieldValues.add(ctx.TEXT().getText());
-</span><span class='line'>}
-</span><span class='line'>public void exitEmpty(CSVParser.EmptyContext ctx) {
-</span><span class='line'>    currentRowFieldValues.add(EMPTY);
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>在我们能处理数据行之前，我们需要从第一行取得列名列表。头行在语法上仅仅是另外的行，但我们在对待它时要不同于常规的数据行，那意味着我们需要检查上下文。暂时让我们假设在exitRow()执行后，currentRowFieldValues包含列名列表。要填充header，我们只需要捕获第一行的字段值。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitHdr(CSVParser.HdrContext ctx) {
-</span><span class='line'>    header = new ArrayList&lt;String&gt;();
-</span><span class='line'>    header.addAll(currentRowFieldValues);
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>谈到行时，我们需要两个操作：一个是当我们开始一行时，另一个是当我们结束一行时。当我们开始一行时，我们需要分配或清除currentRowFieldValues，准备获取一组新的数据。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void enterRow(CSVParser.RowContext ctx) {
-</span><span class='line'>    currentRowFieldValues = new ArrayList&lt;String&gt;();
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>在行结束的时候，我们必须考虑上下文。如果我们仅仅加载头行，那我们不能改变rows字段，因为列名不是数据。在exitRow()中，我们可以通过查看在语法分析树中的父节点的getRuleIndex()值（或者询问父节点是否是HdrContext类型）测试上下文。如果当前行是数据行，我们将通过同时遍历header中的列名和currentRowFieldValues中的值获取的内容创建映射。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitRow(CSVParser.RowContext ctx) {
-</span><span class='line'>    // If this is the header row, do nothing
-</span><span class='line'>    // if ( ctx.parent instanceof CSVParser.HdrContext ) return; OR:
-</span><span class='line'>    if ( ctx.getParent().getRuleIndex() == CSVParser.RULE_hdr ) {
-</span><span class='line'>        return;
-</span><span class='line'>    }
-</span><span class='line'>    // It's a data row
-</span><span class='line'>    Map&lt;String, String&gt; m = new LinkedHashMap&lt;String, String&gt;();
-</span><span class='line'>    int i = 0;
-</span><span class='line'>    for (String v : currentRowFieldValues) {
-</span><span class='line'>        m.put(header.get(i), v);
-</span><span class='line'>        i++;
-</span><span class='line'>    }
-</span><span class='line'>    rows.add(m);
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>到这里，加载CSV数据到数据结构中的任务就算已经完成。在使用ParseTreeWalker遍历树后，我们就可以紧接着打印出rows字段：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ParseTreeWalker walker = new ParseTreeWalker();
-</span><span class='line'>Loader loader = new Loader();
-</span><span class='line'>walker.walk(loader, tree);
-</span><span class='line'>System.out.println(loader.rows);</span></code></pre></td></tr></table></div></figure>
-
-<p>以下是构建和测试序列：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr CSV.g
-</span><span class='line'>compile *.java
-</span><span class='line'>run LoadCSV t.csv</span></code></pre></td></tr></table></div></figure>
-
-<p>下面显示的是输出结果：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>[{Details=Mid Bonus, Month=June, Amount="$2,000"}, {Details=, Month=January,
-</span><span class='line'>Amount="""zippo"""}, {Details=Total Bonuses, Month="", Amount="$5,000"}]</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part24/">ANTLR 4权威参考读书笔记（24）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-08-26T18:46:37+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:46 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在本节中，我们准备讲讲有时候事件方法需要传递部分结果或其它信息的问题。</p>
-
-<h3 id="在事件方法间共享信息">在事件方法间共享信息</h3>
-
-<p>无论收集信息还是计算值，传递参数和返回值都是比使用字段和全局变量更方便良好的编程实践。问题是ANTLR自动生成的监听器方法的签名不需要特定应用的返回值或参数，ANTLR也自动生成访问者方法而不需要特定应用的参数。</p>
-
-<p>接下来，我们将探讨让事件方法无需修改事件方法签名就能传递数据的机制。我们将构建同样的简单计算器的3个不同实现，基于前面章节的LExpr表达式语法。第一个实现使用访问者方法返回值，第二个定义了一个在事件方法间共享的字段，第三个则注解语法分析树节点以便储存感兴趣的值。</p>
-
-<h4 id="使用访问者遍历语法分析树">使用访问者遍历语法分析树</h4>
-
-<p>构建基于访问者的计算器，最简单的方法是让和规则expr相关的事件方法返回子表达式的值。例如，visitAdd()将返回两个子表达式相加的值，visitInt()将返回整型的值。传统的访问者不指定visit方法的返回值。当我们为特定应用需求实现一个类时添加返回类型是容易的，扩展LExprBaseVisitor<T>并提供Integer作为<T>类型参数。访问者代码看起来如下所示：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public static class EvalVisitor extends LExprBaseVisitor&lt;Integer&gt; {
-</span><span class='line'>    public Integer visitMult(LExprParser.MultContext ctx) {
-</span><span class='line'>        return visit(ctx.e(0)) * visit(ctx.e(1));
-</span><span class='line'>    }
-</span><span class='line'>    public Integer visitAdd(LExprParser.AddContext ctx) {
-</span><span class='line'>        return visit(ctx.e(0)) + visit(ctx.e(1));
-</span><span class='line'>    }
-</span><span class='line'>    public Integer visitInt(LExprParser.IntContext ctx) {
-</span><span class='line'>        return Integer.valueOf(ctx.INT().getText());
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>EvalVisitor从ANTLR生成的AbstractParseTreeVisitor类继承通用的visit()方法，我们的访问者使用它去准确地触发子树访问。</p>
-
-<p>注意，EvalVisitor没有针对规则s的访问者方法。在LExprBaseVisitor中的visitS()的默认实现调用预定义的方法ParseTreeVisitor.visitChildren(). visitChildren()返回从最后的子节点访问返回的值。在这里，visitS()返回访问它唯一的子节点（节点e）时返回的表达式的值。我们可以使用这种默认的行为。</p>
-
-<p>在测试文件TestLEvalVisitor.java中，我们有常用代码去启动LExprParser和打印语法分析树，然后我们需要编码去启动EvalVisitor和打印出当访问树时计算出的表达式的值。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>EvalVisitor evalVisitor = new EvalVisitor();
-</span><span class='line'>int result = evalVisitor.visit(tree);
-</span><span class='line'>System.out.println("visitor result = " + result);</span></code></pre></td></tr></table></div></figure>
-
-<p>要构建计算器，需要告诉ANTLR使用-visitor参数去生成访问者。（如果我们不再需要生成监听器，可以使用-no-listener参数）以下是完整的构建和测试序列：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr -visitor LExpr.g
-</span><span class='line'>compile *.java
-</span><span class='line'>run TestLEvalVisitor</span></code></pre></td></tr></table></div></figure>
-
-<p>接着输入以下内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>1+2*3
-</span><span class='line'>EOF</span></code></pre></td></tr></table></div></figure>
-
-<p>你就会看到如下结果：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>(s (e (e 1) + (e (e 2) * (e 3))))
-</span><span class='line'>visitor result = 7</span></code></pre></td></tr></table></div></figure>
-
-<p>如果我们需要特定应用的返回值，访问者工作的相当好，因为我们使用了内建的Java返回值机制。如果我们不希望显式地调用访问者方法去访问子节点，我们可以切换到监听器机制，不幸的是，这意味着我们要放弃使用Java方法返回值的整洁。</p>
-
-<h4 id="使用栈模拟返回值">使用栈模拟返回值</h4>
-
-<p>ANTLR生成的监听器事件方法没有返回值。为了给在语法分析树更高节点上执行的监听器方法返回值，我们可以把部分的值存储在监听器的一个字段中。我们会想到用栈来存储值，方法就是把计算一个子表达式的结果推送到栈中，在语法分析树上用于子表达式的方法则把运算元从栈中弹出。以下是完整的Evaluator计算器监听器（代码在TestLEvaluator.java文件中）：</p>
+<p>我们需要创建一个构造器以便我们能传递我们想要的列号（从1开始计数），所以我们需要在规则中添加一些动作来做这个事情：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -657,192 +145,91 @@
 <span class='line-number'>14</span>
 <span class='line-number'>15</span>
 <span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public static class Evaluator extends LExprBaseListener {
-</span><span class='line'>    Stack&lt;Integer&gt; stack = new Stack&lt;Integer&gt;();
-</span><span class='line'>    public void exitMult(LExprParser.MultContext ctx) {
-</span><span class='line'>        int right = stack.pop();
-</span><span class='line'>        int left = stack.pop();
-</span><span class='line'>        stack.push(left * right);
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Rows;
+</span><span class='line'>
+</span><span class='line'>@parser::members {    // add members to generated RowsParser
+</span><span class='line'>    int col;
+</span><span class='line'>
+</span><span class='line'>    public RowsParser(TokenStream input, int col) {    // custom constructor
+</span><span class='line'>        this(input);
+</span><span class='line'>        this.col = col;
 </span><span class='line'>    }
-</span><span class='line'>    public void exitAdd(LExprParser.AddContext ctx) {
-</span><span class='line'>        int right = stack.pop();
-</span><span class='line'>        int left = stack.pop();
-</span><span class='line'>        stack.push(left + right);
-</span><span class='line'>    }
-</span><span class='line'>    public void exitInt(LExprParser.IntContext ctx) {
-</span><span class='line'>        stack.push(Integer.valueOf(ctx.INT().getText()));
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>file: (row NL)+ ;
+</span><span class='line'>
+</span><span class='line'>row
+</span><span class='line'>locals [int i=0]
+</span><span class='line'>    : ( STUFF
+</span><span class='line'>        {
+</span><span class='line'>            $i++;
+</span><span class='line'>            if ($i == col) System.out.println($STUFF.text);
+</span><span class='line'>        }
+</span><span class='line'>      )+
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>TAB  :  '\t' -&gt; skip ;    // match but don't pass to the parser
+</span><span class='line'>NL   :  '\r'? '\n' ;      // match and pass to the parser
+</span><span class='line'>STUFF:  ~[\t\r\n]+ ;      // match any chars except tab, newline</span></code></pre></td></tr></table></div></figure>
 
-<p>要测试上面的这段代码，我们可以创建和使用在代码TestLEvaluator中的ParseTreeWalker，以下是完整的构建和测试序列：</p>
+<p>在上述语法中，动作是被花括号括起来的代码片段；members动作的代码将会被注入到生成的语法分析器类中的成员区；在规则row中的动作访问的$i是由locals子句定义的局部变量，该动作也用$STUFF.text获取最近匹配的STUFF记号的文本内容。STUFF词法规则匹配任何非TAB或换行的字符，这意味着在列中可以有空格字符。</p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr LExpr.g
-</span><span class='line'>compile *.java
-</span><span class='line'>run TestLEvaluator</span></code></pre></td></tr></table></div></figure>
-
-<p>接着输入以下内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>1+2*3
-</span><span class='line'>EOF</span></code></pre></td></tr></table></div></figure>
-
-<p>你就会看到如下结果：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>(s (e (e 1) + (e (e 2) * (e 3))))
-</span><span class='line'>stack result = 7</span></code></pre></td></tr></table></div></figure>
-
-<p>使用栈字段有点别扭但工作得很好。我们必须确保事件方法以正确的顺序压入和弹出跨越监听器事件的值。带有返回值的访问者没有栈的这种笨拙但却需要手工访问树的节点。第三种实现是通过把部分值隐藏在树节点中来捕获它们。</p>
-
-<h4 id="注解语法分析树">注解语法分析树</h4>
-
-<p>作为使用临时存储在事件方法间共享数据的替代，我们可以把这些值存储在语法分析树本身中。使用树注解方法时我们可以带有监听器或访问者，但在这里我们使用监听器来阐明如何使用它。让我们首先看一下用部分结果注解的1+2*3的LExpr语法分析树。</p>
-
-<p><img src="/uploads/lexpr-parse-tree.png" title="lexpr-parse-tree" ></p>
-
-<p>每个子表达式对应一个子树根（和对应一个e规则调用）。从e节点发出的水平线指向的数字是我们想要返回的部分结果。</p>
-
-<p>让我们看看节点注解策略将如何工作在来自LExpr语法的规则e上。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>e : e MULT e    # Mult
-</span><span class='line'>  | e ADD e     # Add
-</span><span class='line'>  | INT         # Int
-</span><span class='line'>  ;</span></code></pre></td></tr></table></div></figure>
-
-<p>e选项的监听器方法每个都会存储一个结果在相对应的e语法分析树节点中。任何随后的在语法分析树更高节点上的add或multiply事件将通过查看存储在它们对应的子节点中的值来抓取子表达式的值。</p>
-
-<p>现在，让我们假设每个语法分析树节点（每个规则上下文对象）都有一个字段value，那么exitAdd()看起来将是这样；</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitAdd(LExprParser.AddContext ctx) {
-</span><span class='line'>    // e(0).value is the subexpression value of the first e in the alternative
-</span><span class='line'>    ctx.value = ctx.e(0).value + ctx.e(1).value;    // e '+' e # Add
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>这看起来相当合理，但不幸的是，在Java中我们不能扩展类ExprContext去动态地添加字段。为了让语法分析树注解生效，我们需要一种方法去注解各式各样的节点而不需要手工修改由ANTLR生成的关联节点类。</p>
-
-<p>注解语法分析树节点最简单的方式是使用与节点任意值相关联的一个Map。因此，ANTLR提供了一个简单的帮助类ParseTreeProperty。让我们在文件TestLEvaluatorWithProps.java中构建称作EvaluatorWithProps的另一个计算器版本，它使用ParseTreeProperty关联了LExpr语法分析树节点和部分结果。以下是在监听器开始处的适当的定义：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public static class EvaluatorWithProps extends LExprBaseListener {
-</span><span class='line'>    /** maps nodes to integers with Map&lt;ParseTree,Integer&gt; */
-</span><span class='line'>    ParseTreeProperty&lt;Integer&gt; values = new ParseTreeProperty&lt;Integer&gt;();</span></code></pre></td></tr></table></div></figure>
-
-<p>注意：如果你想使用自己的Map类型字段代替ParseTreeProperty，确保它继承自IdentityHashMap，而不是通常的HashMap。我们需要去注解特殊的节点，进行同一性测试而不是equals()。两个e节点可能是equals()，但在内存中不是同一个物理节点。</p>
-
-<p>为注解一个节点，我们使用values.put(node, value)。为得到和一个节点有关联的值，我们使用values.get(node)。这很好，但是让我们创建一些有直白名字的帮助方法以便让代码更容易阅读。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void setValue(ParseTree node, int value) { values.put(node, value); }
-</span><span class='line'>public int getValue(ParseTree node) { return values.get(node); }</span></code></pre></td></tr></table></div></figure>
-
-<p>让我们从最简单的表达式选项Int开始监听器方法。我们想使用它匹配的INT记号的整型值去注解它的语法分析树e节点。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitInt(LExprParser.IntContext ctx) {
-</span><span class='line'>    String intText = ctx.INT().getText();    // INT    # Int
-</span><span class='line'>    setValue(ctx, Integer.valueOf(intText));
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>对于加法树，我们得到两个子表达式子节点的值（运算元）和带有和的注释的子树跟。</p>
+<p>现在，是时候去思考如何使用定制的构造器传递一个列号给语法分析器，并且告诉语法分析器不要构建语法分析树了：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitAdd(LExprParser.AddContext ctx) {
-</span><span class='line'>    int left = getValue(ctx.e(0));    // e '+' e    # Add
-</span><span class='line'>    int right = getValue(ctx.e(1));
-</span><span class='line'>    setValue(ctx, left + right);
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class Rows {
+</span><span class='line'>
+</span><span class='line'>    public static void main(String[] args) throws Exception {
+</span><span class='line'>        ANTLRInputStream input = new ANTLRInputStream(System.in);
+</span><span class='line'>        RowsLexer lexer = new RowsLexer(input);
+</span><span class='line'>        CommonTokenStream tokens = new CommonTokenStream(lexer);
+</span><span class='line'>        int col = Integer.valueOf(args[0]);
+</span><span class='line'>        RowsParser parser = new RowsParser(tokens, col);    // pass column number!
+</span><span class='line'>        parser.setBuildParseTree(false);    // don't waste time bulding a tree
+</span><span class='line'>        parser.file();
+</span><span class='line'>    }
 </span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>方法exitMult()是相同的，只是运算的时候用multiply代替了add。</p>
-
-<p>我们的测试代码从分析规则s开始。因此我们必须确保语法分析树根有e子树的值。为把值从e节点冒泡到根s节点，我们实现了exitS()。</p>
+<p>现在，让我们核实下我们的语法分析器能否正确匹配一些示例输入：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>/** Need to pass e's value out of rule s : e ; */
-</span><span class='line'>public void exitS(LExprParser.SContext ctx) {
-</span><span class='line'>    setValue(ctx, getValue(ctx.e()));    // like: int s() { return e(); }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>以下是如何启动监听器以及打印出来自语法分析树根节点的表达式的值：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ParseTreeWalker walker = new ParseTreeWalker();
-</span><span class='line'>EvaluatorWithProps evalProp = new EvaluatorWithProps();
-</span><span class='line'>walker.walk(evalProp, tree);
-</span><span class='line'>System.out.println("properties result = " + evalProp.getValue(tree));</span></code></pre></td></tr></table></div></figure>
-
-<p>以下是构建和测试序列：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr LExpr.g
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr -no-listener Rows.g  # don't need the listener
 </span><span class='line'>compile *.java
-</span><span class='line'>run TestLEvaluatorWithProps</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>run Rows 1 &lt; rows.txt</span></code></pre></td></tr></table></div></figure>
 
-<p>接着输入以下内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>1+2*3
-</span><span class='line'>EOF</span></code></pre></td></tr></table></div></figure>
-
-<p>你就会看到如下结果：</p>
+<p>这时你会看到rows.txt文件的第1列内容被输出：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>(s (e (e 1) + (e (e 2) * (e 3))))
-</span><span class='line'>stack result = 7</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>parrt
+</span><span class='line'>tombu
+</span><span class='line'>bke</span></code></pre></td></tr></table></div></figure>
 
-<p>现在我们已经看到了相同计算器的3个实现，并且我们也已经准备好把我们的知识用于构建真实案例。因为每个方法都有它的优势和劣势，下面就让我们来比较下不同的技术。</p>
-
-<h3 id="比较信息共享方法">比较信息共享方法</h3>
-
-<p>为得到可复用和可重定目标的语法，我们需要让它们完全清除用户定义的动作。这意味着要把所有特定应用的代码放到语法外的某些监听器和访问者中。监听器和访问者操作语法分析树，ANTLR自动生成合适的树遍历接口和默认实现。因为事件方法签名是固定的和不特定于应用的，所以事件方法可以共享信息的方式有3种：</p>
-
-<ul>
-<li>本地Java调用栈：访问者返回用户定义类型的一个值。如果访问者需要传递参数，它也必须使用下面两种技术的一种。</li>
-<li>基于栈：一个栈字段模仿参数和返回值，像Java调用栈那样。</li>
-<li>注解者：一个Map字段使用有用的值注解节点。</li>
-</ul>
-
-<p>所有这3种方法是和语法本身完全解耦的，并且很好地封装在专门的对象中。除此之外，它们也都有各自的优点和缺点。我们可以根据问题的需要和个人的喜好决定采取哪种方法。你甚至可以在同一个应用中使用多种方法。</p>
-
-<p>访问者方法很好懂，因为它们直接调用其它访问者方法去获取部分结果，并且能像其它任何方法那样返回值。这也是它们的缺点，访问者方法必须显式地访问它们的子节点。而监听器就不需要。因为访问者有个通用的接口，所以它不能定义参数。访问者必须使用其它解决方案的一种去传递参数给它在子节点上调用的访问者方法。访问者的空间效率很好，因为它在任何时间仅需保留少数的部分结果。在树遍历后没有部分结果保留。当访问者方法可以返回值时，每个值必须是同种类型，不想其它的解决方案。</p>
-
-<p>基于栈的解决方案可以模仿参数和返回带有一个栈的值，但在手动管理栈时有个断开的机会。这可能会发生，因为监听器方法不能直接调用彼此。作为程序员，我们必须确定推入栈中的在将来事件方法调用能适当地弹出。栈可以传递多个值和多个返回值。基于栈的解决方案也是空间有效的，因为它不会把任何东西固定到树上。在树遍历后所有的部分结果存储消失。</p>
-
-<p>注解者通常可以作为默认解决方案采用，因为它允许你任意地提供信息给事件方法操作语法分析树中上上下下的节点。你也可以传递多个值，它们可以是任意类型。在许多情况下注解胜于使用带有短暂值的栈。在各种方法的数据传递准备间很少有断开的机会。比起在编程语言中说返回值，使用setValue(ctx, value)注解树不太直观，但是更通用。超过其它两种的这种方法的唯一缺点是在树遍历期间部分结果是保留的，因此它有较大的内存占用。</p>
-
-<p>从另一方面来说，在某些应用中能够注解树正是我们需要的。应用需要在树上通过多遍，第一遍是很方便在树上计算和储存数据的。当语法分析树遍历器重新遍历树的时候第二遍然后就很容易访问数据。总的来说，树注解非常灵活，有一个可接受的内存负担。</p>
+<p>如果将上面命令中的1换成2，你会看到文件的第2列内容被输出；如果换成3，那么第3列内容将会被输出。</p>
 </div>
   
   
@@ -855,7 +242,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part23/">ANTLR 4权威参考读书笔记（23）</a></h1>
+      <h1 class="entry-title"><a href="/blog/overnight-success-it-takes-years/">一夜成名：这需要好几年时间</a></h1>
     
     
       <p class="meta">
@@ -864,42 +251,234 @@
 
 
 
-<time class='entry-date' datetime='2016-08-16T18:09:05+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:09 pm</span></time>
+<time class='entry-date' datetime='2016-01-23T09:36:05+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>23</span><span class='date-suffix'>rd</span>, <span class='date-year'>2016</span></span> <span class='time'>9:36 am</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>默认情况下，ANTLR为每个规则生成一个单一的事件类型，而不管语法分析器匹配了哪个选项。这很不方便，因为监听器和访问者方法必须确定哪个选项被语法分析器匹配。在本节中，我们将看到如何得到更细粒度的事件。</p>
+  <div class="entry-content"><p>英文原文：<a href="http://blog.codinghorror.com/overnight-success-it-takes-years/">http://blog.codinghorror.com/overnight-success-it-takes-years/</a></p>
 
-<h3 id="为规则选项贴标签以得到精确的事件方法">为规则选项贴标签以得到精确的事件方法</h3>
+<p>Gmail的原首席开发者Paul Buchheit说过<a href="http://paulbuchheit.blogspot.com/2009/01/overnight-success-takes-long-time.html">Gmail的成功花了很长时间</a>：</p>
 
-<p>为阐明事件粒度问题，让我们为以下的表达式语法构建一个带有监听器的简单计算器：</p>
+<blockquote>
+<p>我们在2001年8月开始开发Gmail。很长一段时间里，几乎每个人都不喜欢它。有些人使用它因为搜索，但他们有着无尽地抱怨。很多人认为我们应该杀死这个项目，又或者重启它作为一个有本地客户端软件的企业产品，而不是这个疯狂的JavaScript东西。甚至在2004年4月1日当我们到达发布它的那个点时——在开始开发它两年半之后——Google内部的很多人都在预测它的死亡。他们觉得这个产品太怪异了，并且没有人想去更换电子邮件服务。我被告知我们永远不会得到100万用户。</p>
+
+<p>但在我们发布后，除了因为各种原因讨厌它的人，反响出人意外地好。尽管如此，它还是经常被描述为“小众产品（niche）”和“不会被硅谷之外的人使用”。</p>
+
+<p>现在，在我们开始开发Gmail差不多七年半后，我看到一篇<a href="http://www.ft.com/cms/s/0/18cdabec-d8fb-11dd-ab5f-000077b07658.html">文章</a>叙述Gmail如何在去年增长40%，相比Yahoo的2%和Hotmail的-7%。</p>
+</blockquote>
+
+<p>Paul已经离开Google，现在在从事他自己的创业公司FriendFeed（译者注：FriendFeed已于2015年4月9日关闭）。许多业内人士对待FriendFeed不太友善。Stowe Boyd甚至竟然称FriendFeed就是个失败（译者注：Stowe Boyd评论FriendFeed的文章已经被删除了）。Paul从容应对批评：</p>
+
+<blockquote>
+<p>创建一个重要的新产品通常需要时间。FriendFeed需要继续追求创新，就像Gmail六年以前做的那样。FriendFeed显示了很好的前景，但它仍然是一个“在制品”。</p>
+
+<p>我的预期是很大的成功需要好几年时间，没有许多反例（除了YouTube，但现在它其实还没有到达挣成堆钱的那个点）。Facebook成长非常快，但它此时已经五岁了。Larry和Sergey 开始开发Google在1996年——当我开始在那里是1999年，几乎没人听说过它。</p>
+
+<p>一夜成名的观念非常具有误导性，而且相当有害。如果你开始新的东西，那会是一次长途旅行。没有借口去行动缓慢。相反，你必须行动的非常快，否则你将不会到达，因为它是一次长途旅行！这也是为什么节俭是重要的——你不想<a href="http://paulbuchheit.blogspot.com/2008/03/ideas-vs-judgment-and-execution_9197.html">饿死在半山腰上</a>。</p>
+</blockquote>
+
+<p>Stowe Boyd用一张Twitter和FriendFeed的流量对比图说明他关于FriendFeed的观点。这里请允许我把我自己的数据也加到Boyd先生的图上：</p>
+
+<p><img src="/uploads/three-traffic-comparison.png" title="three-traffic-comparison" ></p>
+
+<p>我觉得Paul的态度令人耳目一新，因为对于我们的创业公司<a href="http://stackoverflow.com/">Stack Overflow</a>我也采用同样的态度。我没有期望或甚至渴望一夜成名。我计划的是花上几年的时间去打磨，持续地、稳步地提升。</p>
+
+<p>这项商业计划和我的职业生涯发展计划没有太多区别：成功需要好几年时间。当我说年的时候，我是认真的！不是在说像“更聪明地工作，而不是更努力地工作”那样的陈词滥调。我是在说真正的日历年。你知道的，12个月的，365天的那种。你必须花上你生命的多年时间孜孜不倦地钻研这些东西，每天醒来后一遍又一遍地做它。每天练习和收集反馈去不断变得更好。有时它可能是不愉快的，甚至偶尔是很无趣的，但它是必需的。</p>
+
+<p>这几乎不是唯一的或有趣的建议。Peter Norvig的经典<a href="http://www.norvig.com/21-days.html">用十年自学编程</a>也谈到过这个话题，而且讲得比我更好。</p>
+
+<blockquote>
+<p>研究人员发现在任何领域都需要大约10年时间才能培养出专业技能，包括国际象棋、音乐作曲、电报操作、绘画、钢琴演奏、游泳、网球、以及神经心理学和拓扑学的研究。关键是刻意（deliberative）练习：不仅仅是一次又一次地做它，而是用略微超出你当前能力的任务来挑战自己，尝试它，在做时和做后分析你的表现，并且纠正所有错误。然后重复。再重复。</p>
+
+<p>似乎没有真正的捷径：即使是莫扎特，4岁的音乐天才，在他开始创作世界级音乐前也花了超过13年。甲壳虫乐队似乎横空出世以一连串的冠军歌曲（a string of #1 hits），并且在1964年出现在《埃德·沙利文秀》。但其实自1957年以来他们就已经在利物浦和汉堡的小俱乐部里演出了，虽然他们在早期有广泛的吸引力，但他们最最成功的《Sgt. Pepper&#39;s Lonely Hearts Club Band》发布在1967年。</p>
+</blockquote>
+
+<p>老实说，我期待着有一天醒来，从现在起的2年或3年之后，做着和今天我在做的完全相同的事：为Stack Overflow编写代码，增加另一个微小的改进或有用的功能。很明显我们想要成功。但在某种程度上，成功是无关紧要的，因为这个过程本身是令人满意的。每天醒来做你喜欢的事情——甚至更好的是，周围社区的人也喜欢它——这本身就是一种奖赏。尽管有着成吨的工作要做。</p>
+
+<p>博客也不例外。我经常给有抱负的博客作者<a href="http://blog.codinghorror.com/how-to-achieve-ultimate-blog-success-in-one-easy-step/">这个很重要的建议</a>：如果你开始你的博客，在六个月内别指望有人来读它。如果你这样做，我可以保证你将会非常失望。 可是，如果你能坚持发布计划并且每周写1篇或2篇高质量的博文一整年……然后，也只有到那个时候，你才可以看到稀稀落落的读者。我开始这个博客于2004年，花了整整3年的时间，每周写3到5篇博文，才使得它在软件开发社区内流行开来。</p>
+
+<p>我非常期望在这个博客上一直写，以一种形式或另一种，用我的余生。它是我是谁的一部分。至于那种戏剧性的成名方式，我不抱有任何幻想：归根结底，<a href="http://www.gocomics.com/pearlsbeforeswine/2008/11/16">我只是在网上写博客的那个人</a>。</p>
+
+<p><img src="/uploads/pearls-before-swine.png" title="pearls-before-swine" ></p>
+
+<p>那样挺好的对我来说。我从来没有说过我是聪明的。</p>
+
+<p>不管你最终获得多少读者，或页面浏览量，或任何我们这周正在度量的<a href="http://blog.codinghorror.com/the-high-score-table/">高分排行榜</a> ，请记住，你正在做的事情是值得去做的，因为——嗯——你正在做的事情是值得去做的。</p>
+
+<p>如果你一直这样坚持下去，谁知道会发生什么？很有可能某天你醒过来，发现自己一夜成名了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part5/">ANTLR 4权威参考读书笔记（5）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-01-22T21:18:51+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2016</span></span> <span class='time'>9:18 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在<a href="/blog/reading-notes-the-definitive-antlr4-reference-part3/">ANTLR 4权威参考读书笔记（3）</a>以及<a href="/blog/reading-notes-the-definitive-antlr4-reference-part4/">ANTLR 4权威参考读书笔记（4）</a>中我们分别用访问者和监听器机制实现了计算器的解释执行和编译执行。但并没有给出这两种机制的太多细节，这次就来详细地讲讲。</p>
+
+<p>ANTLR在它的运行库中为两种树遍历机制提供支持。默认情况下，ANTLR生成一个语法分析树监听器接口，在其中定义了回调方法，用于响应被内建的树遍历器触发的事件。</p>
+
+<p>在监听器和访问者机制之间最大的不同是：监听器方法被ANTLR提供的遍历器对象调用；而访问者方法必须显式的调用visit方法遍历它们的子节点，在一个节点的子节点上如果忘记调用visit方法就意味着那些子树没有得到访问。</p>
+
+<p>让我们首先从监听器开始。在我们了解监听器之后，我们也将看到ANTLR如何生成遵循访问者设计模式的树遍历器。</p>
+
+<h3 id="语法分析树监听器">语法分析树监听器</h3>
+
+<p>在Calc.java中有这样两行代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ParseTreeWalker walker = new ParseTreeWalker();
+</span><span class='line'>walker.walk(new DirectiveListener(), tree);</span></code></pre></td></tr></table></div></figure>
+
+<p>类ParseTreeWalker是ANTLR运行时提供的用于遍历语法分析树和触发监听器中回调方法的树遍历器。ANTLR工具根据Calc.g中的语法自动生成ParseTreeListener接口的子接口CalcListener和默认实现CalcBaseListener，其中含有针对语法中每个规则的enter和exit方法。DirectiveListener是我们编写的继承自CalcBaseListener的包含特定应用代码的实现，把它传递给树遍历器后，树遍历器在遍历语法分析树时就会触发DirectiveListener中的回调方法。</p>
+
+<p><img src="/uploads/calc-listener-hierachy.png" title="calc-listener-hierachy" ></p>
+
+<p>下图左边的语法分析树显示ParseTreeWalker执行了一次深度优先遍历，由粗虚线表示，箭头方向代表遍历方向。右边显示的是语法分析树的完整调用序列，它们由ParseTreeWalker触发调用。当树遍历器遇到规则assign的节点时，它触发enterAssign()并且给它传递AssignContext这个语法分析树节点的上下文。在树遍历器访问完assign节点的所有子节点后，它触发exitAssign()。</p>
+
+<p><img src="/uploads/listener-call-sequence.png" title="listener-call-sequence" ></p>
+
+<p>监听器机制的强大之处在于所有都是自动的。我们不必要写语法分析树遍历器，而且我们的监听器方法也不必要显式地访问它们的子节点。</p>
+
+<h3 id="语法分析树访问者">语法分析树访问者</h3>
+
+<p>有些情况下，我们实际想要控制的是遍历本身，在那里我们可以显式地调用visit方法去访问子树节点。参数-visitor告诉ANTLR工具从相应语法生成访问者接口和默认实现，其中含有针对语法中每个规则的visit方法。</p>
+
+<p>下图是我们熟悉的访问者模式操作在语法分析树上。左边部分的粗虚线表示语法分析树的深度优先遍历，箭头方向代表遍历方向。右边部分指明访问者中的方法调用序列。</p>
+
+<p><img src="/uploads/visitor-call-sequence.png" title="visitor-call-sequence" ></p>
+
+<p>下面是Calc.java中的两行代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Expr;
-</span><span class='line'>s : e ;
-</span><span class='line'>e : e op=MULT e    // MULT is '*'
-</span><span class='line'>  | e op=ADD e     // ADD is '+'
-</span><span class='line'>  | INT
-</span><span class='line'>  ;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>EvalVisitor eval = new EvalVisitor();
+</span><span class='line'>// To start walking the parse tree
+</span><span class='line'>eval.visit(tree);</span></code></pre></td></tr></table></div></figure>
 
-<p>按照上面的语法，规则e会产生一个相当无用的监听器，因为规则e的所有选项导致树遍历器触发相同的enterE()和exitE()方法。</p>
+<p>我们首先初始化自制的树遍历器EvalVisitor，然后调用visit()去访问整棵语法分析树。ANTLR运行时提供的访问者支持代码会在看到根节点时调用visitProg()。在那里，visitProg()会把子树作为参数调用visit方法继续遍历，如此等等。</p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public interface ExprListener extends ParseTreeListener {
-</span><span class='line'>    void enterE(ExprParser.EContext ctx);
-</span><span class='line'>    void exitE(ExprParser.EContext ctx);</span></code></pre></td></tr></table></div></figure>
+<p><img src="/uploads/calc-visitor-hierachy.png" title="calc-visitor-hierachy" ></p>
 
-<p>监听器方法必须使用op记号标签和ctx的方法进行测试以查看语法分析器为每个e子树匹配了哪个选项。</p>
+<p>ANTLR自动生成的访问者接口和默认实现可以让我们为访问者方法编写自己的实现，让我们避免必须覆写接口中的每个方法，仅仅聚焦在我们感兴趣的方法上。这种方式减少了我们学习ANTLR必须要花费的时间，让我们回到我们所熟悉的编程语言领域。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part4/">ANTLR 4权威参考读书笔记（4）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-01-18T15:06:54+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>3:06 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在<a href="/blog/reading-notes-the-definitive-antlr4-reference-part3/">ANTLR 4权威参考读书笔记（3）</a>中的计算器是以解释的方式执行的，现在我们想要把它转换成以编译的方式执行。编译执行和解释执行相比，需要依赖于特定的目标机器。在这里我们假设有一台这样的机器，它用堆栈进行运算，支持如下表所示的几种指令：</p>
+
+<table><thead>
+<tr>
+<th>指令</th>
+<th>说明</th>
+<th>操作数个数</th>
+<th>用途</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>LDV</td>
+<td>Load Variable</td>
+<td>1</td>
+<td>变量入栈</td>
+</tr>
+<tr>
+<td>LDC</td>
+<td>Load Constant</td>
+<td>1</td>
+<td>常量入栈</td>
+</tr>
+<tr>
+<td>STR</td>
+<td>Store Value</td>
+<td>1</td>
+<td>栈顶一个元素存入指定变量</td>
+</tr>
+<tr>
+<td>ADD</td>
+<td>Add</td>
+<td>0</td>
+<td>栈顶两个元素出栈，求和后入栈</td>
+</tr>
+<tr>
+<td>SUB</td>
+<td>Subtract</td>
+<td>0</td>
+<td>栈顶两个元素出栈，求差后入栈</td>
+</tr>
+<tr>
+<td>MUL</td>
+<td>Multiply</td>
+<td>0</td>
+<td>栈顶两个元素出栈，求积后入栈</td>
+</tr>
+<tr>
+<td>DIV</td>
+<td>Divide</td>
+<td>0</td>
+<td>栈顶两个元素出栈，求商后入栈</td>
+</tr>
+<tr>
+<td>RET</td>
+<td>Return</td>
+<td>0</td>
+<td>栈顶一个元素出栈，计算结束</td>
+</tr>
+</tbody></table>
+
+<p>做这个最简单的方法是使用ANTLR的语法分析树监听器机制实现DirectiveListener类，然后它通过监听来自树遍历器触发的事件，输出对应的机器指令。</p>
+
+<p>监听器机制的优势是我们不必要自己去做任何树遍历，甚至我们不必要知道遍历语法分析树的运行时如何调用我们的方法，我们只要知道我们的DirectiveListener类得到通知，在与语法规则匹配的短语开始和结束时。这种方式减少了我们学习ANTLR必须要花费的时间，让我们回到我们所熟悉的编程语言领域。</p>
+
+<p>这里不需要创建新的语法规则，还是继续沿用前文Calc.g所包含的语法，标签也要保留：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -914,497 +493,84 @@
 <span class='line-number'>11</span>
 <span class='line-number'>12</span>
 <span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitE(ExprParser.EContext ctx) {
-</span><span class='line'>    if (ctx.getChildCount() == 3) {    // operations have 3 children
-</span><span class='line'>        int left = values.get(ctx.e(0));
-</span><span class='line'>        int right = values.get(ctx.e(1));
-</span><span class='line'>        if (ctx.op.getType() == ExprParser.MULT) {
-</span><span class='line'>            values.put(ctx, left * right);
-</span><span class='line'>        } else {
-</span><span class='line'>            values.put(ctx, left + right);
-</span><span class='line'>        }
-</span><span class='line'>    } else {
-</span><span class='line'>        values.put(ctx, values.get(ctx.getChild(0)));    // an INT
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Calc;
+</span><span class='line'>
+</span><span class='line'>prog
+</span><span class='line'>    : stat+
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>stat
+</span><span class='line'>    : expr                   # printExpr
+</span><span class='line'>    | ID '=' expr            # assign
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>expr
+</span><span class='line'>    : expr op=(MUL|DIV) expr # MulDiv
+</span><span class='line'>    | expr op=(ADD|SUB) expr # AddSub
+</span><span class='line'>    | INT                    # int
+</span><span class='line'>    | ID                     # id
+</span><span class='line'>    | '(' expr ')'           # parens
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>MUL : '*' ;
+</span><span class='line'>
+</span><span class='line'>DIV : '/' ;
+</span><span class='line'>
+</span><span class='line'>ADD : '+' ;
+</span><span class='line'>
+</span><span class='line'>SUB : '-' ;
+</span><span class='line'>
+</span><span class='line'>ID  : [a-zA-Z]+ ;
+</span><span class='line'>
+</span><span class='line'>INT : [0-9]+ ;
+</span><span class='line'>
+</span><span class='line'>WS  : [ \t\r\n]+ -&gt; skip ;    // toss out whitespace</span></code></pre></td></tr></table></div></figure>
 
-<p>在exitE()中引用的MULT字段是在ExprParser中由ANTLR自动生成的：</p>
+<p>然后，我们可以运行ANTLR工具：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr Calc.g</span></code></pre></td></tr></table></div></figure>
+
+<p>它会生成后缀名为tokens和java的六个文件：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class ExprParser extends Parser {
-</span><span class='line'>    public static final int MULT=1, ADD=2, INT=3, WS=4;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Calc.tokens         CaclLexer.java          CalcParser.java
+</span><span class='line'>CalcLexer.tokens    CalcBaseListener.java   CalcListener.java</span></code></pre></td></tr></table></div></figure>
 
-<p>如果我们查看在类ExprParser中的类EContext，我们可以看到ANTLR把来自3个选项的所有元素都塞进了相同的上下文对象。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public static class EContext extends ParserRuleContext {
-</span><span class='line'>    public Token op;                     // derived from label op
-</span><span class='line'>    public List&lt;EContext&gt; e() { ... }    // get all e subtrees
-</span><span class='line'>    public EContext e(int i) { ... }     // get ith e subtree
-</span><span class='line'>    public TerminalNode INT() { ... }    // get INT node if alt 3 of e</span></code></pre></td></tr></table></div></figure>
-
-<p>为得到更精确的监听器事件，ANTLR让我们使用#运算符给任何规则最外层的选项打标签。让我们从Expr派生语法LExpr，并给e的选项打上标签，以下是修改后的e规则：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>e : e MULT e  # Mult
-</span><span class='line'>  | e ADD e   # Add
-</span><span class='line'>  | INT       # Int
-</span><span class='line'>  ;</span></code></pre></td></tr></table></div></figure>
-
-<p>现在，ANTLR为e的每个选项生成了单独的监听器方法，因此，我们不再需要op记号标签。对于选项标签X，ANTLR生成方法enterX()和exitX()。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public interface LExprListener extends ParseTreeListener {
-</span><span class='line'>    void enterMult(LExprParser.MultContext ctx);
-</span><span class='line'>    void exitMult(LExprParser.MultContext ctx);
-</span><span class='line'>    void enterAdd(LExprParser.AddContext ctx);
-</span><span class='line'>    void exitAdd(LExprParser.AddContext ctx);
-</span><span class='line'>    void enterInt(LExprParser.IntContext ctx);
-</span><span class='line'>    void exitInt(LExprParser.IntContext ctx);
-</span><span class='line'>    ...
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>注意，ANTLR也为选项生成特定的以标签命名的上下文对象（EContext的子类）。专门的上下文对象的getter方法只限于应用在那些相关的选项。例如，IntContext只有一个INT()方法，我们可以在enterInt()中调用ctx.INT()，但在enterAdd()中就不能。</p>
-
-<p>监听器和访问者是极好的。我们只需要通过充实事件方法就可以得到可复用和可重定目标的语法以及封装的语言应用。ANTLR甚至会为我们自动生成骨架代码。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-to-create-effective-icons/">如何创建有效的图标</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-08-06T12:43:17+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>6</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>12:43 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="http://www.awwwards.com/how-to-create-effective-icons.html">http://www.awwwards.com/how-to-create-effective-icons.html</a></p>
-
-<p>我可能就是你所说的图标爱好者。我喜欢图标，而且我更加喜欢制作它们！作为一个艺术家，我的背景在很大程度上是绘画——我喜欢绘画，并且我已经画了一辈子（甚至远远早于我知道什么是图形设计）。我想，这是我理解创建图标的一个关键。绘画教你看——然后把你所看到的转化成纸上的线条和图形——而这正是如何创建有效的图标。</p>
-
-<h3 id="几何图形">几何图形</h3>
-
-<p>因此，对初学者而言，基本上任何东西都可以用这四种图形组合而成：</p>
-
-<p><img src="/uploads/effective-icons-1.png" title="effective-icons-1" ></p>
-
-<p>当我想把某事物转换成一个图标时，我观察它然后尽可能地将其拆分为最简单的图形。例如，水滴可以用一个三角形和一个圆形组成。</p>
-
-<p><img src="/uploads/effective-icons-2.png" title="effective-icons-2" ></p>
-
-<p>心形图标可以由两个圆形和一个三角形构成。</p>
-
-<p><img src="/uploads/effective-icons-3.png" title="effective-icons-3" ></p>
-
-<p>我每次都是在Adobe Illustrator中创建这些图形。使用矢量图形可以让我控制线条的粗细，以及图形和其锚点的相互作用。Illustrator也可以让我自由地把线条转换成图形，反之亦然。这一切也许看起来十分基础，但它是我用于创建最复杂图标的同样的方法。下面是我最近在做的一个略微更加复杂些的《权利法案》图标的示例，在这里我应用了同样的原则。</p>
-
-<p><img src="/uploads/effective-icons-4.png" title="effective-icons-4" ></p>
-
-<h3 id="界面图标">界面图标</h3>
-
-<p>我最近有机会为一款超赞的iPhone应用Parker Planner制作一组图标。我很喜欢做这个项目，这个项目其中最重要的一个方面是创建一组易懂的、私有的、实用的和美观的用户界面图标，可以帮助用户浏览操作这款略微复杂的计划应用。</p>
-
-<p><img src="/uploads/effective-icons-5.png" title="effective-icons-5" ></p>
-
-<p>让我们选取这些图标的其中之一分解看看我如何创建它。例如，垃圾桶图标是由三个圆角矩形和三条线构成。</p>
-
-<p>1、选择圆角矩形工具。</p>
-
-<p><img src="/uploads/effective-icons-6.png" title="effective-icons-6" ></p>
-
-<p>2、拖动出一个图形。</p>
-
-<p><img src="/uploads/effective-icons-7.png" title="effective-icons-7" ></p>
-
-<p>3、调整笔划宽度直到你满意。</p>
-
-<p><img src="/uploads/effective-icons-8.png" title="effective-icons-8" ></p>
-
-<p>我通常选择在整组图标中使用一到两种笔划宽度。</p>
-
-<p><img src="/uploads/effective-icons-9.png" title="effective-icons-9" ></p>
-
-<p>这使它们看起来更一致和感觉更有整体性。</p>
-
-<p>4、用另一个圆角矩形创建盖子。</p>
-
-<p><img src="/uploads/effective-icons-10.png" title="effective-icons-10" ></p>
-
-<p>5、再一个圆角矩形创建盖子的把手。</p>
-
-<p><img src="/uploads/effective-icons-11.png" title="effective-icons-11" ></p>
-
-<p>6、擦除圆角矩形的下半部分。</p>
-
-<p><img src="/uploads/effective-icons-12.png" title="effective-icons-12" ></p>
-
-<p>7、现在，通过添加三条竖线到桶身上给桶添加条纹。</p>
-
-<p><img src="/uploads/effective-icons-13.png" title="effective-icons-13" ></p>
-
-<p>8、然后你就获得了它！一个垃圾桶图标……如果你喜欢，你可以用颜色或线条宽度做进一步调整。</p>
-
-<p><img src="/uploads/effective-icons-14.png" title="effective-icons-14" ></p>
-
-<p>我在创建图标时经常使用的一些其它真正有用的工具是Pathfinder，我使用它来剪切、连接和挖空图形。</p>
-
-<p><img src="/uploads/effective-icons-15.png" title="effective-icons-15" ></p>
-
-<p>Stroke/Fill工具，它帮助你将图形在填满和笔划间切换。</p>
-
-<p><img src="/uploads/effective-icons-16.png" title="effective-icons-16" ></p>
-
-<p>以及我非常喜欢的工具Stroke Panel，它帮助你将拐角和线的末端从直角转换到圆角。</p>
-
-<p><img src="/uploads/effective-icons-17.png" title="effective-icons-17" ></p>
-
-<p>当我完成一组图标，我通常将它们全体紧挨着排成一排，看看是否有哪个看起来很奇怪或不到位。然后我会做任何必要的修改。</p>
-
-<p><img src="/uploads/effective-icons-18.png" title="effective-icons-18" ></p>
-
-<p>最后，我总是在应用中测试它们以确保它们感觉正确和功能良好。</p>
-
-<p><img src="/uploads/effective-icons-19.png" title="effective-icons-19" ></p>
-
-<p>最终，我想说创建优秀图标的方法不仅仅是学习Illustrator技巧，尽管它们也是必需的。最好的做法是练习把你周围看到的事物分解成简单图形。你在这点上越是变得更好，你越是能够成为更高超的图标设计师！加油！</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part22/">ANTLR 4权威参考读书笔记（22）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-07-24T21:40:28+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>24</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>9:40 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>基于监听器的方法是极好的，因为所有树遍历和方法触发被自动完成。尽管有时候自动树遍历也是一个缺点，因为我们不能控制遍历本身。例如，我们可能想遍历一段C程序的语法分析树，通过跳过函数体子树忽略函数中的一切。监听器事件方法也不能使用方法返回值去传递数据。当我们需要控制遍历或返回带有事件方法返回值的值时，我们使用访问者模式。现在，让我们构建一个基于访问者版本的属性文件加载器去比较这两种方法。</p>
-
-<h3 id="使用访问者实现应用">使用访问者实现应用</h3>
-
-<p>使用访问者代替监听器，我们只需要让ANTLR生成访问者接口和实现接口，然后创建一段测试代码在语法分析树上调用visit()，根本不需要触及到语法。</p>
-
-<p>在命令行使用-visitor参数时，ANTLR生成接口PropertyFileVisitor和类PropertyFileBaseVisitor，后者有如下的默认实现：</p>
+<p>正如这里我们看到的，ANTLR会为我们自动生成监听器基础设施。其中CalcListener是语法和监听器对象之间的关键接口，描述我们可以实现的回调方法：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class PropertyFileBaseVisitor&lt;T&gt; extends AbstractParseTreeVisitor&lt;T&gt;
-</span><span class='line'>                                        implements PropertyFileVisitor&lt;T&gt; {
-</span><span class='line'>    @Override
-</span><span class='line'>    public T visitFile(PropertyFileParser.FileContext ctx) { ... }
-</span><span class='line'>    @Override
-</span><span class='line'>    public T visitProp(PropertyFileParser.PropContext ctx) { ... }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public interface CalcListener extends ParseTreeListener {
+</span><span class='line'>    void enterProg(CalcParser.ProgContext ctx);
+</span><span class='line'>    void exitProg(CalcParser.ProgContext ctx);
+</span><span class='line'>    void enterPrintExpr(CalcParser.PrintExprContext ctx);</span></code></pre></td></tr></table></div></figure>
 
-<p>我们可以从监听器的exitProp()中拷贝映射功能，然后把它粘贴到与规则prop相关的访问者方法中。</p>
+<p>CalcBaseListener则是ANTLR生成的一组空的默认实现。ANTLR内建的树遍历器会去触发在监听器中像enterProg()和exitProg()这样的一串回调方法，如同它对语法分析树执行了一次深度优先遍历。为响应树遍历器触发的事件，我们的DirectiveListener需要继承CalcBaseListener并实现一些方法。我们不需要实现全部的接口方法，我们也不需要去覆写每个enter和exit方法，我们只需要去覆写那些我们感兴趣的回调方法。</p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class TestPropertyFileVisitor {
-</span><span class='line'>    public static class PropertyFileVisitor extends PropertyFileBaseVisitor&lt;Void&gt; {
-</span><span class='line'>        Map&lt;String,String&gt; props = new OrderedHashMap&lt;String, String&gt;();
-</span><span class='line'>        public Void visitProp(PropertyFileParser.PropContext ctx) {
-</span><span class='line'>            String id = ctx.ID().getText();    // prop : ID '=' STRING '\n' ;
-</span><span class='line'>            String value = ctx.STRING().getText();
-</span><span class='line'>            props.put(id, value);
-</span><span class='line'>            return null;    // Java says must return something even when Void
-</span><span class='line'>        }
-</span><span class='line'>    }</span></code></pre></td></tr></table></div></figure>
-
-<p>这里是访问者接口和类之间的继承关系：</p>
-
-<p><img src="/uploads/propertyfile-visitor-hierachy.png" title="propertyfile-visitor-hierachy" ></p>
-
-<p>访问者在子节点上通过显式地调用接口ParseTreeVisitor的visit()方法遍历语法分析树。那些方法在AbstractParseTreeVisitor中实现。在这里，为prop调用创建的节点没有子树，因此visitProp()不需要调用visit()。</p>
-
-<p>在监听器和访问者的测试代码（例如TestPropertyFileVisitor）之间最大的不同是访问者的测试代码不需要ParseTreeWalker，它只需要让访问者去访问由语法分析器创建的树。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>PropertyFileVisitor loader = new PropertyFileVisitor();
-</span><span class='line'>loader.visit(tree);
-</span><span class='line'>System.out.println(loader.props);    // print results</span></code></pre></td></tr></table></div></figure>
-
-<p>以下是构建和测试序列：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr -visitor PropertyFile.g  # create visitor as well this time
-</span><span class='line'>compile *.java
-</span><span class='line'>run TestPropertyFileVisitor t.properties</span></code></pre></td></tr></table></div></figure>
-
-<p>这里是输出的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>{user="parrt", machine="maniac"}</span></code></pre></td></tr></table></div></figure>
-
-<p>我们可以使用监听器和访问者构建几乎任何我们想要的。一旦我们处于Java空间，就不再需要学习更多的ANTLR知识。我们只要知道语法、语法分析树、监听器和访问者事件方法之间的关系。除此之外，就是代码。在对识别中的输入短语的回答中，我们可以生成输出、收集信息、以某种方式验证短语，或者执行计算。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part21/">ANTLR 4权威参考读书笔记（21）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-07-14T18:38:42+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>14</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:38 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>前文的语法仍然存在问题，因为它限制我们只能使用Java生成语法分析器。为使语法可复用和语言无关，我们需要完全避免嵌入动作。接下来就将展示如何用监听器做到这点。</p>
-
-<h3 id="使用语法分析树监听器实现应用">使用语法分析树监听器实现应用</h3>
-
-<p>在构建语言应用时要避免应用和语法纠缠在一起，关键是让语法分析器生成语法分析树，然后遍历该树去触发特定的应用代码。我们可以使用我们最喜欢的技术遍历树，也可以使用ANTLR生成的树遍历机制中的一个。在本节中，我们将使用ANTLR内建的ParseTreeWalker构建一个基于监听器版本的属性文件应用。</p>
-
-<p>让我们从属性文件语法的原始版本开始：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>file : prop+ ;
-</span><span class='line'>prop : ID '=' STRING '\n' ;</span></code></pre></td></tr></table></div></figure>
-
-<p>下面是属性示例文件t.properties的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>user="parrt"
-</span><span class='line'>machine="maniac"</span></code></pre></td></tr></table></div></figure>
-
-<p>通过上述语法，ANTLR生成PropertyFileParser，该语法分析器会自动构建如下图所示的语法分析树：</p>
-
-<p><img src="/uploads/propertyfile-parse-tree.png" title="propertyfile-parse-tree" ></p>
-
-<p>有了语法分析树，我们就可以使用ParseTreeWalker去访问所有的节点，触发进入和退出方法。</p>
-
-<p>现在来看一下ANTLR通过语法PropertyFile生成的监听器接口PropertyFileListener，当ANTLR的ParseTreeWalker发现和完成节点时，它会为每个规则子树分别触发进入和退出方法。因为在语法PropertyFile中只有两条语法规则，所以在接口中有4个方法：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public interface PropertyFileListener extends ParseTreeListener {
-</span><span class='line'>    void enterFile(PropertyFileParser.FileContext ctx);
-</span><span class='line'>    void exitFile(PropertyFileParser.FileContext ctx);
-</span><span class='line'>    void enterProp(PropertyFileParser.PropContext ctx);
-</span><span class='line'>    void exitProp(PropertyFileParser.PropContext ctx);
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>FileContext和PropContext对象是针对每条语法规则的语法分析树节点的实现，它们包含一些有用的方法。</p>
-
-<p>为方便起见，ANTLR也会生成带有默认实现的类PropertyFileBaseListener，这些默认实现模仿在前文语法中@member区域我们手写的空白方法。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class PropertyFileBaseVisitor&lt;T&gt; extends AbstractParseTreeVisitor&lt;T&gt;
-</span><span class='line'>                                        implements PropertyFileVisitor&lt;T&gt; {
-</span><span class='line'>    @Override
-</span><span class='line'>    public T visitFile(PropertyFileParser.FileContext ctx) { }
-</span><span class='line'>    @Override
-</span><span class='line'>    public T visitProp(PropertyFileParser.PropContext ctx) { }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>默认实现让我们只需要覆盖和实现那些我们关心的方法。例如，以下是属性文件加载器的一个重新实现，像前面那样它只有一个方法，但使用监听器机制：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public static class PropertyFileLoader extends PropertyFileBaseListener {
-</span><span class='line'>    Map&lt;String,String&gt; props = new OrderedHashMap&lt;String, String&gt;();
-</span><span class='line'>    public void exitProp(PropertyFileParser.PropContext ctx) {
-</span><span class='line'>        String id = ctx.ID().getText();    // prop : ID '=' STRING '\n' ;
-</span><span class='line'>        String value = ctx.STRING().getText();
-</span><span class='line'>        props.put(id, value);
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>主要的不同是这个版本扩展了基类监听器，而不是语法分析器，监听器方法在语法分析器完成后被触发。</p>
-
-<p>这里面有很多的接口和类，让我们看一下在这些关键元素间的继承关系。</p>
-
-<p><img src="/uploads/propertyfile-listener-hierachy.png" title="propertyfile-listener-hierachy" ></p>
-
-<p>处于ANTLR运行库中的接口ParseTreeListener要求每个监听器对事件visitTerminal()、enterEveryRule()和exitEveryRule()作出反应，如果有语法错误的还要加上visitErrorNode()。ANTLR从语法文件PropertyFile生成接口PropertyFileListener，并且为类PropertyFileBaseListener的所有方法生成默认实现。我们仅需要构建PropertyFileLoader，它继承了PropertyFileBaseListener中的所有空方法。</p>
-
-<p>方法exitProp()可以访问与规则prop相关的规则上下文对象PropContext，该上下文对象持有在规则prop中提到的每个元素（ID和STRING）的对应方法。因为这些元素是语法中的记号引用，所以方法返回语法分析树节点TerminalNode。我们既可以通过getText()直接访问记号的文本，也可以通过getSymbol()首先获取Token。</p>
-
-<p>现在让我们创建测试文件TestPropertyFile.java遍历树，倾听来自PropertyFileLoader的声音：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>// create a standard ANTLR parse tree walker
-</span><span class='line'>ParseTreeWalker walker = new ParseTreeWalker();
-</span><span class='line'>// create listener then feed to walker
-</span><span class='line'>PropertyFileLoader loader = new PropertyFileLoader();
-</span><span class='line'>walker.walk(loader, tree);    // walk parse tree
-</span><span class='line'>System.out.println(loader.props);    // print results</span></code></pre></td></tr></table></div></figure>
-
-<p>然后就是编译和生成代码，运行测试程序去处理输入文件：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr PropertyFile.g
-</span><span class='line'>compile *.java
-</span><span class='line'>run TestPropertyFile t.properties</span></code></pre></td></tr></table></div></figure>
-
-<p>这里是输出的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>{user="parrt", machine="maniac"}</span></code></pre></td></tr></table></div></figure>
-
-<p>测试程序成功地把文件中的属性赋值重组成内存中的映射数据结构。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part20/">ANTLR 4权威参考读书笔记（20）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-07-03T18:37:26+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2016</span></span> <span class='time'>6:37 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>单独的语法不是很有用，因为相关的语法分析器只能告诉我们某个输入句子是否遵守语言规格。为构建语言应用，我们需要语法分析器在看到特定的输入句子、短语或者记号时触发特定的动作。这些短语-动作对的集合表示语言应用或者至少是在语法和一个更大的周边应用之间的接口。</p>
-
-<p>我们可以使用语法分析树监听器和访问者构建语言应用。监听器是一个响应规则进入和退出事件的对象，这些短语识别事件在语法分析树遍历器发现和完成节点时触发。为了支持应用必须控制树是如何被遍历的这种情况，ANTLR生成的语法分析树也支持著名的树访问者模式。</p>
-
-<p>监听器和访问者之间最大的不同是，监听器方法不对显式地调用方法去遍历它们的子树负责，而访问者必须显式地触发访问子节点以保持树的遍历继续。通过这些显式的访问子树的调用，访问者控制遍历的顺序以及多少树被访问。为方便起见，我们使用术语“事件方法”来指代监听器回调或者访问者方法。</p>
-
-<p>为了确切地知道ANTLR为我们构建了什么样的树遍历设施以及为什么，让我们首先看看监听器机制的起源以及如何使用监听器和访问者把特定应用的代码和语法分离。</p>
-
-<h3 id="从嵌入动作演化到监听器">从嵌入动作演化到监听器</h3>
-
-<p>监听器和访问者机制将语法从应用代码中解耦，提供了一些令人信服的好处。这种解耦很好地封装了应用程序，而不是把它切割成碎片分散到语法中的各个地方。没有嵌入动作，我们可以在不同的应用中复用相同的语法，甚至不需要重新编译生成的语法分析器。如果没有嵌入动作，ANTLR还可以用相同的语法生成不同编程语言的语法分析器。集成语法缺陷修复或更新也更容易，因为我们不必担心嵌入动作导致的合并冲突。</p>
-
-<p>接下来，我们将探讨从带有嵌入动作的语法到完全解耦的语法和应用的演化。以下含有用«...»描述的嵌入动作的属性文件语法读取属性文件，每行一个属性赋值。像«start file»这样的动作只是Java代码适当的替代。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grammar PropertyFile;
-</span><span class='line'>file : {«start file»} prop+ {«finish file»} ;
-</span><span class='line'>prop : ID '=' STRING '\n' {«process property»} ;
-</span><span class='line'>ID   : [a-z]+ ;
-</span><span class='line'>STRING : '"' .*? '"' ;</span></code></pre></td></tr></table></div></figure>
-
-<p>这样的紧密耦合把语法束缚到一个特定的应用上。一个更好的方法是创建由ANTLR生成的语法分析器PropertyFileParser的子类，然后把嵌入动作转换成方法。重构仅留下不重要的方法调用在语法中触发新创建方法的动作，然后，通过子类化语法分析器，我们可以实现任意数量的不同应用而无需修改语法。这样的重构看起来像：</p>
+<p>在本例中，我们需要通过覆写6个方法对6个事件——当树遍历器exit那些有标签的选项时触发——作出响应。我们的基本策略是当这些事件发生时打印出已转换的指令。以下是完整的实现代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1417,141 +583,79 @@
 <span class='line-number'>9</span>
 <span class='line-number'>10</span>
 <span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grammar PropertyFile;
-</span><span class='line'>@members {
-</span><span class='line'>    void startFile() { }    // blank implementations
-</span><span class='line'>    void finishFile() { }
-</span><span class='line'>    void defineProperty(Token name, Token value) { }
-</span><span class='line'>}
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class DirectiveListener extends CalcBaseListener {
 </span><span class='line'>
-</span><span class='line'>file : {startFile();} prop+ {finishFile();} ;
-</span><span class='line'>prop : ID '=' STRING '\n' {defineProperty($ID, $STRING)} ;
-</span><span class='line'>ID   : [a-z]+ ;
-</span><span class='line'>STRING : '"' .*? '"' ;</span></code></pre></td></tr></table></div></figure>
-
-<p>解耦可以让语法被不同的应用复用，但语法因为方法调用的关系仍然被绑定在Java上。</p>
-
-<p>为演示已重构语法的复用性，让我们构建两个不同的应用。首先从遇到属性后只是打印它们的那个开始。这个过程只是去扩展由ANTLR生成的语法分析器类和覆盖一个或多个由语法触发的方法。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class PropertyFilePrinter extends PropertyFileParser {
-</span><span class='line'>    void defineProperty(Token name, Token value) {
-</span><span class='line'>        System.out.println(name.getText() + "=" + value.getText());
+</span><span class='line'>    @Override
+</span><span class='line'>    public void exitPrintExpr(CalcParser.PrintExprContext ctx) {
+</span><span class='line'>        System.out.println("RET\n");
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void exitAssign(CalcParser.AssignContext ctx) {
+</span><span class='line'>        String id = ctx.ID().getText();
+</span><span class='line'>        System.out.println("STR " + id);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void exitMulDiv(CalcParser.MulDivContext ctx) {
+</span><span class='line'>        if (ctx.op.getType() == CalcParser.MUL) {
+</span><span class='line'>            System.out.println("MUL");
+</span><span class='line'>        } else {
+</span><span class='line'>            System.out.println("DIV");
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void exitAddSub(CalcParser.AddSubContext ctx) {
+</span><span class='line'>        if (ctx.op.getType() == CalcParser.ADD) {
+</span><span class='line'>            System.out.println("ADD");
+</span><span class='line'>        } else {
+</span><span class='line'>            System.out.println("SUB");
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void exitId(CalcParser.IdContext ctx) {
+</span><span class='line'>        System.out.println("LDV " + ctx.ID().getText());
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void exitInt(CalcParser.IntContext ctx) {
+</span><span class='line'>        System.out.println("LDC " + ctx.INT().getText());
 </span><span class='line'>    }
 </span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>由于ANTLR生成的PropertyFileParser类中的默认实现，我们不需要覆盖startFile()或finishFile()。</p>
-
-<p>为了启动这个应用，我们需要创建一个特定的PropertyFilePrinter语法分析器子类的实例，而不是常规的PropertyFileParser的。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>PropertyFileLexer lexer = new PropertyFileLexer(input);
-</span><span class='line'>CommonTokenStream tokens = new CommonTokenStream(lexer);
-</span><span class='line'>PropertyFilePrinter parser = new PropertyFilePrinter(tokens);
-</span><span class='line'>parser.file();    // launch our special version of the parser</span></code></pre></td></tr></table></div></figure>
-
-<p>作为第二个应用，我们把属性加载到一个映射中而不是打印它们。我们需要做的就是创建一个新的子类并把不同的功能放到defineProperty()中。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class PropertyFileLoader extends PropertyFileParser {
-</span><span class='line'>    Map&lt;String,String&gt; props = new OrderedHashMap&lt;String, String&gt;();
-</span><span class='line'>    void defineProperty(Token name, Token value) {
-</span><span class='line'>        props.put(name.getText(), value.getText());
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>在语法分析器执行完毕后，字段props将会包含名-值对。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part19/">ANTLR 4权威参考读书笔记（19）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-06-21T21:12:40+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>21</span><span class='date-suffix'>st</span>, <span class='date-year'>2016</span></span> <span class='time'>9:12 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><ul>
-<li>component 构件</li>
-</ul>
-
-<p>因为词法规则可以使用递归，所以词法解析器在技术上和语法解析器一样强大。那意味着我们甚至可以在词法分析器中匹配语法结构。或者，在另一个极端，我们可以把字符当作记号，使用语法分析器去把语法结构应用到字符流（这种被称为无扫描语法分析器）。这导致什么在词法分析器中匹配和什么在语法分析器中匹配的界线在哪里并不是很明显。幸运的是，有几条经验法则可以让我们做出判断：</p>
-
-<ul>
-<li>在词法分析器中匹配和丢弃任何语法分析器根本不需要见到的东西。例如，在词法分析器中识别和扔掉像注释和空格这些东西。否则，语法分析器必须经常查看是否有注释或空格在记号间。</li>
-<li>在词法分析器中匹配诸如标志符、关键字、字符串和数字这样的常用记号。语法分析器比词法分析器有更多的开销，因此，我们不必让语法分析器承受把数字放在一起识别成整数的负担。</li>
-<li>把那些语法分析器不需要去辨别的词法结构合并成一个单独的记号类型。例如，如果我们的应用把整数和浮点数当作同一事物对待，然后把它们合并成记号类型NUMBER，那么就没必要向语法分析器发送单独的记号类型。</li>
-<li>合并能被语法分析器视为一个单独实体的任何东西。例如，如果语法分析器不在乎XML标签里的内容，词法分析器可以把尖括号中的任何东西合并成一个单独的被称为TAG的记号类型。</li>
-<li>如果语法分析器需要先拆开一小块文本后才能去处理它，那么词法分析器应该传递独立的构件作为记号给语法分析器。例如，如果语法分析器需要处理一个IP地址的元素，词法分析器应该发送IP构件（整数和点）的独立的记号。</li>
-</ul>
-
-<p>想象下现在需要处理Web服务器上的日志文件，每一行表示一条记录。让我们假设每条记录都有一个请求IP地址、HTTP协议命令和结果代码。这里是一个日志条目的示例：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>192.168.209.85 "GET /download/foo.html HTTP/1.0" 200</span></code></pre></td></tr></table></div></figure>
-
-<p>如果想要统计文件中有多少行，那么我们可以忽略掉任何东西除了换行字符的序列：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>file  : NL+ ;               // 匹配换行符（NL）序列的语法规则
-</span><span class='line'>STUFF : ~'\n'+ -&gt; skip ;    // 匹配和丢弃除'\n'外的任何东西
-</span><span class='line'>NL    : '\n' ;              // 返回NL给语法分析器或调用代码</span></code></pre></td></tr></table></div></figure>
-
-<p>词法分析器不必识别太多的结构，语法分析器会匹配换行记号的序列。</p>
-
-<p>接下来，我们需要从日志文件中收集一系列的IP地址。这意味着我们需要一条规则去识别IP地址的词法结构。并且我们也可以提供其它记录元素的词法规则：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>IP    : INT '.' INT '.' INT '.' INT ;    // 192.168.209.85
-</span><span class='line'>INT   : [0-9]+ ;                         // 匹配IP八位组或者HTTP结果代码
-</span><span class='line'>STRING: '"' .*? '"' ;                    // 匹配HTTP协议命令
-</span><span class='line'>NL    : '\n' ;                           // 匹配日志文件记录终结符
-</span><span class='line'>WS    : ' ' -&gt; skip ;                    // 忽略空格</span></code></pre></td></tr></table></div></figure>
-
-<p>拥有一套完整的记号后，我们可以让语法规则匹配日志文件中的记录：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>file : row+ ;                // 匹配日志文件中行的语法规则
-</span><span class='line'>row  : IP STRING INT NL ;    // 匹配日志文件记录</span></code></pre></td></tr></table></div></figure>
-
-<p>更进一步，我们需要把文本IP地址转换成32位的数字。使用便利的库函数split(&#39;.&#39;)，我们可以把IP地址切割成字符串传递给语法分析器让它去处理。但是，更好的做法是让词法分析器匹配IP地址的词法结构，然后把匹配出的构件作为记号传递给语法分析器。</p>
+<p>为了让它运行起来，余下我们唯一需要做的事是创建一个主程序去调用它：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1560,17 +664,87 @@
 <span class='line-number'>5</span>
 <span class='line-number'>6</span>
 <span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>file  : row+ ;                           // 匹配日志文件中行的语法规则
-</span><span class='line'>row   : ip STRING INT NL ;               // 匹配日志文件记录
-</span><span class='line'>ip    : INT '.' INT '.' INT '.' INT ;    // 在语法分析器中匹配IP地址
-</span><span class='line'>INT   : [0-9]+ ;                         // 匹配IP八位组或者HTTP结果代码
-</span><span class='line'>STRING: '"' .*? '"' ;                    // 匹配HTTP协议命令
-</span><span class='line'>NL    : '\n' ;                           // 匹配日志文件记录终结符
-</span><span class='line'>WS    : ' ' -&gt; skip ;                    // 忽略空格</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class Calc {
+</span><span class='line'>
+</span><span class='line'>    public static void main(String[] args) throws Exception {
+</span><span class='line'>        InputStream is = args.length &gt; 0 ? new FileInputStream(args[0]) : System.in;
+</span><span class='line'>
+</span><span class='line'>        ANTLRInputStream input = new ANTLRInputStream(is);
+</span><span class='line'>        CalcLexer lexer = new CalcLexer(input);
+</span><span class='line'>        CommonTokenStream tokens = new CommonTokenStream(lexer);
+</span><span class='line'>        CalcParser parser = new CalcParser(tokens);
+</span><span class='line'>        ParseTree tree = parser.prog();
+</span><span class='line'>
+</span><span class='line'>        ParseTreeWalker walker = new ParseTreeWalker();
+</span><span class='line'>        walker.walk(new DirectiveListener(), tree);
+</span><span class='line'>
+</span><span class='line'>        // print LISP-style tree
+</span><span class='line'>        System.out.println(tree.toStringTree(parser));
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>把词法规则IP切换成语法规则ip显示了我们可以多么轻易地移动这条分界线。</p>
+<p>这个程序和前文Calc.java中的代码极度相似，区别只在12-13行。这两行代码负责创建树遍历器，然后让树遍历器去遍历那颗从语法分析器返回的语法分析树，当树遍历器遍历时，它就会触发调用到我们的DirectiveListener中实现的方法。此外，通过传入一个不同的监听器实现我们能简单地生成完全不同的输出。监听器机制有效地隔离了语法和语言应用，使语法可以被其它应用再次使用。</p>
 
-<p>如果要求处理HTTP协议命令字符串的内容，我们可以遵循相同的思考过程。如果不需要检查字符串的部分，那么词法分析器可以把整个字符串作为一个单独的记号传递给语法分析器。如果我们需要抽出各种不同的部分，最好就是让词法分析器去识别那些部分后再把这些匹配出的构件传递给语法分析器。</p>
+<p>现在一切完备，让我们尝试着去编译和运行它吧！下面是完整的命令序列：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>compile *.java
+</span><span class='line'>run Calc calc.txt</span></code></pre></td></tr></table></div></figure>
+
+<p>编译的输出结果如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>LDC 19
+</span><span class='line'>RET
+</span><span class='line'>
+</span><span class='line'>LDC 5
+</span><span class='line'>STR a
+</span><span class='line'>LDC 6
+</span><span class='line'>STR b
+</span><span class='line'>LDV a
+</span><span class='line'>LDV b
+</span><span class='line'>LDC 2
+</span><span class='line'>MUL
+</span><span class='line'>ADD
+</span><span class='line'>RET
+</span><span class='line'>
+</span><span class='line'>LDC 1
+</span><span class='line'>LDC 2
+</span><span class='line'>ADD
+</span><span class='line'>LDC 3
+</span><span class='line'>MUL
+</span><span class='line'>RET</span></code></pre></td></tr></table></div></figure>
 </div>
   
   
@@ -1583,7 +757,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part18/">ANTLR 4权威参考读书笔记（18）</a></h1>
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part3/">ANTLR 4权威参考读书笔记（3）</a></h1>
     
     
       <p class="meta">
@@ -1592,83 +766,22 @@
 
 
 
-<time class='entry-date' datetime='2016-06-14T11:56:18+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>14</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>11:56 am</span></time>
+<time class='entry-date' datetime='2016-01-05T16:48:16+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>5</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>4:48 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>编程语言在词法上看起来惊人地相似，无论是函数式、过程式、声明式还是面向对象语言，看起来几乎都是一样的。这很棒，因为我们只需要学习一次如何描述标志符和整数，没有太大的变化，就可以把它们应用到大多数编程语言上。正如语法分析器以及词法分析器使用规则去描述各种语言构造体一样，我们要使用基本相同的表示法。唯一的区别是语法分析器识别在记号流中的语法结构，而词法分析器识别在字符流中的语法结构。</p>
+  <div class="entry-content"><ul>
+<li>lexical 词法的</li>
+<li>alternative 选项</li>
+<li>notation 表示法</li>
+<li>directive 指令</li>
+<li>label 标签</li>
+</ul>
 
-<p>因为词法分析和语法分析有相似的结构，ANTLR允许我们把两者合并在单个语法文件中。但是因为词法分析和语法分析是语言识别的两个不同阶段，我们必须告诉ANTLR每个规则是和哪个阶段相关联的。我们可以通过以大写字母开始的词法规则名字和以小写字母开始的语法规则名字做到这点。例如，ID是一个词法规则名字，expr则是一个语法规则名字。</p>
-
-<p>当开始构建一个新的语法时，对于那些常用的词法构造体：标志符、数字、字符串、注释以及空格等，我们可以从已经存在的语法中拷贝粘贴规则。然后，通过一些细微的调整，就可以让它运行起来。几乎所有的语言，甚至像JSON和XML这样的非编程语言，都有这些记号的变体。例如，C语言的词法分析器完全可以标记化以下的JSON代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>{
-</span><span class='line'>  "title":"Cat wrestling",
-</span><span class='line'>  "chapters":[ {"Intro":"..."}, ... ]
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>另一个例子就是块注释。在C语言中，它们是被/* ... */括起来的。而在XML里，注释是被&lt;!-- ... --&gt;括起来的。但它们除了开始和结束符号之外，或多或少都有相同的词法构造。</p>
-
-<p>对于关键字、运算符和标点符号，我们不需要词法规则，因为我们可以在语法分析规则中直接引用它们，用单引号括起来，就像<code>&#39;while&#39;</code>、<code>&#39;*&#39;</code>、<code>&#39;++&#39;</code>这样。有些开发者更喜欢使用像MUL而不是字面量<code>&#39;*&#39;</code>这样的词法规则引用，这些都没问题，因为它们都有相同的记号类型。</p>
-
-<p>为了阐明词法规则看起来像什么，让我们从标志符开始构建一个常用记号的简单版本。</p>
-
-<h4 id="匹配标志符">匹配标志符</h4>
-
-<p>在语法伪代码中，一个基本的标志符是由大写或小写字母组成的一个非空序列。根据已经学习到的知识，我们知道需要用(...)+表示法来表示这样的序列模式。因为序列元素可以是大写或小写字母，所以在子规则中我们需要使用选择运算符：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ID : ('a'..'z'|'A'..'Z')+ ;    // 匹配一个或多个大小写字母</span></code></pre></td></tr></table></div></figure>
-
-<p>唯一的新ANTLR表示法是范围运算符：&#39;a&#39;..&#39;z&#39;代表从a到z的任意字符。或者你也可以使用Unicode码位字面量&#39;\uXXXX&#39;，这里的XXXX是Unicode字符码位值的十六进制值。</p>
-
-<p>作为字符集的一个简写，ANTLR支持我们使用更熟悉的正则表达式集合表示法：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ID : [a-zA-Z]+ ;    // 匹配一个或多个大小写字母</span></code></pre></td></tr></table></div></figure>
-
-<p>有时候我们会发现像下面这样的语法貌似存在冲突的现象：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>enumDef : 'enum' '{' ... '}' ;
-</span><span class='line'>FOR : 'for' ;
-</span><span class='line'>ID : [a-zA-Z]+ ;    // 不匹配'enum'或者'for'</span></code></pre></td></tr></table></div></figure>
-
-<p>规则ID也可以同时匹配enum和for这样的关键字，这意味着同样的字符串能被多个规则匹配。但事实上，ANTLR处理这种混合语法时会把字符串字面量以及词法规则与语法规则分隔开，像enum这样的字面量就变成了词法规则并紧随在语法规则之后和在显式的词法规则之前。</p>
-
-<p>ANTLR词法分析器通过偏爱首先指定的规则来解决词法规则间的二义性，这意味着ID规则应该定义在所有的关键字规则之后。ANTLR把隐式的为字面量生成的词法规则放在显式的词法规则之前，因此它们总是有更高的优先级。在这里，&#39;enum&#39;被自动赋予比ID高的优先级。</p>
-
-<p>因为ANTLR总是会重新排序词法规则并让它们在语法规则之后发生。所以上面的语法与下面的变体是相同的：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>FOR : 'for' ;
-</span><span class='line'>ID : [a-zA-Z]+ ;    // 不匹配'enum'或者'for'
-</span><span class='line'>enumDef : 'enum' '{' ... '}' ;</span></code></pre></td></tr></table></div></figure>
-
-<h4 id="匹配数字">匹配数字</h4>
-
-<p>描述像10这样的整型数字非常容易，因为它只是一个数字序列。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>INT : '0'..'9'+ ;    // 匹配一个或多个数字</span></code></pre></td></tr></table></div></figure>
-
-<p>或者</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>INT : [0..9]+ ;    // 匹配一个或多个数字</span></code></pre></td></tr></table></div></figure>
-
-<p>浮点数要复杂的多，但如果我们忽略指数的话，可以很容易地制作一个简化版本。浮点数是数字序列后面跟着一个句点和一个可选的小数部分；或者以一个句点开始，然后是数字序列。单独一个句点是不合法的。因此我们的浮点规则使用一个选择和一些序列模式：</p>
+<p>了解ANTLR最好的方法就是实例。构建一个简单的计算器是个不错的主意。为了使它容易理解且保持简单，我们将只允许基本的算术运算符（加、减、乘、除）、括号表达式、整数和变量。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1676,68 +789,1305 @@
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
 <span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>FLOAT: DIGIT+ '.' DIGIT*    // 匹配1. 39. 3.14159等等
-</span><span class='line'>     | '.' DIGIT+           // 匹配.1 .14159
-</span><span class='line'>     ;
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Calc;
 </span><span class='line'>
-</span><span class='line'>fragment
-</span><span class='line'>DIGIT: [0-9] ;              // 匹配单个数字</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>prog
+</span><span class='line'>    : stat+
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>stat
+</span><span class='line'>    : expr
+</span><span class='line'>    | ID '=' expr
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>expr
+</span><span class='line'>    : expr ('*'|'/') expr
+</span><span class='line'>    | expr ('+'|'-') expr
+</span><span class='line'>    | INT
+</span><span class='line'>    | ID
+</span><span class='line'>    | '(' expr ')'
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>ID  : [a-zA-Z]+ ;
+</span><span class='line'>
+</span><span class='line'>INT : [0-9]+ ;
+</span><span class='line'>
+</span><span class='line'>WS  : [ \t\r\n]+ -&gt; skip ;    // toss out whitespace</span></code></pre></td></tr></table></div></figure>
 
-<p>这里我们使用了一个帮助规则DIGIT，因此我们不必到处去写[0-9]。通过在规则前面加上fragment前缀，我们让ANTLR知道该规则仅被其它词法规则使用。它本身不是一个记号，这意味着我们不能在语法规则中引用它。</p>
+<p>在上述的语法中，程序是由空格（换行符也被当作空格）终止的语句序列，语句可以是表达式或者赋值。那些以小写字母开头的像stat和expr是语法规则；由大写字母开头的诸如ID和INT为词法规则，用于识别标志符和整数这样的记号。我们用“|”分隔规则的选项，我们也可以用“()”把符号分组成子规则。例如，子规则<code>(&#39;*&#39;|&#39;/&#39;)</code>匹配乘法符号或者除法符号。</p>
 
-<h4 id="匹配字符串字面量">匹配字符串字面量</h4>
+<p>ANTLR v4最重要的新特性是它有能力处理（大多数类型的）左递归规则。例如，规则expr前两个选项就在左边缘递归地调用了expr自身。这种指定算术表达式表示法的方法比那些典型的自顶向下语法分析器策略更容易。当然，在这种策略下，我们需要定义多个规则，每个运算符优先级一个规则。</p>
 
-<p>计算机语言中共同具有的下一个常用记号是字符串字面量，例如&quot;hello&quot;。大部分使用双引号作分隔符，有些使用单引号或者两者都使用。以双引号为分隔符而言，在语法伪代码中，一个字符串就是在双引号中的任意字符序列：</p>
+<p>记号定义的表示法对那些有正则表达式经验的应该很熟悉。唯一不寻常的是在WS规则上的<code>-&gt; skip</code>指令，它告诉词法分析器去匹配但丢弃空格，不要把它们放到记号流中，这样在语法分析树上空格就不会有对应的记号。（每个可能的输入字符都必须被至少一个词法规则匹配。）我们通过使用形式化的ANTLR表示法避免捆绑语法到某个特定的目标语言，而不是在语法中插入任意代码片段来告诉词法分析器去忽略。</p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>STRING : '"' .*? '"' ;    // 匹配在双引号中的任意字符</span></code></pre></td></tr></table></div></figure>
-
-<p>语法中的点是通配符运算符，它可以匹配任意单个字符。因此，“<code>.*</code>”是一个能够匹配任意零个或多个字符的序列的循环。当然，它也将消费字符直到文件结尾，所以不是很有用。幸运的是，ANTLR通过正则表达式表示法（?后缀）提供对非贪婪模式规则的支持。非贪婪模式意味着“直到看见在词法规则中跟在子规则后的字符时才停止吃掉字符”。更确切地说，非贪婪模式规则匹配最小数量的字符，同时仍然允许整个周围的规则被匹配。相反，“<code>.*</code>”被认为是贪婪模式，因为它贪婪地消费能够匹配循环内部的所有字符。</p>
-
-<p>以上的STRING规则做得还不够好，因为它不允许字符串中有双引号。为了做到这点，大部分语言定义了以反斜杠开始的转义字符。在字符串中的双引号我们可以使用“\&quot;”。为支持常用的转义字符，我们需要使用以下规则：</p>
+<p>这里是一些用来评估所有语法特性的测试序列：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>STRING: '"' (ESC|.)*? '"' ;
-</span><span class='line'>
-</span><span class='line'>fragment
-</span><span class='line'>ESC : '\\"' | '\\\\' ;    // 匹配字符\"和\\</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>193
+</span><span class='line'>a=5
+</span><span class='line'>b=6
+</span><span class='line'>a+b*2
+</span><span class='line'>(1+2)*3</span></code></pre></td></tr></table></div></figure>
 
-<p>ANTLR自身也需要避开转义字符，所以这里我们需要用“\”去指定反斜杠字符。</p>
-
-<p>现在，在STRING规则中的循环既可以通过调用fragment规则ESC去匹配转义字符序列，也可以通过点通配符去匹配任意字符。当看到一个非转义双引号字符时，“<code>*?</code>”子规则运算符终止“<code>(ESC|.)*?</code>”循环。</p>
-
-<h4 id="匹配注释和空格">匹配注释和空格</h4>
-
-<p>词法分析器会把匹配到的记号通过记号流传递给语法分析器，然后语法分析器检查流的语法结构。但我们希望当词法分析器匹配到注释和空格时能把它们扔掉。那样，语法分析器就不必为匹配无处不在的可选的注释和空格担心。例如，当WS是一个空格的词法规则时以下的语法规则就非常尴尬和容易出错：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>assign : ID (WS|COMMENT)? '=' (WS|COMMENT)? expr (WS|COMMENT)? ;</span></code></pre></td></tr></table></div></figure>
-
-<p>定义这些被丢弃的记号和定义非丢弃的记号一样，我们只需要使用skip指令去表明词法分析器应该扔掉它们。以下是匹配那些衍生自C的语言的单行和多行注释的语法规则：</p>
+<p>把它们放入文件calc.txt中，然后执行以下命令：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>LINE_COMMENT : '//' .*? '\r'? '\n' -&gt; skip ;    // 匹配"//" stuff '\n'
-</span><span class='line'>COMMENT      : '/*' .*? '*/'       -&gt; skip ;    // 匹配"/*" stuff "*/"</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr Calc.g
+</span><span class='line'>compile *.java
+</span><span class='line'>grun Calc prog -gui calc.txt</span></code></pre></td></tr></table></div></figure>
 
-<p>在COMMENT中，“<code>.*?</code>”消费在“<code>/*</code>”和“<code>*/</code>”之间的任意字符。在LINE_COMMENT中，“<code>.*?</code>”消费“//”之后的任意字符，直到它看到一个换行符。</p>
+<p>TestRig会弹出一个显示语法分析树的窗口：</p>
 
-<p>词法分析器接受若干跟随在-&gt;运算符后的指令，skip只是它们中的一个。例如，我们可以通过使用channel指令把传递给语法分析器的记号放进隐藏通道。</p>
+<p><img src="/uploads/calc-parse-tree.png" title="calc-parse-tree" ></p>
 
-<p>最后，让我们处理空格（换行符等也被当作空格）这个常用记号。大部分编程语言都把空格当作记号分隔符，但是另一方面又忽略它们。（Python是个例外，因为它把空格用作特殊语法目的：终止命令和缩进级别的换行符。）以下是告诉ANTLR如何扔掉空格的语法：</p>
+<h3 id="使用访问者模式计算结果">使用访问者模式计算结果</h3>
+
+<p>为了让前面的算术表达式语法分析器计算出结果，我们还需要做些其它的事情。</p>
+
+<p>ANTLR v4鼓励我们使用语法分析树访问者和其它遍历器来实现语言应用，以保持语法的整洁。不过在接触这些之前，我们需要对语法做些修改。</p>
+
+<p>首先，我们需要用标签标明规则的选项，标签可以是和规则名没有冲突的任意标志符。如果选项上没有标签，ANTLR只会为每个规则生成一个visit方法。</p>
+
+<p>在本例中，我们希望为每个选项生成一个不同的visit方法，以便每种输入短语都能得到不同的事件。在新的语法中，标签出现在选项的右边缘，且以“#”符号开头：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>WS : (' '|'\t'|'\r'|'\n')+ -&gt; skip ;    // 匹配一个或多个空格但丢弃</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>stat
+</span><span class='line'>    : expr                   # printExpr
+</span><span class='line'>    | ID '=' expr            # assign
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>expr
+</span><span class='line'>    : expr op=(MUL|DIV) expr # MulDiv
+</span><span class='line'>    | expr op=(ADD|SUB) expr # AddSub
+</span><span class='line'>    | INT                    # int
+</span><span class='line'>    | ID                     # id
+</span><span class='line'>    | '(' expr ')'           # parens
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
 
-<p>或者</p>
+<p>接下来，让我们为运算符字面量定义一些记号名字，以便以后可以在visit方法中引用作为Java常量的它们：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>WS : [ \t\r\n]+ -&gt; skip ;    // 匹配一个或多个空格但丢弃</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>MUL : '*' ;
+</span><span class='line'>
+</span><span class='line'>DIV : '/' ;
+</span><span class='line'>
+</span><span class='line'>ADD : '+' ;
+</span><span class='line'>
+</span><span class='line'>SUB : '-' ;</span></code></pre></td></tr></table></div></figure>
 
-<p>当换行符既是要被忽略的空格又是命令终结符时，就会有个问题。换行符是上下文有关的，在语法上下文中，我们要扔掉换行符，但在其它地方，我们需要把它传递给语法分析器以便让它知道某个命令已经结束。例如，在Python中，后面有换行符的f()会执行代码，调用f()方法，但是如果我们在括号中也插入一个额外的换行符，Python就会在执行调用前等待直到右括号后面的换行符为止。</p>
+<p>现在，我们有了一个增强型的语法。接下来要做的事情是实现一个EvalVisitor类，它通过遍历表达式语法分析树计算和返回值。</p>
+
+<p>执行下面的命令，让ANTLR生成访问者接口和它的默认实现，其中-no-listener参数是告诉ANTLR不再生成监听器相关的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr -no-listener -visitor Calc.g</span></code></pre></td></tr></table></div></figure>
+
+<p>所有被标签标明的选项在生成的访问者接口中都定义了一个visit方法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public interface CalcVisitor&lt;T&gt; extends ParseTreeVisitor&lt;T&gt; {
+</span><span class='line'>    T visitProg(CalcParser.ProgContext ctx);
+</span><span class='line'>    T visitPrintExpr(CalcParser.PrintExprContext ctx);
+</span><span class='line'>    T visitAssign(CalcParser.AssignContext ctx);
+</span><span class='line'>    ...
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>接口定义使用的是Java泛型，visit方法的返回值为参数化类型，这允许我们根据表达式计算返回值的类型去设定实现的泛型参数。因为表达式的计算结果是整型，所以我们的EvalVisitor应该继承<code>CalcBaseVisitor&lt;Integer&gt;</code>类。为计算语法分析树的每个节点，我们需要覆写与语句和表达式选项相关的方法。这里是全部的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class EvalVisitor extends CalcBaseVisitor&lt;Integer&gt; {
+</span><span class='line'>    /** "memory" for our calculator; variable/value pairs go here */
+</span><span class='line'>    Map&lt;String, Integer&gt; memory = new HashMap&lt;String, Integer&gt;();
+</span><span class='line'>
+</span><span class='line'>    /** ID '=' expr */
+</span><span class='line'>    @Override
+</span><span class='line'>    public Integer visitAssign(CalcParser.AssignContext ctx) {
+</span><span class='line'>        String id = ctx.ID().getText();  // id is left-hand side of '='
+</span><span class='line'>        int value = visit(ctx.expr());   // compute value of expression on right
+</span><span class='line'>        memory.put(id, value);           // store it in our memory
+</span><span class='line'>        return value;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    /** expr */
+</span><span class='line'>    @Override
+</span><span class='line'>    public Integer visitPrintExpr(CalcParser.PrintExprContext ctx) {
+</span><span class='line'>        Integer value = visit(ctx.expr()); // evaluate the expr child
+</span><span class='line'>        System.out.println(value);         // print the result
+</span><span class='line'>        return 0;                          // return dummy value
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    /** INT */
+</span><span class='line'>    @Override
+</span><span class='line'>    public Integer visitInt(CalcParser.IntContext ctx) {
+</span><span class='line'>        return Integer.valueOf(ctx.INT().getText());
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    /** ID */
+</span><span class='line'>    @Override
+</span><span class='line'>    public Integer visitId(CalcParser.IdContext ctx) {
+</span><span class='line'>        String id = ctx.ID().getText();
+</span><span class='line'>        if ( memory.containsKey(id) ) return memory.get(id);
+</span><span class='line'>        return 0;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    /** expr op=('*'|'/') expr */
+</span><span class='line'>    @Override
+</span><span class='line'>    public Integer visitMulDiv(CalcParser.MulDivContext ctx) {
+</span><span class='line'>        int left = visit(ctx.expr(0));  // get value of left subexpression
+</span><span class='line'>        int right = visit(ctx.expr(1)); // get value of right subexpression
+</span><span class='line'>        if ( ctx.op.getType() == CalcParser.MUL ) return left * right;
+</span><span class='line'>        return left / right; // must be DIV
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    /** expr op=('+'|'-') expr */
+</span><span class='line'>    @Override
+</span><span class='line'>    public Integer visitAddSub(CalcParser.AddSubContext ctx) {
+</span><span class='line'>        int left = visit(ctx.expr(0));  // get value of left subexpression
+</span><span class='line'>        int right = visit(ctx.expr(1)); // get value of right subexpression
+</span><span class='line'>        if ( ctx.op.getType() == CalcParser.ADD ) return left + right;
+</span><span class='line'>        return left - right; // must be SUB
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    /** '(' expr ')' */
+</span><span class='line'>    @Override
+</span><span class='line'>    public Integer visitParens(CalcParser.ParensContext ctx) {
+</span><span class='line'>        return visit(ctx.expr()); // return child expr's value
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>以前开发和测试语法都是使用的TestRig，这次我们试着编写计算器的主程序来启动代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class Calc {
+</span><span class='line'>
+</span><span class='line'>    public static void main(String[] args) throws Exception {
+</span><span class='line'>        InputStream is = args.length &gt; 0 ? new FileInputStream(args[0]) : System.in;
+</span><span class='line'>
+</span><span class='line'>        ANTLRInputStream input = new ANTLRInputStream(is);
+</span><span class='line'>        CalcLexer lexer = new CalcLexer(input);
+</span><span class='line'>        CommonTokenStream tokens = new CommonTokenStream(lexer);
+</span><span class='line'>        CalcParser parser = new CalcParser(tokens);
+</span><span class='line'>        ParseTree tree = parser.prog();
+</span><span class='line'>
+</span><span class='line'>        EvalVisitor eval = new EvalVisitor();
+</span><span class='line'>        // 开始遍历语法分析树
+</span><span class='line'>        eval.visit(tree);
+</span><span class='line'>
+</span><span class='line'>        System.out.println(tree.toStringTree(parser));
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>创建一个运行主程序的脚本：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>#!/bin/sh
+</span><span class='line'>java -cp .:./antlr-4.5.1-complete.jar:$CLASSPATH $*</span></code></pre></td></tr></table></div></figure>
+
+<p>把它保存为run.sh后，执行以下命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>compile *.java
+</span><span class='line'>run Calc calc.txt</span></code></pre></td></tr></table></div></figure>
+
+<p>然后你就会看到文本形式的语法分析树以及计算结果：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>193
+</span><span class='line'>17
+</span><span class='line'>9
+</span><span class='line'>(prog (stat (expr 193)) (stat a = (expr 5)) (stat b = (expr 6))
+</span><span class='line'> (stat (expr (expr a) + (expr (expr b) * (expr 2)))) (stat (expr
+</span><span class='line'> (expr ( (expr (expr 1) + (expr 2)) )) * (expr 3))))</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part2/">ANTLR 4权威参考读书笔记（2）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-01-01T16:35:41+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>1</span><span class='date-suffix'>st</span>, <span class='date-year'>2016</span></span> <span class='time'>4:35 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><ul>
+<li>token 记号</li>
+<li>ambiguity 二义性</li>
+</ul>
+
+<h3 id="安装antlr">安装ANTLR</h3>
+
+<p>ANTLR是由Java写成的，所以在安装ANTLR前必须保证已经安装有Java 1.6或以上版本。你可以到 <a href="http://www.antlr.org/download.html">http://www.antlr.org/download.html</a> 下载ANTLR的最新版本，或者也可使用命令行工具下载：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>curl -O http://www.antlr.org/download/antlr-4.5.1-complete.jar</span></code></pre></td></tr></table></div></figure>
+
+<p>antlr-4.5.1-complete.jar包含运行ANTLR工具的所有必要依赖，以及编译和执行由ANTLR生成的识别器所需的运行库。ANTLR工具将由语法文件描述的语法转换成识别程序，识别程序利用ANTLR运行库中的某些支持类识别输入的语句。该jar包还包含两个支持库：<a href="https://github.com/abego/treelayout">TreeLayout（一个复杂的树布局库）</a>和<a href="http://www.stringtemplate.org/">StringTemplate（一个用于生成代码和其它结构化文本的模板引擎）</a>。</p>
+
+<p>现在来测试下ANTLR工具是否工作正常：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>java -jar antlr-4.5.1-complete.jar  # 启动org.antlr.v4.Tool</span></code></pre></td></tr></table></div></figure>
+
+<p>如果正常的话会看到以下帮助信息：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ANTLR Parser Generator  Version 4.5.1
+</span><span class='line'> -o ___              specify output directory where all output is generated
+</span><span class='line'> -lib ___            specify location of grammars, tokens files
+</span><span class='line'> ...</span></code></pre></td></tr></table></div></figure>
+
+<p>每次运行ANTLR工具都要输入这么长的命令是否有些痛苦？写个脚本来解放我们的手指吧！</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>#!/bin/sh
+</span><span class='line'>java -cp .:./antlr-4.5.1-complete.jar:$CLASSPATH org.antlr.v4.Tool $*</span></code></pre></td></tr></table></div></figure>
+
+<p>把它保存为antlr.sh，以后就可以使用下列命令来运行ANTLR工具了：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr</span></code></pre></td></tr></table></div></figure>
+
+<h3 id="执行antlr和测试识别器">执行ANTLR和测试识别器</h3>
+
+<p>先看下面这段用于识别像hello world那样短语的简单语法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Hello;               // 定义语法的名字
+</span><span class='line'>
+</span><span class='line'>s  : 'hello' ID ;            // 匹配关键字hello，后面跟着一个标志符
+</span><span class='line'>ID : [a-z]+ ;                // 匹配小写字母标志符
+</span><span class='line'>WS : [ \t\r\n]+ -&gt; skip ;    // 跳过空格、制表符、回车符和换行符</span></code></pre></td></tr></table></div></figure>
+
+<p>把以上语法保存为Hello.g，然后执行以下命令来生成识别器：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr Hello.g</span></code></pre></td></tr></table></div></figure>
+
+<p>该命令会在相同目录下生成后缀名为tokens和java的六个文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Hello.tokens        HelloLexer.java         HelloParser.java
+</span><span class='line'>HelloLexer.tokens   HelloBaseListener.java  HelloListener.java</span></code></pre></td></tr></table></div></figure>
+
+<p>现在开始准备编译由ANTLR生成的Java代码。先写个脚本把编译命令包装起来：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>#!/bin/sh
+</span><span class='line'>javac -cp .:./antlr-4.5.1-complete.jar:$CLASSPATH $*</span></code></pre></td></tr></table></div></figure>
+
+<p>把它保存为compile.sh文件，然后你就可以用以下命令编译代码了：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>compile *.java</span></code></pre></td></tr></table></div></figure>
+
+<p>到此，我们已经有了一个可以被执行的识别器，只缺一个主程序去触发语言识别了。</p>
+
+<p>ANTLR运行库有提供称之为TestRig的测试工具，可以让你不创建主程序就能测试语法。TestRig使用Java反射调用编译后的识别器，它能显示关于识别器如何匹配输入的大量信息。</p>
+
+<p>同样地，创建一个脚本grun.sh来简化以后的打字数：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>#!/bin/sh
+</span><span class='line'>java -cp .:./antlr-4.5.1-complete.jar:$CLASSPATH org.antlr.v4.gui.TestRig $*</span></code></pre></td></tr></table></div></figure>
+
+<p>现在，让我们来打印出识别期间创建的那些记号（记号是指像关键字hello和标识符world那样的词汇符号）：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grun Hello s -tokens</span></code></pre></td></tr></table></div></figure>
+
+<p>敲入上述命令并按回车，接着输入以下内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>hello world  # 输入并按回车
+</span><span class='line'>EOF          # Unix系统输入Ctrl+D或Windows系统输入Ctrl+Z并按回车</span></code></pre></td></tr></table></div></figure>
+
+<p>TestRig会打印出记号列表，每一行输出表示一个记号以及它的有关信息：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>[@0,0:4='hello',&lt;1&gt;,1:0]
+</span><span class='line'>[@1,6:10='world',&lt;2&gt;,1:6]
+</span><span class='line'>[@2,13:12='&lt;EOF&gt;',&lt;-1&gt;,2:0]</span></code></pre></td></tr></table></div></figure>
+
+<p>这里详细讲解下[@1,6:10=&#39;world&#39;,<2>,1:6]的意义。@1表示记号索引（从0开始）；6:10表示记号开始与结束的位置（从0开始）；<2>表示记号类型，具体数值和类型存储在后缀名为tokens的文件中；最后的1:6表示记号在第一行（从1开始），从第6个字符开始（从0开始，制表符作为单个字符计算）。</p>
+
+<p>除此之外，还可以以LISP风格的文本形式查看记号：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grun Hello s -tree</span></code></pre></td></tr></table></div></figure>
+
+<p>它会输出如下形式的记号：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>(s hello world)  # (root children)</span></code></pre></td></tr></table></div></figure>
+
+<p>你也可以以可视化的方式查看语法分析树：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grun Hello s -gui</span></code></pre></td></tr></table></div></figure>
+
+<p><img src="/uploads/hello-parse-tree.png" title="hello-parse-tree" ></p>
+
+<p>以下是TestRig可用的所有参数：</p>
+
+<ul>
+<li>-tokens 打印出记号流。</li>
+<li>-tree 以LISP风格的文本形式打印出语法分析树。</li>
+<li>-gui 在对话框中可视化地显示语法分析树。</li>
+<li>-ps file.ps 在PostScript中生成一个可视化的语法分析树表示，并把它存储在file.ps文件中。</li>
+<li>-encoding encodingname 指定输入文件的编码。</li>
+<li>-trace 在进入/退出规则前打印规则名字和当前的记号。</li>
+<li>-diagnostics 分析时打开诊断消息。此生成消息仅用于异常情况，如二义性输入短语。</li>
+<li>-SLL 使用更快但稍弱的分析策略。</li>
+</ul>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part1/">ANTLR 4权威参考读书笔记（1）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2015-12-30T18:53:45+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>30</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>6:53 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><ul>
+<li>grammar 语法，一种形式化（formal）的语言描述。</li>
+<li>syntax 句法</li>
+<li>phrase 短语</li>
+<li>lexer 词法分析器</li>
+<li>parser 语法分析器</li>
+<li>parse tree 语法分析树，表示语法如何匹配输入的数据结构。</li>
+<li>tree walker 树遍历器</li>
+<li>top-down 自顶向下</li>
+<li>listener 监听器</li>
+<li>visitor 访问者</li>
+<li>backtracking 回溯</li>
+<li>semantic predicates 语义谓词</li>
+</ul>
+
+<p>ANTLR v4是一款强大的语法分析器生成器，可以用来读取，处理，执行和转换结构化文本或二进制文件。通过语法文件，ANTLR可以自动生成词法分析器、语法分析树和树遍历器。</p>
+
+<p>ANTLR v4的语法分析器使用一种新的分析技术称之为<code>Adaptive LL(*)</code>或<code>ALL(*)</code>，是v3 <code>LL(*)</code>的扩展，它可以在生成的语法分析器执行前在运行时动态地执行语法分析而不是静态地。</p>
+
+<p>ANTLR v4极大地简化了用来匹配像算术表达式语法结构的语法规则。对于传统的自顶向下的语法分析器生成器像ANTLR v3，识别表达式的最自然的语法是无效的，v4则不然。ANTLR v4会自动地重写左递归规则为非左递归等价物，唯一的约束是左递归必须是直接的——规则立刻引用它自身。</p>
+
+<p>此前，ANTLR v3用户必须用树构造操作来增强语法。现在，ANTLR v4会自动构建语法分析树，也会以监听器和访问者模式实现的形式自动生成树遍历器。所以，你不再需要构建树语法，可以用访问者模式代替。降低在语法中嵌入动作的重要性使得甚至可以在不重新编译生成的语法分析器的情况下在不同的应用中复用相同的语法。</p>
+
+<p>ANTLR v3的<code>LL(*)</code>分析策略弱于v4的<code>ALL(*)</code>，因此v3有时候需要依赖回溯去正确地分析输入的短语。回溯使得很难去通过生成的语法分析器步进调试语法，因为语法分析器可能会分析相同的输入多次（递归地）；回溯也让语法分析器在无效的输入之上给出一个好的错误消息更难。</p>
+
+<h3 id="这本书里有什么？">这本书里有什么？</h3>
+
+<p>免费在线文档提供了足够的资料用于学习基本的语法和语义，但没有详细地解释ANTLR的概念。只有这本书解释了如何识别语言的语法模式，以及如何用ANTLR语法表示它们。这本书也将帮助你充分的了解ANTLR，是成为高级用户的必读物。</p>
+
+<p>这本书被组织成四个部分。</p>
+
+<ul>
+<li>第一部分介绍ANTLR，提供一些语言的背景知识，带你开始一场ANTLR功能之旅，让你尝下语法的滋味和能用它做什么。</li>
+<li>第二部分是关于使用ANTLR语法结合树遍历器设计语法和构建语言应用。</li>
+<li>第三部分首先展示了如何定制ANTLR生成的语法分析器的错误处理。接下来，你将学习如何在语法中嵌入动作，因为有时候这样做比构建语法分析树然后遍历它更简单有效。关于动作，你还将学习使用语义谓词更改语法分析器的行为去处理一些具有挑战性的识别问题。最后一章解决一些具有挑战性的语言识别问题，例如识别XML和Python中上下文相关的换行符。</li>
+<li>第四部分是参考章节，列出了所有关于使用ANTLR语法元语言和它的运行库的规则。</li>
+</ul>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/pbl-file-format-analysis/">PBL文件格式解析</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2015-12-13T17:33:08+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>13</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>5:33 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>PBL文件是PowerBuilder库文件，在其中存储了应用程序所使用到的所有系统对象和用户自定义对象的集合，同时PBL文件中还存储了源代码控制信息（Source Code Control，简称SCC）。对其文件格式的研究，可以准确地了解程序结构并能对PBL文件中的对象进行修改，同时也有利于库文件的修复，程序动态执行等方面的工作。</p>
+
+<h3 id="pbl文件的存储结构">PBL文件的存储结构</h3>
+
+<p>PBL文件存储信息时是以块（Block）为单位为对象分配存储空间的，每个块的大小固定为512字节，块号从0开始计算，块号与块首字节的偏移地址有如下关系：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>块号 = 块首字节的偏移地址 / 512</span></code></pre></td></tr></table></div></figure>
+
+<p>整个PBL文件由Header块、Bitmap块、Node块、Data块组成。其中除Header块外，其它块均以链表结构组织，其中Data块是Node块中Entry表项的具体内容，是从属于Node块的。下图说明了这些块的关系。</p>
+
+<p><img src="/uploads/pbl-datastruct.png" title="pbl-datastruct" ></p>
+
+<p>图中Header块、首个Bitmap块及首个Node块在存储空间上是相邻的，其中Node块比较特别，占6个块共3072字节，其余块只占512字节，其空间大小及起始地址如下表所示：</p>
+
+<table><thead>
+<tr>
+<th style="text-align: right">块号</th>
+<th>地址范围</th>
+<th>描述</th>
+</tr>
+</thead><tbody>
+<tr>
+<td style="text-align: right">0</td>
+<td>0000-01FF</td>
+<td>Header块</td>
+</tr>
+<tr>
+<td style="text-align: right">1</td>
+<td>0200-03FF</td>
+<td>首个Bitmap块</td>
+</tr>
+<tr>
+<td style="text-align: right">2-7</td>
+<td>0400-0FFF</td>
+<td>首个Node块</td>
+</tr>
+</tbody></table>
+
+<h3 id="header块解析">Header块解析</h3>
+
+<p>Header块是整个PBL的描述信息，它包含了PBL的版本标志，库注释，首个SCC数据块的偏移地址等信息。具体内容如下表所示：</p>
+
+<table><thead>
+<tr>
+<th>块内地址范围</th>
+<th>所占字节</th>
+<th>数据类型</th>
+<th>描述</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>0000-0003</td>
+<td>4</td>
+<td>char</td>
+<td>&#39;HDR*&#39;</td>
+</tr>
+<tr>
+<td>0004-0011</td>
+<td>14</td>
+<td>char</td>
+<td>&#39;PowerBuilder&#39; + 0x00 + 0x00</td>
+</tr>
+<tr>
+<td>0012-0015</td>
+<td>4</td>
+<td>char</td>
+<td>PBL格式版本（如0900表示9.0版本）</td>
+</tr>
+<tr>
+<td>0016-0019</td>
+<td>4</td>
+<td>long</td>
+<td>创建/修改日期时间</td>
+</tr>
+<tr>
+<td>001A-001B</td>
+<td>2</td>
+<td>byte</td>
+<td>保留</td>
+</tr>
+<tr>
+<td>001C-011B</td>
+<td>256</td>
+<td>char</td>
+<td>库注释</td>
+</tr>
+<tr>
+<td>011C-011F</td>
+<td>4</td>
+<td>long</td>
+<td>首个SCC数据块的偏移地址</td>
+</tr>
+<tr>
+<td>0120-0123</td>
+<td>4</td>
+<td>long</td>
+<td>SCC数据块实际大小</td>
+</tr>
+<tr>
+<td>0124-01FF</td>
+<td>220</td>
+<td>byte</td>
+<td>保留</td>
+</tr>
+</tbody></table>
+
+<h3 id="bitmap块解析">Bitmap块解析</h3>
+
+<p>Bitmap块中存放的是表示PBL文件存储空间的使用情况。该块数据结构如下表所示：</p>
+
+<table><thead>
+<tr>
+<th>块内地址范围</th>
+<th>所占字节</th>
+<th>数据类型</th>
+<th>描述</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>0000-0003</td>
+<td>4</td>
+<td>char</td>
+<td>&#39;FRE*&#39;</td>
+</tr>
+<tr>
+<td>0004-0007</td>
+<td>4</td>
+<td>long</td>
+<td>下一个Bitmap块的偏移地址或0</td>
+</tr>
+<tr>
+<td>0008-01FF</td>
+<td>504</td>
+<td>bit</td>
+<td>位图（每个位标识一个块）</td>
+</tr>
+</tbody></table>
+
+<p>由上表可知，包含一个Bitmap块的PBL文件最多可使用504 * 8 = 4032个块。当文件空间超过4032个块时，就需要使用第二个Bitmap块，它的偏移地址由当前Bitmap块块内偏移0004-0007处的值表示。如果是最后一个Bitmap块，则对应的字节处为00 00 00 00，即偏移地址为0。这样就形成了Bitmap块的单向链表。</p>
+
+<p><img src="/uploads/bitmap-block-chain.png" title="bitmap-block-chain" ></p>
+
+<p>位图用于标识块的使用/空闲情况。在位图中为1的位，表示与该位序号对应的块已被使用；反之，表示对应块未使用。例如FF FF 40 00还原为位图则为11111111 11111111 01000000 00000000，该位图表示PBL文件共有18个块，其中的第16号块空闲未使用。</p>
+
+<p><strong>注意：在实际分析多个PBL文件后发现，位图中的位并不能真实反映对应块的空闲/使用情况，只是记录PBL文件使用了多少个块。</strong></p>
+
+<h3 id="node块解析">Node块解析</h3>
+
+<p>Node块是目录块，主要用于存放Entry目录表项。下表是Node块的数据结构：</p>
+
+<table><thead>
+<tr>
+<th>块内地址范围</th>
+<th>所占字节</th>
+<th>数据类型</th>
+<th>描述</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>0000-0003</td>
+<td>4</td>
+<td>char</td>
+<td>&#39;NOD*&#39;</td>
+</tr>
+<tr>
+<td>0004-0007</td>
+<td>4</td>
+<td>long</td>
+<td>左Node块的偏移地址或0</td>
+</tr>
+<tr>
+<td>0008-001B</td>
+<td>4</td>
+<td>long</td>
+<td>父Node块的偏移地址或0</td>
+</tr>
+<tr>
+<td>000C-000F</td>
+<td>4</td>
+<td>long</td>
+<td>右Node块的偏移地址或0</td>
+</tr>
+<tr>
+<td>0010-0011</td>
+<td>2</td>
+<td>short</td>
+<td>块内可用空间（初始值3040）</td>
+</tr>
+<tr>
+<td>0012-0013</td>
+<td>2</td>
+<td>short</td>
+<td>按字母顺序最后一个对象名的位置</td>
+</tr>
+<tr>
+<td>0014-0015</td>
+<td>2</td>
+<td>short</td>
+<td>该Node块中的Entry表项数</td>
+</tr>
+<tr>
+<td>0016-0017</td>
+<td>2</td>
+<td>short</td>
+<td>按字母顺序第一个对象名的位置</td>
+</tr>
+<tr>
+<td>0018-001F</td>
+<td>8</td>
+<td>char</td>
+<td>保留</td>
+</tr>
+<tr>
+<td>0020-00BF</td>
+<td>3040</td>
+<td>chunks</td>
+<td>Entry目录表</td>
+</tr>
+</tbody></table>
+
+<p>其中Entry目录表是顺序表。当一个Node块的空间不足以存储所有Entry表项时，可以再使用一个Node块来存储，并且Entry表项不能跨Node块存储，因此Node块中的空间不能完全利用，会有一定的剩余，这个值记录在块内偏移0010-0011处。</p>
+
+<p>Node块的链接方式有些复杂，它使用一种称之为三叉链表（节点包含四个域：数据域、左指针域、右指针域、父指针域）的链式存储结构把所有Node块组织成为一颗二叉树，这可能是PowerBuilder为了提高查找速度而做的一些优化吧。</p>
+
+<p><img src="/uploads/node-block-tree.png" title="node-block-tree" ></p>
+
+<h3 id="entry表项解析">Entry表项解析</h3>
+
+<p>每个Entry表项对应于一个对象的源代码或PCODE的描述信息，因此Entry目录表就是整个库中各个对象的索引表，存储了各对象的索引信息。例如，在编程中创建一个名为“pbltest”的Window对象类型，那么在Entry目录表中要存放该对象的两个索引表项，分别为“pbltest.srw”用于存储源代码，“pbltest.win”用于存储PCODE。在Entry目录表中存储的对象有以下这些：</p>
+
+<table><thead>
+<tr>
+<th>对象类型</th>
+<th>源代码后缀</th>
+<th>PCODE后辍</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>Application</td>
+<td>sra</td>
+<td>apl</td>
+</tr>
+<tr>
+<td>Window</td>
+<td>srw</td>
+<td>win</td>
+</tr>
+<tr>
+<td>DataWindow</td>
+<td>srd</td>
+<td>dwo</td>
+</tr>
+<tr>
+<td>Menu</td>
+<td>srm</td>
+<td>men</td>
+</tr>
+<tr>
+<td>Function</td>
+<td>srf</td>
+<td>fun</td>
+</tr>
+<tr>
+<td>Query</td>
+<td>srq</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Structure</td>
+<td>srs</td>
+<td>str</td>
+</tr>
+<tr>
+<td>User object</td>
+<td>sru</td>
+<td>udo</td>
+</tr>
+<tr>
+<td>Pipeline</td>
+<td>srp</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Project</td>
+<td>srj</td>
+<td>-</td>
+</tr>
+<tr>
+<td>?</td>
+<td>-</td>
+<td>pra</td>
+</tr>
+<tr>
+<td>?</td>
+<td>-</td>
+<td>prp</td>
+</tr>
+</tbody></table>
+
+<p>Entry表项的具体数据结构如下表所示：</p>
+
+<table><thead>
+<tr>
+<th>块内地址范围</th>
+<th>所占字节</th>
+<th>数据类型</th>
+<th>描述</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>0000-0003</td>
+<td>4</td>
+<td>char</td>
+<td>&#39;ENT*&#39;</td>
+</tr>
+<tr>
+<td>0004-0007</td>
+<td>4</td>
+<td>char</td>
+<td>PBL格式版本（如0900表示9.0版本）</td>
+</tr>
+<tr>
+<td>0008-000B</td>
+<td>4</td>
+<td>long</td>
+<td>首个Data块的偏移地址</td>
+</tr>
+<tr>
+<td>000C-000F</td>
+<td>4</td>
+<td>long</td>
+<td>对象的实际大小</td>
+</tr>
+<tr>
+<td>0010-0013</td>
+<td>4</td>
+<td>long</td>
+<td>对象的创建/修改日期时间</td>
+</tr>
+<tr>
+<td>0014-0015</td>
+<td>2</td>
+<td>short</td>
+<td>对象的注释长度</td>
+</tr>
+<tr>
+<td>0016-0017</td>
+<td>2</td>
+<td>short</td>
+<td>对象名的长度</td>
+</tr>
+<tr>
+<td>0018-????</td>
+<td>?</td>
+<td>char</td>
+<td>对象名 + 0x00</td>
+</tr>
+</tbody></table>
+
+<p>这里需要说明的是，每个Entry表项的长度并不是固定的，它随着对象名的长度变化而变化，所以要读取下一个Entry表项，只能通过计算上一个Entry表项的长度即24 + 对象名长度来得
+到，或者通过搜索下一个ENT*得到。</p>
+
+<h3 id="data块解析">Data块解析</h3>
+
+<p>在Entry目录表中的各对象的实际数据内容是存储在Data块中的。Data块的数据结构如下表所示：</p>
+
+<table><thead>
+<tr>
+<th>块内地址范围</th>
+<th>所占字节</th>
+<th>数据类型</th>
+<th>描述</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>0000-0003</td>
+<td>4</td>
+<td>char</td>
+<td>&#39;DAT*&#39;</td>
+</tr>
+<tr>
+<td>0004-0007</td>
+<td>4</td>
+<td>char</td>
+<td>下一个Data块的偏移地址或0</td>
+</tr>
+<tr>
+<td>0008-0009</td>
+<td>2</td>
+<td>short</td>
+<td>本块内存储的数据的实际长度</td>
+</tr>
+<tr>
+<td>0010-01FF</td>
+<td>502</td>
+<td>char</td>
+<td>对象的实际数据</td>
+</tr>
+</tbody></table>
+
+<p>由上表可知，若对象的数据内容在502字节以上时，就需用多个Data块存放，这些Data块形成一个单向链表。链表的最后一个Data块的0004-0007中存储的偏移地址为00 00 00 00，表示链表结束。0010-01FF处存放的是对象的实际数据，只有最后一个Data块的长度有可能小于502，且以0x00字节表示结束。</p>
+
+<p>根据上面对PBL文件格式的解析，使用Ruby开发了一个小工具，用来输出PBL文件中存储的各种信息。源代码被放在GitHub上面，供大家参考。</p>
+
+<p>代码下载：<a href="https://github.com/dohkoos/pblanalyzer">https://github.com/dohkoos/pblanalyzer</a></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/random-with-weight-function/">带权随机函数</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2015-11-18T18:51:05+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>6:51 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><ul>
+<li>设计抽奖活动时，我们总是要控制抽奖物品出现的概率，让好的东西很难被抽到；</li>
+<li>设计游戏打怪时，我们要控制打怪时的命中概率，要控制宝物掉出的概率；</li>
+<li>网站的置顶广告，我们也要根据广告主的广告费用控制广告的出现时间；</li>
+<li>设计负载均衡算法时，我们要根据服务器的性能控制服务器被选中的可能。</li>
+</ul>
+
+<p>深入思考这些需求，你会发现它们都有相通的概念：每次从多个候选项中随机选取其中一项，要求每个候选项的出现都有一定的概率。</p>
+
+<p>假设有这样的候选项和对应概率：a:20%，b:25%，c:40%，d:15%。现在，把每个候选项的概率用一个称之为权重的正整数表示（最简单的方法是把百分符号去掉）。那么，</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>实际概率 = 候选项权重 / 权重总和 * 100%</span></code></pre></td></tr></table></div></figure>
+
+<p>事实上，权重的总和不一定要等于100，可以是任意大小。</p>
+
+<h3 id="算法描述">算法描述</h3>
+
+<p>依次将各候选项的权重从原点开始放在x轴坐标上首尾相连。这样，每个候选项对应一个取值区间，在总区间范围内随机选取一个值，该值所在区间就对应了选中的项。</p>
+
+<p><img src="/uploads/random-with-weight.png" title="random-with-weight" ></p>
+
+<h3 id="ruby代码实现">Ruby代码实现</h3>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def random(weight)
+</span><span class='line'>  # 获取所有候选项的权重总和
+</span><span class='line'>  total_weight = weight.inject { |r, e| r + e }
+</span><span class='line'>
+</span><span class='line'>  # 随机选取一个介于0到权重总和之间的整数
+</span><span class='line'>  rand_value = rand(total_weight)  # [0, total_weight)
+</span><span class='line'>
+</span><span class='line'>  # 扫描所有候选项，并且保留候选项权重的累积数。
+</span><span class='line'>  # 每当随机数小于累积数时，就停止并选出当前项。
+</span><span class='line'>  weight_barrier = 0
+</span><span class='line'>  weight.each_index do |i|
+</span><span class='line'>    weight_barrier += weight[i]
+</span><span class='line'>
+</span><span class='line'>    break i if rand_value &lt; weight_barrier
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>该实现不能保证每个候选项都恰好按正确的比例被选中，但当次数足够多时，应该会十分接近预先设定的比例。</p>
+
+<h3 id="实际案例">实际案例</h3>
+
+<p>要求写int[] get_weight(int[] weight)函数，返回的是权重的索引。其中weight是权重的数字数组，最终的结果是要大概保证按照给定的比例。</p>
+
+<ul>
+<li>比如weight为[1, 2, 2]，那么权重比例为1:2:2，执行10次后，大概的输出是0 1 1 0 1 1 2 2 2 2；</li>
+<li>比如weight为[100, 0]，那么权重比例为100:0，执行10次后，大概的输出是0 0 0 0 0 0 0 0 0 0；</li>
+<li>比如weight为[1, 1]，那么权重比例为1:1，执行10次后，大概的输出是0 1 0 1 0 0 1 1 0 1。</li>
+</ul>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def get_weight(weight)
+</span><span class='line'>  10.times.map { random(weight) }
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>weight = [1, 2, 2]
+</span><span class='line'>puts get_weight(weight).join(' ')
+</span><span class='line'>
+</span><span class='line'>weight = [100, 0]
+</span><span class='line'>puts get_weight(weight).join(' ')
+</span><span class='line'>
+</span><span class='line'>weight = [1, 1]
+</span><span class='line'>puts get_weight(weight).join(' ')</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/logic-problems-how-many-fish/">逻辑题-共打了多少鱼</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2015-11-03T15:07:14+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2015</span></span> <span class='time'>3:07 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>abcde五人打渔，打完睡觉，a先醒来，扔掉1条鱼，把剩下的分成5份，拿1份走了；b再醒来，也扔掉1条，把剩下的分成5份，拿1份走了；然后cde都按上面的方法取鱼。问他们最少打了多少条鱼？</p>
+
+<table><thead>
+<tr>
+<th>渔民</th>
+<th>醒来时鱼的总数</th>
+<th>取走的鱼数</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>a</td>
+<td>x1 = x</td>
+<td>(x1 - 1) / 5</td>
+</tr>
+<tr>
+<td>b</td>
+<td>x2 = 4 * (x1 - 1) / 5</td>
+<td>(x2 - 1) / 5</td>
+</tr>
+<tr>
+<td>c</td>
+<td>x3 = 4 * (x2 - 1) / 5</td>
+<td>(x3 - 1) / 5</td>
+</tr>
+<tr>
+<td>d</td>
+<td>x4 = 4 * (x3 - 1) / 5</td>
+<td>(x4 - 1) / 5</td>
+</tr>
+<tr>
+<td>e</td>
+<td>x5 = 4 * (x4 - 1) / 5</td>
+<td>(x5 - 1) / 5</td>
+</tr>
+</tbody></table>
+
+<p>由于扔掉1条鱼后，还能被分成5份，设渔民醒来时鱼的总数为remain，那么(remain - 1) % 5的值为0，即remain % 5的值为1。</p>
+
+<p>最简单的方法就是枚举，最小值从1开始：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>fishmen = [0, 0, 0, 0, 0]  # 渔民取走的鱼数
+</span><span class='line'>total = 1
+</span><span class='line'>
+</span><span class='line'>while true do
+</span><span class='line'>  remain = total  # 渔民a醒来时鱼的总数
+</span><span class='line'>  5.times do |i|  # 5个渔民轮流取鱼
+</span><span class='line'>    break if remain % 5 != 1  # 如果不符合扔掉1条鱼后还能分成5份的条件，就枚举下个值
+</span><span class='line'>    fishmen[i] = (remain - 1) / 5  # 渔民取走的鱼数
+</span><span class='line'>    remain = 4 * fishmen[i]  # 渔民取走鱼后剩下的鱼数
+</span><span class='line'>  end
+</span><span class='line'>  break if fishmen[4] != 0  # 如果渔民e也取到了鱼，那么就得到了鱼的总数
+</span><span class='line'>  total += 1
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>puts total  # 结果是3121条鱼</span></code></pre></td></tr></table></div></figure>
+
+<p>上面的代码总过做了3901次循环，下面来做进一步的优化。</p>
+
+<p>从表格可以看出，因为(x5 - 1) % 5 == 0，推导出x5 &gt;= 6；又x1 % 5 == 1，因此x1的个位数必须是1或者6。所以，枚举的最小值可以从11开始，每次步进为5。优化后的代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>fishmen = Array.new(n, 0)
+</span><span class='line'>total = 11
+</span><span class='line'>
+</span><span class='line'>while true do
+</span><span class='line'>  remain = total
+</span><span class='line'>  5.times do |i|
+</span><span class='line'>    break if remain % 5 != 1
+</span><span class='line'>    fishmen[i] = (remain - 1) / 5
+</span><span class='line'>    remain = 4 * fishmen[i]
+</span><span class='line'>  end
+</span><span class='line'>  break if fishmen[4] != 0
+</span><span class='line'>  total += 5
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>puts total</span></code></pre></td></tr></table></div></figure>
+
+<p>总的循环次数减少到1401次，减少了整整64%的循环。</p>
+
+<p>推而广之：n个渔民打渔，每个渔民依次扔掉1条鱼后，把鱼分成n份，然后拿走其中一份，求最少打了多少条鱼？</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>fishmen = Array.new(n, 0)
+</span><span class='line'>total = 2 * n + 1
+</span><span class='line'>
+</span><span class='line'>while true do
+</span><span class='line'>  remain = total
+</span><span class='line'>  n.times do |i|
+</span><span class='line'>    break if remain % n != 1
+</span><span class='line'>    fishmen[i] = (remain - 1) / n
+</span><span class='line'>    remain = remain - 1 - fishmen[i]
+</span><span class='line'>  end
+</span><span class='line'>  break if fishmen[n - 1] != 0
+</span><span class='line'>  total += n
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>puts total</span></code></pre></td></tr></table></div></figure>
+
+<p>这下子无论多少个渔民打渔都可以用这段代码搞定了。我试了试9个渔民，发现竟然可以打近3.9亿条鱼，那得有多少鱼啊！另外，计算时间也明显开始变长了。不知道还能不能做更进一步的优化。如果你有更好的算法，请快点告诉我吧！</p>
 </div>
   
   
@@ -1762,23 +2112,23 @@
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/test/">test</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/test/">test</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/test/">test</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/test/">test</a>
-      </li>
-    
-      <li class="post">
         <a href="/blog/the-mythical-10x-programmer/">神秘的10x程序员</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/learn-anything-faster-with-the-feynman-technique/">费曼技巧：最好的学习方法</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/code-coverage-100-percent-tragedy/">100%代码覆盖率的悲剧</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/unconventional-way-of-learning-a-new-programming-language/">学习新编程语言的非传统方式</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/the-impact-github-is-having-on-your-software-career-right-now/">GitHub对软件职业生涯的影响</a>
       </li>
     
   </ul>
@@ -1792,9 +2142,9 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 145%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 141%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 133%" href="/tags/android/">Android</a>
+<a style="font-size: 132%" href="/tags/android/">Android</a>
 <a style="font-size: 103%" href="/tags/c-plus-plus/">C++</a>
 <a style="font-size: 106%" href="/tags/css/">CSS</a>
 <a style="font-size: 108%" href="/tags/crack/">Crack</a>
