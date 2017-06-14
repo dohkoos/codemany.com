@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Security | 乐者为王]]></title>
   <link href="http://codemany.com/tags/security/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-06-14T00:32:50+08:00</updated>
+  <updated>2017-06-14T23:04:44+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -65,9 +65,48 @@ end
 
 <p><strong>最佳实践：</strong>不要对不安全的动作使用GET。不要使用#match来添加路由（而是使用#post、#put等）。确保没有通配符路由。</p>
 
-<p><strong>修复：</strong>现在，当使用#match添加路由时，Rails需要你指定明确的HTTP动词或via: :all。生成的config/routes.rb不再包含已注释掉的#match路由。（通配符路由也已被删除。）</p>
+<p><strong>修复：</strong>当使用#match添加路由时，Rails现在需要你指定明确的HTTP动词或via: :all。生成的config/routes.rb不再包含已注释掉的#match路由。（通配符路由也已被删除。）</p>
 
 <h4 id="2-格式验证中的正则表达式锚点">2. 格式验证中的正则表达式锚点</h4>
+
+<p>考虑以下验证：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">validates_format_of :name, with: /^[a-z ]+$/i
+</code></pre></div>
+<p>这段代码有个不易察觉的缺陷。开发者可能想强制整个名字属性仅由字母和空格组成。然而相反的是，这只会强制名字中至少有一行由字母和空格组成。正则表达式匹配的一些示例可以使这个缺陷更加清晰：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">&gt;&gt; /^[a-z ]+$/i =~ &quot;Joe User&quot;
+=&gt; 0 # Match
+
+&gt;&gt; /^[a-z ]+$/i =~ &quot; &#39;); -- foo&quot;
+=&gt; nil # No match
+
+&gt;&gt; /^[a-z ]+$/i =~ &quot;a\n &#39;); -- foo&quot;
+=&gt; 0 # Match
+</code></pre></div>
+<p>开发者应该使用\A（字符串的开始）和\z（字符串的结尾）锚点替代&Hat;（行的开始）和$（行的结尾）。正确的代码是：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">validates_format_of :name, with: /\A[a-z ]+\z/i
+</code></pre></div>
+<p>你可以认为开发者有错，而你是对的。然而，正则表达式锚点的行为不一定是明显的，特别是对于没有考虑多行值的开发者。（可能该属性仅被暴露在文本输入字段，而不是文本区域。）</p>
+
+<p>Rails在拯救开发者方面做得不错，这正是Rails 4所做的工作。</p>
+
+<p><strong>最佳实践：</strong>尽可能使用\A和\z来锚定正则表达式，而不是&Hat;和$。</p>
+
+<p><strong>修复：</strong>Rails 4为validates_format_of引入了一个多行选项。如果你的正则表达式使用&Hat;和$而不是\A和\z进行锚定，并且没有传递multiline: true，则Rails将引发异常。这是创建更安全的默认行为的一个很好的例子，同时仍然提供控制以在必要的地方覆盖它。</p>
+
+<h4 id="3-点击劫持">3. 点击劫持</h4>
+
+<p>点击劫持或“用户界面伪装攻击”涉及在不可见的页帧中呈现目标站点，并诱骗受害者在点击时执行出乎意料的动作。如果一个站点很容易被点击劫持攻击，攻击者可能会诱骗用户执行不必要的动作，例如单击购买，在Twitter上跟随某人，或更改他们的隐私设置。</p>
+
+<p>为防御点击劫持攻击，站点必须阻止自己被呈现在frame或不受控制的站点的iframe中。较老的浏览器需要丑陋的“页帧破解”JavaScript，但现代浏览器支持<a href="https://developer.mozilla.org/en-US/docs/HTTP/X-Frame-Options">X-Frame-Options HTTP报头</a>，它指示浏览器是否允许站点被页帧。这个报头很容易包含，也不可能破坏大多数的网站，所以Rails应该默认包含它。</p>
+
+<p><strong>最佳实践：</strong>使用Twitter的<a href="https://github.com/twitter/secureheaders">secure_headers</a>添加一个X-Frame-Options报头，其值为SAMEORIGIN或DENY。</p>
+
+<p><strong>修复：</strong>默认情况下，Rails 4现在发送带有SAMEORIGIN值的X-Frame-Options报头：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">X-Frame-Options: SAMEORIGIN
+</code></pre></div>
+<p>这告诉浏览器你的应用程序只能由源自同一个域的页面构成。</p>
+
+<h4 id="4-用户可读的会话">4. 用户可读的会话</h4>
 ]]></content>
   </entry>
   
