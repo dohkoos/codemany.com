@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Security | 乐者为王]]></title>
   <link href="http://codemany.com/tags/security/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-06-14T23:04:44+08:00</updated>
+  <updated>2017-06-16T00:11:21+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -55,7 +55,7 @@ end
     request.headers[&#39;X-CSRF-Token&#39;]
 end
 </code></pre></div>
-<p>第2行短路CSRF检查：这意味着如果request.get?为true，请求会被认为是“验证过的”，并且CSRF检查将被跳过。事实上，在Rails源代码中，该方法前面就有注释说：</p>
+<p>第2行短路CSRF检查：这意味着如果request.get?为true，请求会被认为是“验证过的”，并且CSRF检查将被跳过。事实上，在Rails的源代码中，该方法前面就有注释说：</p>
 
 <blockquote>
 <p>Get应该是安全和幂等的。</p>
@@ -97,7 +97,7 @@ end
 
 <p>点击劫持或“用户界面伪装攻击”涉及在不可见的页帧中呈现目标站点，并诱骗受害者在点击时执行出乎意料的动作。如果一个站点很容易被点击劫持攻击，攻击者可能会诱骗用户执行不必要的动作，例如单击购买，在Twitter上跟随某人，或更改他们的隐私设置。</p>
 
-<p>为防御点击劫持攻击，站点必须阻止自己被呈现在frame或不受控制的站点的iframe中。较老的浏览器需要丑陋的“页帧破解”JavaScript，但现代浏览器支持<a href="https://developer.mozilla.org/en-US/docs/HTTP/X-Frame-Options">X-Frame-Options HTTP报头</a>，它指示浏览器是否允许站点被页帧。这个报头很容易包含，也不可能破坏大多数的网站，所以Rails应该默认包含它。</p>
+<p>为防御点击劫持攻击，站点必须阻止自己被呈现在frame或不受控制的站点的iframe中。较老的浏览器需要丑陋的“页帧破解”JavaScript，但现代浏览器支持<a href="https://developer.mozilla.org/en-US/docs/HTTP/X-Frame-Options">X-Frame-Options HTTP报头</a>，它告知浏览器是否允许站点被页帧。这个报头很容易包含，也不可能破坏大多数的网站，所以Rails应该默认包含它。</p>
 
 <p><strong>最佳实践：</strong>使用Twitter的<a href="https://github.com/twitter/secureheaders">secure_headers</a>添加一个X-Frame-Options报头，其值为SAMEORIGIN或DENY。</p>
 
@@ -107,6 +107,35 @@ end
 <p>这告诉浏览器你的应用程序只能由源自同一个域的页面构成。</p>
 
 <h4 id="4-用户可读的会话">4. 用户可读的会话</h4>
+
+<p>默认的Rails 3会话存储使用已签名的未加密Cookie。虽然这样可以保护会话免遭篡改，但攻击者可以很容易对会话Cookie的内容进行解码：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">session_cookie = &lt;&lt;-STR.strip.gsub(/\n/, &#39;&#39;)
+BAh7CEkiD3Nlc3Npb25faWQGOgZFRkkiJTkwYThmZmQ3Zm
+dAY7AEZJIgtzZWtyaXQGO…--4c50026d340abf222…
+STR
+
+Marshal.load(Base64.decode64(session_cookie.split(&quot;--&quot;)[0]))
+# =&gt; {
+#   &quot;session_id&quot;  =&gt; &quot;90a8f...&quot;,
+#   &quot;_csrf_token&quot; =&gt; &quot;iUoXA...&quot;,
+#   &quot;secret&quot;      =&gt; &quot;sekrit&quot;
+# }
+</code></pre></div>
+<p>在会话中存储任何敏感信息是不安全的。希望这是众所周知的，但即使用户的会话不包含敏感数据，它仍然可能会产生风险。通过解码会话数据，攻击者可以获得在攻击中可以利用的有关应用程序内部的有用信息。例如，可以得知哪个认证系统正在使用（Authlogic、Devise等）。</p>
+
+<p>虽然这不会自行创建漏洞，但它可以帮助攻击者。关于应用程序如何工作的任何信息都可以被用于磨蚀攻击，并且在某些情况下，可以避免触发那些会给开发者提供正在被攻击的早期警告的异常或者绊网。</p>
+
+<p>用户可读会话违反了最低权限原则，因为即使会话数据必须传递给访问者的浏览器，访问者也无需能够读取数据。</p>
+
+<p><strong>最佳实践：</strong>不要将任何你不希望攻击者访问的信息放入会话中。</p>
+
+<p><strong>修复：</strong>Rails 4将默认会话存储更改为加密的。没有解密密钥，用户在客户端将不再能够解码会话的内容。</p>
+
+<h3 id="尚未解决的问题">尚未解决的问题</h3>
+
+<p>这篇文章的剩余部分讨论Rails在发布时仍然存在的安全风险。希望至少有些会被修复，如果是这样，我将更新这篇文章。</p>
+
+<h4 id="1-详细的服务器报头">1. 详细的服务器报头</h4>
 ]]></content>
   </entry>
   
