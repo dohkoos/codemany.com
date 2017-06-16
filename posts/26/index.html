@@ -9,7 +9,8 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="构建完表达式的语法规则后就可以开始分析语句（statement）的语法规则。不过在这之前还需要先修复两个小缺陷：没有识别日期、时间和内建常量的词法规则。 在PowerScript中，日期的格式是0000-00-00，年份是4位数从1000到3000，月份从01到12，天数从01到31； &hellip;">
+  <meta name="description" content="Ruby DBI是一个为Ruby程序访问数据库提供的与数据库无关的统一数据库编程接口。结构层次上可以分为两层： Database Interface 数据库接口层，与数据库无关，提供与数据库无关的标准接口
+Database Driver 数据库驱动，与数据库相关 Ruby DBI模块可以从 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -79,7 +80,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/using-antlr-to-build-powerscript-parser-part6/">使用ANTLR构建PowerScript语法分析器（6）</a></h1>
+      <h1 class="entry-title"><a href="/blog/install-and-use-ruby-dbi/">Ruby DBI的安装和使用</a></h1>
     
     
       <p class="meta">
@@ -88,18 +89,34 @@
 
 
 
-<time class='entry-date' datetime='2008-05-03T19:07:10+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2008</span></span> <span class='time'>7:07 pm</span></time>
+<time class='entry-date' datetime='2007-09-04T22:35:15+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>4</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>10:35 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>构建完表达式的语法规则后就可以开始分析语句（statement）的语法规则。不过在这之前还需要先修复两个小缺陷：没有识别日期、时间和内建常量的词法规则。</p>
+  <div class="entry-content"><p>Ruby DBI是一个为Ruby程序访问数据库提供的与数据库无关的统一数据库编程接口。结构层次上可以分为两层：</p>
 
-<p>在PowerScript中，日期的格式是0000-00-00，年份是4位数从1000到3000，月份从01到12，天数从01到31；时间是24小时格式00:00:00:000000，秒的小数部分可有可无，最多能有6位数字，所以时间范围是从00:00:00到23:59:59:999999。内建常量则以字母开头，字母数字组合，以“!”符号结束的字符串。</p>
+<ol>
+<li>Database Interface 数据库接口层，与数据库无关，提供与数据库无关的标准接口</li>
+<li>Database Driver 数据库驱动，与数据库相关</li>
+</ol>
 
-<p>根据这些描述我们可以得到日期、时间和内建常量的词法规则：</p>
+<p>Ruby DBI模块可以从 <a href="http://ruby-dbi.sourceforge.net/">http://ruby-dbi.sourceforge.net/</a> 取得，下载后解压缩，配置，然后安装：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ruby setup.rb config --with=dbi,dbd_mysql
+</span><span class='line'>ruby setup.rb setup
+</span><span class='line'>ruby setup.rb install</span></code></pre></td></tr></table></div></figure>
+
+<p>注意：--with参数必须根据你所安装的数据库类型来选择。可以配置多个，但不能选择没有安装在你机器上的数据库类型。记得刚开始的时候我使用ruby setup.rb config来配置（我机器上只安装了MySQL和SQL Server），结果在ruby setup.rb setup时一直出现像下面这样的错误信息：</p>
+
+<p><img src="/uploads/ruby-dbi.png" title="ruby-dbi" ></p>
+
+<p>下面是一个完整的例子</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -128,31 +145,129 @@
 <span class='line-number'>25</span>
 <span class='line-number'>26</span>
 <span class='line-number'>27</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>DATE_LITERAL    // 1996-09-26
-</span><span class='line'>    : '1'..'3' '0'..'9' '0'..'9' '0'..'9' '-' '0'..'1' '0'..'9' '-' '0'..'3' '0'..'9'
-</span><span class='line'>      {
-</span><span class='line'>          System.out.println("date&gt;" + getText());
-</span><span class='line'>      }
-</span><span class='line'>    ;
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># dbitest.rb
+</span><span class='line'>require 'dbi'
 </span><span class='line'>
-</span><span class='line'>TIME_LITERAL    // 00:00:00:000000
-</span><span class='line'>    : '0'..'2' '0'..'9' ':' '0'..'5' '0'..'9' ':' '0'..'5' '0'..'9'
-</span><span class='line'>      ( '.' '0'..'9'
-</span><span class='line'>      | '0'..'9' '0'..'9'
-</span><span class='line'>      | '0'..'9' '0'..'9' '0'..'9'
-</span><span class='line'>      | '0'..'9' '0'..'9' '0'..'9' '0'..'9'
-</span><span class='line'>      | '0'..'9' '0'..'9' '0'..'9' '0'..'9' '0'..'9'
-</span><span class='line'>      | '0'..'9' '0'..'9' '0'..'9' '0'..'9' '0'..'9' '0'..'9'
-</span><span class='line'>      )?
-</span><span class='line'>      {
-</span><span class='line'>          System.out.println("time&gt;" + getText());
-</span><span class='line'>      }
-</span><span class='line'>    ;
+</span><span class='line'># Connect to a database
+</span><span class='line'>dbh = DBI.connect('dbi:Mysql:rubydbi:localhost', 'root', '123456')
 </span><span class='line'>
-</span><span class='line'>ENUM_LITERAL
-</span><span class='line'>    : Letter (Letter|'0'..'9')* '!'
+</span><span class='line'>dbh.do('DROP TABLE IF EXISTS people')
+</span><span class='line'>dbh.do('CREATE TABLE people (id int, name varchar(30))')
+</span><span class='line'>
+</span><span class='line'># Insert some rows, use placeholders
+</span><span class='line'>sql = 'INSERT INTO people VALUES (?, ?)'
+</span><span class='line'>dbh.prepare(sql) do |sth|
+</span><span class='line'>    sth.execute('100', 'Michael')
+</span><span class='line'>    sth.execute('200', 'John')
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'># Select all rows
+</span><span class='line'>sth = dbh.prepare('SELECT * FROM people')
+</span><span class='line'>sth.execute
+</span><span class='line'>
+</span><span class='line'># Print out each row
+</span><span class='line'>while row = sth.fetch do
+</span><span class='line'>    p row
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'># Close the statement handle when done
+</span><span class='line'>sth.finish
+</span><span class='line'>
+</span><span class='line'>dbh.do('DROP TABLE people')
+</span><span class='line'>
+</span><span class='line'># Finally, disconnect
+</span><span class='line'>dbh.disconnect</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/using-antlr-to-build-powerscript-parser-part2/">使用ANTLR构建PowerScript语法分析器（2）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-09-02T16:44:22+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2007</span></span> <span class='time'>4:44 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在<a href="/blog/using-antlr-to-build-powerscript-parser-part1/">使用ANTLR构建PowerScript语法分析器（1）</a>中写的词法规则存在几个小问题：</p>
+
+<ol>
+<li>换行符和回车符同时存在于WS和EndOfLine两个词法规则中，属于重复定义；</li>
+<li>输出单行注释时紧随其后会额外多输出一个空行；</li>
+<li>单行注释是文件的最后一行时不能被词法分析器识别；</li>
+<li>像<code>/* comments /* nested comments */ */</code>这种嵌套注释会被输出成：</li>
+</ol>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>bc&gt;/* comments /* nested comments */
+</span><span class='line'>bc&gt;/* comments /* nested comments */ */</span></code></pre></td></tr></table></div></figure>
+
+<p>下面我们将逐个修复它们。</p>
+
+<p>解决第1个问题前先要问问自己，单行注释的词法规则中真的需要包含EndOfLine这个词法规则吗？真的需要吗？如果没有的话，当词法分析器识别到换行符或回车符时，就会去匹配词法规则WS。这样看来，EndOfLine这个词法规则在这里其实是不必要的，完全可以删除掉。</p>
+
+<p>第2个问题因为词法规则EndOfLine已经被删除，所以也就不存在了。这儿仅仅分析下问题的原因。词法分析器分析单行注释时，EndOfLine会被当作单行注释的一部分予以识别。翻看生成的词法识别器代码，可以看到打印代码块出现在词法规则EndOfLine调用的后面。打印代码块中的getText()方法是从CharStream中获取文本的，如果在词法规则EndOfLine被调用后才执行，因为词法规则EndOfLine被调用时会将CharStream的当前索引向尾部移动，这时获得的文本就会包含EndOfLine，导致打印时额外输出一个空行。</p>
+
+<p>第3个问题同样也由于第1个问题的修复而不存在了。它出现的原因是因为文件最后一行的结尾字符是EOF，无法匹配词法规则EndOfLine。</p>
+
+<p>第4个问题则可以通过计数器来处理。先初始化一个计数器变量depthOfComments来标记块注释的深度，当遇到<code>“/*”</code>时就加1，遇到<code>“*/”</code>时则减1。输出时只要判断depthOfComments是否等于0就行了。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>@lexer::members {
+</span><span class='line'>    int depthOfComments = 0;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>BLOCK_COMMENT
+</span><span class='line'>    : '/*' {depthOfComments++;}
+</span><span class='line'>      ( options {greedy=false;}
+</span><span class='line'>      : ('/' '*')=&gt; BLOCK_COMMENT
+</span><span class='line'>      | '/' ~('*')
+</span><span class='line'>      | ~('/')
+</span><span class='line'>      )*
+</span><span class='line'>      '*/' {depthOfComments--;}
 </span><span class='line'>      {
-</span><span class='line'>          System.out.println("enum&gt;" + getText());
+</span><span class='line'>          if (depthOfComments == 0) {
+</span><span class='line'>              System.out.println("bc&gt;" + getText());
+</span><span class='line'>          }
 </span><span class='line'>      }
 </span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
 </div>
@@ -167,7 +282,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/using-antlr-to-build-powerscript-parser-part5/">使用ANTLR构建PowerScript语法分析器（5）</a></h1>
+      <h1 class="entry-title"><a href="/blog/using-antlr-to-build-powerscript-parser-part1/">使用ANTLR构建PowerScript语法分析器（1）</a></h1>
     
     
       <p class="meta">
@@ -176,178 +291,116 @@
 
 
 
-<time class='entry-date' datetime='2008-05-02T19:27:12+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2008</span></span> <span class='time'>7:27 pm</span></time>
+<time class='entry-date' datetime='2007-08-22T23:43:04+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2007</span></span> <span class='time'>11:43 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>基本表达式的语法规则构建完毕，那么表达式的语法规则构建就颇为简单了。<a href="/blog/using-antlr-to-build-powerscript-parser-part4/">使用ANTLR构建PowerScript语法分析器（4）</a>中已经说过表达式是由运算元和运算符复合组成。所以在编写表达式语法规则前先要分析下PowerScript的运算符以及它们的优先级。</p>
+  <div class="entry-content"><p>首先，让我们从最简单的做起，先实现一套能正确分析PowerScript注释的词法规则。PowerScript支持两种注释形式：单行注释（//）和多行注释（/* ... */）。</p>
 
-<p>PowerScript支持四种类型的运算符，分别是：</p>
-
-<ul>
-<li>针对数字数据类型的算术运算符，执行算术计算；</li>
-<li>针对所有类型的关系运算符，比较数字，文本和布尔值；</li>
-<li>针对布尔类型的逻辑运算符，执行布尔值上的关系运算符</li>
-<li>针对字符串类型连接运算符，连接字符串和二进制大对象。</li>
-</ul>
-
-<h3 id="算术运算符">算术运算符</h3>
-
-<table><thead>
-<tr>
-<th>Operator</th>
-<th>Meaning</th>
-</tr>
-</thead><tbody>
-<tr>
-<td>+</td>
-<td>Addition</td>
-</tr>
-<tr>
-<td>-</td>
-<td>Subtraction</td>
-</tr>
-<tr>
-<td>*</td>
-<td>Multiplication</td>
-</tr>
-<tr>
-<td>/</td>
-<td>Division</td>
-</tr>
-<tr>
-<td>^</td>
-<td>Exponentiation</td>
-</tr>
-</tbody></table>
-
-<h3 id="关系运算符">关系运算符</h3>
-
-<table><thead>
-<tr>
-<th>Operator</th>
-<th>Meaning</th>
-</tr>
-</thead><tbody>
-<tr>
-<td>=</td>
-<td>Equals</td>
-</tr>
-<tr>
-<td>&gt;</td>
-<td>Greater than</td>
-</tr>
-<tr>
-<td>&lt;</td>
-<td>Less than</td>
-</tr>
-<tr>
-<td>&lt;&gt;</td>
-<td>Not equal</td>
-</tr>
-<tr>
-<td>&gt;=</td>
-<td>Greater than or equal</td>
-</tr>
-<tr>
-<td>&lt;=</td>
-<td>Less than or equal</td>
-</tr>
-</tbody></table>
-
-<h3 id="逻辑运算符">逻辑运算符</h3>
-
-<table><thead>
-<tr>
-<th>Operator</th>
-<th>Meaning</th>
-</tr>
-</thead><tbody>
-<tr>
-<td>NOT</td>
-<td>Logical negation</td>
-</tr>
-<tr>
-<td>AND</td>
-<td>Logical and</td>
-</tr>
-<tr>
-<td>OR</td>
-<td>Logical or</td>
-</tr>
-</tbody></table>
-
-<h3 id="连接运算符">连接运算符</h3>
-
-<table><thead>
-<tr>
-<th>Operator</th>
-<th>Meaning</th>
-</tr>
-</thead><tbody>
-<tr>
-<td>+</td>
-<td>Concatenate</td>
-</tr>
-</tbody></table>
-
-<h3 id="运算符优先级">运算符优先级</h3>
-
-<table><thead>
-<tr>
-<th>Operator</th>
-<th>Purpose</th>
-</tr>
-</thead><tbody>
-<tr>
-<td>( )</td>
-<td>Grouping (see note below on overriding)</td>
-</tr>
-<tr>
-<td>+, -</td>
-<td>Unary plus and unary minus (indicates positive or negative number)</td>
-</tr>
-<tr>
-<td>^</td>
-<td>Exponentiation</td>
-</tr>
-<tr>
-<td>*, /</td>
-<td>Multiplication and division</td>
-</tr>
-<tr>
-<td>+, -</td>
-<td>Addition and subtraction; string concatenation</td>
-</tr>
-<tr>
-<td>=, &gt;, &lt;, &lt;=, &gt;=, &lt;&gt;</td>
-<td>Relational operators</td>
-</tr>
-<tr>
-<td>NOT</td>
-<td>Negation</td>
-</tr>
-<tr>
-<td>AND</td>
-<td>Logical and</td>
-</tr>
-<tr>
-<td>OR</td>
-<td>Logical or</td>
-</tr>
-</tbody></table>
-
-<p>清楚运算符和优先级后，该如何表示这些表达式的语法关系呢？有个标准的分析表达式的递归定义可以套用，大部分表达式都遵循这个模式：</p>
+<p>单行注释以双斜杠（//）起头，直到遇到行结束符为止，所以在这里要先明确一下行结束符用什么表示。在DOS系统中行结束符用“\r\n”表示，在Unix系统中行结束符用“\n”表示，现在的Mac系统也是以“\n”表示行结束符，但早期的Mac系统中行结束符则是以“\r”表示。所以兼容这几种操作系统的行结束符词法规则为：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>thisLevelExpression
-</span><span class='line'>    : nextHigherPrecedenceExpression (OPERATOR nextHigherPrecedenceExpression)*</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>fragment
+</span><span class='line'>EndOfLine
+</span><span class='line'>    : '\r' '\n'    // DOS
+</span><span class='line'>    | '\r'         // Mac
+</span><span class='line'>    | '\n'         // Unix
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
 
-<p>现在我们就可以根据PowerScript的运算符优先级写出表达式的语法规则了：</p>
+<p>现在，有了行结束符词法规则，就可以定义单行注释的词法规则了：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>LINE_COMMENT
+</span><span class='line'>    : '//' ~('\n'|'\r')* EndOfLine
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>通常的多行注释词法规则是这样的：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>BLOCK_COMMENT
+</span><span class='line'>    : '/*' ( options {greedy=false;} : . )* '*/'
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>但由于PowerScript支持嵌套注释，所以上面的规则无效，必须重新定义。当词法分析器遇到<code>“/*”</code>后就进入了多行注释。这时假如遇到了<code>“/”</code>符号，词法分析器必须预取一个字符，看这个字符是不是<code>“*”</code>。如果是的话，就进入了嵌套的多行注释，否则，则还是处在多行注释中。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>BLOCK_COMMENT
+</span><span class='line'>    : '/*'
+</span><span class='line'>      ( options {greedy=false;}
+</span><span class='line'>      : ('/' '*')=&gt; BLOCK_COMMENT    // 在多行注释中遇到“/*”，用语法断言确定是嵌套多行注释
+</span><span class='line'>      | '/' ~('*')                   // 在多行注释中只遇到“/”，而没有紧跟着的“*”
+</span><span class='line'>      | ~('/')                       // 在多行注释中没有遇到“/”
+</span><span class='line'>      )*
+</span><span class='line'>      '*/'
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>当然，我们还希望忽略空格、制表符、回车符、换行符等无意义字符。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>WS
+</span><span class='line'>    : (' '|'\t'|'\r'|'\n') {$channel=HIDDEN;}
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>测试代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>/* This is a comment.   */
+</span><span class='line'>/* /This is a comment. */
+</span><span class='line'>/* *This is a comment. */
+</span><span class='line'>/* This is a comment. /* */*/
+</span><span class='line'>/* This is a comment. /* This is a nested comment. */ */
+</span><span class='line'>/*  The comment starts here.
+</span><span class='line'> /*  The nested comment starts here.
+</span><span class='line'> The nested comment ends here.  */
+</span><span class='line'> The comment ends here.  */
+</span><span class='line'>/* The comment starts here,
+</span><span class='line'> continues to this line,&
+</span><span class='line'> and finally ends here. */
+</span><span class='line'>// This entire line is a comment.
+</span><span class='line'>// This entire line is a comment. //
+</span><span class='line'>// /This entire line is a comment.
+</span><span class='line'>// This entire line is a comment. */
+</span><span class='line'>// This entire line is a comment. /*</span></code></pre></td></tr></table></div></figure>
+
+<p>完整的PowerScript.g的内容如下：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -384,40 +437,44 @@
 <span class='line-number'>33</span>
 <span class='line-number'>34</span>
 <span class='line-number'>35</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>expression
-</span><span class='line'>    : logical_or_expression
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar PowerScript;
+</span><span class='line'>
+</span><span class='line'>program
+</span><span class='line'>    : LINE_COMMENT+
+</span><span class='line'>    | BLOCK_COMMENT+
 </span><span class='line'>    ;
 </span><span class='line'>
-</span><span class='line'>logical_or_expression
-</span><span class='line'>    : logical_and_expression ('or' logical_and_expression)*
+</span><span class='line'>LINE_COMMENT
+</span><span class='line'>    : '//' ~('\n'|'\r')* EndOfLine
+</span><span class='line'>      {
+</span><span class='line'>          System.out.println("lc&gt;" + getText());
+</span><span class='line'>      }
 </span><span class='line'>    ;
 </span><span class='line'>
-</span><span class='line'>logical_and_expression
-</span><span class='line'>    : logical_not_expression ('and' logical_not_expression)*
+</span><span class='line'>BLOCK_COMMENT
+</span><span class='line'>    : '/*'
+</span><span class='line'>      ( options {greedy=false;}
+</span><span class='line'>      : ('/' '*')=&gt; BLOCK_COMMENT
+</span><span class='line'>      | '/' ~('*')
+</span><span class='line'>      | ~('/')
+</span><span class='line'>      )*
+</span><span class='line'>      '*/'
+</span><span class='line'>      {
+</span><span class='line'>          System.out.println("bc&gt;" + getText());
+</span><span class='line'>      }
 </span><span class='line'>    ;
 </span><span class='line'>
-</span><span class='line'>logical_not_expression
-</span><span class='line'>    : 'not'? relational_expression
+</span><span class='line'>WS
+</span><span class='line'>    : (' '|'\t'|'\r'|'\n') {$channel=HIDDEN;}
 </span><span class='line'>    ;
 </span><span class='line'>
-</span><span class='line'>relational_expression
-</span><span class='line'>    : additive_expression (('='|'&gt;'|'&lt;'|'&lt;&gt;'|'&gt;='|'&lt;=') additive_expression)*
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>additive_expression
-</span><span class='line'>    : multiplicative_expression (('+'|'-') multiplicative_expression)*
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>multiplicative_expression
-</span><span class='line'>    : exponentive_expression (('*'|'/') exponentive_expression)*
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>exponentive_expression
-</span><span class='line'>    : unary_expression ('^' unary_expression)*
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>unary_expression
-</span><span class='line'>    : ('+'|'-')? primary_expression
+</span><span class='line'>fragment
+</span><span class='line'>EndOfLine
+</span><span class='line'>    : '\r' '\n'    // DOS
+</span><span class='line'>    | '\r'         // Mac
+</span><span class='line'>    | '\n'         // Unix
 </span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
 </div>
   
@@ -431,7 +488,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/using-antlr-to-build-powerscript-parser-part4/">使用ANTLR构建PowerScript语法分析器（4）</a></h1>
+      <h1 class="entry-title"><a href="/blog/getting-started-jpa-with-spring2/">JPA + Spring 2入门</a></h1>
     
     
       <p class="meta">
@@ -440,18 +497,35 @@
 
 
 
-<time class='entry-date' datetime='2008-04-26T22:17:05+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>10:17 pm</span></time>
+<time class='entry-date' datetime='2007-08-10T18:33:42+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>10</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>6:33 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>到目前为止，PowerScript的词法分析已经完成的差不多了，接下来就要开始实现它的语法规则。我们准备先从表达式（expression）开始下手，因为它是语法规则中最核心的部分。</p>
+  <div class="entry-content"><p>JPA（Java Persistence API）是EJB 3.0 新引入的一个把Java数据对象映射成关系数据库对象的数据持久化编程模型，它弥补了JDBC、ORM、EJB 2等在Java对象持久化方面的不足之处，并且非常易于使用。JPA可以被当作一个单独的 POJO（Plain Old Java Object）持续化使用，或者被集成到任意Java EE兼容的容器或其它的轻量级框架（例如Spring）等一起使用。</p>
 
-<p>简单的来说，表达式是计算的最小单元，是可以被计算产生值的代码的任何部分。一般是由一个或多个运算元和通常是一个运算符构成，运算元本身也可以是表达式。这样层层递归嵌套，直到被称为基本表达式（primary expression）的最简单部分。</p>
+<h3 id="配置jpa">配置JPA</h3>
 
-<p>基本表达式包含有标志符、字面量（literal）、字段存取、函数调用和数组存取等，圆括号括起的表达式通常也被认为是基本表达式。以下是它们的大致表现形式：</p>
+<p>Spring提供了两种方法创建JPA的EntityManagerFactory对象。</p>
+
+<p>方法1：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;beans&gt;
+</span><span class='line'>    &lt;bean id="entityManagerFactory" class="org.springframework.orm.jpa.LocalEntityManagerFactoryBean"&gt;
+</span><span class='line'>        &lt;property name="persistenceUnitName" value="persistenceUnit" /&gt;
+</span><span class='line'>    &lt;/bean&gt;
+</span><span class='line'>&lt;/beans&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>FactoryBean创建的EntityManagerFactory适用于仅通过JPA进行数据访问的环境。由于使用了PersistenceProvider自动侦测机制，所以只能从默认路径classpath:META-INF/persistence.xml中读取配置信息。</p>
+
+<p>方法2：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -459,21 +533,211 @@
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
 <span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>rating
-</span><span class='line'>'This is a string'
-</span><span class='line'>x.y
-</span><span class='line'>f(x)
-</span><span class='line'>a[x]
-</span><span class='line'>(x)</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;beans&gt;
+</span><span class='line'>    &lt;bean id="entityManagerFactory" class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean"&gt;
+</span><span class='line'>        &lt;property name="dataSource" ref="someDataSource" /&gt;
+</span><span class='line'>        &lt;property name="loadTimeWeaver"&gt;
+</span><span class='line'>            &lt;bean class="org.springframework.instrument.classloading.SimpleLoadTimeWeaver" /&gt;
+</span><span class='line'>        &lt;/property&gt;
+</span><span class='line'>    &lt;/bean&gt;
+</span><span class='line'>&lt;/beans&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p>在PowerScript中调用函数和事件的语法如下：</p>
+<p>FactoryBean提供了对JPA EntityManagerFactory的完整控制，非常适合那种有简单定制需要的环境。你可以处理多个persistence.xml配置文件；覆盖persistence.xml文件的默认路径；可以传递Spring托管的JDBC DataSource给JPA PersistenceProvider，用来替代persistence.xml中的JDBC配置（这个Spring托管的DataSource通常被作为nonJtaDataSource传送给PersistenceProvider，并且覆盖persistence.xml中相同的nonJtaDataSource）。</p>
+
+<h3 id="数据访问">数据访问</h3>
+
+<p>基于JPA的DAO可以通过三种方式进行数据访问JpaDaoSupport，JpaTemplate和plain JPA。其中JpaTemplate是plain JPA的封装，而JpaDaoSupport又是JpaTemplate的封装。无疑，使用不对Spring产生任何依赖的Plain JPA的API进行编程是最好选择。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>{ objectname. } { ancestorname :: } { type } { calltype } { when } name ( { argumentlist } )</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class ProductDaoImpl implements ProductDao {
+</span><span class='line'>    private EntityManager entityManager = null;
+</span><span class='line'>
+</span><span class='line'>    @PersistenceContext
+</span><span class='line'>    public void setEntityManager(EntityManager entityManager) {
+</span><span class='line'>        this.entityManager = entityManager;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public Collection loadProductsByCategory(String category) {
+</span><span class='line'>         Query query = em.createQuery("from Product as p where p.category = :category");
+</span><span class='line'>         query.setParameter("category", category);
+</span><span class='line'>         return query.getResultList();
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>其中，花括号中的项表示可以有可以无。type有两个值function和event，calltype有两个值static和dynamic，when有两个值trigger和post，并且type，calltype和when的顺序可以任意调换。如果ancestorclass是当前对象的直接父类的话，那么可以使用super关键字代替。</p>
+<p>需要注意的是，必须激活PersistenceAnnotationBeanPostProcessor功能才能让Spring识别@PersistenceContext注解。</p>
 
-<p>这里是收集的一些基本表达式：</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;beans&gt;
+</span><span class='line'>    &lt;!-- JPA annotations bean post processor --&gt;
+</span><span class='line'>    &lt;bean class="org.springframework.orm.jpa.support.PersistenceAnnotationBeanPostProcessor" /&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;bean id="productDao" class="com.codemany.netlink.dao.impl.ProductDaoImpl" /&gt;
+</span><span class='line'>&lt;/beans&gt;</span></code></pre></td></tr></table></div></figure>
+
+<h3 id="异常转化">异常转化</h3>
+
+<p>Spring提供了一个允许通过使用@Repository注解进行透明的异常转化的解决方案。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>@Repository
+</span><span class='line'>public class ProductDaoImpl implements ProductDao {</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;beans&gt;
+</span><span class='line'>    &lt;!-- Exception translation bean post processor --&gt;
+</span><span class='line'>    &lt;bean class="org.springframework.dao.annotation.PersistenceExceptionTranslationPostProcessor" /&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>后置处理器将自动的寻找所有的异常转化器（PersistenceExceptionTranslator这个接口的实现类）并通知所有打上@Repository注解的bean，从而能够使得被找到的异常转化器能够在抛出异常时做相应的异常转化工作。</p>
+
+<p>总的来说，DAO能够基于普通的Java持久层API和注解来实现，但同样也能享受到由Spring管理事务、IoC和透明的异常转化（转化成为Spring的异常体系）等好处。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/rediscovering-the-button-element/">重新认识button元素</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-07-26T23:49:49+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>11:49 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>英文原文：<a href="http://www.particletree.com/features/rediscovering-the-button-element/">http://www.particletree.com/features/rediscovering-the-button-element/</a></p>
+
+<h3 id="简介">简介</h3>
+
+<p>对每个应用程序设计者来说，为你的用户创建一套一致的界面是个不懈的斗争。在Web上构建一致性尤为艰难，因为跨越浏览器和操作系统的视觉渲染差异是完全不同的，并且在什么能做和不能做上几乎是随心所欲的。在你<a href="http://www.456bereastreet.com/archive/200409/styling_form_controls/">处理</a> <a href="http://www.456bereastreet.com/archive/200410/styling_even_more_form_controls/">表单元素</a>时这个问题变得更为明显。在标准外观的战争里，它们中最大的输家是臭名昭著的提交按钮。</p>
+
+<p>现状是，带有type=&quot;submit&quot;的输入要么是太丑陋（Firefox），有点缺陷（Internet Explorer），要么完全缺乏弹性（Safari）。大多数的解决方案是使用图片输入和自己创建这个该死的东西。这是不幸的，因为那样做以后每当我们急需一个新按钮时工作就被归结为启用Photoshop的繁琐任务。我们需要的是更好的东西——一些对于设计者来说更加灵活和有意义的东西。我们很幸运，因为解决方案已经存在，它所需要的是一点点爱。我的朋友们，让我向你介绍我的小朋友：<code>&lt;button&gt;</code>元素。</p>
+
+<h3 id="输入-vs-按钮">输入 vs 按钮</h3>
+
+<p>这里是标准的提交按钮标记：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;input type="submit" value="Submit" /&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>它在浏览器三兄弟里看起来像这样：</p>
+
+<p><img src="/uploads/input-submit.gif" title="input-submit" ></p>
+
+<p>嗯。这里是创建一个用于提交的按钮元素时使用的标记：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;button type="submit"&gt;Submit&lt;/button&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>并且它看起来像这样：</p>
+
+<p><img src="/uploads/button-tag.gif" title="button-tag" ></p>
+
+<p>这些按钮与上面对等物的工作和行为方式完全相同。除提交表单外，你可以让它们禁用，添加一个accesskey甚至指定一个tabindex。除了Safari里的按钮看起来有视觉差异（它没有把不自然的aqua界面放到按钮上，这对我们是有利的），关于<code>&lt;button&gt;</code>标签最酷的事情是你可以在它们里面放置有用的HTML元素，像图片：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;button type="submit"&gt;&lt;img src="" alt="" /&gt; Submit&lt;/button&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>它们看起来像这样：</p>
+
+<p><img src="/uploads/button-images.gif" title="button-images" ></p>
+
+<p>非常好。（好吧，它们有点丑，但是我说过它们需要一点点爱。）实际上，根据W3C所说，这些特殊的视觉差异正是<code>&lt;button&gt;</code>元素被创建的原因。</p>
+
+<blockquote>
+<p>Buttons created with the BUTTON element function just like buttons created with the INPUT element, but they offer richer rendering possibilities: the BUTTON element may have content. For example, a BUTTON element that contains an image functions like and may resemble an INPUT element whose type is set to “image”, but the BUTTON element type allows content.</p>
+
+<p><a href="http://www.w3.org/TR/html4/interact/forms.html#h-17.5">The Button Element - W3C</a></p>
+</blockquote>
+
+<p>所以这里我们正在寻找一种设计解决方案，好在拥有海量资料的互联网上有一段标记可以帮助我们解决这个问题。这很方便，然而不幸的是大多数设计者和开发者甚至不知道该元素存在。现在，在我直接用按钮元素替换所有在<a href="http://wufoo.com/">Wufoo</a>中的图片输入之前，我决定标记和CSS必须满足几个需求：</p>
+
+<p><strong>需求</strong></p>
+
+<blockquote>
+<ol>
+<li>它们必须看起来像按钮。</li>
+<li>它们必须在浏览器里看起来相同。</li>
+<li>我用于按钮的样式需要同样能被使用在链接上（因为在Wufoo中的交互总是由一个表单提交或者从链接来的一个Ajax调用引发，这些东西很可能并排排列，我需要它们具有相同的视觉重量感）。</li>
+<li>在许多不同情况下使用时标记需要保持弹性和易于修改。</li>
+<li>我应该能够有效地使用图标和颜色来传递关于这种交互将要发生的信息。</li>
+</ol>
+</blockquote>
+
+<p>带着这些适当的挑战，我潜进CSS，在解决一些跨浏览器的挑战之后，得出了以下内容（你也可以在Wufoo上看到所有的这些内容）：</p>
+
+<p><strong>结果</strong></p>
+
+<p><img src="/uploads/buttons.gif" title="buttons" ></p>
+
+<p>没有什么疯狂的。简单，但是有效。现在，我喜欢这种处理按钮的方式是我可以使用<a href="http://famfamfam.com/">FAMFAMFAM</a>的1000个图标库去说明大量可笑的想法和动作而不必每一次我需要一些新东西时都要从Photoshop生成。如果我们快速查看下标记，你会注意到在那里的最后两个按钮实际上是链接：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div class="buttons"&gt;
+</span><span class='line'>    &lt;button type="submit" class="positive"&gt;
+</span><span class='line'>        &lt;img src="/images/icons/tick.png" alt=""/&gt; Save
+</span><span class='line'>    &lt;/button&gt;
+</span><span class='line'>    &lt;a href="/password/reset/"&gt;
+</span><span class='line'>        &lt;img src="/images/icons/key.png" alt=""/&gt; Change Password
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>    &lt;a href="#" class="negative"&gt;
+</span><span class='line'>        &lt;img src="/images/icons/cross.png" alt=""/&gt; Cancel
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>&lt;/div&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>这很有用的原因是因为在Web应用中许多动作是由REST驱动的，所以只要通过链接把用户请求发送到某个特定的URL就会发起它们需要做的事情。使用可以在这两种类型的元素（链接和按钮）上工作的样式，为我们提供了灵活性，以保持我们的交互方式看起来是一致的和适当的，不管它是通过Ajax完成还是一个标准的提交。</p>
+
+<p>仅仅是一些简短的题外话。你可能想知道我为什么把那些图标图片中的alt属性留成空白。它可能会令一些人感到惊讶，虽然每个图片的alt属性是必需的，实际上描述它们不是必需的。空的alt属性完全有效，并且帮助屏幕阅读器知道哪些信息事实上要被忽略，在你试图寻找下一个适当的可操作条目时节省你用户宝贵的时间。因为图标实际上是多余的，我宁愿不要浪费用户的时间听到我用于可视化的图片发生了什么事。它们只会听到“Submit”而不是“Checkmark Submit”，这实际上会让事情有点困惑。</p>
+
+<h3 id="css">CSS</h3>
+
+<p>在大多数情况下，样式化这些按钮的CSS是相当直白的。让人抓破脑袋的跨浏览器的不一致性导致下列代码中填充的数量不一致，但没什么不可能，你们很幸运，这个问题已经解决了。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -502,35 +766,59 @@
 <span class='line-number'>25</span>
 <span class='line-number'>26</span>
 <span class='line-number'>27</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>this.ls_array[1]
-</span><span class='line'>this.event pfc_addrow()
-</span><span class='line'>this.event rowfocuschanged(ll_row)
-</span><span class='line'>this.event post doubleclicked(xpos, ypos, row, dwo)
-</span><span class='line'>this.uo_1.function hallo()
-</span><span class='line'>post function column_order_update_from_grid()
-</span><span class='line'>event ue_process()
-</span><span class='line'>
-</span><span class='line'>close(parent)
-</span><span class='line'>parent.enabled
-</span><span class='line'>parent.hide()
-</span><span class='line'>parent.event ue_postconstructor()
-</span><span class='line'>parent.function static trigger wf_process( )
-</span><span class='line'>parent.post uf_process_item ()
-</span><span class='line'>
-</span><span class='line'>super::create
-</span><span class='line'>super::event clicked()
-</span><span class='line'>super::event clicked(xpos, ypos, row, dwo)
-</span><span class='line'>super::of_remove_tail(anv_tailnode)
-</span><span class='line'>super::event trigger selectionchanging(oldindex, newindex)
-</span><span class='line'>
-</span><span class='line'>iu_tab_postings.post of_enable_sort(dw_main, dw_detail, false)
-</span><span class='line'>lw_sheet.dynamic event pfc_close()
-</span><span class='line'>w_main.event doubleclicked(flags, xpos, ypos)
-</span><span class='line'>dw_main.event pfc_retrieve()
-</span><span class='line'>cb_ok.event trigger clicked()
-</span><span class='line'>cb_ok.triggerevent(clicked!)</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>/* BUTTONS */
+</span><span class='line'>.buttons a, .buttons button {
+</span><span class='line'>    display: block;
+</span><span class='line'>    float: left;
+</span><span class='line'>    margin: 0 7px 0 0;
+</span><span class='line'>    background-color: #f5f5f5;
+</span><span class='line'>    border: 1px solid #dedede;
+</span><span class='line'>    border-top: 1px solid #eee;
+</span><span class='line'>    border-left: 1px solid #eee;
+</span><span class='line'>    font-family: "Lucida Grande", Tahoma, Arial, Verdana, sans-serif;
+</span><span class='line'>    font-size: 100%;
+</span><span class='line'>    line-height: 130%;
+</span><span class='line'>    text-decoration: none;
+</span><span class='line'>    font-weight: bold;
+</span><span class='line'>    color: #565656;
+</span><span class='line'>    cursor: pointer;
+</span><span class='line'>    padding: 5px 10px 6px 7px;    /* Links */
+</span><span class='line'>}
+</span><span class='line'>.buttons button {
+</span><span class='line'>    width: auto;
+</span><span class='line'>    overflow: visible;
+</span><span class='line'>    padding: 4px 10px 3px 7px;    /* IE6 */
+</span><span class='line'>}
+</span><span class='line'>.buttons button[type] {
+</span><span class='line'>    padding: 5px 10px 5px 7px;    /* Firefox */
+</span><span class='line'>    line-height: 17px;    /* Safari */
+</span><span class='line'>}
+</span><span class='line'>*:first-child+html button[type] {
+</span><span class='line'>    padding: 4px 10px 3px 7px;    /* IE7 */
+</span><span class='line'>}
+</span><span class='line'>.buttons button img, .buttons a img {
+</span><span class='line'>    margin: 0 3px -3px 0 !important;
+</span><span class='line'>    padding: 0;
+</span><span class='line'>    border: none;
+</span><span class='line'>    width: 16px;
+</span><span class='line'>    height: 16px;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>有了以上的这些信息，我们就可以很容易地得到基本表达式的语法规则：</p>
+<p>当致力于不一致性的时候有件事出现了，就是Internet Explorer中关于显示长按钮有个渲染缺陷的事实。你可以在<a href="http://jehiah.cz/archive/button-width-in-ie-revised">Jehiah.cz</a>阅读相关内容，但它是什么导致了以上代码中一些宽度和溢出的声明。</p>
+
+<h3 id="添加一些颜色">添加一些颜色</h3>
+
+<p>在Wufoo中，我们使悬停颜色蓝色成为中性动作，对于正面和负面内涵适当地使用绿色和红色。以下的代码是我们为处理按钮而创建的样式，这些按钮意味着显示像添加和保存这样的正面交互以及像取消和删除这样的负面交互。对我们来说这是一次不错的尝试，显然你可以根据自己的喜好选择颜色。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -571,82 +859,49 @@
 <span class='line-number'>37</span>
 <span class='line-number'>38</span>
 <span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-<span class='line-number'>44</span>
-<span class='line-number'>45</span>
-<span class='line-number'>46</span>
-<span class='line-number'>47</span>
-<span class='line-number'>48</span>
-<span class='line-number'>49</span>
-<span class='line-number'>50</span>
-<span class='line-number'>51</span>
-<span class='line-number'>52</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>expression_list
-</span><span class='line'>    : expression (',' expression)*
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>expression
-</span><span class='line'>    : primary_expression
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>primary_expression
-</span><span class='line'>    : '(' expression ')'
-</span><span class='line'>    | (object_name '.')* (ancestor_name '::')? call_specifier* IDENTIFIER identifier_suffix?
-</span><span class='line'>    | literal
-</span><span class='line'>    | '::'? object_name
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>object_name
-</span><span class='line'>    : 'this'
-</span><span class='line'>    | 'parent'
-</span><span class='line'>    | IDENTIFIER
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>ancestor_name
-</span><span class='line'>    : 'super'
-</span><span class='line'>    | IDENTIFIER
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>call_specifier
-</span><span class='line'>    : 'function'
-</span><span class='line'>    | 'event'
-</span><span class='line'>    | 'static'
-</span><span class='line'>    | 'dynamic'
-</span><span class='line'>    | 'trigger'
-</span><span class='line'>    | 'post'
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>identifier_suffix
-</span><span class='line'>    : arguments ('.' IDENTIFIER arguments)*    // cascaded calling
-</span><span class='line'>    | '[' expression_list? ']'
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>arguments
-</span><span class='line'>    : '(' expression_list? ')'
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>literal
-</span><span class='line'>    : STRING_LITERAL
-</span><span class='line'>    | INTEGER_LITERAL
-</span><span class='line'>    | FLOAT_LITERAL
-</span><span class='line'>    | BOOLEAN_LITERAL
-</span><span class='line'>    | LINE_COMMENT
-</span><span class='line'>    | BLOCK_COMMENT
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<p>不过，如果到这里就开始用ANTLR工具生成词法分析器和语法分析器的话，你会得到一堆的警告信息。要消除这些警告需要在语法文件头部添加：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>options {
-</span><span class='line'>    backtrack=true;
+</pre></td><td class='code'><pre><code class=''><span class='line'>/* STANDARD */
+</span><span class='line'>button:hover, .buttons a:hover {
+</span><span class='line'>    background-color: #dff4ff;
+</span><span class='line'>    border: 1px solid #c2e1ef;
+</span><span class='line'>    color: #336699;
+</span><span class='line'>}
+</span><span class='line'>.buttons a:active {
+</span><span class='line'>    background-color: #6299c5;
+</span><span class='line'>    border: 1px solid #6299c5;
+</span><span class='line'>    color: #fff;
+</span><span class='line'>}
+</span><span class='line'>/* POSITIVE */
+</span><span class='line'>button.positive, .buttons a.positive {
+</span><span class='line'>    color: #529214;
+</span><span class='line'>}
+</span><span class='line'>.buttons a.positive:hover, button.positive:hover {
+</span><span class='line'>    background-color: #e6efc2;
+</span><span class='line'>    border: 1px solid #c6d880;
+</span><span class='line'>    color: #529214;
+</span><span class='line'>}
+</span><span class='line'>.buttons a.positive:active {
+</span><span class='line'>    background-color: #529214;
+</span><span class='line'>    border: 1px solid #529214;
+</span><span class='line'>    color: #fff;
+</span><span class='line'>}
+</span><span class='line'>/* NEGATIVE */
+</span><span class='line'>.buttons a.negative, button.negative {
+</span><span class='line'>    color: #d12f19;
+</span><span class='line'>}
+</span><span class='line'>.buttons a.negative:hover, button.negative:hover {
+</span><span class='line'>    background: #fbe3e4;
+</span><span class='line'>    border: 1px solid #fbc2c4;
+</span><span class='line'>    color: #d12f19;
+</span><span class='line'>}
+</span><span class='line'>.buttons a.negative:active {
+</span><span class='line'>    background-color: #d12f19;
+</span><span class='line'>    border: 1px solid #d12f19;
+</span><span class='line'>    color: #fff;
 </span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>它的作用是告诉ANTLR在LL(*)语法分析失败的时候要去尝试匹配其它选项。</p>
+<h3 id="总结">总结</h3>
+
+<p>最后，这只是我们决定如何用Wufoo处理事情，它是为我们制定的开发流程。当然，这不是玩这个游戏的唯一方法。有许多你可以给它添加趣味的方法（使用渐变！）和改变周围的事物（在标记中的图片上使用图片替换）。因为<code>&lt;button&gt;</code>标签几乎可以处理在它里面的任何标记，你可以添加一些<code>&lt;span&gt;</code>标签，然后使用<a href="http://www.oscaralexander.com/tutorials/how-to-make-sexy-buttons-with-css.html">Alex Griffioen最近写的方法</a>来创建真正漂亮的圆角渐变作品。老实说，我希望对于许多与他们应用中可复用表单界面斗争的设计者来说这只是一个很好的起点。或许甚至，我希望你再次看看这个经常被浪费的表单元素，在不经思考就为提交采用输入和PSD之前要二思。</p>
 </div>
   
   
@@ -659,7 +914,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/cannot-launch-the-remote-parser-because-port-49153-is-already-in-use/">Cannot launch the remote parser because port 49153 is already in use</a></h1>
+      <h1 class="entry-title"><a href="/blog/debugging-cpp-dll-in-visual-csharp/">在Visual C#中调试C++的DLL</a></h1>
     
     
       <p class="meta">
@@ -668,18 +923,14 @@
 
 
 
-<time class='entry-date' datetime='2008-04-25T16:03:53+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>25</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>4:03 pm</span></time>
+<time class='entry-date' datetime='2007-07-03T21:09:09+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2007</span></span> <span class='time'>9:09 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>在Windows Server 2008中使用ANTLRWorks调试语法时，总是提示说什么端口49153已被占用。使用netstat -an发现这个端口正在被别的进程监听着，虽然知道问题原因，但是不知道如何解决。后来从<a href="http://www.cnblogs.com/zhoujg/archive/2008/03/29/1129281.html">如果AntlrWorks的Debug报错“当前端口已被占用”，可能是防火墙的原因</a>得到启示：AntlrWorks是可以修改远程调试端口的。不过我没有像该文作者介绍的那样将调试端口改成49253，因为那样可能需要设置防火墙。而是直接将之设置到了一个不在使用的端口49151上。</p>
-
-<p>设置调试端口的路径如下：</p>
-
-<p>File -&gt; Preferences -&gt; Debugger -&gt; Default local port</p>
+  <div class="entry-content"><p>在Visual C#中调试C++的DLL很简单，只要在C#项目属性的Debug一项中钩上“Enable unmanaged code debugging”，然后你就可以像调试一般程序那样调试DLL了。</p>
 </div>
   
   
@@ -692,7 +943,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/install-radiant-on-lunarpages-shared-server/">在Lunarpages虚拟主机上安装Radiant</a></h1>
+      <h1 class="entry-title"><a href="/blog/getting-started-dll-programming-with-visual-cpp/">VC++动态链接库（DLL）编程入门</a></h1>
     
     
       <p class="meta">
@@ -701,63 +952,58 @@
 
 
 
-<time class='entry-date' datetime='2008-04-20T06:55:11+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>20</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>6:55 am</span></time>
+<time class='entry-date' datetime='2007-06-23T09:35:02+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>23</span><span class='date-suffix'>rd</span>, <span class='date-year'>2007</span></span> <span class='time'>9:35 am</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>安裝Rails、Mongrel和Radiant</p>
+  <div class="entry-content"><p>DLL是一个包含可由多个程序同时使用的代码和数据的集合。例如，在Windows操作系统中，Comdlg32动态链接库 执行与对话框有关的常见函数。因此，每个程序都可以使用该DLL中包含的功能来实现“打开”对话框。这有助于促进代码复用和内存的有效使用。通过使用DLL，程序可以实现模块化，由相对独立的组件组成。例如，一个计帐程序可以按模块来销售。可以在运行时将各个模块加载到主程序中（如果安装了相应模块）。因为模块是彼此独立的，所以程序的加载速度更快，而且模块只在相应的功能被请求时才加载。</p>
+
+<h3 id="dll的优点">DLL的优点</h3>
+
+<ol>
+<li>使用较少的资源。当多个程序使用同一个函数库时，DLL可以减少在磁盘和物理内存中加载的代码的重复量。这不仅可以大大影响在前台运行的程序，而且可以大大影响其它在Windows操作系统上运行的程序；</li>
+<li>简化部署和安装。当DLL中的函数需要更新或修复时，只要函数的参数和返回值没有更改，就不需重新编译或重新建立程序与该DLL的链接。此外，如果多个程序使用同一个DLL，那么多个程序都将从该更新或修复中获益；</li>
+<li>支持多语言程序。只要程序遵循函数的调用约定，用不同编程语言编写的程序就可以调用相同的DLL函数。程序与DLL函数在下列方面必须是兼容的：函数期望其参数被推送到堆栈上的顺序，是函数还是应用程序负责清理堆栈，以及寄存器中是否传递了任何参数；</li>
+<li>使国际版本的创建轻松完成。通过将资源放到DLL中，创建应用程序的国际版本变得容易得多。可将用于应用程序的每个语言版本的字符串放到单独的DLL资源文件中，并使不同的语言版本加载合适的资源。</li>
+</ol>
+
+<h3 id="dll的类型（kinds-of-dlls）">DLL的类型（Kinds of DLLs）</h3>
+
+<p>Visual C++支持三种类型的DLL，它们分别是Non-MFC DLL、MFC Regular DLL和MFC Extension DLL：</p>
+
+<ol>
+<li>Non-MFC DLL指的是不用MFC的类库结构，直接用C语言写的DLL，其导出的函数是标准的C接口，能被MFC或非MFC编写的客户程序调用；</li>
+<li>Extension DLL支持C++接口，也就是说它导出C++函数或者整个类给客户程序。导出函数可以使用C++或MFC的数据形式作为参数或返回值，当导出整个类时，客户程序可以创建此类的对象或者从这些类进行派生。使用Extension DLL的一个问题就是该DLL仅能和MFC客户程序一起工作；</li>
+<li>Regular DLL和上述的Extension Dll一样，也是用MFC类库编写的，它的一个明显的特点是在源文件里有一个继承CWinApp的类（注意：此类DLL虽然从CWinApp派生，但没有消息循环）。Regular DLL有一个很大的限制就是，它只可以导出C风格的函数，但不能导出C++类、成员函数或重载函数。调用Regular DLL的客户程序不必是MFC应用程序，也可以是在Visual C++、Dephi、Visual Basic等环境下开发的客户程序。</li>
+</ol>
+
+<h3 id="dll的加载">DLL的加载</h3>
+
+<p>客户程序使用DLL的方式有两种：隐式链接（静态加载或加载时动态链接）和显式链接（动态加载或运行时动态链接）。</p>
+
+<p>为了隐式链接到DLL，客户程序必须从DLL的提供程序获取下列项：</p>
+
+<ol>
+<li>包含导出函数或C++类声明的头文件（.h文件）；</li>
+<li>要链接的导入库（.lib文件）；</li>
+<li>实际的DLL（.dll文件）。</li>
+</ol>
+
+<p>使用DLL的客户程序必须include头文件（此头文件包含每个DLL中的导出函数或C++类），并且链接到此DLL的创建者所提供的导入库。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>gem install rails --include-dependencies
-</span><span class='line'>gem install mongrel --include-dependencies
-</span><span class='line'>gem install radiant --include-dependencies</span></code></pre></td></tr></table></div></figure>
-
-<p>建立Radiant项目</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>radiant --database mysql rcms</span></code></pre></td></tr></table></div></figure>
-
-<p>登录Lunarpages cPanel面板，创建数据库rcms及访问该数据库的账号，设置该帐号的访问权限。然后进入MySQL的数据库管理工具phpMyAdmin，导入在本地建立好的创建数据表的SQL文件，执行之。然后修改config/database.yml文件，填入前面创建的访问数据库的用户名和密码。</p>
-
-<p>将config/environment.rb中的</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>#ENV['RAILS_ENV'] ||= 'production'</span></code></pre></td></tr></table></div></figure>
-
-<p>去掉注释</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ENV['RAILS_ENV'] ||= 'production'</span></code></pre></td></tr></table></div></figure>
-
-<p>再将public/dispatch.fcgi中的</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>#!/usr/bin/env ruby</span></code></pre></td></tr></table></div></figure>
-
-<p>修改为</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>#!/usr/local/bin/ruby</span></code></pre></td></tr></table></div></figure>
-
-<p>然后将rcms上传到Lunarpages虚拟主机的根目录下，上传后的目录结构如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>/public_html
-</span><span class='line'>/www
-</span><span class='line'>/rcms</span></code></pre></td></tr></table></div></figure>
-
-<p>在cPanel中点击“Cron Jobs” -&gt; “Advanced (Unix Style)”进入Cron管理页面。</p>
-
-<p><img src="/uploads/lunarpages-cron-jobs.png" title="lunarpages-cron-jobs" ></p>
-
-<p>创建如下Cron指令（使用默认时间设置，指令会每分钟被执行一次）。</p>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// Cacl.cpp
+</span><span class='line'>DLLAPI int Sum(int a, int b)
+</span><span class='line'>{
+</span><span class='line'>    return a + b;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -766,82 +1012,107 @@
 <span class='line-number'>5</span>
 <span class='line-number'>6</span>
 <span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>cd /home/&lt;username&gt;
-</span><span class='line'>mv public_html public_html.bak
-</span><span class='line'>ln -s /home/&lt;username&gt;/rcms/public public_html
-</span><span class='line'>mkdir public_html/cgi-bin
-</span><span class='line'>chown -R username:&lt;username&gt; /home/&lt;username&gt;/rcms
-</span><span class='line'>chmod 755 /home/&lt;username&gt;/rcms
-</span><span class='line'>chmod 755 /home/&lt;username&gt;/rcms/public</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// Cacl.h
+</span><span class='line'>#ifdef CACL_EXPORTS
+</span><span class='line'>#define DLLAPI __declspec(dllexport)
+</span><span class='line'>#else
+</span><span class='line'>#define DLLAPI __declspec(dllimport)
+</span><span class='line'>#endif
+</span><span class='line'>
+</span><span class='line'>DLLAPI int Sum(int a, int b);</span></code></pre></td></tr></table></div></figure>
 
-<p>再填好接收执行结果的邮件地址，然后等个2-3分钟后查收邮件就可以了，在收到邮件后切记要删除上面创建的指令。</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// Client.cpp
+</span><span class='line'>DLLAPI int Sum(int a, int b);</span></code></pre></td></tr></table></div></figure>
 
-<p>现在就可以通过浏览器访问部署在Lunarpages上的Radiant了。</p>
+<p>为了显式链接到DLL，客户程序必须在运行时通过函数调显式加载DLL：</p>
 
-<p>如果你想让Radiant跑在类似<code>http://example.com/rcms</code>这样的域名下，那么可以将上面的指令替换成：</p>
+<ol>
+<li>调用LoadLibrary加载DLL和获取模块句柄；</li>
+<li>调用GetProcAddress获取指向客户程序要调用的每个导出函数的函数指针（由于客户程序是通过指针调用DLL的函数，编译器不生成外部引用，故无需与导入库链接）；</li>
+<li>使用完DLL后调用FreeLibrary释放资源。</li>
+</ol>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>cd /home/&lt;username&gt;/public_html
-</span><span class='line'>ln -s ../rcms/public rcms
-</span><span class='line'>chown -R username:&lt;username&gt; /home/&lt;username&gt;/rcms
-</span><span class='line'>chmod 755 /home/&lt;username&gt;/rcms</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// Client.cpp
+</span><span class='line'>HINSTANCE hDLL = LoadLibrary("demo");
+</span><span class='line'>if (hDLL != NULL)
+</span><span class='line'>{
+</span><span class='line'>    LPFNDLLFUNC1 lpfnDllFunc1 = GetProcAddress(hDLL, "Sum");
+</span><span class='line'>    if (lpfnDllFunc1 == NULL)
+</span><span class='line'>    {
+</span><span class='line'>        FreeLibrary(hDLL);
+</span><span class='line'>        return SOME_ERROR_CODE;
+</span><span class='line'>    }
+</span><span class='line'>    return lpfnDllFunc1(dwParam, uParam);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>如果Radiant不工作的话可以在Cron Jobs中使用下列指令检查出了什么问题。</p>
+<h3 id="客户程序如何找到dll">客户程序如何找到DLL</h3>
+
+<p>如果用LoadLibrary显式链接DLL的话，可以指定DLL的全路径名。如果没有指定路径名，或者使用了隐式链接，则系统将使用下面的搜索序列来定位DLL：</p>
+
+<ol>
+<li>包含客户可执行文件所在的目录；</li>
+<li>当前目录；</li>
+<li>Windows系统目录（可用GetSystemDirectory函数获取）；</li>
+<li>Windows目录（可用GetWindowsDirectory函数获取）；</li>
+<li>在Path环境变量里列出的目录（注意：不使用LIBPATH环境变量）。</li>
+</ol>
+
+<h3 id="导出dll函数">导出DLL函数</h3>
+
+<p>DLL文件的布局与EXE文件非常相似，但有一个重要差异：DLL文件包含导出表。导出表包含DLL导出到客户程序的每个函数的名称。只有导出表中的函数可由客户程序访问。DLL中的任何其它函数都是DLL私有的。通过使用带/EXPORTS选项的dumpbin工具，可以查看DLL的导出表。有两种方法可以从DLL导出函数：</p>
+
+<p>方法1：在定义中使用__declspec(dllexport)关键词。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>cd /home/&lt;username&gt;/rcms/public
-</span><span class='line'>chmod 777 dispatch.fcgi
-</span><span class='line'>./dispatch.fcgi
-</span><span class='line'>chmod 644 dispatch.fcgi</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// 导出函数
+</span><span class='line'>__declspec(dllexport) void __cdecl Function();
+</span><span class='line'>
+</span><span class='line'>// 导出类中的所有公共数据成员和成员函数
+</span><span class='line'>class __declspec(dllexport) CExampleExport : public CObject
+</span><span class='line'>{
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
+<p>方法2：在生成DLL时，创建一个后缀名为def的模块定义文件（如果希望按序号而不是按名称从DLL导出函数，则使用此方法）。</p>
 
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/running-mongrel-and-radiant-on-windows/">在Windows上面跑Mongrel和Radiant</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2008-04-16T16:16:41+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>4:16 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>安裝Rails、Mongrel和Radiant</p>
+<p>实例DLL和客户程序代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>gem install rails --include-dependencies
-</span><span class='line'>gem install mongrel --include-dependencies
-</span><span class='line'>gem install radiant --include-dependencies</span></code></pre></td></tr></table></div></figure>
-
-<p>建立Radiant项目</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>radiant --database mysql rcms</span></code></pre></td></tr></table></div></figure>
-
-<p>编辑数据库配置文件config/database.yml，填写连接数据库时的用户名和密码：</p>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// Cacl.h
+</span><span class='line'>#ifdef CACL_EXPORTS
+</span><span class='line'>#define DLLAPI __declspec(dllexport)
+</span><span class='line'>#else
+</span><span class='line'>#define DLLAPI __declspec(dllimport)
+</span><span class='line'>#endif
+</span><span class='line'>
+</span><span class='line'>DLLAPI int Sum(int a, int b);</span></code></pre></td></tr></table></div></figure>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -863,172 +1134,51 @@
 <span class='line-number'>18</span>
 <span class='line-number'>19</span>
 <span class='line-number'>20</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>development:
-</span><span class='line'>  adapter: mysql
-</span><span class='line'>  database: rcms_development
-</span><span class='line'>  username: root
-</span><span class='line'>  password: 123456
-</span><span class='line'>  host: localhost
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// Cacl.cpp
+</span><span class='line'>#include &lt;windows.h&gt;
+</span><span class='line'>#include "Cacl.h"
 </span><span class='line'>
-</span><span class='line'>test:
-</span><span class='line'>  adapter: mysql
-</span><span class='line'>  database: rcms_test
-</span><span class='line'>  username: root
-</span><span class='line'>  password: 123456
-</span><span class='line'>  host: localhost
+</span><span class='line'>BOOL APIENTRY DllMain(HANDLE hModule, DWORD reason, LPVOID lpReserved)
+</span><span class='line'>{
+</span><span class='line'>    switch (reason)
+</span><span class='line'>    {
+</span><span class='line'>        case DLL_PROCESS_ATTACH:
+</span><span class='line'>        case DLL_THREAD_ATTACH:
+</span><span class='line'>        case DLL_THREAD_DETACH:
+</span><span class='line'>        case DLL_PROCESS_DETACH:
+</span><span class='line'>            break;
+</span><span class='line'>    }
+</span><span class='line'>    return TRUE;
+</span><span class='line'>}
 </span><span class='line'>
-</span><span class='line'>production:
-</span><span class='line'>  adapter: mysql
-</span><span class='line'>  database: rcms_production
-</span><span class='line'>  username: root
-</span><span class='line'>  password: 123456
-</span><span class='line'>  host: localhost</span></code></pre></td></tr></table></div></figure>
-
-<p>在MySQL中创建数据库，因为是开发环境，所以创建的数据库名为rcms_development。</p>
-
-<p>进入rcms目录，在命令行下敲入以下命令创建数据表：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>rake development db:bootstrap</span></code></pre></td></tr></table></div></figure>
-
-<p>一切都准备好后，就可以启动Mongrel服务器了：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mongrel_rails start</span></code></pre></td></tr></table></div></figure>
-
-<p>不出意料的话，应该会看到如下图的信息。</p>
-
-<p><img src="/uploads/mongrel-rails.png" title="mongrel-rails" ></p>
-
-<p>如果在启动Mongrel时遇到下面的错误：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>!!! Path to log file not valid: log/mongrel.log
-</span><span class='line'>mongrel::start reported an error. Use mongrel_rails mongrel::start -h to get help.</span></code></pre></td></tr></table></div></figure>
-
-<p>可以通过指定应用目录来解决，因为Mongrel在创建log之前会先验证应用目录。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mongrel_rails start -c rcms</span></code></pre></td></tr></table></div></figure>
-
-<p>如果想把Mongrel作为Windows服务的形式启动，需要安装mongrel_service插件：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>gem install mongrel_service</span></code></pre></td></tr></table></div></figure>
-
-<p>注意：某些文档会叫你用gem install win32-service安装win32-service，但实际上不是很必要。因为在安装mongrel_service时系统会问你是否要安装win32-service。</p>
-
-<p>安装好后就可以创建Windows服务了：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mongrel_rails service::install -N rcms -c rcms -e development</span></code></pre></td></tr></table></div></figure>
-
-<p>其中-N指明service名称，-c指明Rails应用的目录，-e指启动模式。</p>
-
-<p>在“控制面版” -&gt; “管理工具” -&gt; “服务”中可以发现多了名为rcms的服务。如果要取消该服务，可以使用以下命令：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mongrel_rails service::remove -N rcms</span></code></pre></td></tr></table></div></figure>
-
-<p>启动和关闭该服务的命令是：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mongrel_rails service::start -N rcms
-</span><span class='line'>mongrel_rails service::stop -N rcms</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/backup-foxmail-mail-using-win32/">使用Win32备份Foxmail的邮件</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2008-04-13T07:38:52+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>13</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>7:38 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Foxmail是一个非常不错的邮件客户端，可惜在对邮箱内邮件的备份上做的不是很好，只能手工一封一封地将邮件导出，在邮件比较少时这样处理还可以应付，但假如有成百上千封邮件时还要这样处理显然是相当郁闷的。因此写了一个可以自动将某个邮箱中所有邮件导出为独立的eml格式邮件文件（该格式可以被OutLook邮件程序识别并打开）的小程序。</p>
-
-<p>在Foxmail的安装目录下有一个mail文件夹，该文件夹中的每个子目录分别对应着一个邮件账号。进入某个帐号对应的文件夹，可以发现文件夹中有以in.BOX、out.BOX、send.BOX、spam.BOX和trash.BOX等文件，它们分别对应于收件箱、发件箱、已发送邮件箱、垃圾邮件箱和废件箱。根据<a href="http://www.yesky.com/72/1663572.shtml">VC++实现Foxmail邮件的批量导出</a>一文可以知道每个邮件头以下面的16个字符开始：</p>
+</span><span class='line'>DLLAPI int Sum(int a, int b)
+</span><span class='line'>{
+</span><span class='line'>    return a + b;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>0x10 0x10 0x10 0x10 0x10 0x10 0x10
-</span><span class='line'>0x11 0x11 0x11 0x11 0x11 0x11
-</span><span class='line'>0x53 0x0D 0x0A</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// Client.cpp
+</span><span class='line'>#include &lt;stdio.h&gt;
+</span><span class='line'>#include "Cacl.h"
+</span><span class='line'>
+</span><span class='line'>int main(int argc, char* argv[])
+</span><span class='line'>{
+</span><span class='line'>    printf("Sum = %d\n", Sum(5, 3));
+</span><span class='line'>    return 0;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>知道了邮箱所对应存储文件的格式后，以下的事情就变的简单了。</p>
+<h3 id="如何调试dll">如何调试DLL</h3>
 
-<ol>
-<li>获取要备份的文件夹路径；</li>
-<li>遍历该文件夹，找出以BOX为后缀名的邮箱存储文件；</li>
-<li>分析存储文件，将邮件导出为eml格式的邮件文本。</li>
-</ol>
-
-<p>下面是需要用到的一些Win32 API函数：</p>
-
-<p>创建非模态对话框</p>
-
-<ul>
-<li>CreateDialog</li>
-</ul>
-
-<p>获取目录信息</p>
-
-<ul>
-<li>BROWSEINFO</li>
-<li>LPITEMIDLIST</li>
-<li>SHBrowseForFolder</li>
-<li>SHGetPathFromIDList</li>
-</ul>
-
-<p>遍历某个目录下的文件</p>
-
-<ul>
-<li>SetCurrentDirectory</li>
-<li>FindFileFirst</li>
-<li>FindNextFile</li>
-<li>FindClose</li>
-</ul>
-
-<p>备份邮件</p>
-
-<ul>
-<li>CreateDirectory</li>
-<li>CreateFile</li>
-<li>ReadFile</li>
-<li>WriteFile</li>
-<li>CloseHandle</li>
-</ul>
-
-<p>还有，如果在对话框模版里用到了不一般的控件(比如说进度条)，那么还需要</p>
-
-<ol>
-<li>引用头文件commctrl.h；</li>
-<li>并链接comctl32.lib；</li>
-<li>在WinMain中创建对话框前调用InitCommonControls()方法。</li>
-</ol>
-
-<p><a href="/uploads/box2eml.zip" title="box2eml.zip">代码下载</a></p>
+<p>调试DLL很容易，只要从DLL工程启动调试器即可。第一次这样做的时候，调试器会请求给出客户EXE程序的路径。之后，每次从调试器运行DLL时，调试器会自动装入客户EXE程序，而EXE用搜索序列找到DLL。</p>
 </div>
   
   
@@ -1041,7 +1191,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/tips-for-windows-server-2008-configuration/">Windows Server 2008配置技巧</a></h1>
+      <h1 class="entry-title"><a href="/blog/stored-procedure-batch-replace-value-of-a-field-with-another-field-mysql-version/">批量更新表中某个字段的值到另一个字段的存储过程（MySQL版）</a></h1>
     
     
       <p class="meta">
@@ -1050,121 +1200,14 @@
 
 
 
-<time class='entry-date' datetime='2008-04-11T13:20:39+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>11</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>1:20 pm</span></time>
+<time class='entry-date' datetime='2007-06-03T06:16:16+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2007</span></span> <span class='time'>6:16 am</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><h3 id="如何取消登录时要按ctrl-alt-delete组合键">如何取消登录时要按Ctrl+Alt+Delete组合键</h3>
-
-<p>开始 -&gt; 运行 -&gt; gpedit.msc -&gt; 计算机配置 -&gt; Windows设置 -&gt; 安全设置 -&gt; 本地策略，点击“安全选项”，在右侧的框内找到“交互式登录：不要按CTRL+ALT+DEL” -&gt; 启用。</p>
-
-<h3 id="如何取消关机时出现的关机理由选择项">如何取消关机时出现的关机理由选择项</h3>
-
-<p>开始 -&gt; 运行 -&gt; gpedit.msc -&gt; 计算机配置 -&gt; 管理模板，点击“系统”，在右侧的框内找到“显示关机事件跟踪” -&gt; 禁用。</p>
-
-<h3 id="如何禁止远程用户的匿名访问">如何禁止远程用户的匿名访问</h3>
-
-<p>开始 -&gt; 运行 -&gt; regedit，定位到HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa，修改右侧框内restrictanonymous的值为1。</p>
-
-<h3 id="如何在退出系统时清除最近打开的文档的历史">如何在退出系统时清除最近打开的文档的历史</h3>
-
-<p>开始 -&gt; 运行 -&gt; gpedit.msc -&gt; 用户配置 -&gt; 管理模板 -&gt; 开始菜单和任务栏 -&gt; 在右侧的框内找到“退出系统时清除最近打开文档的历史” -&gt; 启用。</p>
-
-<h3 id="如何取消必须输入密码登录系统">如何取消必须输入密码登录系统</h3>
-
-<p>开始 -&gt; 运行 -&gt; rundll32 netplwiz.dll,UsersRunDll，选中要自动登陆的账户，取消“要使用本机，用户必须输入用户名密码”，输入该帐户的密码即可（前提是要关闭UAC）。</p>
-
-<h3 id="如何关闭uac">如何关闭UAC</h3>
-
-<p>控制面板 -&gt; 用户帐户 -&gt; 打开或关闭用户账户控制 -&gt; 取消“使用用户账户控制(UAC)帮助保护您的计算机”。</p>
-
-<h3 id="如何关闭ie增强安全配置">如何关闭IE增强安全配置</h3>
-
-<p>控制面板 -&gt; 管理工具 -&gt; 服务器管理器 -&gt; 在右侧的框内找到“配置 IE SEC”并打开 -&gt; 禁用。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-to-switch-between-http-and-https-in-web-application/">如何在Web应用的HTTP与HTTPS间的相互切换</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2008-03-27T16:26:53+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>27</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>4:26 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>对于HTTPS和HTTP的不同请求，Web容器会生成两个不同的session对象。因此，如果在同一个Web应用中只有部分页面使用SSL，要保证使用SSL的页面与不使用SSL的页面间的相互切换（也就是HTTPS请求与HTTP请求间的切换）会话保持连续，那么可以通过在访问的URL中传递sessionId来实现，也就是说在进入或退出HTTPS的URL上绑定一个sessionId。比如从HTTP切换到HTTPS时，URL为<code>https://example.com/login.do;jsessionid=&lt;%=session.getId()%&gt;</code>，从HTTPS切换到HTTP时为<code>http://example.com/welcome.do;jsessionid=&lt;%=session.getId()%&gt;</code>。这样Web容器会根据这个sessionId获取session对象，而不是生成新的session对象。就可以保证HTTP和HTTPS切换时会话不变。</p>
-
-<p>由于在URL上绑定的sessionId容易被窃取，为了保证用户安全，会话认证时需要结合客户端IP地址。即当用户登录后，通过session.setAttribute(&quot;clientIp&quot;, request.getRemoteAddr())保存客户端的IP地址，在后继认证会话的合法性时判断客户端的IP是否是原先存储在session对象的clientIP属性的IP地址，如果不是则该会话是非法会话。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/features-i-want-to-see-in-java7/">希望能在Java 7中看到的特性</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2008-03-18T13:34:33+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>1:34 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>1、支持@前缀的字符串，这样就不必再为到底是写几个反斜杠绞尽脑汁了。</p>
-
-<p>2、支持String类型的switch。</p>
-
-<p>3、支持静态equals方法的String类或扩展方法（Extension methods）。不明白为什么Java总是使劲地支持一些丑陋又复杂的语法。像比较两个字符串就偏偏要写成这种样式：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if (str1 != null && !str1.equals(str2))</span></code></pre></td></tr></table></div></figure>
-
-<p>难道就不能写成下面的格式吗？</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if (str1 != str2)</span></code></pre></td></tr></table></div></figure>
-
-<p>或</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if (!String.equals(str1, str2))</span></code></pre></td></tr></table></div></figure>
-
-<p>其中str1或str2中任何一个值为null时返回false。</p>
-
-<p>4、对泛型进行一些适当的修正。比如：</p>
+  <div class="entry-content"><p>对博客做了一些修改，需要将entries表中的updatetime字段值替换成pubtime字段的值，为此写了一个MySQL存储过程，其中涉及游标的使用：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1183,78 +1226,140 @@
 <span class='line-number'>15</span>
 <span class='line-number'>16</span>
 <span class='line-number'>17</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class GenericsTest {
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>DELIMITER //
 </span><span class='line'>
-</span><span class='line'>//    public void output(List&lt;String&gt; list) {
-</span><span class='line'>//        System.out.println("List&lt;String&gt;");
-</span><span class='line'>//    }
+</span><span class='line'>CREATE PROCEDURE sp_batch_replace_field_value_with_another()
+</span><span class='line'>BEGIN
+</span><span class='line'>    DECLARE p_id INT;
+</span><span class='line'>    DECLARE p_pubtime DATETIME;
+</span><span class='line'>    DECLARE p_done BOOL;
+</span><span class='line'>    DECLARE p_cursor CURSOR FOR SELECT id, pubtime FROM entries;
+</span><span class='line'>    DECLARE CONTINUE HANDLER FOR NOT FOUND SET p_done = true;
 </span><span class='line'>
-</span><span class='line'>    public void output(List&lt;Object&gt; list) {
-</span><span class='line'>        System.out.println("List&lt;Object&gt;");
-</span><span class='line'>    }
+</span><span class='line'>    OPEN p_cursor;
+</span><span class='line'>        REPEAT
+</span><span class='line'>            FETCH p_cursor INTO p_id, p_pubtime;
+</span><span class='line'>            UPDATE entries SET updatetime = p_pubtime WHERE id = p_id;
+</span><span class='line'>            UNTIL p_done = true
+</span><span class='line'>        END REPEAT;
+</span><span class='line'>    CLOSE p_cursor;
+</span><span class='line'>END//
 </span><span class='line'>
-</span><span class='line'>    public static void main(String[] args) {
-</span><span class='line'>        GenericsTest gt = new GenericsTest();
-</span><span class='line'>
-</span><span class='line'>        gt.output(new ArrayList&lt;Object&gt;());
-</span><span class='line'>        gt.output(new ArrayList&lt;String&gt;());    // 竟然不能通过编译，想不通！
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>DELIMITER ;</span></code></pre></td></tr></table></div></figure>
 
-<p>5、可以通过[]来访问List和Map。然后，下面的代码</p>
+<p>第一次在SQLyog中写存储过程，在修改了存储过程后竟然不知道如何保存。点击File -&gt; Save却是保存为另外一个文件，而不是直接保存修改的存储过程。经过多番尝试后发现按F5键就可以了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/comsybasejdbcsybsqlexception-the-parameter-in-the-procedure-was-not-declared-as-an-output-parameter/">com.sybase.jdbc.SybSQLException: The parameter '@user' in the procedure 'sp_adm_chk_lvl' was not declared as an OUTPUT parameter</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-06-01T17:33:13+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>1</span><span class='date-suffix'>st</span>, <span class='date-year'>2007</span></span> <span class='time'>5:33 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>运行环境：WebLogic 8.16 + Sybase ASE 12.5</p>
+
+<p>问题：The New, Save from File menu are grayed out</p>
+
+<p>分析打印出来的日志文件找到有以下异常出现：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>List content = new LinkedList(10);
-</span><span class='line'>content.add(0, "Fred");
-</span><span class='line'>content.add(1, "Barney");
-</span><span class='line'>String name = content.get(0);</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>org.springframework.jdbc.UncategorizedSQLException: CallableStatementCallback
+</span><span class='line'>    ; uncategorized SQLException for SQL [{? = call sp_adm_chk_lvl(?, ?, ?, ?, ?, ?, ?)}]
+</span><span class='line'>    ; SQL state [ZZZZZ]; error code [276]
+</span><span class='line'>    ; The parameter '@user' in the procedure 'sp_adm_chk_lvl' was not declared as an OUTPUT parameter.
+</span><span class='line'>    ; nested exception is com.sybase.jdbc.SybSQLException: The parameter '@user' in the procedure 'sp_adm_chk_lvl' was not declared as an OUTPUT parameter.</span></code></pre></td></tr></table></div></figure>
 
-<p>就可以写成</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>List content = new LinkedList(10);
-</span><span class='line'>content[0] = "Fred";
-</span><span class='line'>content[1] = "Barney";
-</span><span class='line'>String name = content[0];</span></code></pre></td></tr></table></div></figure>
-
-<p>还有可能的就是允许为列表使用数组初始化程序语法。例如：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>LinkedList content = {"Fred", "Barney", "Wilma", "Betty"};</span></code></pre></td></tr></table></div></figure>
-
-<p>6、添加decimal或money关键字作为原生类型，或者使BigDecimal支持+，-，*，/等运算符。处理金融相关的数据时总是要使用到BigDecimal类型。可由于BigDecimal不支持运算符，在比较大小时就会很繁琐。例如，比较两个金额的大小：</p>
+<p>搜索到一篇出现类似问题的文章 <a href="http://www.ibm.com/support/docview.wss?uid=swg21174150">http://www.ibm.com/support/docview.wss?uid=swg21174150</a> ，其中有这么一段文字：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>BigDecimal zero = new BigDecimal(0);
-</span><span class='line'>if (amount.compareTo(zero) &gt; 0) {
-</span><span class='line'>  return true;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>If you call CallableStatement.clearParameters() when the statement has a ?=rpc return value,
+</span><span class='line'>we forget that there is a return value and the next time the rpc is executed we send too many
+</span><span class='line'>input parameters, and they are all shifted to the right. This problem has been corrected,
+</span><span class='line'>and jConnect now has the expected behavior for the clearParameters() method.</span></code></pre></td></tr></table></div></figure>
 
-<p>7、支持ref/out关键字或支持返回Tuples。例如：</p>
+<p>因此猜测菜单变灰的问题是由于使用了不正确的JDBC Driver版本。在Weblogic Console发现Connection Pools中Driver Name是com.sybase.jdbc.SybDriver，而正确的设置应该是com.sybase.jdbc2.jdbc.SybDriver，修改Driver Name后New, Save菜单项果然可以正常使用了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/union-lotto-simulation-ernie/">双色球（Union Lotto）模拟摇奖器</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-05-30T18:26:49+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>30</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>6:26 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>双色球基本规则：</p>
+
+<ol>
+<li>彩票投注区分为红色球号码区和蓝色球号码区；</li>
+<li>每注投注号码由6个红色球号码和1个蓝色球号码组成。红色球号码从1-33中选择；蓝色球号码从1-16中选择；</li>
+<li>摇奖时先摇出6个红色球号码，再摇出1个蓝色球号码，摇出的红色球号码按从小到大的顺序和蓝色球号码一起公布。</li>
+</ol>
+
+<p>双色球模拟摇奖器代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>(int, int, int) transform(int x, int y, int z)
-</span><span class='line'>
-</span><span class='line'>(r, g, b) = transform(x, y, z);
-</span><span class='line'>(l, a, b) = transform(transform(x, y, z));</span></code></pre></td></tr></table></div></figure>
-
-<p>当某个方法中有多个返回值或方法需要修改传递进来的String参数并返回修改后的值时，当前的Java语法处理起来就会比较麻烦。</p>
-
-<p>8、重新整理简化I/O和Collection中的API，使之更易使用。</p>
-
-<p>9、简单而强大的Date和Time实现，将java.util包中的Date和Calendar类合并成一个。</p>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># union_lotto.rb
+</span><span class='line'>red_balls = Array.new(33) {|i| i + 1}
+</span><span class='line'>blue_balls = Array.new(16) {|i| i + 1}
+</span><span class='line'>1.upto(6) do
+</span><span class='line'>  print red_balls.delete_at(rand(red_balls.length)), ' '
+</span><span class='line'>end
+</span><span class='line'>puts '- ' + blue_balls.delete_at(rand(blue_balls.length)).to_s</span></code></pre></td></tr></table></div></figure>
 </div>
   
   
@@ -1279,23 +1384,23 @@
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/the-mythical-10x-programmer/">神秘的10x程序员</a>
       </li>
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/learn-anything-faster-with-the-feynman-technique/">费曼技巧：最好的学习方法</a>
       </li>
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/code-coverage-100-percent-tragedy/">100%代码覆盖率的悲剧</a>
       </li>
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/unconventional-way-of-learning-a-new-programming-language/">学习新编程语言的非传统方式</a>
       </li>
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/the-impact-github-is-having-on-your-software-career-right-now/">GitHub对软件职业生涯的影响</a>
       </li>
     
   </ul>
@@ -1309,9 +1414,9 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 145%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 141%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 133%" href="/tags/android/">Android</a>
+<a style="font-size: 132%" href="/tags/android/">Android</a>
 <a style="font-size: 103%" href="/tags/c-plus-plus/">C++</a>
 <a style="font-size: 106%" href="/tags/css/">CSS</a>
 <a style="font-size: 108%" href="/tags/crack/">Crack</a>

@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="每个程序猿家里都有一堆技术书籍，偶也不例外，因此想写个Android应用来管理自己的藏书以及想买的书籍。在网上找到marshal的识别图书ISBN号并输出查询结果的示例和完善图书查询原型，增加收藏夹功能两篇文章，写的非常不错，还提供源代码。下载代码研究后发现已基本具备了想要的功能， &hellip;">
+  <meta name="description" content="HTTP Response Header有个Content-Disposition参数，该参数的目的是为了在客户端另存文件时提供一个建议的文件名。将它的值设置为attachment后，浏览器就会老老实实地显示另存为对话框，如果这个值设成inline， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -79,7 +79,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/manage-books-by-scanning-isbn-barcode/">扫描ISBN条码实现藏书管理</a></h1>
+      <h1 class="entry-title"><a href="/blog/how-to-avoid-browser-open-the-file-automatically-when-click-link-to-download-file/">如何避免点击链接下载文件时浏览器自动打开文件</a></h1>
     
     
       <p class="meta">
@@ -88,176 +88,26 @@
 
 
 
-<time class='entry-date' datetime='2013-04-25T12:17:14+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>25</span><span class='date-suffix'>th</span>, <span class='date-year'>2013</span></span> <span class='time'>12:17 pm</span></time>
+<time class='entry-date' datetime='2012-06-03T07:26:02+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2012</span></span> <span class='time'>7:26 am</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>每个程序猿家里都有一堆技术书籍，偶也不例外，因此想写个Android应用来管理自己的藏书以及想买的书籍。在网上找到marshal的<a href="http://marshal.easymorse.com/archives/2745">识别图书ISBN号并输出查询结果的示例</a>和<a href="http://marshal.easymorse.com/archives/2756">完善图书查询原型，增加收藏夹功能</a>两篇文章，写的非常不错，还提供源代码。下载代码研究后发现已基本具备了想要的功能，决定在它的基础上做些修改供自己使用。</p>
+  <div class="entry-content"><p>HTTP Response Header有个Content-Disposition参数，该参数的目的是为了在客户端另存文件时提供一个建议的文件名。将它的值设置为attachment后，浏览器就会老老实实地显示另存为对话框，如果这个值设成inline，则无论怎样浏览器都会自动尝试用已知关联的程序打开文件。</p>
 
-<p>把原来uses-sdk的minSdkVersion改成了9，增加android:targetSdkVersion=&quot;17&quot;。然后使用手机测试程序时发现，在连接网络时后台会抛出android.os.NetworkOnMainThreadException，并且应用崩溃打不开。通过查阅相关资料了解到，自从Android 2.3之后，系统增加了一个类StrictMode。这个类对网络的访问方式进行了一定的改变。官方文档给出了这个类设置的目的：</p>
+<p>注意：在Firefox中需要把filename用双引号包起来才能得到想要的文件名，不然如果含有空格就会丢掉空格后面的部分，而IE会把空格转为下划线。</p>
 
-<blockquote>
-<p>StrictMode is a developer tool which detects things you might be doing by accident and brings them to your attention so you can fix them.</p>
-
-<p>StrictMode is most commonly used to catch accidental disk or network access on the application&#39;s main thread, where UI operations are received and animations take place. Keeping disk and network operations off the main thread makes for much smoother, more responsive applications. By keeping your application&#39;s main thread responsive, you also prevent ANR dialogs from being shown to users.</p>
-
-<p>Note that even though an Android device&#39;s disk is often on flash memory, many devices run a filesystem on top of that memory with very limited concurrency. It&#39;s often the case that almost all disk accesses are fast, but may in individual cases be dramatically slower when certain I/O is happening in the background from other processes. If possible, it&#39;s best to assume that such things are not fast.</p>
-</blockquote>
-
-<p>因为marshal把访问网络的代码直接放到UI线程中，造成和主线程的首要工作——UI交互——相矛盾。解决这类问题很容易，把访问网络的代码放到AsyncTask中就行了。</p>
-
-<p>接着发现豆瓣API查询返回的是500错误，在浏览器上访问却又正常，后来给HttpClient加上Agent头就没问题了，不知道是不是期间豆瓣的API在实现上作了改变。</p>
+<p>Java设置header代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>HttpClient client = new DefaultHttpClient();
-</span><span class='line'>String agent = System.getProperty("http.agent");
-</span><span class='line'>client.getParams().setParameter(CoreProtocolPNames.USER_AGENT, agent);</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>res.addHeader("Content-Disposition", "attachment; filename=" + res.encodeURL(filename));</span></code></pre></td></tr></table></div></figure>
 
-<p>解析豆瓣XML查询结果的代码：</p>
+<p>Ruby设置header代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
-</span><span class='line'>factory.setNamespaceAware(true);
-</span><span class='line'>XmlPullParser parser = factory.newPullParser();
-</span><span class='line'>parser.setInput(inputStream, "utf-8");
-</span><span class='line'>
-</span><span class='line'>Book book = new Book();
-</span><span class='line'>book.setIsbn(getIntent().getExtras().getString("ISBN"));
-</span><span class='line'>
-</span><span class='line'>int eventType = parser.getEventType();
-</span><span class='line'>while (eventType != XmlPullParser.END_DOCUMENT) {
-</span><span class='line'>    switch (eventType) {
-</span><span class='line'>    case XmlPullParser.START_TAG:
-</span><span class='line'>        if ("link".equals(parser.getName())
-</span><span class='line'>                && "image".equals(parser.getAttributeValue(null, "rel"))) {
-</span><span class='line'>            book.setImageUrl(parser.getAttributeValue(null, "href"));
-</span><span class='line'>            eventType = parser.next();
-</span><span class='line'>        } else if ("summary".equals(parser.getName())) {
-</span><span class='line'>            book.setSummary(parser.nextText());
-</span><span class='line'>        } else if ("attribute".equals(parser.getName())) {
-</span><span class='line'>            String name = parser.getAttributeValue(null, "name");
-</span><span class='line'>            if ("title".equals(name)) {
-</span><span class='line'>                book.setTitle(parser.nextText());
-</span><span class='line'>            } else if ("author".equals(name)) {
-</span><span class='line'>                book.setAuthor(parser.nextText());
-</span><span class='line'>            } else if ("publisher".equals(name)) {
-</span><span class='line'>                book.setPublisher(parser.nextText());
-</span><span class='line'>            }
-</span><span class='line'>        }
-</span><span class='line'>        break;
-</span><span class='line'>    case XmlPullParser.END_TAG:
-</span><span class='line'>        break;
-</span><span class='line'>    }
-</span><span class='line'>    eventType = parser.next();
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>然后，然后就是结果页面不显示图书信息。想要找到原因，肿么办？看来要调试WebView了！<a href="http://developer.android.com/guide/webapps/debugging.html">http://developer.android.com/guide/webapps/debugging.html</a> 告诉了我们如何调试。</p>
-
-<p>首先在WebView上设置setWebChromeClient方法：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>webView.setWebChromeClient(new WebChromeClient() {
-</span><span class='line'>    public void onConsoleMessage(String message,
-</span><span class='line'>            int lineNumber, String sourceID) {
-</span><span class='line'>        Log.d(TAG, message + " -- From line "
-</span><span class='line'>                + lineNumber + " of " + sourceID);
-</span><span class='line'>    }
-</span><span class='line'>});</span></code></pre></td></tr></table></div></figure>
-
-<p>然后在JavaScript脚本中使用以下方法就可以在logcat中看到调试信息了。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>console.log(String)
-</span><span class='line'>console.info(String)
-</span><span class='line'>console.warn(String)
-</span><span class='line'>console.error(String)</span></code></pre></td></tr></table></div></figure>
-
-<p>重新运行程序，果然在logcat中看到报如下错误：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Uncaught TypeError: Object [object Object] has no method 'xxx'</span></code></pre></td></tr></table></div></figure>
-
-<p>搜索后在Stack Overflow找到了<a href="http://stackoverflow.com/questions/14031635/android-4-2-1-webview-and-javascript-interface-breaks">问题的答案</a>（Stack Overflow真的非常不错，问题的回答都非常详尽）。<a href="http://developer.android.com/guide/webapps/webview.html#BindingJavaScript">http://developer.android.com/guide/webapps/webview.html#BindingJavaScript</a> 是官方文档的解释。</p>
-
-<p>解决方法就是在要被JavaScript调用的方法上加@JavascriptInterface注解：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class Book {
-</span><span class='line'>
-</span><span class='line'>    @JavascriptInterface
-</span><span class='line'>    public String getAuthor() {
-</span><span class='line'>        return author;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void setAuthor(String author) {
-</span><span class='line'>        if (this.author != null) {
-</span><span class='line'>            this.author += ", " + author;
-</span><span class='line'>        } else {
-</span><span class='line'>            this.author = author;
-</span><span class='line'>        }
-</span><span class='line'>    }</span></code></pre></td></tr></table></div></figure>
-
-<p>代码下载：<a href="https://github.com/dohkoos/Bookly">https://github.com/dohkoos/Bookly</a></p>
+</pre></td><td class='code'><pre><code class=''><span class='line'>headers['Content-Disposition'] = "attachment; filename=#{filename}"</span></code></pre></td></tr></table></div></figure>
 </div>
   
   
@@ -270,7 +120,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/the-proper-way-to-draw-rounded-corners/">绘制圆角的正确方法</a></h1>
+      <h1 class="entry-title"><a href="/blog/how-to-avoid-the-project-is-always-90-percent-done/">如何避免项目总是完成90%</a></h1>
     
     
       <p class="meta">
@@ -279,36 +129,26 @@
 
 
 
-<time class='entry-date' datetime='2013-04-11T14:59:45+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>11</span><span class='date-suffix'>th</span>, <span class='date-year'>2013</span></span> <span class='time'>2:59 pm</span></time>
+<time class='entry-date' datetime='2012-05-19T14:23:25+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>19</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>2:23 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>英文原文：<a href="http://usabilitypost.com/2009/01/26/the-proper-way-to-draw-rounded-corners/">http://usabilitypost.com/2009/01/26/the-proper-way-to-draw-rounded-corners/</a></p>
+  <div class="entry-content"><p>程序员经常会说“功能已经基本完成，接下来只需要花点时间进行扫尾工作即可，但这些基本都是些小事情，我已经完成了90%。”但实际情况是项目进度总是延迟。这里最最根本的问题是什么？这个程序员并没有一个清单，把自己要做的所有事情都列出来。这就意味着，即使他坚信自己已经完成90%的工作，他还是不知道这个项目什么时候可以做完，他的时间表是没有真实依据的。</p>
 
-<p>在网络上，我已经注意到当人们在他们的设计中实现圆角时犯了很多同样的错误。因为某些原因，当有另外一个圆角在它里面的时候，这个圆角会带来一个问题—无论是有一个围绕周围的边界，还是另一个圆角形状坐落在一个圆角形状内。</p>
+<p>一个好的软件项目经理的任务就是，鼓励并且强制要求程序员创建一张他们所要做的全部事情的列表。然后再为其中的每一项列出子项，并且尽可能把所有的子项都加进来。一旦你拥有了这么一个包含所有事项的列表，你就可以开始估算这个任务需要花费多少时间了。</p>
 
-<p>这里是我要说的：</p>
+<p>以下是避免“总是完成90%”问题的发生的几点建议：</p>
 
-<p><img src="/uploads/bad-corner.png" title="bad-corner" ></p>
-
-<p>我看到了很多这种类型的圆角。你可以看到圆角的半径和内圆角的是相同的。这是错误的，因为如果你保持相同半径，两个拐角之间的空间量不会自始至终相等。</p>
-
-<p>下面是相等间距看起来的样子：</p>
-
-<p><img src="/uploads/good-corner.png" title="good-corner" ></p>
-
-<p>这是正确的做法。有什么不同？内角的半径被减小了。好吧，但你怎么知道半径应该有多大？这很简单—如果你把外面的圆角想象成一个圆形，你可以看到它的圆心在哪里。</p>
-
-<p><img src="/uploads/corner-center.png" title="corner-center" ></p>
-
-<p>把这个圆心同样地作为内角的圆心，你就会得到内角的半径。使用这种方法将确保两个形状之间的完美契合。</p>
-
-<p><img src="/uploads/good-corner-ruler.png" title="good-corner-ruler" ></p>
-
-<p>现在你知道了吧？这是做多个圆角彼此包含的正确办法。当然，不需要你使用精确的圆心—有时为了设计良好还需要你移动一点点。但请不要仅仅把相同的圆角向内移动—这是绝对错误的。</p>
+<ol>
+<li>把项目中所有要做的事情全部罗列出来做成列表。</li>
+<li>估算这个列表中每一项所需要花费的时间。这种最初的估算可以帮助你知道整个项目大致要花费多少时间。</li>
+<li>如果列表中有一项的时间花费超过1天，则把这项拆分成若干小项。这种将大任务拆分成小任务的方式是解决“总是完成90%”问题的关键步骤。</li>
+<li>使用一种呈现任务状态的方式，以便那些感兴趣的人可以了解项目进度。</li>
+<li>既然你已经拥有很多小的任务，并且这些任务所消耗的时间都在1天以内，你就可以每天追踪自己的任务完成情况。</li>
+</ol>
 </div>
   
   
@@ -321,7 +161,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/page-layout-using-sitemesh/">使用SiteMesh做网页布局</a></h1>
+      <h1 class="entry-title"><a href="/blog/notes-rewrite-generator-from-rails-2x-to-rails-3x/">改写Rails 2.x generator到Rails 3.x时的一些记录</a></h1>
     
     
       <p class="meta">
@@ -330,636 +170,47 @@
 
 
 
-<time class='entry-date' datetime='2013-04-09T08:18:33+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>9</span><span class='date-suffix'>th</span>, <span class='date-year'>2013</span></span> <span class='time'>8:18 am</span></time>
+<time class='entry-date' datetime='2012-05-03T07:13:58+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2012</span></span> <span class='time'>7:13 am</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>SiteMesh是一个基于GoF的Decorator模式，用于页面布局的框架。能帮助我们在由大量页面构成的项目中创建一致的页面布局和外观。</p>
+  <div class="entry-content"><p>因为有个基于Rails 2.x的项目用到了<a href="https://github.com/jsboulanger/feedback">feedback</a>插件，在把项目迁移到Rails 3.x版本后，需要让feedback也支持Rails 3.x。但是原作者早已不再更新该插件，所以只能自己动手。花了两天时间查找资料，修改代码，终于完成。</p>
 
-<p>这里我们将会把它整合到JBookShelf里去。要和Struts 2整合，先在pom.xml添加以下插件，该插件会将依赖的SiteMesh也一并包含到项目中。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;dependency&gt;
-</span><span class='line'>    &lt;groupId&gt;org.apache.struts&lt;/groupId&gt;
-</span><span class='line'>    &lt;artifactId&gt;struts2-sitemesh-plugin&lt;/artifactId&gt;
-</span><span class='line'>    &lt;version&gt;2.3.12&lt;/version&gt;
-</span><span class='line'>&lt;/dependency&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>将web.xml配置中原来的</p>
+<p>Rails 3.x中生成generator可用下面的命令：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;filter&gt;
-</span><span class='line'>    &lt;filter-name&gt;struts2&lt;/filter-name&gt;
-</span><span class='line'>    &lt;filter-class&gt;
-</span><span class='line'>        org.apache.struts2.dispatcher.ng.filter.StrutsPrepareAndExecuteFilter
-</span><span class='line'>    &lt;/filter-class&gt;
-</span><span class='line'>&lt;/filter&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;filter-mapping&gt;
-</span><span class='line'>    &lt;filter-name&gt;struts2&lt;/filter-name&gt;
-</span><span class='line'>    &lt;url-pattern&gt;/*&lt;/url-pattern&gt;
-</span><span class='line'>&lt;/filter-mapping&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>改成</p>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rails g generator feedback_form
+</span><span class='line'>      create  lib/generators/feedback_form
+</span><span class='line'>      create  lib/generators/feedback_form/feedback_form_generator.rb
+</span><span class='line'>      create  lib/generators/feedback_form/USAGE
+</span><span class='line'>      create  lib/generators/feedback_form/templates</span></code></pre></td></tr></table></div></figure>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;filter&gt;
-</span><span class='line'>    &lt;filter-name&gt;struts-prepare&lt;/filter-name&gt;
-</span><span class='line'>    &lt;filter-class&gt;org.apache.struts2.dispatcher.ng.filter.StrutsPrepareFilter&lt;/filter-class&gt;
-</span><span class='line'>&lt;/filter&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;filter&gt;
-</span><span class='line'>    &lt;filter-name&gt;sitemesh&lt;/filter-name&gt;
-</span><span class='line'>    &lt;filter-class&gt;com.opensymphony.sitemesh.webapp.SiteMeshFilter&lt;/filter-class&gt;
-</span><span class='line'>&lt;/filter&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;filter&gt;
-</span><span class='line'>    &lt;filter-name&gt;struts-execute&lt;/filter-name&gt;
-</span><span class='line'>    &lt;filter-class&gt;org.apache.struts2.dispatcher.ng.filter.StrutsExecuteFilter&lt;/filter-class&gt;
-</span><span class='line'>&lt;/filter&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;filter-mapping&gt;
-</span><span class='line'>    &lt;filter-name&gt;struts-prepare&lt;/filter-name&gt;
-</span><span class='line'>    &lt;url-pattern&gt;/*&lt;/url-pattern&gt;
-</span><span class='line'>&lt;/filter-mapping&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;filter-mapping&gt;
-</span><span class='line'>    &lt;filter-name&gt;sitemesh&lt;/filter-name&gt;
-</span><span class='line'>    &lt;url-pattern&gt;/*&lt;/url-pattern&gt;
-</span><span class='line'>&lt;/filter-mapping&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;filter-mapping&gt;
-</span><span class='line'>    &lt;filter-name&gt;struts-execute&lt;/filter-name&gt;
-</span><span class='line'>    &lt;url-pattern&gt;/*&lt;/url-pattern&gt;
-</span><span class='line'>&lt;/filter-mapping&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>这里要注意过滤器的位置。SiteMesh过滤器必须在StrutsPrepareFilter之后和StrutsExecuteFilter之前，否则在SiteMesh的修饰器页面中将访问不到ActionContext。这是因为Struts 2的所有值是保存在Stack Context或者ValueStack中的。默认情况下，某个过滤器一旦访问了该Stack Context或ValueStack，里面对应的值会被清洗掉。如果先使用Struts 2的StrutsPrepareAndExecuteFilter来过滤用户请求，则SiteMesh的过滤器将无法取得Stack Context或者ValueStack中的数据。为了解决这个问题，Struts 2提供了StrutsPrepareFilter和StrutsExecuteFilter类（在2.1.3版本前是ActionContextCleanUp和FilterDispatcher），通过它们协同来确保SiteMesh正常工作。</p>
-
-<p>在WEB-INF下添加decorators.xml文档：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
-</span><span class='line'>&lt;decorators defaultdir="/layouts"&gt;
-</span><span class='line'>    &lt;excludes&gt;
-</span><span class='line'>        &lt;pattern&gt;/stylesheets/*&lt;/pattern&gt;
-</span><span class='line'>        &lt;pattern&gt;/javascripts/*&lt;/pattern&gt;
-</span><span class='line'>        &lt;pattern&gt;/images/*&lt;/pattern&gt;
-</span><span class='line'>    &lt;/excludes&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;decorator name="application" page="application.jsp"&gt;
-</span><span class='line'>        &lt;pattern&gt;/*&lt;/pattern&gt;
-</span><span class='line'>    &lt;/decorator&gt;
-</span><span class='line'>&lt;/decorators&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>stylesheets、javascripts、images目录下的内容是不需要被修饰的，可以把它们放到execludes块中排除掉。</p>
-
-<p>新建/layouts/application.jsp模版页：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%@ taglib uri="/struts-tags" prefix="s" %&gt;
-</span><span class='line'>&lt;%@ taglib uri="http://www.opensymphony.com/sitemesh/decorator" prefix="decorator" %&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;!DOCTYPE html&gt;
-</span><span class='line'>&lt;html&gt;
-</span><span class='line'>&lt;head&gt;
-</span><span class='line'>    &lt;meta charset="utf-8"&gt;
-</span><span class='line'>    &lt;title&gt;&lt;decorator:title default="JBookShelf" /&gt;&lt;/title&gt;
-</span><span class='line'>    &lt;decorator:head /&gt;
-</span><span class='line'>&lt;/head&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;body&gt;
-</span><span class='line'>    &lt;div&gt;
-</span><span class='line'>        &lt;s:if test="#session.user_session_key != null"&gt;
-</span><span class='line'>        &lt;s:a action="listBook"&gt;All Books&lt;/s:a&gt;
-</span><span class='line'>        Welcome, you have logined.
-</span><span class='line'>        &lt;s:a action="logout"&gt;Logout&lt;/s:a&gt;
-</span><span class='line'>        &lt;/s:if&gt;
-</span><span class='line'>        &lt;s:else&gt;
-</span><span class='line'>        &lt;s:a action="login!input"&gt;Login&lt;/s:a&gt; |
-</span><span class='line'>        &lt;s:a action="register!input"&gt;Register&lt;/s:a&gt;
-</span><span class='line'>        &lt;/s:else&gt;
-</span><span class='line'>    &lt;/div&gt;
-</span><span class='line'>    &lt;hr /&gt;
-</span><span class='line'>    &lt;div&gt;Navigation&lt;/div&gt;
-</span><span class='line'>    &lt;hr /&gt;
-</span><span class='line'>    &lt;decorator:body /&gt;
-</span><span class='line'>    &lt;hr /&gt;
-</span><span class='line'>    &lt;div&gt;Footer&lt;/div&gt;
-</span><span class='line'>&lt;/body&gt;
-</span><span class='line'>&lt;/html&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/draw-2d-bar-graph-using-ichartjs/">使用ichartjs画2D条形图</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2013-03-27T06:45:37+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>27</span><span class='date-suffix'>th</span>, <span class='date-year'>2013</span></span> <span class='time'>6:45 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p><a href="/blog/using-open-flash-chart-ii-in-rails/">在Rails中使用Open Flash Chart II</a>中使用了OFC2来画2D条形图。现在Flash快要不行了，因为有了更好的HTML5。好的程序猿也要紧随潮流，使用新的技术来改进和增强他们的代码。这次就尝试使用HTML5图形库来替换OFC2。比较已有的一些图形库，最后选定国产的<a href="http://www.ichartjs.com/">ichartjs</a>。</p>
-
-<p>实现2D条形图真的很简单：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;script type="text/javascript" src="ichart.1.1.min.js"&gt;&lt;/script&gt;
-</span><span class='line'>&lt;script type="text/javascript"&gt;
-</span><span class='line'>$(function() {
-</span><span class='line'>  var data = [
-</span><span class='line'>    {name: 'IE', value: 35.75, color: '#a5c2d5'},
-</span><span class='line'>    {name: 'Chrome', value: 29.84, color: '#cbab4f'},
-</span><span class='line'>    {name: 'Firefox', value: 24.88, color: '#76a871'},
-</span><span class='line'>    {name: 'Safari',value: 6.77, color: '#9f7961'},
-</span><span class='line'>    {name: 'Opera',value：2.02, color: '#a56f8f'},
-</span><span class='line'>    {name: 'Other',value: 0.73, color: '#6f83a5'}
-</span><span class='line'>  ];
-</span><span class='line'>
-</span><span class='line'>  new iChart.Bar2D({
-</span><span class='line'>    render: 'canvasDiv',
-</span><span class='line'>    data: data,
-</span><span class='line'>    title: 'Top 5 Browsers from 1 to 29 Feb 2012',
-</span><span class='line'>    showpercent: true,
-</span><span class='line'>    decimalsnum: 2,
-</span><span class='line'>    width: 800,
-</span><span class='line'>    height: 400,
-</span><span class='line'>    coordinate: {
-</span><span class='line'>      scale: [{
-</span><span class='line'>        position: 'bottom',
-</span><span class='line'>        start_scale: 0,
-</span><span class='line'>        end_scale: 40,
-</span><span class='line'>        scale_space: 8,
-</span><span class='line'>        listeners: {
-</span><span class='line'>          parseText: function(t, x, y) {
-</span><span class='line'>            return {text: t + "%"}
-</span><span class='line'>          }
-</span><span class='line'>        }
-</span><span class='line'>      }]
-</span><span class='line'>    }
-</span><span class='line'>  }).draw();
-</span><span class='line'>});
-</span><span class='line'>&lt;/script&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;div id="canvasDiv"&gt;&lt;/div&gt;</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/logic-problems-the-teachers-birthday/">逻辑题-老师的生日</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2013-03-13T10:01:28+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>13</span><span class='date-suffix'>th</span>, <span class='date-year'>2013</span></span> <span class='time'>10:01 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>小明和小强都是某老师的学生，老师的生日是M月N日，他们都知道老师的生日是以下十组中的一个。老师把M告诉了小明，把N告诉了小强，然后问他们是否知道自己的生日。小明说“如果我不知道小强也不知道”，小强说“本来我不知道，你说了这话我就知道了”，小明说“那我也知道了 ”。问老师的生日是以下的哪个？</p>
-
-<p>3/4, 3/5, 3/8, 6/4, 6/7, 9/1, 9/5, 12/1, 12/2, 12/8</p>
-
-<p>按M排：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>3/4, 3/5, 3/8
-</span><span class='line'>6/4, 6/7
-</span><span class='line'>9/1, 9/5
-</span><span class='line'>12/1, 12/2, 12/8</span></code></pre></td></tr></table></div></figure>
-
-<p>按N排：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>9/1, 12/1
-</span><span class='line'>12/2
-</span><span class='line'>3/4, 6/4
-</span><span class='line'>3/5, 9/5
-</span><span class='line'>6/7
-</span><span class='line'>3/8, 12/8</span></code></pre></td></tr></table></div></figure>
-
-<p>条件一：小明说“如果我不知道小强也不知道”。分析：因为M都是重复的，所以小明一定不知道。小明知道M以后肯定小强不知道，说明N肯定也是重复，可以剔除12/2和6/7这两个日期。另外，还可以排队N为2与7所对应的月份，因为当老师生日的M为6或12时，小强是有可能知道的，与已知条件相违背。结果：3/4, 3/5, 3/8, 9/1, 9/5。</p>
-
-<p>按M排：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>3/4, 3/5, 3/8
-</span><span class='line'>9/1, 9/5</span></code></pre></td></tr></table></div></figure>
-
-<p>按N排：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>3/4
-</span><span class='line'>3/5, 9/5
-</span><span class='line'>3/8
-</span><span class='line'>9/1</span></code></pre></td></tr></table></div></figure>
-
-<p>条件二：小强说“本来我不知道，你说了这话我就知道了”。分析：根据上面的结果和条件二可以知道，现在N一定不能是重复的，可以把3/5和9/5排除。结果：3/4, 3/8, 9/1。</p>
-
-<p>按M排：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>3/4, 3/8
-</span><span class='line'>9/1</span></code></pre></td></tr></table></div></figure>
-
-<p>按N排：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>3/4
-</span><span class='line'>3/8
-</span><span class='line'>9/1</span></code></pre></td></tr></table></div></figure>
-
-<p>条件三：小明说“那我也知道了”。分析：综合条件二的结果和条件三可以判定现在M应该是单一的，所以只能是9。结果：9/1。</p>
-
-<p>老师的生日为9/1。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/htaccess-example-explanation/">.htaccess实例详解</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2013-03-10T12:01:35+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>10</span><span class='date-suffix'>th</span>, <span class='date-year'>2013</span></span> <span class='time'>12:01 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>又一次迁移博客服务器。因为是迁移，就没有采取安装的方式，而是把以前的程序拷贝到新服务器上。</p>
-
-<p>打开首页的时候没问题，访问具体文章时就出错了：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Not Found
-</span><span class='line'>The requested URL /sample-article.html was not found on this server.</span></code></pre></td></tr></table></div></figure>
-
-<p>试着去后台重新做设置，然后就发现在根目录下多了个.htaccess文件，内容如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;IfModule mod_rewrite.c&gt;
-</span><span class='line'>RewriteEngine On
-</span><span class='line'>RewriteBase /
-</span><span class='line'>RewriteRule ^index\.php$ - [L]
-</span><span class='line'>RewriteCond %{REQUEST_FILENAME} !-f
-</span><span class='line'>RewriteCond %{REQUEST_FILENAME} !-d
-</span><span class='line'>RewriteRule . /index.php [L]
-</span><span class='line'>&lt;/IfModule&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>以前也看过这个文件，总是模模糊糊不太明白。今天研究的时候发现一下子就清清楚楚了（这大概就是佛家所说的顿悟吧，不过它的发生应该还是建立在渐修的基础上）。</p>
-
-<p>下面来说说这些内容的理解：</p>
-
-<p>第1行就是打开重写引擎。</p>
-
-<p>第2行是设置URI前缀。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Syntax: RewriteRule Pattern Substitution [flags]
-</span><span class='line'>
-</span><span class='line'>- (dash)
-</span><span class='line'> A dash indicates that no substitution should be performed (the existing path
-</span><span class='line'> is passed through untouched). This is used when a flag (see below) needs to
-</span><span class='line'> be applied without changing the path.
-</span><span class='line'>
-</span><span class='line'>last|L
-</span><span class='line'> Stop the rewriting process immediately and don't apply any more rules.
-</span><span class='line'> Especially note caveats for per-directory and .htaccess context.</span></code></pre></td></tr></table></div></figure>
-
-<p>第3行是完全匹配index.php的URI，但不做替换，并且匹配成功后就停止执行重写过程。</p>
-
-<p>第6行就是把所有的访问请求重写，指给index.php，然后停止执行重写过程。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Syntax: RewriteCond TestString CondPattern
-</span><span class='line'>
-</span><span class='line'>REQUEST_FILENAME
-</span><span class='line'> The full local filesystem path to the file or script matching the request,
-</span><span class='line'> if this has already been determined by the server at the time REQUEST_FILENAME
-</span><span class='line'> is referenced. Otherwise, such as when used in virtual host context, the same
-</span><span class='line'> value as REQUEST_URI.
-</span><span class='line'>
-</span><span class='line'>You can prefix the pattern string with a '!' character (exclamation mark) to
-</span><span class='line'>specify a non-matching pattern.
-</span><span class='line'>
-</span><span class='line'>'-d' (is directory)
-</span><span class='line'> Treats the TestString as a pathname and tests whether or not it exists, and
-</span><span class='line'> is a directory.
-</span><span class='line'>
-</span><span class='line'>'-f' (is regular file)
-</span><span class='line'> Treats the TestString as a pathname and tests whether or not it exists, and
-</span><span class='line'> is a regular file.</span></code></pre></td></tr></table></div></figure>
-
-<p>第4和第5行是不去测试访问URI是否是目录或文件。其实有了第6行这两行基本就是摆设了。</p>
-
-<p>最后再唠叨一句，有问题直接查官方文档应该是最好的选择。官方文档链接：<a href="http://httpd.apache.org/docs/current/mod/mod_rewrite.html">Apache Module mod_rewrite</a>。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/logic-problems-100-lamps/">逻辑题-100盏电灯</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2013-02-26T08:56:21+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2013</span></span> <span class='time'>8:56 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>房间里有100盏电灯，编号为1，2，3...100，每盏灯上有一个按钮，初始时灯全都是关的。</p>
-
-<p>编好号的100位同学由房间外依次走进去，将自己编号的倍数的灯的按钮全部按一次，例如第一位同学把编号是1的倍数的灯的按钮按一下（此时100盏灯全亮），第二位同学把编号是2的倍数的灯的按钮按一下（此时只有50盏灯亮着，50盏被这个人按灭了）...第100位同学把编号是100的倍数的灯（即编号为100的灯）的按钮按一下，请问依次走完后，还有多少盏灯亮着？</p>
-
-<p>解题思路：</p>
-
-<p>被按过奇数次的灯亮着，偶数次的灯关了。因为每个同学会把自己编号的倍数的灯全部按一次，所以：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>1号灯会被1号同学按下；
-</span><span class='line'>2号灯会被1，2号同学按下；
-</span><span class='line'>3号灯会被1，3号同学按下；
-</span><span class='line'>4号灯会被1，2，4号同学按下；
-</span><span class='line'>5号灯会被1，5号同学按下；
-</span><span class='line'>6号灯会被1，2，3，6号同学按下；
-</span><span class='line'>7号灯会被1，7号同学按下；
-</span><span class='line'>...
-</span><span class='line'>依此类推</span></code></pre></td></tr></table></div></figure>
-
-<p>从上面可以总结出n号灯会被以它所有约数为编号的同学按下。</p>
-
-<p>这样，问题就变成了求每盏灯的编号有多少个约数的数学问题。如果约数个数为奇数，灯亮着；反之，灯关着。</p>
-
-<p>Ruby代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># Light state: ON/OFF = true/false
-</span><span class='line'>lamps = Array.new(100, false)
-</span><span class='line'>
-</span><span class='line'>1.upto(lamps.length) do |lno|
-</span><span class='line'>  1.upto(lno) do |fno|
-</span><span class='line'>    lamps[lno - 1] = !lamps[lno - 1] if lno % fno == 0
-</span><span class='line'>  end
-</span><span class='line'>end
-</span><span class='line'>
-</span><span class='line'>lamps.each_index do |i|
-</span><span class='line'>  print "Light #{i + 1} is "
-</span><span class='line'>  puts lamps[i] ? "ON" : "OFF"
+</pre></td><td class='code'><pre><code class=''><span class='line'>class InitializerGenerator &lt; Rails::Generators::NamedBase
+</span><span class='line'>  source_root File.expand_path("../templates", __FILE__)
 </span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
 
-<p>最后，我们会发现编号1，4，9，16，25...100的灯是亮着的，其它都是灭的。即编号值可以开出整数平方根的灯是亮的。</p>
+<p>生成基类也从Rails::Generators::Base变成了Rails::Generators::NamedBase。它们的区别是Rails::Generators::NamedBase期望至少一个参数。</p>
+
+<p>USAGE文件里的内容是输入-h选项时显示的文档：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rails generate feedback_form --help
+</span><span class='line'>Usage:
+</span><span class='line'>  rails generate feedback_form NAME [options]</span></code></pre></td></tr></table></div></figure>
+
+<p>Rails 2.x中的manifest可以删除了，因为在3.x的generator中每个public方法在生成过程中会被自动调用。</p>
 </div>
   
   
@@ -972,7 +223,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/do-we-really-need-naming-conventions-for-interfaces/">我们真的需要接口命名规范吗？</a></h1>
+      <h1 class="entry-title"><a href="/blog/using-rails-32-to-create-a-simple-accounting-application/">用Rails 3.2打造简单记账应用</a></h1>
     
     
       <p class="meta">
@@ -981,33 +232,50 @@
 
 
 
-<time class='entry-date' datetime='2013-02-24T13:34:04+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>24</span><span class='date-suffix'>th</span>, <span class='date-year'>2013</span></span> <span class='time'>1:34 pm</span></time>
+<time class='entry-date' datetime='2012-04-18T07:49:27+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>7:49 am</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>英文原文：<a href="http://www.adam-bien.com/roller/abien/entry/in_the_age_of_dryness">http://www.adam-bien.com/roller/abien/entry/in_the_age_of_dryness</a></p>
+  <div class="entry-content"><p>Rails已经到3.2版本了，和以前的2.3版本有了很大的不同，决定把原来老版本的记账应用重新写一遍，更新部分插件。</p>
 
-<p>译者：感觉这篇文章讲的不错，也不算太长，就翻译了过来。</p>
-
-<p>在过去的项目/审查中我发现了如下的接口及其实现的命名规范：</p>
+<p>首先是创建项目：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>IService service = new Service();
-</span><span class='line'>
-</span><span class='line'>Service service = new ServiceImpl();
-</span><span class='line'>
-</span><span class='line'>ServiceIF service = new Service();</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rails new qianbao
+</span><span class='line'>cd qianbao
+</span><span class='line'>rails g scaffold entry amount:decimal tags:string comment:text effective_date:date
+</span><span class='line'>rails g controller home index</span></code></pre></td></tr></table></div></figure>
 
-<p>每一条都含有多余信息。无论是强调接口或其实现，相关信息都已经包含在代码中，所以都是多余的。这种命名规范仅当你真的不知道如何命名实现的时候才需要，作为去思考一个名称的替代，它更容易依靠现有的模板。</p>
+<p>删除public/index.html，在config/routes.rb中添加根路由：</p>
 
-<p>实现名称的缺乏可能也是作为它的非充分责任的一个指标（an indicator for it&#39;s unsufficient responsibilities）。因此，如果你找不到一个适当的实现名称，考虑移除接口直接暴露实现可能是个好主意——没有奇怪的规范。实际上JDK中没有这样的规范，接口及其实现也经常称为不同（are often even called differently）：</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>root :to =&gt; 'home#index'</span></code></pre></td></tr></table></div></figure>
+
+<p>现在要给应用加上一个认证系统（注册、激活、登录、登出），这次使用<a href="https://github.com/plataformatec/devise">devise</a>插件实现。</p>
+
+<p>在Gemfile中添加：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>gem 'devise'</span></code></pre></td></tr></table></div></figure>
+
+<p>然后执行下列命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>bundle install
+</span><span class='line'>rails g devise:install
+</span><span class='line'>rails g devise user
+</span><span class='line'>rails g devise:views</span></code></pre></td></tr></table></div></figure>
+
+<p>创建一个迁移任务，把User和Entry模型关联起来：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1016,64 +284,41 @@
 <span class='line-number'>5</span>
 <span class='line-number'>6</span>
 <span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Runnable r = new Thread();
+</pre></td><td class='code'><pre><code class=''><span class='line'>class AddUserIdToEntries &lt; ActiveRecord::Migration
+</span><span class='line'>  def change
+</span><span class='line'>    add_column :entries, :user_id, :integer
 </span><span class='line'>
-</span><span class='line'>RootPaneContainer c = new JFrame();
+</span><span class='line'>    add_index :entries, :user_id
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>修改Entry和User模型：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class Entry &lt; ActiveRecord::Base
+</span><span class='line'>  validates :effective_date, :presence =&gt; true
+</span><span class='line'>  validates :amount,         :presence =&gt; true,
+</span><span class='line'>                             :numericality =&gt; { :greater_than =&gt; 0.0 },
+</span><span class='line'>                             :format =&gt; { :with =&gt; /^\d+??(?:\.\d{0,2})?$/ }
+</span><span class='line'>  validates :tags,           :presence =&gt; true,
+</span><span class='line'>                             :length =&gt; { :within =&gt; 1..255 }
 </span><span class='line'>
-</span><span class='line'>TableModel t = new DefaultTableModel();
-</span><span class='line'>
-</span><span class='line'>Remote remote = new UnicastRemoteObject();</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>  belongs_to :user</span></code></pre></td></tr></table></div></figure>
 
-<p>接口的目的是抽象或从几个实现解耦。一个单一的实现并不需要通过接口来解耦。也有一些例外的规则，如需要使用动态代理等。</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class User &lt; ActiveRecord::Base
+</span><span class='line'>  has_many :entries</span></code></pre></td></tr></table></div></figure>
 
-<p>通过单个的，有着奇怪命名规范的实现（implementation）来实现（realize）一个接口不应该被认为是一般的最佳实践……</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/using-interceptor-to-prohibit-users-from-accessing-unauthorized-books-information/">使用Interceptor禁止用户访问未授权的图书信息</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2013-02-01T18:50:02+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>1</span><span class='date-suffix'>st</span>, <span class='date-year'>2013</span></span> <span class='time'>6:50 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>现在的JBookShelf有两个问题：</p>
-
-<ol>
-<li>未登录的用户可以访问图书信息；</li>
-<li>登录后的用户可以访问其他用户的图书信息。</li>
-</ol>
-
-<p>第一个问题可以使用Struts 2的Interceptor来解决：</p>
-
-<ol>
-<li>创建一个实现了Interceptor接口的类；</li>
-<li>在struts.xml配置中定义这个拦截器；</li>
-<li>在struts.xml中定义一个使用了上面拦截器的拦截栈；</li>
-<li>在struts.xml中定义一个全局转向配置。</li>
-</ol>
-
-<p>实现自己的拦截器有点要注意的是，拦截器必须是无状态的，不要使用在API提供的ActionInvocation之外的任何东西。要求拦截器是无状态的原因是Struts 2不能保证为每一个请求或者action创建一个实例，所以如果拦截器带有状态，会引发并发问题。</p>
-
-<p>创建AuthorizationInterceptor类，继承类AbstractInterceptor。为什么继承它呢？而不是直接实现接口Interceptor。这是因为AbstractInterceptor已经实现了Interceptor接口，并且实现了接口中的init和destroy方法。而在这个拦截器中，我们并不需要使用这两个方法。下面上代码：</p>
+<p>修改app/views/layouts/application.html.erb文件：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1092,147 +337,25 @@
 <span class='line-number'>15</span>
 <span class='line-number'>16</span>
 <span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.account.interceptor;
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;body&gt;
+</span><span class='line'>  &lt;% if user_signed_in? %&gt;
+</span><span class='line'>    &lt;p&gt;
+</span><span class='line'>      &lt;strong&gt;&lt;%= link_to current_user.email, edit_user_registration_path %&gt;&lt;/strong&gt;
+</span><span class='line'>      &lt;%= link_to 'Logout', destroy_user_session_path, :method =&gt; :delete %&gt;
+</span><span class='line'>    &lt;/p&gt;
+</span><span class='line'>    &lt;%= link_to "All Entries", entries_path %&gt;
+</span><span class='line'>  &lt;% else %&gt;
+</span><span class='line'>    &lt;p&gt;
+</span><span class='line'>      &lt;strong&gt;You are currently not logged in.&lt;/strong&gt;
+</span><span class='line'>      &lt;%= link_to 'Sign in', new_user_session_path %&gt; or
+</span><span class='line'>      &lt;%= link_to 'Sign up', new_user_registration_path %&gt;
+</span><span class='line'>    &lt;/p&gt;
+</span><span class='line'>  &lt;% end %&gt;
 </span><span class='line'>
-</span><span class='line'>import java.util.Collections;
-</span><span class='line'>import java.util.Set;
-</span><span class='line'>
-</span><span class='line'>import com.codemany.account.model.User;
-</span><span class='line'>
-</span><span class='line'>import com.opensymphony.xwork2.Action;
-</span><span class='line'>import com.opensymphony.xwork2.ActionInvocation;
-</span><span class='line'>import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
-</span><span class='line'>import com.opensymphony.xwork2.util.TextParseUtil;
-</span><span class='line'>
-</span><span class='line'>public class AuthorizationInterceptor extends AbstractInterceptor {
-</span><span class='line'>    private static final long serialVersionUID = -5140884040684756043L;
-</span><span class='line'>
-</span><span class='line'>    protected Set&lt;String&gt; skipActions = Collections.emptySet();
-</span><span class='line'>
-</span><span class='line'>    public void setSkipActions(String skipActions) {
-</span><span class='line'>        this.skipActions = TextParseUtil.commaDelimitedStringToSet(skipActions);
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    @Override
-</span><span class='line'>    public String intercept(ActionInvocation invocation) throws Exception {
-</span><span class='line'>        User user = (User)invocation.getInvocationContext()
-</span><span class='line'>                .getSession().get(User.SESSION_KEY);
-</span><span class='line'>
-</span><span class='line'>        boolean isLogined = user != null;
-</span><span class='line'>        String action = invocation.getProxy().getActionName();
-</span><span class='line'>        // 如果用户未登录，并且访问的是需要登录权限的Action，就跳转到全局转向配置login上
-</span><span class='line'>        if (isLogined || skipActions.contains(action)) {
-</span><span class='line'>            return invocation.invoke();
-</span><span class='line'>        } else {
-</span><span class='line'>            return Action.LOGIN;
-</span><span class='line'>        }
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>  &lt;%= yield %&gt;
+</span><span class='line'>&lt;/body&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p>这里的skipActions目的是为了跳过一些不需要拦截的Action。因为默认情况下，拦截器会拦截Action中的所有的方法。像login，register这类Action是任何用户在任何状态下都可以访问的，所以不需要拦截，这里就可以将这些Action放到skipActions中来跳过拦截。</p>
-
-<p>实现了拦截类后还要在struts.xml进行配置使它起作用，以下是struts.xml的完整代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
-</span><span class='line'>&lt;!DOCTYPE struts PUBLIC
-</span><span class='line'>    "-//Apache Software Foundation//DTD Struts Configuration 2.3//EN"
-</span><span class='line'>    "http://struts.apache.org/dtds/struts-2.3.dtd"&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;struts&gt;
-</span><span class='line'>    &lt;constant name="struts.enable.DynamicMethodInvocation" value="true" /&gt;
-</span><span class='line'>    &lt;constant name="struts.devMode" value="true" /&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;package name="default" extends="struts-default"&gt;
-</span><span class='line'>        &lt;interceptors&gt;
-</span><span class='line'>            &lt;interceptor name="authorization"
-</span><span class='line'>                class="com.codemany.account.interceptor.AuthorizationInterceptor" /&gt;
-</span><span class='line'>
-</span><span class='line'>            &lt;interceptor-stack name="authorizationStack"&gt;
-</span><span class='line'>                &lt;interceptor-ref name="authorization"&gt;
-</span><span class='line'>                    &lt;param name="skipActions"&gt;login, logout, register&lt;/param&gt;
-</span><span class='line'>                &lt;/interceptor-ref&gt;
-</span><span class='line'>                &lt;interceptor-ref name="defaultStack" /&gt;
-</span><span class='line'>            &lt;/interceptor-stack&gt;
-</span><span class='line'>        &lt;/interceptors&gt;
-</span><span class='line'>
-</span><span class='line'>        &lt;default-interceptor-ref name="authorizationStack" /&gt;
-</span><span class='line'>
-</span><span class='line'>        &lt;!-- 全局转向配置 --&gt;
-</span><span class='line'>        &lt;!-- 还记得拦截器里面的return Action.LOGIN这句吧，当程序执行完这一行后，--&gt;
-</span><span class='line'>        &lt;!-- 就会到struts.xml文件的global-results中找name为login的全局转向配置。--&gt;
-</span><span class='line'>        &lt;global-results&gt;
-</span><span class='line'>            &lt;result name="login" type="redirectAction"&gt;login!input&lt;/result&gt;
-</span><span class='line'>        &lt;/global-results&gt;
-</span><span class='line'>    &lt;/package&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;include file="account.xml" /&gt;
-</span><span class='line'>    &lt;include file="book.xml" /&gt;
-</span><span class='line'>&lt;/struts&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>然后将account.xml和book.xml中package继承的父包改成struts.xml配置中的default包：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;package name="account" extends="default"&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;package name="book" extends="default"&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>第二个问题的解决就是修改BookAction.java的代码，不再从数据库中读取Book数据，而是从当前登录用户的books属性中查找Book信息。</p>
+<p>修改app/controller/entries_controller.rb：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1315,117 +438,128 @@
 <span class='line-number'>79</span>
 <span class='line-number'>80</span>
 <span class='line-number'>81</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.book.action;
+<span class='line-number'>82</span>
+<span class='line-number'>83</span>
+<span class='line-number'>84</span>
+<span class='line-number'>85</span>
+<span class='line-number'>86</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class EntriesController &lt; ApplicationController
+</span><span class='line'>  before_filter :authenticate_user!
 </span><span class='line'>
-</span><span class='line'>import java.util.ArrayList;
-</span><span class='line'>import java.util.List;
+</span><span class='line'>  # GET /entries
+</span><span class='line'>  # GET /entries.json
+</span><span class='line'>  def index
+</span><span class='line'>    @entries = current_user.entries
 </span><span class='line'>
-</span><span class='line'>import com.codemany.account.model.User;
-</span><span class='line'>import com.codemany.book.model.Book;
-</span><span class='line'>import com.codemany.book.service.BookService;
+</span><span class='line'>    respond_to do |format|
+</span><span class='line'>      format.html # index.html.erb
+</span><span class='line'>      format.json { render json: @entries }
+</span><span class='line'>    end
+</span><span class='line'>  end
 </span><span class='line'>
-</span><span class='line'>import com.opensymphony.xwork2.ActionContext;
-</span><span class='line'>import com.opensymphony.xwork2.ActionSupport;
+</span><span class='line'>  # GET /entries/1
+</span><span class='line'>  # GET /entries/1.json
+</span><span class='line'>  def show
+</span><span class='line'>    @entry = current_user.entries.find(params[:id])
 </span><span class='line'>
-</span><span class='line'>public class BookAction extends ActionSupport {
-</span><span class='line'>    private static final long serialVersionUID = 2538923417705852774L;
+</span><span class='line'>    respond_to do |format|
+</span><span class='line'>      format.html # show.html.erb
+</span><span class='line'>      format.json { render json: @entry }
+</span><span class='line'>    end
+</span><span class='line'>  end
 </span><span class='line'>
-</span><span class='line'>    private Long bookId;
-</span><span class='line'>    private Book book;
-</span><span class='line'>    private List&lt;Book&gt; bookList;
+</span><span class='line'>  # GET /entries/new
+</span><span class='line'>  # GET /entries/new.json
+</span><span class='line'>  def new
+</span><span class='line'>    @entry = Entry.new
 </span><span class='line'>
-</span><span class='line'>    private BookService bookService;
+</span><span class='line'>    respond_to do |format|
+</span><span class='line'>      format.html # new.html.erb
+</span><span class='line'>      format.json { render json: @entry }
+</span><span class='line'>    end
+</span><span class='line'>  end
 </span><span class='line'>
-</span><span class='line'>    public String list() throws Exception {
-</span><span class='line'>        if (bookList == null) {
-</span><span class='line'>            bookList = new ArrayList&lt;Book&gt;();
-</span><span class='line'>        }
-</span><span class='line'>        bookList.addAll(getCurrentUser().getBooks());
-</span><span class='line'>        return "list";
-</span><span class='line'>    }
+</span><span class='line'>  # GET /entries/1/edit
+</span><span class='line'>  def edit
+</span><span class='line'>    @entry = current_user.entries.find(params[:id])
+</span><span class='line'>  end
 </span><span class='line'>
-</span><span class='line'>    public String show() throws Exception {
-</span><span class='line'>        book = getCurrentUser().getBook(bookId);
-</span><span class='line'>        return "show";
-</span><span class='line'>    }
+</span><span class='line'>  # POST /entries
+</span><span class='line'>  # POST /entries.json
+</span><span class='line'>  def create
+</span><span class='line'>    @entry = Entry.new(params[:entry])
+</span><span class='line'>    @entry.user = current_user
 </span><span class='line'>
-</span><span class='line'>    public String input() throws Exception {
-</span><span class='line'>        if (bookId != null) {
-</span><span class='line'>            book = getCurrentUser().getBook(bookId);
-</span><span class='line'>        }
-</span><span class='line'>        return INPUT;
-</span><span class='line'>    }
+</span><span class='line'>    respond_to do |format|
+</span><span class='line'>      if @entry.save
+</span><span class='line'>        format.html { redirect_to @entry, notice: 'Entry was successfully created.' }
+</span><span class='line'>        format.json { render json: @entry, status: :created, location: @entry }
+</span><span class='line'>      else
+</span><span class='line'>        format.html { render action: "new" }
+</span><span class='line'>        format.json { render json: @entry.errors, status: :unprocessable_entity }
+</span><span class='line'>      end
+</span><span class='line'>    end
+</span><span class='line'>  end
 </span><span class='line'>
-</span><span class='line'>    public String saveOrUpdate() throws Exception {
-</span><span class='line'>        book.setUser(getCurrentUser());
-</span><span class='line'>        bookService.saveOrUpdateBook(book);
-</span><span class='line'>        return SUCCESS;
-</span><span class='line'>    }
+</span><span class='line'>  # PUT /entries/1
+</span><span class='line'>  # PUT /entries/1.json
+</span><span class='line'>  def update
+</span><span class='line'>    @entry = current_user.entries.find(params[:id])
 </span><span class='line'>
-</span><span class='line'>    public String delete() throws Exception {
-</span><span class='line'>        Book book = getCurrentUser().getBook(bookId);
-</span><span class='line'>        if (book != null) {
-</span><span class='line'>            bookService.deleteBook(bookId);
-</span><span class='line'>            getCurrentUser().getBooks().remove(book);
-</span><span class='line'>        }
-</span><span class='line'>        return SUCCESS;
-</span><span class='line'>    }
+</span><span class='line'>    respond_to do |format|
+</span><span class='line'>      if @entry.update_attributes(params[:entry])
+</span><span class='line'>        format.html { redirect_to @entry, notice: 'Entry was successfully updated.' }
+</span><span class='line'>        format.json { head :no_content }
+</span><span class='line'>      else
+</span><span class='line'>        format.html { render action: "edit" }
+</span><span class='line'>        format.json { render json: @entry.errors, status: :unprocessable_entity }
+</span><span class='line'>      end
+</span><span class='line'>    end
+</span><span class='line'>  end
 </span><span class='line'>
-</span><span class='line'>    public List&lt;Book&gt; getBookList() {
-</span><span class='line'>        return bookList;
-</span><span class='line'>    }
+</span><span class='line'>  # DELETE /entries/1
+</span><span class='line'>  # DELETE /entries/1.json
+</span><span class='line'>  def destroy
+</span><span class='line'>    @entry = current_user.entries.find(params[:id])
+</span><span class='line'>    @entry.destroy
 </span><span class='line'>
-</span><span class='line'>    public Book getBook() {
-</span><span class='line'>        return book;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void setBook(Book book) {
-</span><span class='line'>        this.book = book;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void setBookId(Long bookId) {
-</span><span class='line'>        this.bookId = bookId;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void setBookService(BookService bookService) {
-</span><span class='line'>        this.bookService = bookService;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    private User getCurrentUser() {
-</span><span class='line'>        return (User)ActionContext.getContext()
-</span><span class='line'>                .getSession().get(User.SESSION_KEY);
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>    respond_to do |format|
+</span><span class='line'>      format.html { redirect_to entries_url }
+</span><span class='line'>      format.json { head :no_content }
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
 
-<p>上面的代码会产生异常，提示取出的Book数据为空，所以要在User.hbm.xml中set标签后添加属性lazy=“false”，这样Hibernate从数据库中读取User数据时会连带取出对应的Book数据：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;set name="books" inverse="true" lazy="false"&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>下面是BookAction类中用到的User.getBook(bookId)代码：</p>
+<p>执行以下命令启动应用：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class User {
-</span><span class='line'>
-</span><span class='line'>    public Book getBook(Long bookId) {
-</span><span class='line'>        for (Book book : books) {
-</span><span class='line'>            if (bookId != null && bookId.equals(book.getId())) {
-</span><span class='line'>                return book;
-</span><span class='line'>            }
-</span><span class='line'>        }
-</span><span class='line'>        return null;
-</span><span class='line'>    }</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rake db:migrate
+</span><span class='line'>rails s</span></code></pre></td></tr></table></div></figure>
 
-<p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
+<p>以前的版本用的CSS框架是<a href="http://blueprintcss.org/">Blueprint</a>，这次使用比它更方便快捷的<a href="https://github.com/twitter/bootstrap">Bootstrap</a>。Bootstrap建立在Less上，有个<a href="https://github.com/metaskills/less-rails-bootstrap">less-rails-bootstrap</a>，不过在安装libv8时竟然要提示缺少Python，拜托！我用的是Ruby，要我装Python，啥意思啊！还是找个Sass版的Bootstrap吧。</p>
+
+<p>下载<a href="https://github.com/jlong/sass-twitter-bootstrap">sass-twitter-bootstrap</a>：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>git clone https://github.com/jlong/sass-twitter-bootstrap.git</span></code></pre></td></tr></table></div></figure>
+
+<p>将sass-twitter-bootstrap/lib中的文件拷贝到app/assets/stylesheets/twitter目录下。然后将app/assets/stylesheets/application.css中的</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>*= require_tree .</span></code></pre></td></tr></table></div></figure>
+
+<p>修改为</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>*= require twitter/bootstrap</span></code></pre></td></tr></table></div></figure>
+
+<p>再在文件末尾添加：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>body { padding-top: 60px; }</span></code></pre></td></tr></table></div></figure>
+
+<p>现在就可以使用Bootstrap来布局美化应用了。</p>
 </div>
   
   
@@ -1438,7 +572,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/save-session-data-in-web-application/">在Web应用中保存Session数据</a></h1>
+      <h1 class="entry-title"><a href="/blog/progress-bar-does-not-work-when-reopen-progressdialog-using-showdialog/">使用showDialog()创建的ProgressDialog再次打开时进度条不变化</a></h1>
     
     
       <p class="meta">
@@ -1447,28 +581,438 @@
 
 
 
-<time class='entry-date' datetime='2013-01-30T14:34:05+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>30</span><span class='date-suffix'>th</span>, <span class='date-year'>2013</span></span> <span class='time'>2:34 pm</span></time>
+<time class='entry-date' datetime='2012-04-15T13:15:24+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>15</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>1:15 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><h3 id="保存在客户端">保存在客户端</h3>
+  <div class="entry-content"><p>先来看段代码：</p>
 
-<p>Cookie是一个很好的机制。有时候还可以使用隐藏的表单字段（hidden form fields）。</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+</span><span class='line'>    android:layout_width="fill_parent"
+</span><span class='line'>    android:layout_height="fill_parent"
+</span><span class='line'>    android:orientation="vertical"&gt;
+</span><span class='line'>    &lt;Button
+</span><span class='line'>        android:layout_width="fill_parent"
+</span><span class='line'>        android:layout_height="wrap_content"
+</span><span class='line'>        android:text="Copy Contacts"
+</span><span class='line'>        android:onClick="copyContacts" /&gt;
+</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
 
-<h3 id="保存在服务器上">保存在服务器上</h3>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>import android.app.Activity;
+</span><span class='line'>import android.app.Dialog;
+</span><span class='line'>import android.app.ProgressDialog;
+</span><span class='line'>import android.os.AsyncTask;
+</span><span class='line'>import android.os.Bundle;
+</span><span class='line'>import android.view.View;
+</span><span class='line'>
+</span><span class='line'>public class DialogActivity extends Activity {
+</span><span class='line'>    private static final int COPY_CONTACTS = 0;
+</span><span class='line'>
+</span><span class='line'>    private ProgressDialog mProgressDialog;
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void onCreate(Bundle savedInstanceState) {
+</span><span class='line'>        super.onCreate(savedInstanceState);
+</span><span class='line'>        setContentView(R.layout.main);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public void copyContacts(View target) {
+</span><span class='line'>        showDialog(COPY_CONTACTS);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    protected Dialog onCreateDialog(int id) {
+</span><span class='line'>        switch (id) {
+</span><span class='line'>        case COPY_CONTACTS:
+</span><span class='line'>            mProgressDialog = new ProgressDialog(this);
+</span><span class='line'>            mProgressDialog.setTitle("Copy contacts");
+</span><span class='line'>            mProgressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+</span><span class='line'>            mProgressDialog.setMax(100);
+</span><span class='line'>            new AsyncCopyContactsTask().execute();
+</span><span class='line'>            break;
+</span><span class='line'>        }
+</span><span class='line'>        return mProgressDialog;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    private class AsyncCopyContactsTask extends AsyncTask&lt;Void, Void, Integer&gt; {
+</span><span class='line'>        @Override
+</span><span class='line'>        protected Integer doInBackground(Void... params) {
+</span><span class='line'>            for (int i = 0; i &lt; 100; i++) {
+</span><span class='line'>                try {
+</span><span class='line'>                    Thread.sleep(100);
+</span><span class='line'>                } catch (InterruptedException e) {
+</span><span class='line'>                }
+</span><span class='line'>                publishProgress();
+</span><span class='line'>            }
+</span><span class='line'>            return 0;
+</span><span class='line'>        }
+</span><span class='line'>
+</span><span class='line'>        protected void onProgressUpdate(Void... progress) {
+</span><span class='line'>            mProgressDialog.incrementProgressBy(1);
+</span><span class='line'>        }
+</span><span class='line'>
+</span><span class='line'>        protected void onPostExecute(Integer result) {
+</span><span class='line'>            mProgressDialog.dismiss();
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>最自然的选择。问题是当不止一台前端服务器时，需要能支持Session复制（session replication）和故障转移（failover）的集群。不管哪个前端服务器收到请求，Session数据都在上面。问题是每次请求时可能都要有数据复制和故障转移的动作，影响性能。有个更简单的方法是Sticky session。即当客户第一次请求时，负载均衡服务器分配一个Cookie给客户，下次请求时就可以通过Cookie访问与上次相同的服务器，这样客户的Session数据就只要在单台服务器上。Sticky session也有两个问题：单点故障和负载均衡可能不是最优。</p>
+<p>第一次点击按钮会显示一个进度条，上面的数字处于变动当中，到达最大值后进度条会消失不见；再次点击按钮后，就会发现进度条上的数值和消失前相同，并且不再变化，而且进度条也不会消失。这是为什么呢？</p>
 
-<h3 id="保存在数据库中">保存在数据库中</h3>
+<p>Activity中有三个和对话框显示有关的方法：showDialog()，dismissDialog()和removeDialog()。其中showDialog()用于显示一个对话框；dismissDialog()使对话框消失，但仍然处于内存中，只是不显示而已，如果再次调用showDialog()方法，则缓存在内存中的对话框会重新显示，而不需要重新创建。removeDialog()使对话框消失，并从内存中将对话框清除，如果再次调用showDialog()来显示它，则在显示之前需要重新创建对话框。</p>
 
-<p>通常最后数据库成为了性能瓶颈。</p>
+<p>在一个对话框的声明周期内，onCreateDialog()仅被调用一次，但onPrepareDialog()方法会每次被调用。比如，第一次调用 showDialog()方法显示某个对话框时，会先触发onCreateDialog()的执行，然后再触发onPrepareDialog()方法；如果将某个对话框 removeDialog()后再showDialog()，也会先触发onCreateDialog()，接着触发onPrepareDialog()方法；如果某个对话框是被dismiss()掉的，再调用 showDialog()方法来显示它时就不会触发onCreateDialog()方法的执行，只会触发onPrepareDialog()方法。</p>
 
-<h3 id="使用独立的session存储">使用独立的Session存储</h3>
+<p>这是因为第一次调用showDialog()时，Android从你的Activity中调用onCreateDialog()方法，得到返回的Dialog对象。把当前Activity设置为该对话框的所有者，从而把对话框挂靠到Activity上，让Activity自动管理该对话框的状态。这样，下次调用showDialog()时就不用重新创建Dialog对象，而是复用旧的。</p>
 
-<p>可以考虑Memcached或Redis。</p>
+<p>所以，解决再次打开ProgressDialog时进度条不变化的最好方法就是将mProgressDialog.dismiss()改成removeDialog(COPY_CONTACTS)。</p>
+
+<p>注意：如果你决定在onCreateDialog()方法之外创建一个对话框，它将不会被附着到活动上。不过，你可以通过setOwnerActivity()把它附着到一个Activity上。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/steve-jobs-resignation-letter-to-apple/">史蒂夫·乔布斯的辞职信</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2012-03-13T12:20:03+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>13</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>12:20 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>英文原文：<a href="http://www.apple.com/pr/library/2011/08/24Letter-from-Steve-Jobs.html">http://www.apple.com/pr/library/2011/08/24Letter-from-Steve-Jobs.html</a></p>
+
+<p>致苹果董事会和苹果社区：</p>
+
+<p>我一直说，如果有一天我不能履行作为苹果CEO的职责和期望，我会第一个让你们知道。遗憾的是，这一天已经来临。</p>
+
+<p>我在此辞去苹果CEO的职务。如果董事会同意，我将愿意担任董事长、董事或者苹果员工。</p>
+
+<p>就我的继任者而言，我强烈建议执行我们的接班计划，任命Tim Cook为苹果的CEO。</p>
+
+<p>我相信，苹果最辉煌和最具创新的日子就在前方。我期望在新的岗位看到它的成功，并为此做出自己的贡献。</p>
+
+<p>在苹果，我结交了一些我一生中最好的朋友。谢谢你们大家，多年来能和你们一起工作。</p>
+
+<p>史蒂夫</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-currency-wars-confuse-reader-opnion/">《货币战争》是如何混淆读者视听的</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2012-03-01T07:19:25+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>1</span><span class='date-suffix'>st</span>, <span class='date-year'>2012</span></span> <span class='time'>7:19 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>这是早就写好了的。《货币战争》刚发行就买了读了，看到三分之一的时候就看不下去了，准备写篇文章驳斥书中的观点，就列出了下面的提纲，不过因为文笔太差，一直没能把内容扩充起来，到现在也没了这个心思，这里把已经写的贴出来给大家看看吧。</p>
+
+<ol>
+<li>读者们喜欢阴谋论；</li>
+<li>美联储是私有的从来不是什么秘密。因为金融机构和公有还是私有无关，而是和财力及信用有关；</li>
+<li>偷换概念，将金融家们的被动行为说成是主动行为，造成一种金融家们无所不能的环境；</li>
+<li>放大作者想写的，缩小作者不想说的。只要是美国总统遇刺身亡就说是不符合金融家们的利益导致，那为什么不说别的国家呢？不要忘记军队掌握在谁的手中，给你个叛国罪啊什么的就能叫金融家们玩完，况且国家还有那么多秘密机构呢！想想希特勒时期的罗斯柴尔德家族吧。</li>
+</ol>
+
+<p>货币战争真实存在，亚洲金融风暴、索罗斯狙击英镑这些都是货币战争。金融家们能调动数亿万计的财富，确实也很强大，但是不应该把他们的能力无限放大。</p>
+
+<p>对美联储性质感兴趣的可以到它的<a href="http://federalreserve.gov/">官方网站</a>看看。这里还有篇评论宋鸿兵和他书的文章：<a href="http://wenyidaobk.blog.163.com/blog/static/1243789052009712928966/">http://wenyidaobk.blog.163.com/blog/static/1243789052009712928966/</a></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/daily-report-from-rejection-to-acceptance-then-love/">工作日志：从拒绝到接受再到喜欢</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2012-02-11T07:04:08+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>11</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>7:04 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>刚毕业，在苏州一家公司工作，需要写工作日志，心里不喜欢，但不得不写，每天应付了事。现在想来大概是因为不知道写什么，怎么写的缘故（自觉语言贫乏，感觉好多话要说，但写出来却是干巴巴的几句，所以对一切需要动笔的如思想汇报、工作小结、年终总结等都特别不乐意，更别提上学时候的写作文了）。</p>
+
+<p>到第二家公司，刚开始不要写，后来公司作了调整就要写了，这时是不再拒绝，以一种无所谓的态度接受了。</p>
+
+<p>在第三家后，也是开始不要写，后来调整要写，不过由于有具体的日志格式，所以对这个还是非常接受的。</p>
+
+<p>今天凌晨醒来后睡不着，在床上胡思乱想，突然想到工作日志的事。从管理人员的角度思考了工作日志的问题，有了一些新的想法，发现工作日志其实是管理人员了解工作进度的这么一个东西。在一个项目组里，项目经理可以通过你每天的工作日志对你今天的工作有一个大致的了解，综合所有小组成员的工作日志就可以对项目所处的状态有个大约的概念。否则，每天只见你上班下班，坐在那里做事，但不知道你做了什么，做的怎么样，对项目状态不了解，项目就非常容易失控。</p>
+
+<p>工作日志格式：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>[main content]
+</span><span class='line'>今天做了什么，完成度怎么样？有哪些问题？
+</span><span class='line'>明天的计划是什么？
+</span><span class='line'>
+</span><span class='line'>[questions]
+</span><span class='line'>
+</span><span class='line'>[suggestions]</span></code></pre></td></tr></table></div></figure>
+
+<p>我觉得明天的计划这一项非常重要，通过明天的计划以及当天工作完成的情况我们就可以了解我们制定的计划是否合理有效。如果每天制定的计划都不能按时完成，那么说明自己对自己的能力估计过高，需要降低期望值。而项目经理可以通过某个组员一段时间内工作计划的完成度来了解组员的工作状态，如果组员一直处于计划不能按时完成状态，那么就要考虑是否要与组员沟通这个情况，帮助组员解决情况。</p>
+
+<h3 id="为什么要有个工作日志系统，而不是采用邮件的方式？">为什么要有个工作日志系统，而不是采用邮件的方式？</h3>
+
+<ol>
+<li>有文字记录（这个邮件也可以做到）；</li>
+<li>日志集中放置（这个邮件无法做到）；</li>
+<li>可以通过分析日志得出一些有用的统计（这个邮件无法做到）。</li>
+</ol>
+
+<p>2014/12/23更新</p>
+
+<p>其实把日志格式中的“今天”改成“昨天”，“明天”改成“今天”就是每日例会的模板了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-crack-huawei-hg526-telecom-cat/">如何破解华为HG526电信猫</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2012-01-15T12:56:43+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>15</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>12:56 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>把家里的电信从旧的4M套餐改为新的4M套餐，每月费用省了40多块，还送了个华为的HG526电信猫和iTV。拿到HG526后发现它带有无线路由功能，想着是不是可以让它自动拨号，以替换原来的ADSL猫和无线路由器。网上搜索一下，发现有很多教程，参考着资料一番实践，终于把设备给换了下来。这里做个笔记，把实践中碰到的问题和疑惑记录下来，分享给大家。</p>
+
+<p>破解HG526的关键是获得超级用户telecomadmin的密码，通过以下步骤实现：</p>
+
+<ol>
+<li>准备U盘，在根目录下建立一个文件夹e8_Config_backup，插入华为HG526；</li>
+<li>使用HG526的默认帐号（用户名useradmin）登录路由器192.168.1.1；</li>
+<li>在浏览器地址栏里输入<code>http://192.168.1.1/html/ehomeclient/cfgUSBRestore.cgi?coverusbpath=usb1_1</code>回车（注意大小写），提示备份成功；</li>
+<li>把U盘插入电脑，e8_Config_backup文件夹下多了一个文件ctce8_HG526.cfg；</li>
+<li>用附件中的工具把配置文件解密，找到telecomadmin帐号的密码；</li>
+<li>用超级用户telecomadmin登录，把远程管理关闭（不然密码就会被电信更改的）。</li>
+</ol>
+
+<p>路由拨号配置</p>
+
+<p>登录后，进入“网络” -&gt; “宽带设置”，在“连接名称”右边，选择“INTERNET_R_8_35”，按照下图配置，修改自己的上网账号和密码。</p>
+
+<p><img src="/uploads/hg526.png" title="hg526" ></p>
+
+<p>这里有个问题，某些地方的VPI/VCI值是不一样的，本人所在区域值是0/100，所以上面应该选“INTERNET_B_0_100”。其它地方如果刷了不能用建议咨询下电信维护人员。</p>
+
+<p>将破解的配置文件恢复到HG526中</p>
+
+<p>在U盘的e8_Config_backup文件夹里放入破解修改后的ctce8_HG526.cfg文件，插入HG526。用超级用户登录，在“管理” -&gt; “设备管理”页面中，在“启用USB自动恢复配置文件”后面打上钩。然后点击“设备重启”。注意观察HG526以及U盘的指示灯，等HG526上所有的灯稳定了，配置也就刷进去了。</p>
+
+<p>删除TR069协议，修改远程管理网址和域名</p>
+
+<p>正常情况下“TR069_R_8_46”连接项在配置页面中无法删除，但我们可以使用Web Developer插件来做到。在安装了Web Developer插件的Firefox中访问路由器，用telecomadmin登录，进入“网络” -&gt; “宽带设置”，在页面中点击右键，在Web Developer工具栏中选择“表单” -&gt; “开启 被禁用的表单”。然后你就可以删除TR069协议了。远程管理的修改与之类似。</p>
+
+<p>关于TR069的解释：TR-069是由DSL论坛所开发的技术规范之一，其全称为“CPE广域网管理协议”。它提供了对下一代网络中家庭网络设备进行管理配置的通用框架和协议，用于从网络侧对家庭网络中的网关、路由器、机顶盒等设备进行远程集中管理。电信通过TR069协议修改我们的无线猫的配置，比如超级用户名密码，用户权限等，所以我们的配置文件里要关闭TR069，大家注意不要自己打开，否则一旦被改了超级用户名密码就惨了！</p>
+
+<p>HG526配置文件加/解密工具下载：<a href="https://github.com/dohkoos/hw-hg526">https://github.com/dohkoos/hw-hg526</a></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/7-ways-to-grow-the-action-habit/">7个方法养成立即行动的习惯</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2011-12-02T21:10:11+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2011</span></span> <span class='time'>9:10 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>英文原文：<a href="http://www.pickthebrain.com/blog/grow-the-action-habit/">http://www.pickthebrain.com/blog/grow-the-action-habit/</a></p>
+
+<p>所有顶级成功人士都有一个共同的品质——那就是立即行动。这种品质可以取代智商、天赋和人际关系，来决定你的薪资范围和晋升速度。</p>
+
+<p>尽管这个观念很简单，但是真正掌握它的人却是极少数。行动的习惯——把想法转换成立即行动的习惯——是完成任务必不可少的习惯。这里有7个方法让你养成立即行动的习惯：</p>
+
+<h3 id="1-不要等到条件都完美了才行动">1. 不要等到条件都完美了才行动</h3>
+
+<p>如果你想等条件都完美了才开始行动，你可能永远都不会开始。因为总是会有些事情不是那么好。或是错过时机，行情不好，或是竞争太激烈。现实世界中没有完美的开始时间。你必须立即行动，等问题出现时再去解决它。<a href="http://sethgodin.typepad.com/seths_blog/2006/11/when_to_start.html">开始行动的最佳时间是去年，其次便是现在。</a></p>
+
+<h3 id="2-做个实干家">2. 做个实干家</h3>
+
+<p>行动胜于空想。你想开始实践吗？你有没有好的创意要告诉老板？今天就行动起来吧。想法停留在你脑子里的时间越长，它就会变得越弱。几天之后，细节就会变得模糊。一周过去，你已经完全忘记它了。要想成为一名实干家，你需要做更多的事情，并且在此过程中激发新的想法。</p>
+
+<h3 id="3-记住，想法本身并不能带来成功">3. 记住，想法本身并不能带来成功</h3>
+
+<p>想法是很重要，但是它只有在被执行后才有价值。一个被付诸行动的平凡想法，比许多“某一天”或者“正确时机”再去实施的卓越创意更有价值。如果你有一个觉得真的很不错的想法，那么就去实现它。如果你不行动起来，那么这个想法永远不会被实现。</p>
+
+<h3 id="4-用行动去克服恐惧">4. 用行动去克服恐惧</h3>
+
+<p>你有没有注意到，在公众演讲中最恐惧的时刻是轮到你上场前那段等待的时刻？即使是专业的演讲者和演员也经历过表演前的焦虑。他们一旦开始，恐惧就会消失。行动是治疗恐惧的最佳方法。万事开头难。一旦行动起来，你将建立起自信，事情也会变得简单。通过行动来克服恐惧，通过行动来建立自信。</p>
+
+<h3 id="5-机械地开启你的创造力">5. 机械地开启你的创造力</h3>
+
+<p>人们对创造性工作的一大误解就是认为它只会在有灵感的时候产生。如果你一直等待灵感来敲门，那么你的作品就会很少。与其等待，不如机械地开启你的创造马达。如果你需要写些东西，那么强制自己坐下来后再写。笔尖在纸上滑动，思绪展开，开始写作，用你的笔激起你的伟大想法吧。</p>
+
+<h3 id="6-先顾眼前">6. 先顾眼前</h3>
+
+<p>把注意力集中在你当下可以做的事情上。不要去烦恼上周本该完成的事，也不要担心明天要完成的任务。你唯一能左右的时间就是现在。如果你过于考虑从前或者将来，你不会完成任何事情。明天或下周的事经常永远都不会发生。</p>
+
+<h3 id="7-立即切入正题">7. 立即切入正题</h3>
+
+<p>人们在开会前一般都会做些社交活动或着聊聊天。对于个体工作者也是如此。你在开始真正工作前多久会查看一次Email或RSS feeds呢？如果你不去绕过它们直接开始工作的话，这些分心的事情将会耗费你大量的时间。如果你做到了这点，你就会成为一个高效的人，别人也会把你当作领导者来看待。</p>
+
+<p>没有上级的指示就采取行动，这需要勇气。或许这就是为何主动性是如此稀缺的才能，以至于大多数经理都在寻找这种人才。争取主动，当你有一个好的想法的时候，立即去实现它，不要等别人来告诉你。一旦人们看到你在很认真地完成事情，他们就会想要加入你。成功人士不需要别人告诉他们该做什么。如果你想成为这样的人，那就应该习惯独立行动。</p>
 </div>
   
   
@@ -1493,23 +1037,23 @@
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/the-mythical-10x-programmer/">神秘的10x程序员</a>
       </li>
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/learn-anything-faster-with-the-feynman-technique/">费曼技巧：最好的学习方法</a>
       </li>
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/code-coverage-100-percent-tragedy/">100%代码覆盖率的悲剧</a>
       </li>
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/unconventional-way-of-learning-a-new-programming-language/">学习新编程语言的非传统方式</a>
       </li>
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/the-impact-github-is-having-on-your-software-career-right-now/">GitHub对软件职业生涯的影响</a>
       </li>
     
   </ul>
@@ -1523,9 +1067,9 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 145%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 141%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 133%" href="/tags/android/">Android</a>
+<a style="font-size: 132%" href="/tags/android/">Android</a>
 <a style="font-size: 103%" href="/tags/c-plus-plus/">C++</a>
 <a style="font-size: 106%" href="/tags/css/">CSS</a>
 <a style="font-size: 108%" href="/tags/crack/">Crack</a>

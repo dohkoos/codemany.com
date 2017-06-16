@@ -9,7 +9,10 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="">
+  <meta name="description" content="现在我们准备构建一个工具，用来把ANTLR 4权威参考读书笔记（7）中idata.txt里的数据按group分行显示，就像这样： 1
+2
+2 9 10
+3 1 2 3 我们可以借助语法分析树的监听器机制来对词法分析结束后生成的记号流进行改写，我们不需要实现每一个监听器接口方法， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -79,7 +82,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/test/">test</a></h1>
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part13/">ANTLR 4权威参考读书笔记（13）</a></h1>
     
     
       <p class="meta">
@@ -88,14 +91,122 @@
 
 
 
-<time class='entry-date' datetime='2016-12-17T20:14:12+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>17</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>8:14 pm</span></time>
+<time class='entry-date' datetime='2016-05-06T18:24:18+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>6</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:24 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"></div>
+  <div class="entry-content"><p>现在我们准备构建一个工具，用来把<a href="/blog/reading-notes-the-definitive-antlr4-reference-part7/">ANTLR 4权威参考读书笔记（7）</a>中idata.txt里的数据按group分行显示，就像这样：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>2 9 10
+</span><span class='line'>3 1 2 3</span></code></pre></td></tr></table></div></figure>
+
+<p>我们可以借助语法分析树的监听器机制来对词法分析结束后生成的记号流进行改写，我们不需要实现每一个监听器接口方法，只需要在捕获到group的时候把换行符插到它末尾就行。实现改写的代码如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class RewriteListener extends IDataBaseListener {
+</span><span class='line'>    TokenStreamRewriter rewriter;
+</span><span class='line'>
+</span><span class='line'>    public RewriteListener(TokenStream tokens) {
+</span><span class='line'>        rewriter = new TokenStreamRewriter(tokens);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void enterGroup(IDataParser.GroupContext ctx) {
+</span><span class='line'>        rewriter.insertAfter(ctx.stop, '\n');
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>接着就是写一个小程序来调用我们上面的改写类：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class IData {
+</span><span class='line'>
+</span><span class='line'>    public static void main(String[] args) throws Exception {
+</span><span class='line'>        InputStream is = args.length &gt; 0 ? new FileInputStream(args[0]) : System.in;
+</span><span class='line'>
+</span><span class='line'>        ANTLRInputStream input = new ANTLRInputStream(is);
+</span><span class='line'>        IDataLexer lexer = new IDataLexer(input);
+</span><span class='line'>        CommonTokenStream tokens = new CommonTokenStream(lexer);
+</span><span class='line'>        IDataParser parser = new IDataParser(tokens);
+</span><span class='line'>        ParseTree tree = parser.file();
+</span><span class='line'>
+</span><span class='line'>        RewriteListener listener = new RewriteListener(tokens);
+</span><span class='line'>
+</span><span class='line'>        System.out.println("Before Rewriting");
+</span><span class='line'>        System.out.println(listener.rewriter.getText());
+</span><span class='line'>
+</span><span class='line'>        ParseTreeWalker walker = new ParseTreeWalker();
+</span><span class='line'>        walker.walk(listener, tree);
+</span><span class='line'>
+</span><span class='line'>        System.out.println("After Rewriting");
+</span><span class='line'>        System.out.println(listener.rewriter.getText());
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>这里的关键是TokenStreamRewriter对象知道如何在不修改流的情况下提供一个记号流的修改过的视图。它把所有的操作方法当作指令并把它们排进队列，等到在遍历记号流把它作为文本渲染回去的时候再执行。每次我们调用getText()时rewriter就会执行那些指令。</p>
+
+<p>最后就是构建和测试应用：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr IData.g
+</span><span class='line'>compile *.java
+</span><span class='line'>run IData idata.txt</span></code></pre></td></tr></table></div></figure>
+
+<p>以下是输出结果：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Before Rewriting
+</span><span class='line'>29103123
+</span><span class='line'>After Rewriting
+</span><span class='line'>2910
+</span><span class='line'>3123</span></code></pre></td></tr></table></div></figure>
+
+<p>仅用几行代码，我们就能够没有任何烦恼地对某些内容做轻微的调整。这种策略对于源代码检测或重构这类一般性的问题是非常有效的。TokenStreamRewriter是一个非常强大且有效的操作记号流的工具。</p>
+</div>
   
   
 
@@ -107,7 +218,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/test/">test</a></h1>
+      <h1 class="entry-title"><a href="/blog/developers-are-blinded-by-the-light/">开发者被灯光蒙蔽了双眼</a></h1>
     
     
       <p class="meta">
@@ -116,145 +227,51 @@
 
 
 
-<time class='entry-date' datetime='2016-12-10T11:56:57+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>10</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>11:56 am</span></time>
+<time class='entry-date' datetime='2016-04-30T23:08:43+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>30</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>11:08 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"></div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/test/">test</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-12-03T09:22:11+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2016</span></span> <span class='time'>9:22 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"></div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/the-perils-of-shared-code/">共享代码的风险</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-11-25T18:51:10+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>25</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:51 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="https://www.innoq.com/en/blog/the-perils-of-shared-code/">https://www.innoq.com/en/blog/the-perils-of-shared-code/</a></p>
-
-<p>通往地狱的道路往往是由良好的意愿铺就。在各种软件项目中，我看到人们走在这样的道路上，他们在微服务之间借助库共享代码。在几乎每个组织支持微服务架构的项目中，各个团队和开发者都期望以某些核心库为基础构建他们的微服务。显然，即使可能带来的问题已经被知道很长时间了，很多人仍然不知道它们。在这篇博文中，我想研究为什么使用这样的库可能起初听起来有吸引力，为什么可能会出现问题，以及如何能够减轻这些问题。</p>
-
-<h3 id="共享代码的目的">共享代码的目的</h3>
-
-<p>通过库来共享代码有两个主要目的：共享领域逻辑和共享基础设施层中的抽象。</p>
-
-<ol>
-<li><p><em>共享的领域模型：</em>领域模型的特定部分在两个或多个有界上下文之间是共同的，因此，作为三番五次实现它的替换，你消除了重复的需要和引入该领域逻辑的不一致实现的可能性。通常，人们想要像那样共享的领域模型的部分是核心领域或一个或多个通用子领域。在领域驱动设计的行话中，这也被称为共享内核。通常，你可以在这里找到像会话和身份验证逻辑这样的概念，但不限于此。一套相关的方法是规范数据模型。</p></li>
-<li><p><em>基础设施层抽象：</em>你想避免一次又一次地实现基础设施层的有用抽象，因此你把它们放进一个库里。通常，这些库在数据库访问、消息传递和序列化等方面提供一套统一的方法。</p></li>
-</ol>
-
-<p>两者的动机是相同的——避免重复，也就是说，遵循DRY原则（Don’t repeat yourself!）。一旦实现这些逻辑有几个好处：</p>
+  <div class="entry-content"><p>英文原文：<a href="http://programmingzen.com/2008/12/30/developers-are-blinded-by-the-light/">http://programmingzen.com/2008/12/30/developers-are-blinded-by-the-light/</a></p>
 
 <blockquote>
-<p>你不需要花费宝贵的时间致力于那些已经被解决的问题。</p>
-
-<p>有一套统一的方式做消息传递、数据库访问等。这意味着，当开发者需要去阅读和修改其他开发者最初创建的微服务中的代码时，他们很容易找到他们的方式。</p>
-
-<p>关于彼此行为略有不同的业务逻辑或基础设施关注点，你不想有不同的实现。取而代之的是，有一套做正确事情的规范实现。</p>
+<p>Blinded by the light,<br>
+revved up like a deuce,<br>
+another runner in the night<br>
+— Bruce Springsteen</p>
 </blockquote>
 
-<h3 id="共享代码的问题">共享代码的问题</h3>
+<p>人类在计算几率方面是异常地差。我们有限的经验强烈地影响着我们对事件的可能性的认知。例如，我们往往极大地高估由恐怖袭击、意外枪支走火或者飓风引起死亡的几率，并且极大地低估像坠落、溺水或者流感死亡的原因。其原因是媒体经常提醒我们恐怖主义、飓风的危险或者关于孩子们被意外射杀的瞬间故事。你很少发现关于一个人溺水、坠落或者由于流感死亡的故事在国家新闻频道上被报道。新闻报道有一种倾向是耸人听闻，为的是引起人们的注意和钩住大量的观众，因此当谈到估计什么可能/不可能发生时它们促成人们的偏见。</p>
 
-<p>在理论上听起来很棒的东西不会没有自己的问题，而且这些问题可能比你试图用你的库解决的问题更令人痛苦。Stefan Tilkov已经详细解释了<a href="https://www.innoq.com/en/blog/thoughts-on-a-canonical-data-model/">为什么你应该避免规范的数据模型</a>。除此之外，让我指出一些其它的问题。</p>
+<p>同样的，在电视和报纸上过度曝光心花怒放的彩票中奖者举起他们超大的支票往往歪曲人们对通过购买一注彩票胜利的可能性的认知。对这个问题持一个严谨和客观的态度将会很快揭露中奖的几率比它们表面上看起来的要差得多。[1]</p>
 
-<h4 id="分布式单体">分布式单体</h4>
+<p>我注意到这种情况也正在开发/创业的世界里发生。这是一波新的淘金热。太多的开发者正在试图建立下一个大的社交网络，成为下一个Facebook（或YouTube），聚集数以百万计的人群，希望被大公司以一笔数量荒谬的钱收购。媒体喜欢这类故事。</p>
 
-<p>通常，似乎存在一个隐含的假设，将东西放入库意味着你永远不必担心使用错误或过时的实现构成的服务，因为他们只需要更新其对库的依赖关系到最新版本。</p>
+<p>因此，正在试图构建下一个Facebook的开发者类似于彩票买家。他们中的一些人会成功和获胜，但大部分人会惨遭失败。我们真正需要多少社交网络？广告支撑的模式适合某些设法吸引庞大的人群同时保持其费用最低（例如PlentyOfFish）或者被收购（例如YouTube，它也在花Google的钱）的幸运的公司。在这个过程中其他人都是在烧钱以及浪费VC的钱和诚意。</p>
 
-<p>每当你依靠通过将所有的微服务更新到同样的新版本库，来对所有微服务的某些行为作出一致的改变时，你就会在它们之间引入强耦合。你失去了微服务的一个主要优点，即它们彼此独立地演进和部署的能力。</p>
+<p>我担心很多开发者被灯光蒙蔽了双眼。他们对获得成功的真实几率的认知受到了媒体连续报道的百万——如果不是10亿——美元收购和成功故事的扭曲。而且有些VC鼓励这种行为，希望能在他们的投资上看到高回报。毕竟这些都是非常富有的人，他们对小规模的成功不感兴趣。</p>
 
-<p>我见过这样的案例，所有的服务必须同时部署，以便服务仍能正常工作。如果你达到这种状态，不可否认，你实际上构建了一个分布式的单体。</p>
+<p>除了明显的浪费时间和资源之外，我认为许多开发者为了追求极不可能的结果放弃了极好的机会。用一个传统商业计划挣1,000万的可能性和按YouTube的方式挣10亿的可能性的比例，与这些金额能负担得起你的不同生活质量不成正比。如果你破产了，有3万美元的信用卡债务，或者你是中产阶级，你会发现1,000万美元可以提高的生活质量总是远远超过从1,000万到10亿能提高的。而且重要的是，我们要认识到瞄准尽管更小，但更有可能的结果不会以任何方式阻止你以后的“伟大梦想”，一旦你的第一次（或者第一次成功的）创业已经取得了成功。</p>
 
-<p>一个流行的示例是使用代码生成，例如，基于服务API的Swagger描述，以便为你的服务提供一个客户端库。比你想象的更多，开发者可能会滥用此种方式进行重大变更，因为依赖服务“只”需要使用新版本的客户端库。这不是你如何<a href="http://olivergierke.de/2016/10/evolving-distributed-systems/">演进一个分布式系统</a>。</p>
+<p>你愿意参加20次有1次胜利机会的100万美元抽奖，还是50,000,000次有1次机会的5亿美元抽奖？理性的人会选择第1个，然而在今天，大部分创业公司都倾向于选择第2个。他们这么做是因为他们极大地高估了他们以第2个抽奖成功的几率。</p>
 
-<h4 id="依赖地狱">依赖地狱</h4>
+<p>创建一个产品并让人们为它付费。不要拿VC的钱，除非你真的不考虑依靠自己的力量启动你的公司。软件世界的主要优点之一是在开始的时候极少量的资本需要。如果你想做Web应用，可以使用软件即服务（SaaS）模型，让你的用户为你提供的软件和服务付费。你将会有更加少的受众，更少的可伸缩性问题和费用，以及有更多的收入和更大的盈利机会。Joel Spolsky（和<a href="http://www.joelonsoftware.com/items/2008/12/29.html">他那华丽的办公空间</a>）挣得数百万收入是因为他的公司在出售一套Web版的bug追踪器。你知道有多少免费的bug追踪器？在这个市场上存在多少竞争对手？我确信有许多。然而，虽然Joel的人气毫无疑问地帮助到了他的公司，但此案例仍然展示了一个企业如何通过构建一个更好的产品而成功。</p>
 
-<p>库，尤其是那些旨在为基础设施关注点提供通用解决方案的库，往往有个额外的问题：它们会附上它们依赖的一整套额外的库。你的库的传递依赖树越大，它导致俗称为依赖地狱的噩梦的可能性就越高。因为你的微服务可能需要自己的额外的依赖，它们同样具有传递依赖性，直到它们中的某些库间接地拉进一些库的冲突版本，这只是个时间问题，只在不同版本之间选择是不可能的，因为它们是二进制不兼容的。</p>
+<p>就像David Heinemeier Hansson提及的，有无数不受关注的公司在像那样挣钱。[2]如果你把视线从聚光灯上移开，你将看到许多公司在它们所做的事情上面非常成功，尽管它们不出名或者没有制造新闻头条。它们中的有些公司实际上努力不去吸引太多的关注到它们的成功上（经常用数百万美元来衡量），以便防止竞争对手的涌现。</p>
 
-<p>当然，你的解决方案也许只是提供微服务可能需要的所有库作为你的核心库的依赖。那仍然意味着你的微服务不能独立地演进，例如通过升级到它们依赖的唯一的特定库的更高版本——它们都与核心库的发布周期步调一致。除此之外，为什么你要强制每个服务接受一整堆的依赖，当它们实际上可能只需要依赖中的一些时？</p>
+<p>不管你的名字是不是家喻户晓，你甚至不必创建Web应用才能非常成功。你可能会想到为智能手机包括iPhone开发移动应用。但是良好的老式桌面应用让各种各样的软件公司继续发展。这就是为什么“你不能再用商业桌面软件挣钱，或者桌面应用都死了”的扭曲的认知太荒谬的原因。作为开发者/微型ISV/创业公司，你用良好设计的桌面软件挣钱的机会远远高于构建任何一款YouTube、Flickr或者Facebook复制品的机会。</p>
 
-<h4 id="自顶而下的库设计">自顶而下的库设计</h4>
+<p>要了解我们的认知是怎么被扭曲的，你只需要和那些公开分享它们软件销售统计的公司交谈。你将会被用相对普通的软件挣到钱的数额震惊。Balsamiq制作了一款UI草图应用卖79美元。作者成功挣到了<a href="http://www.balsamiq.com/blog/?p=424">10万美元收入在前5个月</a>，大部分是通过销售应用的桌面版本。在这个产业里他当然远非最大的赢家之一。我提到这个不过是因为它表明那是一个非常不错的想法，很好执行，当你让你的用户付费时能很快带来收入。如果你认为在5个月里10万美元很少，那我来问你有多少免费网站达成一个类似的每月收入净额。如果你正在寻找更大的收入，了解下Omni Graffle，它给<a href="http://www.omnigroup.com/applications/OmniGraffle/">Omni Group</a>赚取了数百万美元，或者把你的目光放到B2B应用上（在那个市场里某些应用卖上千美元一份）。</p>
 
-<p>通常情况下，我见过的库被一个或多个架构师强加于开发者，采用自顶而下的方法进行库设计。</p>
+<p>当许多开发者被灯光蒙蔽了双眼的时候，有创业想法的智者正在建立真正的软件业务。我请你走出来做同样的事情。</p>
 
-<p>通常，在这种情况下发生的是，由库暴露的API太受限制和不灵活，或者使用了错误的抽象级别，因为它们是由不够熟悉广泛的不同的真实世界用例的人设计的。这样的库经常导致不得不使用它的开发者遭受挫折，以及导致人们试图绕过库的限制。</p>
+<p>脚注</p>
 
-<h4 id="单语言解决一切">单语言解决一切</h4>
+<p>[1] 我在这里总结的概念被Dan Gilbert在<a href="http://www.ted.com/index.php/talks/dan_gilbert_researches_happiness.html">这个TED演讲</a>里更详细地说明了。</p>
 
-<p>强制使用库的最明显的缺陷之一是，这使得它更难以切换到不同的编程语言（或者平台，比如JVM或.NET），再次失去了微服务架构的一个优势，即选择最适合给定问题的技术的能力。如果你后来意识到，你终究需要这种语言或者平台的多样性，你必须创造各种奇怪的支持。例如，Netflix提出的<a href="https://github.com/Netflix/Prana">Prana</a>，一个同时运行非JVM服务的附加件，为他们提供到Netflix技术栈的一套HTTP API。</p>
-
-<h3 id="我们能不能做得更好？">我们能不能做得更好？</h3>
-
-<p>由于所有的问题都是通过库共享代码引入的，最极端的解决方案是根本没有这样的库。如果你这样做，你将不得不做一些复制和粘贴或者为新的微服务提供一个模板项目，以便从前面所述的步调一致中释放你的服务。基础设施代码以及领域模型的共享内核中都可以这么做。事实上，Eric Evans在他的关于领域驱动设计的经典蓝皮书中提到，“通常各个团队只是在各自的内核备份上改动，每隔一定时间才会与其他团队集成”[1]。共享内核不一定要是库。</p>
-
-<p>如果你不喜欢复制和粘贴的想法，那也很好。毕竟，如上所述，通过库共享代码有一定的优势。在这种情况下，这里有一些重要的事情需要考虑：</p>
-
-<h4 id="最少依赖的小型库">最少依赖的小型库</h4>
-
-<p>尝试将大的共享库分成一组非常小的、高度集中的库，每个库解决一个特定的问题。试着让这些库成为零依赖库，只依靠语言的标准库。是的，仅仅针对语言的标准库来编程并不总是令人愉快的，但是对于你公司的所有团队的巨大好处（甚至超出你的公司，如果你的馆是开源的）显然大于这个微小的不便。</p>
-
-<p>当然，零依赖并不总是可能的，特别是对于基础设施关注点。对于这些，通过你的每个小型库最小化所需的依赖。另外，有时可以独立于库的核心，提供与别的库的绑定或集成作为单独的工件。</p>
-
-<h4 id="留下选择余地">留下选择余地</h4>
-
-<p>不要指望服务将在特定时间点更新到共享库的最新版本的事实。换句话说，不要强制团队进行库更新，而是让他们可以按照自己的节奏自由更新。这可能需要你以向后和向前兼容的方式修改库，但它会解耦你的服务，不仅给你微服务架构的运营成本，而且还有一些优势。</p>
-
-<p>如果可能，不仅要避免强制库更新，还要使库本身的使用可选。</p>
-
-<h4 id="自底而上的库设计">自底而上的库设计</h4>
-
-<p>最后，如果你想拥有共享库，我见过的获得成功的项目是使用自底而上的方法。让你的团队实现他们的微服务，而不是让象牙塔架构师设计在现实世界中几乎不可用的库，而当在多个服务的生产中已经证明它们自己的一些常见模式出现时，将它们提取到库中。</p>
-
-<p>[1] Evans, Eric: Domain-Driven Design: Tackling Complexity in the Heart of Software, p. 355</p>
+<p>[2] David Heinemeier Hansson在<a href="http://www.37signals.com/svn/posts/1495-the-untold-millions">他的一篇帖子</a>中持类似的观点，该帖给了本文以灵感。</p>
 </div>
   
   
@@ -267,7 +284,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/test/">test</a></h1>
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part12/">ANTLR 4权威参考读书笔记（12）</a></h1>
     
     
       <p class="meta">
@@ -276,542 +293,7 @@
 
 
 
-<time class='entry-date' datetime='2016-11-18T05:58:56+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>5:58 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"></div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/test/">test</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-11-12T14:21:50+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>2:21 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"></div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part30/">ANTLR 4权威参考读书笔记（30）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-10-26T18:02:32+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:02 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>有时我们在调试语法时需要ANTLR提供更好的消息提示，为达到这个目的，我们可以改变ANTLR的标准错误报告。</p>
-
-<h3 id="改变和重定向antlr错误消息">改变和重定向ANTLR错误消息</h3>
-
-<p>默认情况下，ANTLR把所有的错误发送给标准错误，但我们可以通过提供ANTLRErrorListener接口的实现来修改目标和内容。该接口有syntaxError()方法可以应用于词法分析器和语法分析器。方法syntaxError()接收各种有关错误的位置以及错误消息的信息。它也接收语法分析器的一个引用，因此我们可以查询关于识别的状态。</p>
-
-<p>例如，这里是一个错误监听器，它打印规则调用栈以及随后的用有问题的记号信息来加强的通常错误消息：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public static class VerboseListener extends BaseErrorListener {
-</span><span class='line'>    @Override
-</span><span class='line'>    public void syntaxError(Recognizer&lt;?, ?&gt; recognizer,
-</span><span class='line'>                            Object offendingSymbol,
-</span><span class='line'>                            int line, int charPositionInLine,
-</span><span class='line'>                            String msg,
-</span><span class='line'>                            RecognitionException e)
-</span><span class='line'>    {
-</span><span class='line'>        List&lt;String&gt; stack = ((Parser)recognizer).getRuleInvocationStack();
-</span><span class='line'>        Collections.reverse(stack);
-</span><span class='line'>        System.err.println("rule stack: "+stack);
-</span><span class='line'>        System.err.println("line "+line+":"+charPositionInLine+" at "+
-</span><span class='line'>        offendingSymbol+": "+msg);
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>使用这个定义，我们的应用可以很容易地在调用开始规则前给语法分析器添加一个错误监听器。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>SimpleParser parser = new SimpleParser(tokens);
-</span><span class='line'>parser.removeErrorListeners();    // remove ConsoleErrorListener
-</span><span class='line'>parser.addErrorListener(new VerboseListener());    // add ours
-</span><span class='line'>parser.prog();    // parse as usual</span></code></pre></td></tr></table></div></figure>
-
-<p>在添加我们自己的错误监听器之前，必须先移除标准的终端错误监听器，否则的话就会得到重复的错误消息。</p>
-
-<p>现在让我们看下包含一个额外类名以及缺少字段名的类定义的错误消息看起来是什么样子：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>compile *.java
-</span><span class='line'>run TestE_Listener</span></code></pre></td></tr></table></div></figure>
-
-<p>以下是包含额外类名以及缺少字段名的类定义：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class T T {
-</span><span class='line'>  int ;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>然后我们就会看到如下错误消息：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>rule stack: [prog, classDef]
-</span><span class='line'>line 1:8 at [@2,8:8='T',&lt;9&gt;,1:8]: extraneous input 'T' expecting '{'
-</span><span class='line'>rule stack: [prog, classDef, member]
-</span><span class='line'>line 2:6 at [@5,18:18=';',&lt;8&gt;,2:6]: no viable alternative at input 'int;'
-</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
-
-<p>栈[prog, classDef]指出语法分析器在规则classDef中，且被prog调用。注意，记号信息包含在输入流中的字符位置，这在高亮输入中的错误时是非常有用的。例如，记号[@2,8:8=&#39;T&#39;,<9>,1:8]指出它是记号流中的第3个记号（索引从0开始），字符范围从8到8，记号类型为9，位于第1行，并且在字符位置8（计数从0开始，且TAB被当作一个字符）。</p>
-
-<p>作为另一个示例，让我们构建一个错误监听器TestE_Listener2.java，它打印带有被下划线强调的有错误的记号的行。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>compile *.java
-</span><span class='line'>run TestE_Listener2</span></code></pre></td></tr></table></div></figure>
-
-<p>输入以下数据：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class T XYZ {
-</span><span class='line'>  int ;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>然后就会看如如下错误信息：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>line 1:8 extraneous input 'XYZ' expecting '{'
-</span><span class='line'>class T XYZ {
-</span><span class='line'>        ^^^
-</span><span class='line'>line 2:6 no viable alternative at input 'int;'
-</span><span class='line'>  int ;
-</span><span class='line'>      ^
-</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
-
-<p>为了让事情变得更容易，我们将忽略TAB——charPositionInLine不是列号，因为TAB的大小不是统一定义的。这里是一个错误监听器实现，强调输入中的错误位置。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public static class UnderlineListener extends BaseErrorListener {
-</span><span class='line'>    public void syntaxError(Recognizer&lt;?, ?&gt; recognizer,
-</span><span class='line'>                            Object offendingSymbol,
-</span><span class='line'>                            int line, int charPositionInLine,
-</span><span class='line'>                            String msg,
-</span><span class='line'>                            RecognitionException e) {
-</span><span class='line'>        System.err.println("line "+line+":"+charPositionInLine+" "+msg);
-</span><span class='line'>        underlineError(recognizer,(Token)offendingSymbol,
-</span><span class='line'>        line, charPositionInLine);
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    protected void underlineError(Recognizer recognizer,
-</span><span class='line'>                                  Token offendingToken, int line,
-</span><span class='line'>                                  int charPositionInLine) {
-</span><span class='line'>        CommonTokenStream tokens =
-</span><span class='line'>            (CommonTokenStream)recognizer.getInputStream();
-</span><span class='line'>        String input = tokens.getTokenSource().getInputStream().toString();
-</span><span class='line'>        String[] lines = input.split("\n");
-</span><span class='line'>        String errorLine = lines[line - 1];
-</span><span class='line'>        System.err.println(errorLine);
-</span><span class='line'>        for (int i=0; i&lt;charPositionInLine; i++) System.err.print(" ");
-</span><span class='line'>        int start = offendingToken.getStartIndex();
-</span><span class='line'>        int stop = offendingToken.getStopIndex();
-</span><span class='line'>        if ( start&gt;=0 && stop&gt;=0 ) {
-</span><span class='line'>            for (int i=start; i&lt;=stop; i++) System.err.print("^");
-</span><span class='line'>        }
-</span><span class='line'>        System.err.println();
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>关于错误监听器还有一件事需要知道。当语法分析器侦测到一个模棱两可的输入序列时，它会通知错误监听器。默认的错误监听器ConsoleErrorListener实际上不会在终端打印任何东西，也就是说，语法分析器不会通知用户。让我们回顾下能用两种方式匹配输入<code>f();</code>的那段歧义语法。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Ambig;
-</span><span class='line'>
-</span><span class='line'>stat: expr ';'    // expression statement
-</span><span class='line'>    | ID '(' ')' ';'    // function call statement
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>expr: ID '(' ')'
-</span><span class='line'>    | INT
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>INT : [0-9]+ ;
-</span><span class='line'>ID  : [a-zA-Z]+ ;
-</span><span class='line'>WS  : [ \t\r\n]+ -&gt; skip ;</span></code></pre></td></tr></table></div></figure>
-
-<p>如果我们测试这段语法，我们不会看到有关模棱两可的输入的警告。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr Ambig.g
-</span><span class='line'>compile *.java
-</span><span class='line'>grun Ambig stat</span></code></pre></td></tr></table></div></figure>
-
-<p>然后输入：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>f();</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part29/">ANTLR 4权威参考读书笔记（29）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-10-18T11:22:11+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>11:22 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>当我们开发一套语法时，会有很多错误要去修复。在完成语法前，生成的语法分析器不会识别所有有效的句子。在这期间，提供有用信息的错误消息帮助我们追踪到语法问题。一旦我们有了一套正确的语法，然后我们就必须处理用户输入的不合语法的句子，或者甚至由其它程序发生故障生成的不合语法的句子。在这两种情况下，语法分析器对不合语法的输入的响应方式是一个需要重点考虑的问题。</p>
-
-<p>在这里，我们将学习被ANTLR生成的语法分析器使用的自动错误报告和恢复策略。</p>
-
-<h3 id="错误展示">错误展示</h3>
-
-<p>描述ANTLR的错误恢复策略的最好方式是观察由它生成的语法分析器对错误输入的响应。让我们看一个类Java语言的语法，它包含带有字段和方法成员的类定义。该方法有简单的语句和表达式。嵌入动作在语法分析器找到元素时就打印它们。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Simple;
-</span><span class='line'>
-</span><span class='line'>prog: classDef+ ; // match one or more class definitions
-</span><span class='line'>
-</span><span class='line'>classDef
-</span><span class='line'>    : 'class' ID '{' member+ '}' // a class has one or more members
-</span><span class='line'>      {System.out.println("class "+$ID.text);}
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>member
-</span><span class='line'>    : 'int' ID ';'    // field definition
-</span><span class='line'>      {System.out.println("var "+$ID.text);}
-</span><span class='line'>    | 'int' f=ID '(' ID ')' '{' stat '}'    // method definition
-</span><span class='line'>      {System.out.println("method: "+$f.text);}
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>stat: expr ';'
-</span><span class='line'>      {System.out.println("found expr: "+$stat.text);}
-</span><span class='line'>    | ID '=' expr ';'
-</span><span class='line'>      {System.out.println("found assign: "+$stat.text);}
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>expr: INT
-</span><span class='line'>    | ID '(' INT ')'
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>INT : [0-9]+ ;
-</span><span class='line'>ID  : [a-zA-Z]+ ;
-</span><span class='line'>WS  : [ \t\r\n]+ -&gt; skip ;</span></code></pre></td></tr></table></div></figure>
-
-<p>现在，先让我们使用一些有效的输入运行语法分析器，借以观测正常的输出。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr Simple.g
-</span><span class='line'>compile *.java
-</span><span class='line'>grun Simple prog</span></code></pre></td></tr></table></div></figure>
-
-<p>输入以下数据：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class T { int i; }</span></code></pre></td></tr></table></div></figure>
-
-<p>你就会看到：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>var i
-</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
-
-<p>语法分析器没有显示任何错误，它执行打印语句，报告关于变量i和类定义T的正确识别。</p>
-
-<p>接下来，让我们尝试一个带有方法定义的类，该方法含有一个虚假赋值表达式。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grun Simple prog -gui</span></code></pre></td></tr></table></div></figure>
-
-<p>输入测试数据：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class T {
-</span><span class='line'>  int f(x) { a = 3 4 5; }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>然后你就会看到：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>line 2:19 mismatched input '4' expecting ';'
-</span><span class='line'>method: f
-</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
-
-<p>在4记号处，语法分析器没有找到它期待的“;”，所以它报告一个错误。line 2:19指出有问题的标记是在第2行第19列的字符位置（字符位置从0开始）。因为使用了-gui参数，我们可以看到带有高亮错误节点的语法分析树。</p>
-
-<p><img src="/uploads/simple-parse-tree.png" title="simple-parse-tree" ></p>
-
-<p>在这里，有两个额外的记号，并且语法分析器给出一个不匹配的通用错误消息。如果只有单个的额外记号，语法分析器可能会智能一点，指出它是一个额外的记号。在接下来的运行测试中，有个额外的“;”在类名和类体之间：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grun Simple prog</span></code></pre></td></tr></table></div></figure>
-
-<p>输入如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class T ; { int i; }</span></code></pre></td></tr></table></div></figure>
-
-<p>输出结果：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>line 1:8 extraneous input ';' expecting '{'
-</span><span class='line'>var i
-</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
-
-<p>在“;”处语法分析器报告一个错误，但给出了一个稍微翔实的答案，因为它知道下一个记号就是它实际上在寻找的那个。这个特性被称为单个记号删除（single-token deletion），因为语法分析器可以简单地装作额外的记号不存在并继续执行。</p>
-
-<p>同样的，语法分析器可以在侦测到缺少一个记号时做单个记号插入（single-token insertion）。让我们删掉结束的“}”看看会发生什么。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grun Simple prog</span></code></pre></td></tr></table></div></figure>
-
-<p>然后输入：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class T {
-</span><span class='line'>  int f(x) { a = 3; }</span></code></pre></td></tr></table></div></figure>
-
-<p>结果是：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>found assign: a=3;
-</span><span class='line'>method: f
-</span><span class='line'>line 3:0 missing '}' at '&lt;EOF&gt;'
-</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
-
-<p>语法分析器报告它不能找到必须的结束记号“}”。</p>
-
-<p>当语法分析器处于决策点时，会出现另一个常见的语法错误，并且剩余的输入与规则或子规则的任何选项都不一致。例如，如果我们忘记字段声明中的变量名，规则member中的选项都不匹配。语法分析器报告没有可行的选项。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grun Simple prog</span></code></pre></td></tr></table></div></figure>
-
-<p>输入以下代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class T { int ; }</span></code></pre></td></tr></table></div></figure>
-
-<p>然后结果是：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>line 1:14 no viable alternative at input 'int;'
-</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
-
-<p>在“int”和“;”之间没有空格，因为我们在WS()规则中告诉词法分析器skip()。</p>
-
-<p>如果有词法错误，ANTLR也会放出错误消息，指出哪些字符不能匹配为记号。例如，如果我们提交一个完全未知的字符，我们将得到一个记号识别错误。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grun Simple prog</span></code></pre></td></tr></table></div></figure>
-
-<p>输入：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class # { int i; }</span></code></pre></td></tr></table></div></figure>
-
-<p>输出：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>line 1:6 token recognition error at: '#'
-</span><span class='line'>line 1:8 missing ID at '{'
-</span><span class='line'>var i
-</span><span class='line'>class &lt;missing ID&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>因为没有给出有效的类名，单个记号插入机制召唤了“missing ID”名字，以致类名记号是非空值。如果想控制语法分析器如何召唤记号，可以覆盖DefaultErrorStrategy中的getMissingSymbol()。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part28/">ANTLR 4权威参考读书笔记（28）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-10-06T18:42:25+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>6</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:42 pm</span></time>
+<time class='entry-date' datetime='2016-04-26T10:20:44+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>10:20 am</span></time>
         
       </p>
     
@@ -819,487 +301,15 @@
 
 
   <div class="entry-content"><ul>
-<li>scope 作用域</li>
+<li>sentinel 哨兵</li>
+<li>tag 标签</li>
 </ul>
 
-<p>为了阐明Cymbol语法是可复用的，本节中我们将在不做修改的基础上再次使用它，用于构建一个完全不同的应用。不仅如此，我们还会在同样的树上使用两个不同的监听器做两次遍历。</p>
+<p>目前我们看到的输入文件都只包含一种语言，但在实际应用中我们可能会遇到某些包含多种语言的文件格式。例如，Java的文档注释，XML文件等。这些环绕着模板表达式的文本需要不同的处理方式，它们被称为孤岛语言。</p>
 
-<h3 id="验证程序符号的使用情况">验证程序符号的使用情况</h3>
+<p>ANTLR有提供一个称之为“词法模型”的词法分析器特性，它让我们可以很容易地处理包含混合格式的文件。基本思路是：当词法分析器看到特殊的哨兵字符序列时，就让它在模式之间来回切换。</p>
 
-<p>为Cymbol这样的编程语言构建解释器、编译器或者转换器，我们需要验证Cymbol程序是否正确地使用符号（标志符）。接下来，我们将构建一个Cymbol验证器用于检查以下的条件：</p>
-
-<ul>
-<li>可见的变量引用有相应的定义（在作用域内）。</li>
-<li>函数引用有相应的定义（函数可以以任何顺序出现）。</li>
-<li>变量不作为函数使用。</li>
-<li>函数不作为变量使用。</li>
-</ul>
-
-<p>让我们看一下有许多不同引用的Cymbol示例代码，其中有些是无效的。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>int f(int x, float y) {
-</span><span class='line'>    g();      // forward reference is ok
-</span><span class='line'>    i = 3;    // no declaration for i (error)
-</span><span class='line'>    g = 4;    // g is not variable (error)
-</span><span class='line'>    return x + y;    // x, y are defined, so no problem
-</span><span class='line'>}
-</span><span class='line'>void g() {
-</span><span class='line'>    int x = 0;
-</span><span class='line'>    float y;
-</span><span class='line'>    y = 9;    // y is defined
-</span><span class='line'>    f();      // backward reference is ok
-</span><span class='line'>    z();      // no such function (error)
-</span><span class='line'>    y();      // y is not function (error)
-</span><span class='line'>    x = f;    // f is not a variable (error)
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>为验证程序中的一切都没问题，根据前面的条件，我们应该打印出函数列表和本地变量以及全局符号列表（函数和全局变量）。更进一步，当我们发现问题时应该给出一个错误。例如，使用上述输入，让我们构建一个称为CheckSymbols的应用。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>java CheckSymbols vars.cymbol</span></code></pre></td></tr></table></div></figure>
-
-<p>在执行以上命令后会生成如下输出：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>locals:[]
-</span><span class='line'>function&lt;f:tINT&gt;:[&lt;x:tINT&gt;, &lt;y:tFLOAT&gt;]
-</span><span class='line'>locals:[x, y]
-</span><span class='line'>function&lt;g:tVOID&gt;:[]
-</span><span class='line'>globals:[f, g]
-</span><span class='line'>line 3:4 no such variable: i
-</span><span class='line'>line 4:4 g is not a variable
-</span><span class='line'>line 13:4 no such function: z
-</span><span class='line'>line 14:4 y is not a function
-</span><span class='line'>line 15:8 f is not a variable</span></code></pre></td></tr></table></div></figure>
-
-<p>实现这类问题的关键是一个被称为符号表的相应的数据结构。我们的应用会把符号存在符号表中，然后通过在符号表中查找符号引用检查它们的正确性。在接下来的部分，我们将大概看一看数据结构看起来像什么，并且使用它去解决手头的验证问题。</p>
-
-<h3 id="符号表中的速成课">符号表中的速成课</h3>
-
-<p>语言实现者通常称持有符号的数据结构为符号表。语言的实现决定符号表的结构和复杂性，如果一门语言允许相同的标志符在不同的上下文中指向不同的东西，符号表会将那些符号分组到不同的作用域中。作用域只是一组符号，例如函数的参数列表或变量列表以及在全局作用域内的函数。</p>
-
-<p>符号表自身只是一个符号定义的存储库——它不作任何检查。为了验证代码，我们需要检查表达式中违反我们之前设置的规则的变量和函数引用。符号验证有两个基本操作：定义符号和解决符号。定义一个符号意味着把它添加到一个作用域中。解决一个符号意味着计算出符号指向哪个定义。在某种程度上，解决一个符号意味着找到最近的匹配定义。最近的作用域是最近的封闭作用域。例如，让我们看看另一个Cymbol例子，它在不同的作用域有符号定义。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>int x;
-</span><span class='line'>int y;
-</span><span class='line'>void a()
-</span><span class='line'>{
-</span><span class='line'>    int x;
-</span><span class='line'>    x = 1;
-</span><span class='line'>    // x resolves to current scope, not x in global scope
-</span><span class='line'>    y = 2;
-</span><span class='line'>    // y is not found in current scope, but resolves in global
-</span><span class='line'>    { int y = x; }
-</span><span class='line'>}
-</span><span class='line'>void b(int z)
-</span><span class='line'>{ }</span></code></pre></td></tr></table></div></figure>
-
-<p>全局作用域包含变量x和y以及函数a()和b()。函数处于全局作用域，但它们也构成新的作用域用于持有函数的参数，如果有的话。同样嵌套在函数作用域内的是函数本地代码块，它们构成另一个新的作用域。本地变量被约束在嵌套在函数作用域内的本地作用域内。</p>
-
-<p>因为符号x被定义了两次，所以做不到仅把所有标识符都填充进单个集合而没有冲突。这也是作用域出现的原因。我们保留一组作用域，并且一个作用域中的每个标志符只允许有单个定义。我们还保留一个指向父作用域的指针，以便在外层作用域中找到符号定义。这些作用域形成了一棵树。</p>
-
-<p><img src="/uploads/cymbol-scope-tree.png" title="cymbol-scope-tree" ></p>
-
-<p>沿着从任何作用域到根（全局作用域）的路径的所有节点形成一堆作用域。为了找到一个符号的定义，我们从围绕着引用的作用域开始，并沿着作用域树向上遍历，直到找到它的定义。</p>
-
-<h3 id="验证器架构">验证器架构</h3>
-
-<p>开始构建验证器前，先让我们思考下大方向和总体策略。我们可以根据关键操作——定义和解决——把问题分解。对于定义，我们需要侦听变量和函数定义事件，然后把符号对象插入围绕着定义的作用域。在函数定义的开始处，我们需要压栈一个新的作用域，然后在函数定义的结尾处把它出栈。</p>
-
-<p>为解决和检查符号引用，我们需要侦听在表达式中的变量和函数名字引用。针对每个引用，我们将验证是否有匹配的定义，以及引用是否正确使用符号。</p>
-
-<p>这似乎很直截了当，但有个并发症：在源码文件中，Cymbol程序可以调用在它之后定义的一个函数。我们称它为前向引用。为支持这个特性，我们需要在语法分析树上执行两次遍历。第一遍，或者阶段，定义包含函数的符号，然后第二遍进行解决。用这种方法，第二遍可以看到文件中的所有函数。以下是用于触发在语法分析树上两次遍历的代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ParseTreeWalker walker = new ParseTreeWalker();
-</span><span class='line'>DefPhase def = new DefPhase();
-</span><span class='line'>walker.walk(def, tree);
-</span><span class='line'>// create next phase and feed symbol table info from def to ref phase
-</span><span class='line'>RefPhase ref = new RefPhase(def.globals, def.scopes);
-</span><span class='line'>walker.walk(ref, tree);</span></code></pre></td></tr></table></div></figure>
-
-<p>在定义阶段，我们将创建许多作用域。除非我们保持对它们的引用，否则垃圾收集器会回收它们。为了符号表能够度过从定义到解决阶段的转变，我们需要追踪这些作用域。储存它们最合乎逻辑的地方是在语法分析树本身（或者，从技术上讲，使用关联值与树节点的注解映射）。然后引用阶段就可以在它下行语法分析树时很简单地获得当前作用域的指针。与函数和本地块关联的树节点将可以获得它们的作用域的指针。</p>
-
-<h3 id="定义和解决符号">定义和解决符号</h3>
-
-<p>考虑到我们的基本策略，让我们从DefPhase开始构建我们的验证器。这个阶段类需要3个字段：一个全局作用域的引用、一个用于追踪我们创建的作用域的语法分析树注解器，以及一个当前作用域的指针。enterFile()的监听器代码在活动开始时创建全局变量。当活动结束时，exitFile()负责打印结果。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class DefPhase extends CymbolBaseListener {
-</span><span class='line'>    ParseTreeProperty&lt;Scope&gt; scopes = new ParseTreeProperty&lt;Scope&gt;();
-</span><span class='line'>    GlobalScope globals;
-</span><span class='line'>    Scope currentScope;    // define symbols in this scope
-</span><span class='line'>    public void enterFile(CymbolParser.FileContext ctx) {
-</span><span class='line'>        globals = new GlobalScope(null);
-</span><span class='line'>        currentScope = globals;
-</span><span class='line'>    }
-</span><span class='line'>    public void exitFile(CymbolParser.FileContext ctx) {
-</span><span class='line'>        System.out.println(globals);
-</span><span class='line'>    }</span></code></pre></td></tr></table></div></figure>
-
-<p>当语法分析器找到函数声明时，应用需要创建一个FunctionSymbol对象。作为一个符号和作为一个包含参数的作用域，FunctionSymbol对象负有双重责任。为把函数作用域嵌套在全局作用域内，我们需要把函数作用域压栈。我们通过设置函数的封闭作用域为当前作用域并重置当前作用域来做到这点。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void enterFunctionDecl(CymbolParser.FunctionDeclContext ctx) {
-</span><span class='line'>    String name = ctx.ID().getText();
-</span><span class='line'>    int typeTokenType = ctx.type().start.getType();
-</span><span class='line'>    Symbol.Type type = CheckSymbols.getType(typeTokenType);
-</span><span class='line'>
-</span><span class='line'>    // push new scope by making new one that points to enclosing scope
-</span><span class='line'>    FunctionSymbol function = new FunctionSymbol(name, type, currentScope);
-</span><span class='line'>    currentScope.define(function);    // Define function in current scope
-</span><span class='line'>    saveScope(ctx, function);         // Push: set function's parent to current
-</span><span class='line'>    currentScope = function;          // Current scope is now function scope
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>void saveScope(ParserRuleContext ctx, Scope s) {
-</span><span class='line'>    scopes.put(ctx, s);
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>方法saveScope()使用函数作用域注解functionDecl规则节点，以便在随后的引用阶段可以获得它。当我们离开函数时就出栈函数作用域，因此当前作用域仍然是全局作用域。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitFunctionDecl(CymbolParser.FunctionDeclContext ctx) {
-</span><span class='line'>    System.out.println(currentScope);
-</span><span class='line'>    currentScope = currentScope.getEnclosingScope();    // pop scope
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>本地作用域以类似的方式工作。我们在监听器方法enterBlock()中压栈一个作用域，然后在exitBlock()中出栈它。</p>
-
-<p>在处理好作用域和函数定义后，我们就可以开始定义参数和变量。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitFormalParameter(CymbolParser.FormalParameterContext ctx) {
-</span><span class='line'>    defineVar(ctx.type(), ctx.ID().getSymbol());
-</span><span class='line'>}
-</span><span class='line'>public void exitVarDecl(CymbolParser.VarDeclContext ctx) {
-</span><span class='line'>    defineVar(ctx.type(), ctx.ID().getSymbol());
-</span><span class='line'>}
-</span><span class='line'>void defineVar(CymbolParser.TypeContext typeCtx, Token nameToken) {
-</span><span class='line'>    int typeTokenType = typeCtx.start.getType();
-</span><span class='line'>    Symbol.Type type = CheckSymbols.getType(typeTokenType);
-</span><span class='line'>    VariableSymbol var = new VariableSymbol(nameToken.getText(), type);
-</span><span class='line'>    currentScope.define(var); // Define symbol in current scope
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>到此，定义阶段已经完成。</p>
-
-<p>为构建引用阶段，让我们将当前作用域设置为从定义阶段传递过来的全局作用域。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public RefPhase(GlobalScope globals, ParseTreeProperty&lt;Scope&gt; scopes) {
-</span><span class='line'>    this.scopes = scopes;
-</span><span class='line'>    this.globals = globals;
-</span><span class='line'>}
-</span><span class='line'>public void enterFile(CymbolParser.FileContext ctx) {
-</span><span class='line'>    currentScope = globals;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>然后，就像树遍历器触发Cymbol函数和块的进入与退出事件那样，监听器方法通过访问在定义阶段期间存储在树中的值来及时更新currentScope。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void enterFunctionDecl(CymbolParser.FunctionDeclContext ctx) {
-</span><span class='line'>    currentScope = scopes.get(ctx);
-</span><span class='line'>}
-</span><span class='line'>public void exitFunctionDecl(CymbolParser.FunctionDeclContext ctx) {
-</span><span class='line'>    currentScope = currentScope.getEnclosingScope();
-</span><span class='line'>}
-</span><span class='line'>public void enterBlock(CymbolParser.BlockContext ctx) {
-</span><span class='line'>    currentScope = scopes.get(ctx);
-</span><span class='line'>}
-</span><span class='line'>public void exitBlock(CymbolParser.BlockContext ctx) {
-</span><span class='line'>    currentScope = currentScope.getEnclosingScope();
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>随着遍历器的行进恰当地设置作用域，我们可以通过实现变量引用和函数调用的监听器方法解决符号。当遍历器遇到一个变量引用时，它调用exitVar()，该方法使用resolve()试图在当前作用域的符号表中查找变量名。如果resolve()在当前作用域中没有找到符号，它会查找封闭作用域链。如果必要，resolve()将寻找所有方式直到全局作用域。如果找不到一个合适的定义，它会返回null值。如果resolve()找到的符号是一个函数而不是变量，就需要生成一个错误消息。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitVar(CymbolParser.VarContext ctx) {
-</span><span class='line'>    String name = ctx.ID().getSymbol().getText();
-</span><span class='line'>    Symbol var = currentScope.resolve(name);
-</span><span class='line'>    if ( var==null ) {
-</span><span class='line'>        CheckSymbols.error(ctx.ID().getSymbol(), "no such variable: "+name);
-</span><span class='line'>    }
-</span><span class='line'>    if ( var instanceof FunctionSymbol ) {
-</span><span class='line'>        CheckSymbols.error(ctx.ID().getSymbol(), name+" is not a variable");
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>处理函数调用基本上是相同的，如果不能找到一个定义或找到了一个变量，都需要发出一个错误。</p>
-
-<p>最后，是用来显示早先需要的输出的构建和测试序列：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr Cymbol.g
-</span><span class='line'>compile *.java
-</span><span class='line'>run CheckSymbols vars.cymbol</span></code></pre></td></tr></table></div></figure>
-
-<p>输出结果如下所示：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>locals:[]
-</span><span class='line'>function&lt;f:tINT&gt;:[&lt;x:tINT&gt;, &lt;y:tFLOAT&gt;]
-</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part27/">ANTLR 4权威参考读书笔记（27）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-09-28T09:32:41+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>28</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>9:32 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>前面我们主要处理的是数据，今天我们就来做些编程语言方面的事情。</p>
-
-<h3 id="生成调用关系图">生成调用关系图</h3>
-
-<p>软件很难编写和维护，这就是为什么我们试图构建工具去提高我们的生产力和工作效率。例如，在过去的十年里，我们已经看到测试框架、代码覆盖工具和代码分析器的激增，也很高心看到类层次结构的可视化树，以及大部分开发环境支持这个功能。其中有种可视化被称为调用图，它由函数作为节点，并且函数调用作为节点间的有向边。</p>
-
-<p>这本节中，我们将使用Cymbol语法构建一个调用图生成器。考虑以下函数和函数调用集：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>int main() { fact(); a(); }
-</span><span class='line'>float fact(int n) {
-</span><span class='line'>    print(n);
-</span><span class='line'>    if (n == 0) then return 1;
-</span><span class='line'>    return n * fact(n - 1);
-</span><span class='line'>}
-</span><span class='line'>void a() { int x = b(); if false then {c(); d();} }
-</span><span class='line'>void b() { c(); }
-</span><span class='line'>void c() { b(); }
-</span><span class='line'>void d() { }
-</span><span class='line'>void e() { }</span></code></pre></td></tr></table></div></figure>
-
-<p>我们将会把它可视化成如下的调用图：</p>
-
-<p><img src="/uploads/cymbol-call-graph.png" title="cymbol-call-graph" ></p>
-
-<p>可视化的好处是人眼可以很容易地挑出偏差。例如，e()节点是个孤立节点，它意味着没有函数调用它，因此它是一段死代码。一目了然，我们找到一个可以被丢弃的函数。我们还可以通过在图中寻找像fact() -&gt; fact()和b() -&gt; c() -&gt; d()这样的循环非常容易地检测递归。</p>
-
-<p>为了可视化调用图，我们需要读入一段Cymol程序和创建一个DOT文件。例如，以下是我们需要为t.cymbol生成的DOT文件。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>digraph G {
-</span><span class='line'>    ranksep=.25;
-</span><span class='line'>    edge [arrowsize=.5]
-</span><span class='line'>    node [shape=circle, fontname="ArialNarrow",
-</span><span class='line'>    fontsize=12, fixedsize=true, height=.45];
-</span><span class='line'>    main; fact; a; b; c; d; e;
-</span><span class='line'>    main -&gt; fact;
-</span><span class='line'>    main -&gt; a;
-</span><span class='line'>    fact -&gt; print;
-</span><span class='line'>    fact -&gt; fact;
-</span><span class='line'>    a -&gt; b;
-</span><span class='line'>    a -&gt; c;
-</span><span class='line'>    a -&gt; d;
-</span><span class='line'>    b -&gt; c;
-</span><span class='line'>    c -&gt; b;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>上面的输出包括样本设置描述，例如ranksep=.25;和一列节点和边。为抓住孤立节点，我们需要确保为每个函数名生成节点定义，即使它没有出边和入边。否则它将不会出现在图中。注意在节点定义行末尾的e节点。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>main; fact; a; b; c; d; e;</span></code></pre></td></tr></table></div></figure>
-
-<p>我们的策略很简单，当语法分析器找到一个函数声明时，应用会把当前函数名添加到一个列表，并且设置一个字段称为currentFunctionName。当语法分析器看到一个函数调用，应用会记录从currentFunctionName到被调用函数名的一条边。</p>
-
-<p>开始之前，让我们给Cymbol.g中的一些规则选项打上标签，以便获得更精确的监听器方法。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>expr: ID '(' exprList? ')'    # Call
-</span><span class='line'>    | expr '[' expr ']'       # Index
-</span><span class='line'>    | '-' expr                # Negate
-</span><span class='line'>    | '!' expr                # Not
-</span><span class='line'>    | expr '*' expr           # Mult
-</span><span class='line'>    | expr ('+'|'-') expr     # AddSub
-</span><span class='line'>    | expr '==' expr          # Equal
-</span><span class='line'>    | ID                      # Var
-</span><span class='line'>    | INT                     # Int
-</span><span class='line'>    | '(' expr ')'            # Parens
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<p>然后，作为语言应用的基础，把所有图相关的东西封装进一个类。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>static class Graph {
-</span><span class='line'>    // I'm using org.antlr.v4.runtime.misc: OrderedHashSet, MultiMap
-</span><span class='line'>    Set&lt;String&gt; nodes = new OrderedHashSet&lt;String&gt;();    // list of functions
-</span><span class='line'>    MultiMap&lt;String, String&gt; edges = new MultiMap&lt;String, String&gt;();    // caller-&gt;callee
-</span><span class='line'>    public void edge(String source, String target) {
-</span><span class='line'>        edges.map(source, target);
-</span><span class='line'>    }</span></code></pre></td></tr></table></div></figure>
-
-<p>从节点和边的集合中，我们可以在类Graph的toDOT()中使用一些Java代码转储出适当的DOT代码。</p>
+<p>XML是个很好的例子，它通常会在同一个文件中包含不同的词法结构。一个XML语法分析器会把除标签和实体引用（例如<code>&amp;hearts;</code>）之外的任何东西当作文本块。当词法分析器看到<code>&lt;</code>时，它切换到INSIDE模式；当它看到<code>&gt;</code>或<code>/&gt;</code>时，就切换回默认模式。以下的语法展示了该特性是如何工作的：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1325,94 +335,50 @@
 <span class='line-number'>22</span>
 <span class='line-number'>23</span>
 <span class='line-number'>24</span>
-<span class='line-number'>25</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public String toDOT() {
-</span><span class='line'>    StringBuilder buf = new StringBuilder();
-</span><span class='line'>    buf.append("digraph G {\n");
-</span><span class='line'>    buf.append("    ranksep=.25;\n");
-</span><span class='line'>    buf.append("    edge [arrowsize=.5]\n");
-</span><span class='line'>    buf.append("    node [shape=circle, fontname=\"ArialNarrow\",\n");
-</span><span class='line'>    buf.append("    fontsize=12, fixedsize=true, height=.45];\n");
-</span><span class='line'>    buf.append("    ");
-</span><span class='line'>    for (String node : nodes) {    // print all nodes first
-</span><span class='line'>        buf.append(node);
-</span><span class='line'>        buf.append("; ");
-</span><span class='line'>    }
-</span><span class='line'>    buf.append("\n");
-</span><span class='line'>    for (String src : edges.keySet()) {
-</span><span class='line'>        for (String trg : edges.get(src)) {
-</span><span class='line'>            buf.append("    ");
-</span><span class='line'>            buf.append(src);
-</span><span class='line'>            buf.append(" -&gt; ");
-</span><span class='line'>            buf.append(trg);
-</span><span class='line'>            buf.append(";\n");
-</span><span class='line'>        }
-</span><span class='line'>    }
-</span><span class='line'>    buf.append("}\n");
-</span><span class='line'>    return buf.toString();
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>lexer grammar XMLLexer;
+</span><span class='line'>
+</span><span class='line'>// Default "mode": Everything OUTSIDE of a tag
+</span><span class='line'>OPEN        :   '&lt;'                 -&gt; pushMode(INSIDE) ;
+</span><span class='line'>COMMENT     :   '&lt;!--' .*? '--&gt;'    -&gt; skip ;
+</span><span class='line'>EntityRef   :   '&' [a-z]+ ';' ;
+</span><span class='line'>TEXT        :   ~('&lt;'|'&')+ ;    // match any 16 bit char minus &lt; and &
+</span><span class='line'>
+</span><span class='line'>// ----------------- Everything INSIDE of a tag ---------------------
+</span><span class='line'>mode INSIDE;
+</span><span class='line'>
+</span><span class='line'>CLOSE       :   '&gt;'                 -&gt; popMode ;    // back to default mode
+</span><span class='line'>SLASH_CLOSE :   '/&gt;'                -&gt; popMode ;
+</span><span class='line'>EQUALS      :   '=' ;
+</span><span class='line'>STRING      :   '"' .*? '"' ;
+</span><span class='line'>SlashName   :   '/' Name ;
+</span><span class='line'>Name        :   ALPHA (ALPHA|DIGIT)* ;
+</span><span class='line'>S           :   [ \t\r\n]           -&gt; skip ;
+</span><span class='line'>
+</span><span class='line'>fragment
+</span><span class='line'>ALPHA       :   [a-zA-Z] ;
+</span><span class='line'>
+</span><span class='line'>fragment
+</span><span class='line'>DIGIT       :   [0-9] ;</span></code></pre></td></tr></table></div></figure>
 
-<p>现在我们要做的是使用监听器填满这些数据结构，监听器需要两个字段用于记录。</p>
+<p>把上述语法保存为XMLLexer.g文件，然后使用包含以下内容的t.xml文件作为输入来测试它：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>static class FunctionListener extends CymbolBaseListener {
-</span><span class='line'>    Graph graph = new Graph();
-</span><span class='line'>    String currentFunctionName = null;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;tools&gt;
+</span><span class='line'>  &lt;tool name="ANTLR"&gt;A parser generator&lt;/tool&gt;
+</span><span class='line'>&lt;/tools&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p>然后应用只需要监听两个事件。首先，在语法分析器发现函数声明时记录当前的函数名。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void enterFunctionDecl(CymbolParser.FunctionDeclContext ctx) {
-</span><span class='line'>    currentFunctionName = ctx.ID().getText();
-</span><span class='line'>    graph.nodes.add(currentFunctionName);
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>其次，当语法分析器侦测到函数调用时，应用需要记录从当前函数到被调用函数的一条边。</p>
+<p>以下是构建和运行测试的命令：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitCall(CymbolParser.CallContext ctx) {
-</span><span class='line'>    String funcName = ctx.ID().getText();
-</span><span class='line'>    // map current function to the callee
-</span><span class='line'>    graph.edge(currentFunctionName, funcName);
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>注意，函数调用不能隐藏在嵌套代码块或诸如a()这样的声明中。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>void a() { int x = b(); if false then {c(); d();} }</span></code></pre></td></tr></table></div></figure>
-
-<p>无论什么时候，只要树遍历器发现函数调用就触发监听器方法exitCall()。</p>
-
-<p>通过语法分析树和类FunctionListener，我们可以启动带有监听器的一个遍历器去产生输出。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ParseTreeWalker walker = new ParseTreeWalker();
-</span><span class='line'>FunctionListener collector = new FunctionListener();
-</span><span class='line'>walker.walk(collector, tree);
-</span><span class='line'>System.out.println(collector.graph.toString())</span></code></pre></td></tr></table></div></figure>
-
-<p>在转储DOT字符串前，该代码会打印出函数和边的列表。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr Cymbol.g
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr XMLLexer.g
 </span><span class='line'>compile *.java
-</span><span class='line'>run CallGraph t.cymbol</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>grun XML tokens -tokens t.xml</span></code></pre></td></tr></table></div></figure>
 
-<p>以下是部分输出结果：</p>
+<p>这里是输出的内容：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -1420,12 +386,534 @@
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
 <span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>edges: {main=[fact, a], fact=[print, fact], a=[b, c, d], b=[c], c=[b]},
-</span><span class='line'>functions: [main, fact, a, b, c, d, e]
-</span><span class='line'>digraph G {
-</span><span class='line'>ranksep=.25;
-</span><span class='line'>edge [arrowsize=.5]
-</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>[@0,0:0='&lt;',&lt;1&gt;,1:0]
+</span><span class='line'>[@1,1:5='tools',&lt;10&gt;,1:1]
+</span><span class='line'>[@2,6:6='&gt;',&lt;5&gt;,1:6]
+</span><span class='line'>[@3,7:10='\r\n  ',&lt;4&gt;,1:7]
+</span><span class='line'>[@4,11:11='&lt;',&lt;1&gt;,2:2]
+</span><span class='line'>[@5,12:15='tool',&lt;10&gt;,2:3]
+</span><span class='line'>[@6,17:20='name',&lt;10&gt;,2:8]
+</span><span class='line'>[@7,21:21='=',&lt;7&gt;,2:12]
+</span><span class='line'>[@8,22:28='"ANTLR"',&lt;8&gt;,2:13]
+</span><span class='line'>[@9,29:29='&gt;',&lt;5&gt;,2:20]
+</span><span class='line'>[@10,30:47='A parser generator',&lt;4&gt;,2:21]
+</span><span class='line'>[@11,48:48='&lt;',&lt;1&gt;,2:39]
+</span><span class='line'>[@12,49:53='/tool',&lt;9&gt;,2:40]
+</span><span class='line'>[@13,54:54='&gt;',&lt;5&gt;,2:45]
+</span><span class='line'>[@14,55:56='\r\n',&lt;4&gt;,2:46]
+</span><span class='line'>[@15,57:57='&lt;',&lt;1&gt;,3:0]
+</span><span class='line'>[@16,58:63='/tools',&lt;9&gt;,3:1]
+</span><span class='line'>[@17,64:64='&gt;',&lt;5&gt;,3:7]
+</span><span class='line'>[@18,65:66='\r\n',&lt;4&gt;,3:8]
+</span><span class='line'>[@19,67:66='&lt;EOF&gt;',&lt;-1&gt;,4:0]</span></code></pre></td></tr></table></div></figure>
+
+<p>上面输出的每一行代表一个记号，包含记号索引、开始和结束字符、记号文本、记号类型，最后的行和字符位置则告诉我们词法分析器如何标记化输入。</p>
+
+<p>在命令行中，XML tokens序列处通常是一个语法名字后面跟着开始规则，但在这里，我们使用语法名字后面跟着特殊的规则名字tokens来告诉TestRig应该运行词法分析器而不是语法分析器。接着使用选项-tokens打印出匹配的记号列表。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part11/">ANTLR 4权威参考读书笔记（11）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-04-18T18:13:27+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:13 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>为制作语言应用，我们必须为每个输入短语或子短语执行一些适当的代码，那样做最简单的方法是操作由语法分析器自动创建的语法分析树。</p>
+
+<p>早些时候我们已经学习了词法分析器处理字符和把记号传递给语法分析器，然后语法分析器分析语法和创建语法分析树的相关知识。对应的ANTLR类分别是CharStream、Lexer、Token、Parser和ParseTree。连接词法分析器和语法分析器的管道被称为TokenStream。下图说明了这些类型的对象如何连接到内存中其它的对象。</p>
+
+<p><img src="/uploads/basic-data-structure.png" title="basic-data-structure" ></p>
+
+<p>这些ANTLR数据结构共享尽可能多的数据以便节省内存的需要。上图显示在语法分析树中的叶子（记号）节点含有在记号流中记号的点。记号记录开始和结束字符在CharStream中的索引，而不是复制子串。这里没有与空格字符有关的记号，因为我们假设我们的词法分析器扔掉了空格。</p>
+
+<p>下图显示的是ParseTree的子类RuleNode和TerminalNode以及它们所对应的子树根节点和叶子节点。RuleNode包含有方法如getChild()和getParent()等，但RuleNode并不专属于特定语法所有。为了能更好地访问在特定节点中的元素，ANTLR为每个规则生成一个RuleNode的子类。下图显示了赋值语句例子的子树根节点的特定类，它们是StatContext、AssignContext和ExprContext：</p>
+
+<p><img src="/uploads/parse-tree-node.png" title="parse-tree-node" ></p>
+
+<p>它们记录了通过规则对短语识别的每件事情，所以被称为上下文对象。每个上下文对象都知道被识别短语的开始和结束记号以及提供对所有短语的元素的访问。例如，AssignContext提供方法ID()和expr()去访问标志符节点和表达式子树。</p>
+
+<p>给出了具体类型的描述后，我们可以手工编写代码去执行树的深度优先遍历。当我们发现和完成节点时我们可以执行任何我们想要的动作。典型的动作是诸如计算结果，更新数据结构，或者生成输出。相比每次为每个应用编写同样的树遍历样板代码，使用ANTLR自动生成的树遍历机制更方便、更容易。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part10/">ANTLR 4权威参考读书笔记（10）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-04-08T22:11:39+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>8</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>10:11 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>一个模棱两可的短语或句子通常是指它有不止一种解释。换句话说，短语或句子能匹配不止一种语法结构。要解释或转换一个短语，程序必须要能唯一地确认它的含义，这意味着我们必须提供无歧义的语法，以便生成的语法分析器能用明确的一个方法匹配每个输入短语。</p>
+
+<p>在这里，让我们展示一些有歧义的语法以便让二义性的概念更具体。如果你以后在构建语法时陷入二义性，你可以参考本节的内容。</p>
+
+<p>一些明显有歧义的语法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>assign
+</span><span class='line'>    : ID '=' expr    // 匹配一个赋值语句，例如f()
+</span><span class='line'>    | ID '=' expr    // 前面选项的精确复制
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>expr
+</span><span class='line'>    : INT ;</span></code></pre></td></tr></table></div></figure>
+
+<p>大多数时候二义性是不明显的，就像下面的语法，它能通过规则stat的两个选项匹配函数调用：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>stat
+</span><span class='line'>    : expr          // 表达式语句
+</span><span class='line'>    | ID '(' ')'    // 函数调用语句
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>expr
+</span><span class='line'>    : ID '(' ')'
+</span><span class='line'>    | INT
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>这里是输入f()的两个解释，从规则stat开始：</p>
+
+<p><img src="/uploads/fn-parse-tree.png" title="fn-parse-tree" ></p>
+
+<p>左边的语法分析树显示f()匹配规则expr。右边的语法分析树显示f()匹配规则stat的第二个选项。</p>
+
+<p>因为大部分语言它们的语法都被设计成无歧义的，有歧义的语法类似于编程缺陷，所以我们需要识别语法并为每个输入短语提交单一选择给语法分析器。如果语法分析器发现一个有歧义的短语，它必须选一个可行的选项。ANTLR通过选择涉及决定的第一个选项解决二义性。在本例中，语法分析器将选择与左边的语法分析树有关的f()的解释。</p>
+
+<p>二义性可以发生在词法分析器中也能发生在语法分析器中，但ANTLR可以自动地解决它们。ANTLR通过使输入字符串和语法中第一个指定的词法规则匹配来解决词法二义性。为了明白这是如何工作的，让我们看看对大部分编程语言都很普遍的二义性：在关键字和标志符规则中的二义性。关键字begin（后面有个非字母）也是标志符，至少词法上，因此词法分析器可以匹配b-e-g-i-n到两者中的任何一个规则。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>BEGIN : 'begin' ;    // 匹配b-e-g-i-n序列，即把二义性解析为BEGIN
+</span><span class='line'>ID    : [a-z]+ ;     // 匹配一个或多个任意小写字母</span></code></pre></td></tr></table></div></figure>
+
+<p>注意，词法分析器会试着为每个记号尽可能匹配最长的字符串，这意味着输入beginner将仅仅匹配规则ID。词法分析器不会把beginner匹配成BEGIN然后ID匹配输入ner。</p>
+
+<p>有时候语言的语法就明显有歧义，没有任何的语法重组能改变这个事实。例如，算术表达式的自然语法可以用两种方式解释像1+2*3这样的输入，要么从左到右执行运算符，要么像大部分语言那样按优先级顺序。</p>
+
+<p>C语言展示了另一种二义性，但我们可以使用上下文信息比如标志符如何被定义来解决它。考虑代码片段<code>i*j;</code>。在语法上，它看起来像是一个表达式，但它的含义或者语义依赖i是类型名还是变量。如果i是类型名，那么这个片段不是表达式，而是一个声明为指向类型i的指针变量j。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part9/">ANTLR 4权威参考读书笔记（9）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-03-27T07:10:05+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>27</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>7:10 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><ul>
+<li>predication 断定</li>
+<li>predict 预判</li>
+<li>lookahead 预读</li>
+</ul>
+
+<p>ANTLR工具根据语法规则，例如我们刚才看到的assign，生成递归下降语法分析器。递归下降语法分析器只是递归方法的一个集合，每个规则一个方法。下降这个术语指的是分析从语法分析树的根开始向着叶子进行（记号）。我们首先调用的规则，即stat符号，成为语法分析树的根。那也就意味着对<a href="/blog/reading-notes-the-definitive-antlr4-reference-part8/">ANTLR 4权威参考读书笔记（8）</a>中的语法分析树来说需要调用方法stat()。这类分析更通用的术语是自顶向下分析：递归下降语法分析器仅仅是自顶向下语法分析器实现的一种。</p>
+
+<p>要了解递归下降语法分析器是什么样子，可以看看下面ANTLR为规则assign生成的方法（稍微做过整理）：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// assign : ID '=' expr ;
+</span><span class='line'>void assign() {    // 根据规则assign生成的方法
+</span><span class='line'>    match(ID);     // 比较ID和当前输入符号然后消费
+</span><span class='line'>    match('=');
+</span><span class='line'>    expr();        // 通过调用expr()匹配表达式
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>递归下降语法分析器最酷的部分是通过跟踪调用方法stat()、assign()和expr()绘制出的调用关系图反映了内部的语法分析树节点。match()的调用对应语法分析树叶子。为了在一个手工构建的语法分析器中手动构建一颗语法分析树，我们需要在每个规则方法的开始处插入“添加新子树根”操作，以及给match()一个“添加新叶子节点”操作。</p>
+
+<p>方法assign()只是检查确保所有必要的记号存在且以正确的顺序。当语法分析器进入assign()时，它不必在多个选项之间进行选择。选项是规则定义右边的选择之一。例如，调用assign的stat规则可能有其它类型的语句。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>/** 匹配起始于当前输入位置的任何语句 */
+</span><span class='line'>stat
+</span><span class='line'>    : assign    // 第一个选项（'|'是选项分隔符）
+</span><span class='line'>    | ifstat    // 第二个选项
+</span><span class='line'>    | whilestat
+</span><span class='line'>    ...
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>stat的分析规则看起来像一条switch语句：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>void stat() {
+</span><span class='line'>    switch ( «current input token» ) {
+</span><span class='line'>        CASE ID : assign(); break;
+</span><span class='line'>        CASE IF : ifstat(); break;    // IF是关键字'if'的记号类型
+</span><span class='line'>        CASE WHILE : whilestat(); break;
+</span><span class='line'>        ...
+</span><span class='line'>        default : «raise no viable alternative exception»
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>方法stat()必须通过检查下一个输入记号作出分析决定或断定。分析决定预判哪一个选项将会成功。在本例中，当看到WHILE关键字时会预判是规则stat的第三个选项。规则方法stat()然后就会调用whilestat()。你以前可能听说过术语预读记号，那只是下一个输入记号。预读记号可以是语法分析器在匹配和消费输入记号之前嗅探的任何记号。</p>
+
+<p>有时候，语法分析器需要一些预读记号去预判哪个选项会成功。它甚至必须考虑从当前位置直到文件结尾的所有的记号。ANTLR默默地为你处理所有的这些事情，但是对决策过程有个基本的了解是有帮助的，可以让调试生成的语法分析器更容易。</p>
+
+<p>为更好地理解分析决定，想象有一个单一入口和单一出口的迷宫，有单词写在地板上。每个沿着从入口到出口路径的单词序列表示一个句子。迷宫的结构与定义一门语言的语法规则类似。为测试一个句子在一门语言中的成员身份，我们在穿越迷宫时把句子的单词和沿着地板的单词作比较。如果通过句子的单词我们能到达出口，那么句子就是有效的。</p>
+
+<p>为了通过迷宫，我们必须在每个岔口选择一条有效路径，正如我们必须在语法分析器中选择选项一样。通过把我们句子中下一个单词（们）和沿着来自每个岔口的每条路径上可见的单词比较，我们做出决定该走哪条路。我们能从岔口看到的单词与预读记号类似。当每条路径以唯一的单词开始时决定是相当容易的。在规则stat中，每个选项从唯一的记号开始，因此stat()可以通过查看第一个预读记号识别选项。</p>
+
+<p>当单词从一个岔口重叠部分开始每条路径时，语法分析器需要继续往前看，扫描可以识别选项的单词。ANTLR可以根据需要为每个分析决定自动上下调节预读数量。如果预读的结果是多条同样的到出口的路径，那说明当前的输入短语有多种解释，这会导致二义性。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/economic-inequality-the-short-version/">贫富差距精简版</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-03-21T20:40:27+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>21</span><span class='date-suffix'>st</span>, <span class='date-year'>2016</span></span> <span class='time'>8:40 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>英文原文：<a href="http://paulgraham.com/sim.html">http://paulgraham.com/sim.html</a></p>
+
+<p>2016年1月</p>
+
+<p><em>正如经常发生的那样——当说一些有争议的话题时，已经有我刚写的一篇贫富差距的文章的一些非常新奇的解释。我想这可能有助于澄清问题，如果我试着写一个简简单单、没有误解的版本。</em></p>
+
+<p>很多人谈论贫富差距。几乎所有人都说贫富差距增大是坏的，贫富差距缩小是好的。</p>
+
+<p>但是贫富差距本身并非坏事。它有多方面的原因。很多是坏的，但有些是好的。</p>
+
+<p>例如，高入狱率和税收漏洞是增大贫富差距的不良因素。</p>
+
+<p>但是创业同样地增大贫富差距。创业成功的创始人最终会得到值很多钱的股票。</p>
+
+<p>而且不像高入狱率和税收漏洞，创业整体上是好的。</p>
+
+<p>既然贫富差距本身并非坏事，我们就不应该攻击它。相反，我们应该攻击那些造成贫富差距的不良因素。</p>
+
+<p>例如，我们应该攻击贫穷，而不是攻击贫富差距。</p>
+
+<p>攻击贫富差距是双重错误。它会损害好的和坏的原因。但更糟的是，这是一个攻击坏的原因的无效方式。</p>
+
+<p>除非我们直接攻击坏的贫富差距原因，否则我们不能做好解决它们的工作。</p>
+
+<p>但是，如果我们解决了所有坏的贫富差距原因，我们依然将增加贫富差距的水平，因为正在增长的技术力量。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part8/">ANTLR 4权威参考读书笔记（8）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-03-20T09:57:45+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>20</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>9:57 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><ul>
+<li>sentence 句子</li>
+</ul>
+
+<p>一门语言由有效的句子组成，一个句子由短语组成，一个短语由子短语和词汇符号组成。要实现一门语言，我们必须构建一个能读取句子以及对发现的短语和输入符号作出适当反应的应用。</p>
+
+<p>这样的应用必须能够识别特定语言的所有有效的句子、短语和子短语。识别一个短语意味着我们能够确定短语的各种组件并能指出它与其它短语的区别。例如，我们把输入sp=100识别为赋值语句，这就意味着我们知道sp是赋值目标以及100是要存储的值。识别赋值语句sp=100也意味着应用认为它是明显不同于，比如说，a+b语句的。在识别后，应用将执行适当的操作，例如performAssignment(&quot;sp&quot;, 100)或者translateAssignment(&quot;sp&quot;, 100)。</p>
+
+<p>识别语言的程序被称为语法分析器。语法指代控制语言成员的规则，每条规则都表示一个短语的结构。为了更容易地实现识别语言的程序，通常我们会把识别语言的语法分析拆解成两个相似但不同的任务或阶段。</p>
+
+<p>把字符组成单词或符号（记号）的过程被称为词法分析或简单标记化。我们把标记输入的程序称为词法分析器。词法分析器能把相关的记号组成记号类型，例如INT（整数）、ID（标志符）、FLOAT（浮点数）等。当语法分析器只关心类型的时候，词法分析器会把词汇符号组成类型，而不是单独的符号。记号至少包含两块信息：记号类型（确定词法结构）和匹配记号的文本。</p>
+
+<p>第二阶段是真正的语法分析器，它使用这些记号去识别句子结构，在本例中是赋值语句。默认情况下，ANTLR生成的语法分析器会构建一个称为语法分析树或语法树的数据结构，它记录语法分析器如何识别输入句子的结构和它的组件短语。下图阐明了语言识别器的基本数据流：</p>
+
+<p><img src="/uploads/basic-data-flow.png" title="basic-data-flow" ></p>
+
+<p>语法分析树的内部节点是分组和确认它们子节点的短语名字。根节点是最抽象的短语名字，在本例中是stat（“statement”的缩写）。语法分析树的叶子节点永远是输入记号。</p>
+
+<p>通过生成语法分析树，语法分析器给应用的其余部分提供了方便的数据结构，它们含有关于语法分析器如何把符号组成短语的完整信息。树是非常容易处理的，并且也能被程序员很好的理解。更好的是，语法分析器能自动地生成语法分析树。</p>
+
+<p>通过操作语法分析树，需要识别相同语言的多个应用能复用同一个语法分析器。当然，你也可以选择直接在语法中嵌入特定应用的代码片段，这是语法分析器生成器传统的做法。ANTLR v4仍然允许这样做，但是语法分析树有助于更简洁更解耦的设计。</p>
+
+<p>语法分析树对于需要多次树遍历的转换也是非常有用的，因为在计算依赖关系的阶段通常会需要前一个阶段的信息。相比于在每个阶段都要准备输入字符，我们只需要遍历语法分析树多次，更具有效率。</p>
+
+<p>我们使用一套规则指定短语：语法分析树子树根节点对应于语法规则名。这里的语法规则对应于上图中assign子树的第一层：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>assign : ID '=' expr ;    // 匹配赋值语句像"sp = 100"</span></code></pre></td></tr></table></div></figure>
+
+<p>明白ANTLR如何把这些规则转换为人类可读的语法分析代码是使用和调试语法的基础，可以让我们更深入地挖掘语法分析是如何工作的。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part7/">ANTLR 4权威参考读书笔记（7）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-03-11T16:42:08+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>11</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>4:42 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在<a href="/blog/reading-notes-the-definitive-antlr4-reference-part6/">ANTLR 4权威参考读书笔记（6）</a>中的这些动作仅仅是提取和打印被语法分析器匹配的值，它们并没有改变语法分析器本身。</p>
+
+<p>实际上，动作还可以影响语法分析器如何识别输入短语。这类特殊的动作被称为语义谓词。下面我们会用一个简单的例子来展示语义谓词的强大能力：动态地打开和关闭语法的某个部分。</p>
+
+<h3 id="使用语义谓词改变语法分析">使用语义谓词改变语法分析</h3>
+
+<p>有一个读入整数序列的语法，它的玄机是由输入的部分指定有多少个整数组合在一起，所以我们必须等到运行时才能知道有多少个整数被匹配。这里是示例输入文件idata.txt的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>2 9 10 3 1 2 3</span></code></pre></td></tr></table></div></figure>
+
+<p>第一个数字表示匹配后续两个数字9和10；紧跟着10的数字3表示匹配接下来的三个数字。我们的目的是设计一个语法IData.g，把9和10组合在一起，把1、2和3组合在一起。在语法上执行下面的命令后显示的语法分析树能够清楚地标识出整数的分组，就像下图显示的那样：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr -no-listener IData.g
+</span><span class='line'>compile *.java
+</span><span class='line'>grun IData file -gui idata.txt</span></code></pre></td></tr></table></div></figure>
+
+<p><img src="/uploads/idata-parse-tree.png" title="idata-parse-tree" ></p>
+
+<p>要达成这个目标，以下语法中的关键是一个被称为语义谓词的布尔值操作：{$i &lt;= $n}?。当谓词计算结果为true时，语法分析器匹配整数直到超过规则参数n要求的数量；当计算结果为false时，谓词让相关的选项从生成的语法分析器中“消失”。
+在这个案例中，值为false的谓词让(...)*循环从规则里终止并返回。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar IData;
+</span><span class='line'>
+</span><span class='line'>file : group+ ;
+</span><span class='line'>
+</span><span class='line'>group: INT sequence[$INT.int] ;
+</span><span class='line'>
+</span><span class='line'>sequence[int n]
+</span><span class='line'>locals [int i=1]
+</span><span class='line'>     : ( {$i &lt;= $n}? INT {$i++;} )*    // match n integers
+</span><span class='line'>     ;
+</span><span class='line'>
+</span><span class='line'>INT  : [0-9]+ ;  // match integers
+</span><span class='line'>WS   : [ \t\n\r]+ -&gt; skip ;    // toss out all whitespace</span></code></pre></td></tr></table></div></figure>
+
+<p>被语法分析器使用的规则sequence的内部语法表示看起来就像下图这样：</p>
+
+<p><img src="/uploads/idata-rule-sequence.png" title="idata-rule-sequence" ></p>
+
+<p>虚线表明谓词可以剪断那条路径，只给语法分析器留下一个选择：退出的路径。</p>
+
+<p>虽然大部分时间我们不需要这样的微管理，但它至少让我们知道我们有这样的武器可以处理病理分析问题。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-detect-and-prevent-spam-traffic-in-ga/">Google Analytics中如何检测并防止垃圾流量</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-02-27T18:38:18+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>27</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:38 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>使用Google Analytics网站分析工具对博客进行数据统计。在经过一段时间的数据收集后，发现总是会有大量的垃圾流量存在。这里的垃圾流量，指的是对网站毫无作用且会影响网站数据报表质量的流量。通常Google Analytics中的垃圾流量可以分为以下两大类：</p>
+
+<ul>
+<li>一类被称为ghost referral，这些流量事实上从来没有来过你的网站，也不会出现在你网站服务器的日志中，但你可以在数据报表中发现它们，它们影响了Google Analytics中的数据；</li>
+<li>另一类是爬虫流量，包括搜索引擎爬虫流量和非搜索引擎爬虫流量，这些流量会影响Google Analytics中各渠道流量占比及会话次数、跳出率、停留时间等关键指标。</li>
+</ul>
+
+<h3 id="垃圾流量检测方法">垃圾流量检测方法</h3>
+
+<p>打开报告 -&gt; 受众群体 -&gt; 技术 -&gt; 广告网络 -&gt; 主机名，统计报表如下图所示：</p>
+
+<p><img src="/uploads/report-with-spam.png" title="report-with-spam" ></p>
+
+<p>可以看到，只有181个会话的主机名是我的博客域名，即真实来到我博客的流量，也就是说有超过一半的流量属于垃圾流量。并且这些垃圾流量基本都出现了不同程度的数据异常，如新会话百分比为0%、新用户为0、跳出率为100%、平均会话时长为00:00:00。这些垃圾流量的主机名与博客域名无关，说明是第一类垃圾流量。出现这类数据的原因可能是：</p>
+
+<ul>
+<li>别的网站使用了和你网站相同的媒体资源ID，这种情况一般来说不可能，除非恶意为之；</li>
+<li>有人使用Google Analytics中的Measurement Protocol做机器生成的访问流量，而你的媒体资源ID不幸躺枪。</li>
+</ul>
+
+<h3 id="使用过滤器屏蔽垃圾流量">使用过滤器屏蔽垃圾流量</h3>
+
+<p>打开“管理”页面，在博客帐号的“所有过滤器”下添加新的过滤条件，使用预定义或自定义均可，基本配置如下所示：</p>
+
+<p><img src="/uploads/exclude-spam-filter.png" title="exclude-spam-filter" ></p>
+
+<p>然后把“可选择的数据视图”中的选项添加到“选定的数据视图”中，保存即可。</p>
+
+<p>过段时间后再回来查看报表，就会发现垃圾流量消失的干干净净了：</p>
+
+<p><img src="/uploads/report-without-spam.png" title="report-without-spam" ></p>
 </div>
   
   
@@ -1450,23 +938,23 @@
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/the-mythical-10x-programmer/">神秘的10x程序员</a>
       </li>
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/learn-anything-faster-with-the-feynman-technique/">费曼技巧：最好的学习方法</a>
       </li>
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/code-coverage-100-percent-tragedy/">100%代码覆盖率的悲剧</a>
       </li>
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/unconventional-way-of-learning-a-new-programming-language/">学习新编程语言的非传统方式</a>
       </li>
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/the-impact-github-is-having-on-your-software-career-right-now/">GitHub对软件职业生涯的影响</a>
       </li>
     
   </ul>
@@ -1480,9 +968,9 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 145%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 141%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 133%" href="/tags/android/">Android</a>
+<a style="font-size: 132%" href="/tags/android/">Android</a>
 <a style="font-size: 103%" href="/tags/c-plus-plus/">C++</a>
 <a style="font-size: 106%" href="/tags/css/">CSS</a>
 <a style="font-size: 108%" href="/tags/crack/">Crack</a>
