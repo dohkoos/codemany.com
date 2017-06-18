@@ -9,7 +9,12 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="wxWidgets提供了一个用来检测是否只有一个实例在运行的wxSingleInstanceChecker类。为了检测程序只运行一个实例，你可以在程序运行之初使用该类创建一个m_check对象，这个对象将存在于程序的整个生命周期。 &hellip;">
+  <meta name="description" content="无标题栏窗口的实现很简单。先将窗口从wxMiniFrame继承，然后在窗口的构造函数中设置一下窗口的样式。 1
+2
+3
+4
+5
+MainFrame::MainFrame(const wxPoint& pos, const wxSize& size) : wxMiniFrame(NULL, &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +78,109 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-implement-draggable-window-without-title-bar/">如何实现一个可拖动的无标题栏窗口</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-12-03T15:46:55+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2007</span></span> <span class='time'>3:46 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>无标题栏窗口的实现很简单。先将窗口从wxMiniFrame继承，然后在窗口的构造函数中设置一下窗口的样式。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>MainFrame::MainFrame(const wxPoint& pos, const wxSize& size)
+</span><span class='line'>    : wxMiniFrame(NULL, wxID_ANY, wxEmptyString, pos, size)
+</span><span class='line'>{
+</span><span class='line'>    SetWindowStyleFlag(wxFRAME_NO_TASKBAR | wxNO_BORDER);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>但是，窗口的移动通常都是通过鼠标点住标题栏拖动窗口来实现的，那么现在没有了标题栏，该如何移动窗口呢？我们知道，当鼠标拖动窗口时，它在窗口中的位置是始终不变的。所以如果能够在鼠标移动过程中，通过改变窗口在桌面上的坐标，并且始终保持鼠标相对于窗口的坐标不变，即可实现鼠标的拖动效果。</p>
+
+<p>在具体的设计中，先在鼠标的MouseDown事件中记录下鼠标相对于窗口的偏移，在鼠标的MouseMove事件中根据鼠标在桌面上的位置实时设置窗口的位置，即可达到鼠标拖动窗口的操作。利用此方法实现鼠标拖动，与常规的标题栏鼠标拖动在效果上有一点区别。通过标题栏拖动时，鼠标移动过程中不重画窗口，只有松开鼠标后才在固定位置重画窗口，因此其速度较快。而采用本方法的拖动过程中，每移动一步都需要重画窗口，因此对速度稍有影响，在慢一些的机器上可能会出现轻微的拖尾现象。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>void MainFrame::OnMouseMove(wxMouseEvent& event)
+</span><span class='line'>{
+</span><span class='line'>    if (event.Dragging() && event.LeftIsDown())
+</span><span class='line'>    {
+</span><span class='line'>        wxPoint pt = ClientToScreen(event.GetPosition());
+</span><span class='line'>        int x = pt.x - m_delta.x;
+</span><span class='line'>        int y = pt.y - m_delta.y;
+</span><span class='line'>        Move(x, y);
+</span><span class='line'>    }
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>void MainFrame::OnMouseLeftDown(wxMouseEvent& event)
+</span><span class='line'>{
+</span><span class='line'>    CaptureMouse();
+</span><span class='line'>    wxPoint pt = ClientToScreen(event.GetPosition());
+</span><span class='line'>    wxPoint origin = GetPosition();
+</span><span class='line'>    int dx = pt.x - origin.x;
+</span><span class='line'>    int dy = pt.y - origin.y;
+</span><span class='line'>    m_delta = wxPoint(dx, dy);
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>void MainFrame::OnMouseLeftUp(wxMouseEvent& WXUNUSED(event))
+</span><span class='line'>{
+</span><span class='line'>    if (HasCapture())
+</span><span class='line'>    {
+</span><span class='line'>        ReleaseMouse();
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p><a href="/uploads/wxDragAndDrop.zip" title="wxDragAndDrop.zip">代码下载</a></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1028,217 +1136,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/using-antlr-to-build-powerscript-parser-part3/">使用ANTLR构建PowerScript语法分析器（3）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2007-09-07T16:40:49+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>7</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>4:40 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><h3 id="转义字符（special-ascii-characters）">转义字符（Special ASCII Characters）</h3>
-
-<p>PowerScript中转义字符是以波浪号（~）开头。下图是PowerScript支持的完整的转义字符，#字符表示数字。Decimal由三个十进制数组成，范围是000-255；Hexadecimal由两个十六进制数组成，范围是00-FF；Octal由三个八进制数组成，范围是000-377。</p>
-
-<p><img src="/uploads/pb-special-char.png" title="pb-special-char" ></p>
-
-<p>注意：#表示数字是必须的。譬如，必须用~007这种样式来表示转义字符，而不能是~7这种。</p>
-
-<p>这里是转义字符的词法规则：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>fragment
-</span><span class='line'>Escape
-</span><span class='line'>    : '~' ('n'|'t'|'v'|'r'|'f'|'b'|'\"'|'\''|'~')
-</span><span class='line'>    | DecimalEscape
-</span><span class='line'>    | HexEscape
-</span><span class='line'>    | OctalEscape
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>fragment
-</span><span class='line'>DecimalEscape
-</span><span class='line'>    : '~' ('0'..'1') ('0'..'9') ('0'..'9')    // 000 - 199
-</span><span class='line'>    | '~' '2' ('0'..'5') ('0'..'5')           // 200 - 255
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>fragment
-</span><span class='line'>HexEscape
-</span><span class='line'>    : '~h' ('0'..'9'|'a'..'f'|'A'..'F') ('0'..'9'|'a'..'f'|'A'..'F')    // 00 - FF
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>fragment
-</span><span class='line'>OctalEscape
-</span><span class='line'>    : '~o' ('0'..'3') ('0'..'7') ('0'..'7')   // 000 - 377
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<h3 id="字符和字符串字面量（character-and-string-literals）">字符和字符串字面量（Character and String Literals）</h3>
-
-<p>PowerScript程序中字符和字符串字面量没有明显的区别。字符是指由单引号（&#39;）或双引号（&quot;）括起来的一个ASCII字符，例如：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>char c
-</span><span class='line'>c = 'T'
-</span><span class='line'>c = "T"</span></code></pre></td></tr></table></div></figure>
-
-<p>字符串字面量则是指由单引号或双引号括起来的不多于1024个的ASCII字符串，例如：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>string s
-</span><span class='line'>s = 'This is a string'
-</span><span class='line'>s = "This is a string"</span></code></pre></td></tr></table></div></figure>
-
-<p>由于两者没有明显区别，因此在词法分析时只能将两者都作为字符串字面量来处理。至于到底是字符还是字符串，只有到了语意分析阶段才能作出判断。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>STRING_LITERAL
-</span><span class='line'>    : ( '\'' (Escape|~('~'|'\r'|'\n'|'\''))* '\''
-</span><span class='line'>      | '\"' (Escape|~('~'|'\r'|'\n'|'\"'))* '\"'
-</span><span class='line'>      )
-</span><span class='line'>      {
-</span><span class='line'>          System.out.println("string&gt;" + getText());
-</span><span class='line'>      }
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<h3 id="数字和布尔字面量（numeric-and-boolean-literals）">数字和布尔字面量（Numeric and Boolean Literals）</h3>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>INTEGER_LITERAL
-</span><span class='line'>    : ('0'|'1'..'9' ('0'..'9')*)
-</span><span class='line'>      {
-</span><span class='line'>          System.out.println("integer&gt;" + getText());
-</span><span class='line'>      }
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>FLOAT_LITERAL
-</span><span class='line'>    : ( ('0'..'9')+ '.' ('0'..'9')* Exponent?
-</span><span class='line'>      | '.' ('0'..'9')+ Exponent?
-</span><span class='line'>      | ('0'..'9')+ Exponent?
-</span><span class='line'>      )
-</span><span class='line'>      {
-</span><span class='line'>          System.out.println("float&gt;" + getText());
-</span><span class='line'>      }
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>BOOLEAN_LITERAL
-</span><span class='line'>    : ('true'|'false')
-</span><span class='line'>      {
-</span><span class='line'>          System.out.println("boolean&gt;" + getText());
-</span><span class='line'>      }
-</span><span class='line'>
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>fragment
-</span><span class='line'>Exponent
-</span><span class='line'>    : ('e'|'E') ('+'|'-')? ('0'..'9')+
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<h3 id="标识符（identifier）">标识符（Identifier）</h3>
-
-<p>标识符规则可以参看<a href="/blog/powerscript-identifier/">PowerScript标识符</a>一文，以下是标识符的词法规则：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>IDENTIFIER
-</span><span class='line'>    : Letter (Letter|'0'..'9'|'$'|'#'|'%')*    // 暂时不支持短横线（-）
-</span><span class='line'>      {
-</span><span class='line'>          System.out.println("identifier&gt;" + getText());
-</span><span class='line'>      }
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>fragment
-</span><span class='line'>Letter
-</span><span class='line'>    : ('A'..'Z'|'a'..'z'|'_')
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/26">&larr; Older</a>
@@ -1256,6 +1153,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/the-10x-developer-is-not-myth/">10x开发者不是神话</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/the-mythical-10x-programmer/">神秘的10x程序员</a>
       </li>
     
@@ -1269,10 +1170,6 @@
     
       <li class="post">
         <a href="/blog/unconventional-way-of-learning-a-new-programming-language/">学习新编程语言的非传统方式</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/the-impact-github-is-having-on-your-software-career-right-now/">GitHub对软件职业生涯的影响</a>
       </li>
     
   </ul>
@@ -1309,7 +1206,7 @@
 <a style="font-size: 117%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 95%" href="/tags/spring/">Spring</a>
 <a style="font-size: 99%" href="/tags/struts/">Struts</a>
-<a style="font-size: 143%" href="/tags/translation/">Translation</a>
+<a style="font-size: 144%" href="/tags/translation/">Translation</a>
 <a style="font-size: 95%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 106%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 106%" href="/tags/wxwidgets/">wxWidgets</a>

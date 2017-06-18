@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="前文的语法仍然存在问题，因为它限制我们只能使用Java生成语法分析器。为使语法可复用和语言无关，我们需要完全避免嵌入动作。接下来就将展示如何用监听器做到这点。 使用语法分析树监听器实现应用 在构建语言应用时要避免应用和语法纠缠在一起，关键是让语法分析器生成语法分析树， &hellip;">
+  <meta name="description" content="基于监听器的方法是极好的，因为所有树遍历和方法触发被自动完成。尽管有时候自动树遍历也是一个缺点，因为我们不能控制遍历本身。例如，我们可能想遍历一段C程序的语法分析树，通过跳过函数体子树忽略函数中的一切。监听器事件方法也不能使用方法返回值去传递数据。当我们需要控制遍历或返回带有事件方法返回值的值时， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,110 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part22/">ANTLR 4权威参考读书笔记（22）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-07-24T21:40:28+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>24</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>9:40 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>基于监听器的方法是极好的，因为所有树遍历和方法触发被自动完成。尽管有时候自动树遍历也是一个缺点，因为我们不能控制遍历本身。例如，我们可能想遍历一段C程序的语法分析树，通过跳过函数体子树忽略函数中的一切。监听器事件方法也不能使用方法返回值去传递数据。当我们需要控制遍历或返回带有事件方法返回值的值时，我们使用访问者模式。现在，让我们构建一个基于访问者版本的属性文件加载器去比较这两种方法。</p>
+
+<h3 id="使用访问者实现应用">使用访问者实现应用</h3>
+
+<p>使用访问者代替监听器，我们只需要让ANTLR生成访问者接口和实现接口，然后创建一段测试代码在语法分析树上调用visit()，根本不需要触及到语法。</p>
+
+<p>在命令行使用-visitor参数时，ANTLR生成接口PropertyFileVisitor和类PropertyFileBaseVisitor，后者有如下的默认实现：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class PropertyFileBaseVisitor&lt;T&gt; extends AbstractParseTreeVisitor&lt;T&gt;
+</span><span class='line'>                                        implements PropertyFileVisitor&lt;T&gt; {
+</span><span class='line'>    @Override
+</span><span class='line'>    public T visitFile(PropertyFileParser.FileContext ctx) { ... }
+</span><span class='line'>    @Override
+</span><span class='line'>    public T visitProp(PropertyFileParser.PropContext ctx) { ... }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>我们可以从监听器的exitProp()中拷贝映射功能，然后把它粘贴到与规则prop相关的访问者方法中。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class TestPropertyFileVisitor {
+</span><span class='line'>    public static class PropertyFileVisitor extends PropertyFileBaseVisitor&lt;Void&gt; {
+</span><span class='line'>        Map&lt;String,String&gt; props = new OrderedHashMap&lt;String, String&gt;();
+</span><span class='line'>        public Void visitProp(PropertyFileParser.PropContext ctx) {
+</span><span class='line'>            String id = ctx.ID().getText();    // prop : ID '=' STRING '\n' ;
+</span><span class='line'>            String value = ctx.STRING().getText();
+</span><span class='line'>            props.put(id, value);
+</span><span class='line'>            return null;    // Java says must return something even when Void
+</span><span class='line'>        }
+</span><span class='line'>    }</span></code></pre></td></tr></table></div></figure>
+
+<p>这里是访问者接口和类之间的继承关系：</p>
+
+<p><img src="/uploads/propertyfile-visitor-hierachy.png" title="propertyfile-visitor-hierachy" ></p>
+
+<p>访问者在子节点上通过显式地调用接口ParseTreeVisitor的visit()方法遍历语法分析树。那些方法在AbstractParseTreeVisitor中实现。在这里，为prop调用创建的节点没有子树，因此visitProp()不需要调用visit()。</p>
+
+<p>在监听器和访问者的测试代码（例如TestPropertyFileVisitor）之间最大的不同是访问者的测试代码不需要ParseTreeWalker，它只需要让访问者去访问由语法分析器创建的树。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>PropertyFileVisitor loader = new PropertyFileVisitor();
+</span><span class='line'>loader.visit(tree);
+</span><span class='line'>System.out.println(loader.props);    // print results</span></code></pre></td></tr></table></div></figure>
+
+<p>以下是构建和测试序列：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr -visitor PropertyFile.g  # create visitor as well this time
+</span><span class='line'>compile *.java
+</span><span class='line'>run TestPropertyFileVisitor t.properties</span></code></pre></td></tr></table></div></figure>
+
+<p>这里是输出的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>{user="parrt", machine="maniac"}</span></code></pre></td></tr></table></div></figure>
+
+<p>我们可以使用监听器和访问者构建几乎任何我们想要的。一旦我们处于Java空间，就不再需要学习更多的ANTLR知识。我们只要知道语法、语法分析树、监听器和访问者事件方法之间的关系。除此之外，就是代码。在对识别中的输入短语的回答中，我们可以生成输出、收集信息、以某种方式验证短语，或者执行计算。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -3118,543 +3222,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/logic-problems-who-owns-the-fish/">逻辑题-谁养鱼</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-05-12T18:06:58+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:06 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><ol>
-<li>在一条街上，有5座房子，喷了5种颜色。</li>
-<li>每座房子里住着不同国籍的人。</li>
-<li>每个人喝不同的饮料，抽不同品牌的香烟，养不同的宠物。</li>
-</ol>
-
-<p>问题是：谁养鱼？</p>
-
-<p>提示：</p>
-
-<ol>
-<li>英国人住红色房子。</li>
-<li>瑞典人养狗。</li>
-<li>丹麦人喝茶。</li>
-<li>绿色房子在白色房子左面。</li>
-<li>绿色房子主人喝咖啡。</li>
-<li>抽Pall Mall香烟的人养鸟。</li>
-<li>黄色房子主人抽Dunhill香烟。</li>
-<li>住在中间房子的人喝牛奶。</li>
-<li>挪威人住第一间房子。</li>
-<li>抽Blends香烟的人住在养猫的人隔壁。</li>
-<li>养马的人住抽Dunhill香烟的人隔壁。</li>
-<li>抽Blue Master的人喝啤酒。</li>
-<li>德国人抽Prince香烟。</li>
-<li>挪威人住蓝色房子隔壁。</li>
-<li>抽Blends香烟的人有一个喝水的邻居。</li>
-</ol>
-
-<p>在回答上述问题前先画一个6行5列的表格，从上到下的每一行分别代表房子的顺序（A表示左边第一间房子）、哪国人、房子颜色、饮料、香烟、宠物。下表是问题的初始状态：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">A</th>
-<th style="text-align: center">B</th>
-<th style="text-align: center">C</th>
-<th style="text-align: center">D</th>
-<th style="text-align: center">E</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-</tbody></table>
-
-<p>根据提示8、9和14可以得到：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">A</th>
-<th style="text-align: center">B</th>
-<th style="text-align: center">C</th>
-<th style="text-align: center">D</th>
-<th style="text-align: center">E</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">挪威人</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">蓝色</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">牛奶</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-</tbody></table>
-
-<p>由提示4和5可以判定房子D的颜色是绿色，房子主人喝咖啡，房子E的颜色是白色。如下表所示：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">A</th>
-<th style="text-align: center">B</th>
-<th style="text-align: center">C</th>
-<th style="text-align: center">D</th>
-<th style="text-align: center">E</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">挪威人</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">蓝色</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">绿色</td>
-<td style="text-align: center">白色</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">牛奶</td>
-<td style="text-align: center">咖啡</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-</tbody></table>
-
-<p>结合提示1、7和11可以知道房子C是红色的，住的是英国人，房子A是黄色的。挪威人抽Dunhill香烟。住房子B的人养马。如下表所示：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">A</th>
-<th style="text-align: center">B</th>
-<th style="text-align: center">C</th>
-<th style="text-align: center">D</th>
-<th style="text-align: center">E</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">挪威人</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">英国人</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">黄色</td>
-<td style="text-align: center">蓝色</td>
-<td style="text-align: center">红色</td>
-<td style="text-align: center">绿色</td>
-<td style="text-align: center">白色</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">牛奶</td>
-<td style="text-align: center">咖啡</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">Dunhill</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">马</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-</tbody></table>
-
-<p>依据上表可知，挪威人喝的饮料是水、茶或者啤酒。结合提示3和12可以断定挪威人喝的是水。如下表所示：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">A</th>
-<th style="text-align: center">B</th>
-<th style="text-align: center">C</th>
-<th style="text-align: center">D</th>
-<th style="text-align: center">E</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">挪威人</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">英国人</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">黄色</td>
-<td style="text-align: center">蓝色</td>
-<td style="text-align: center">红色</td>
-<td style="text-align: center">绿色</td>
-<td style="text-align: center">白色</td>
-</tr>
-<tr>
-<td style="text-align: center">水</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">牛奶</td>
-<td style="text-align: center">咖啡</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">Dunhill</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">马</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-</tbody></table>
-
-<p>通过提示15可以得出住房子B的人抽Blends香烟。如下表所示：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">A</th>
-<th style="text-align: center">B</th>
-<th style="text-align: center">C</th>
-<th style="text-align: center">D</th>
-<th style="text-align: center">E</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">挪威人</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">英国人</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">黄色</td>
-<td style="text-align: center">蓝色</td>
-<td style="text-align: center">红色</td>
-<td style="text-align: center">绿色</td>
-<td style="text-align: center">白色</td>
-</tr>
-<tr>
-<td style="text-align: center">水</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">牛奶</td>
-<td style="text-align: center">咖啡</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">Dunhill</td>
-<td style="text-align: center">Blends</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">马</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-</tbody></table>
-
-<p>结合提示12可以推断住房子E的人抽Blue Master香烟、喝啤酒。住房子B的人喝茶。如下表所示：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">A</th>
-<th style="text-align: center">B</th>
-<th style="text-align: center">C</th>
-<th style="text-align: center">D</th>
-<th style="text-align: center">E</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">挪威人</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">英国人</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">黄色</td>
-<td style="text-align: center">蓝色</td>
-<td style="text-align: center">红色</td>
-<td style="text-align: center">绿色</td>
-<td style="text-align: center">白色</td>
-</tr>
-<tr>
-<td style="text-align: center">水</td>
-<td style="text-align: center">茶</td>
-<td style="text-align: center">牛奶</td>
-<td style="text-align: center">咖啡</td>
-<td style="text-align: center">啤酒</td>
-</tr>
-<tr>
-<td style="text-align: center">Dunhill</td>
-<td style="text-align: center">Blends</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">Blue Master</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">马</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-</tbody></table>
-
-<p>由提示3、13得到房子B住的是丹麦人。房子D住的是德国人，抽Prince香烟。如下表所示：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">A</th>
-<th style="text-align: center">B</th>
-<th style="text-align: center">C</th>
-<th style="text-align: center">D</th>
-<th style="text-align: center">E</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">挪威人</td>
-<td style="text-align: center">丹麦人</td>
-<td style="text-align: center">英国人</td>
-<td style="text-align: center">德国人</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">黄色</td>
-<td style="text-align: center">蓝色</td>
-<td style="text-align: center">红色</td>
-<td style="text-align: center">绿色</td>
-<td style="text-align: center">白色</td>
-</tr>
-<tr>
-<td style="text-align: center">水</td>
-<td style="text-align: center">茶</td>
-<td style="text-align: center">牛奶</td>
-<td style="text-align: center">咖啡</td>
-<td style="text-align: center">啤酒</td>
-</tr>
-<tr>
-<td style="text-align: center">Dunhill</td>
-<td style="text-align: center">Blends</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">Prince</td>
-<td style="text-align: center">Blue Master</td>
-</tr>
-<tr>
-<td style="text-align: center">?</td>
-<td style="text-align: center">马</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-</tbody></table>
-
-<p>再由提示6和10确定住房子C的人抽Pall Mall香烟、养鸟。挪威人养猫。如下表所示：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">A</th>
-<th style="text-align: center">B</th>
-<th style="text-align: center">C</th>
-<th style="text-align: center">D</th>
-<th style="text-align: center">E</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">挪威人</td>
-<td style="text-align: center">丹麦人</td>
-<td style="text-align: center">英国人</td>
-<td style="text-align: center">德国人</td>
-<td style="text-align: center">?</td>
-</tr>
-<tr>
-<td style="text-align: center">黄色</td>
-<td style="text-align: center">蓝色</td>
-<td style="text-align: center">红色</td>
-<td style="text-align: center">绿色</td>
-<td style="text-align: center">白色</td>
-</tr>
-<tr>
-<td style="text-align: center">水</td>
-<td style="text-align: center">茶</td>
-<td style="text-align: center">牛奶</td>
-<td style="text-align: center">咖啡</td>
-<td style="text-align: center">啤酒</td>
-</tr>
-<tr>
-<td style="text-align: center">Dunhill</td>
-<td style="text-align: center">Blends</td>
-<td style="text-align: center">Pall Mall</td>
-<td style="text-align: center">Prince</td>
-<td style="text-align: center">Blue Master</td>
-</tr>
-<tr>
-<td style="text-align: center">猫</td>
-<td style="text-align: center">马</td>
-<td style="text-align: center">鸟</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">?</td>
-</tr>
-</tbody></table>
-
-<p>最后结合提示2推断得到房子E住的是瑞典人，养狗。如下表所示：</p>
-
-<table><thead>
-<tr>
-<th style="text-align: center">A</th>
-<th style="text-align: center">B</th>
-<th style="text-align: center">C</th>
-<th style="text-align: center">D</th>
-<th style="text-align: center">E</th>
-</tr>
-</thead><tbody>
-<tr>
-<td style="text-align: center">挪威人</td>
-<td style="text-align: center">丹麦人</td>
-<td style="text-align: center">英国人</td>
-<td style="text-align: center">德国人</td>
-<td style="text-align: center">瑞典人</td>
-</tr>
-<tr>
-<td style="text-align: center">黄色</td>
-<td style="text-align: center">蓝色</td>
-<td style="text-align: center">红色</td>
-<td style="text-align: center">绿色</td>
-<td style="text-align: center">白色</td>
-</tr>
-<tr>
-<td style="text-align: center">水</td>
-<td style="text-align: center">茶</td>
-<td style="text-align: center">牛奶</td>
-<td style="text-align: center">咖啡</td>
-<td style="text-align: center">啤酒</td>
-</tr>
-<tr>
-<td style="text-align: center">Dunhill</td>
-<td style="text-align: center">Blends</td>
-<td style="text-align: center">Pall Mall</td>
-<td style="text-align: center">Prince</td>
-<td style="text-align: center">Blue Master</td>
-</tr>
-<tr>
-<td style="text-align: center">猫</td>
-<td style="text-align: center">马</td>
-<td style="text-align: center">鸟</td>
-<td style="text-align: center">?</td>
-<td style="text-align: center">狗</td>
-</tr>
-</tbody></table>
-
-<p>现在，结果已经出来了：德国人养鱼。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/4">&larr; Older</a>
@@ -3672,6 +3239,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/the-10x-developer-is-not-myth/">10x开发者不是神话</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/the-mythical-10x-programmer/">神秘的10x程序员</a>
       </li>
     
@@ -3685,10 +3256,6 @@
     
       <li class="post">
         <a href="/blog/unconventional-way-of-learning-a-new-programming-language/">学习新编程语言的非传统方式</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/the-impact-github-is-having-on-your-software-career-right-now/">GitHub对软件职业生涯的影响</a>
       </li>
     
   </ul>
@@ -3725,7 +3292,7 @@
 <a style="font-size: 117%" href="/tags/ruby/">Ruby</a>
 <a style="font-size: 95%" href="/tags/spring/">Spring</a>
 <a style="font-size: 99%" href="/tags/struts/">Struts</a>
-<a style="font-size: 143%" href="/tags/translation/">Translation</a>
+<a style="font-size: 144%" href="/tags/translation/">Translation</a>
 <a style="font-size: 95%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 106%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 106%" href="/tags/wxwidgets/">wxWidgets</a>
