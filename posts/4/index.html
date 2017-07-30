@@ -9,7 +9,13 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="对于大多数语法而言，注释和空格都是语法分析器可以忽略的东西。如果我们不想让注释和空格在语法中到处都是，那么就需要让词法分析器把它们扔掉。不幸的是，这意味着任何后续的处理步骤都不能再访问注释和空格。保留但忽略注释和空格的秘密是把这些发送给语法分析器的记号放到一个“隐藏通道”中。 &hellip;">
+  <meta name="description" content="在聚焦到具体的语法规则内部结构之前，我们要先讨论下语法的整体剖析以及如何形成一套初始的语法骨架。 语法文件通常是由一个命名语法的头和一系列可以彼此调用的规则组成。就像下面这样： 1
+2
+3
+4
+5
+grammar MyG; rule1 : «stuff» ;
+rule2 : «more stuff &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +79,79 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part15/">ANTLR 4权威参考读书笔记（15）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-05-22T17:51:36+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2016</span></span> <span class='time'>5:51 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在聚焦到具体的语法规则内部结构之前，我们要先讨论下语法的整体剖析以及如何形成一套初始的语法骨架。</p>
+
+<p>语法文件通常是由一个命名语法的头和一系列可以彼此调用的规则组成。就像下面这样：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar MyG;
+</span><span class='line'>
+</span><span class='line'>rule1 : «stuff» ;
+</span><span class='line'>rule2 : «more stuff» ;
+</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
+
+<p>设计语法就是要搞清楚«stuff»是什么？哪个规则是开始规则。这要求我们需要知道给定语言的一系列代表性的输入例子。当然，从语言参考手册甚至另一个语法分析器生成器格式而来的语法也是有帮助的。</p>
+
+<p>正确设计语法的方法是借鉴功能分解或者自顶向下的设计，从粗粒度级别到细粒度级别逐步定义语言结构并把它们编码为语法规则。所以，我们的第一个任务就是找到粗粒度语言结构的名字，同时它也是开始规则。在英语中我们使用sentence，对于XML文件来说它则是document。</p>
+
+<p>设计开始规则的内容是用英语伪代码描述整个输入格式的问题。例如，“a comma-separated-value (CSV) file is a sequence of rows terminated by newlines.”这段文字，在is a左边的至关重要的单词file是规则名字，在is a右边的所有内容则成为在规则定义右则的«stuff»的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>file : «a sequence of rows terminated by newlines» ;</span></code></pre></td></tr></table></div></figure>
+
+<p>然后我们通过描述在开始规则右侧被确定的元素来进行下一个粒度级别的设计。在规则右侧的名词通常是对记号或尚未定义的规则的引用，这些记号是那些我们在正常情况下视为单词、标点符号、运算符的元素。就像单词是英语句子中的原子成分那样，记号在语法规则中也是如此。规则引用则涉及到像row那样需要被分解为更详细部分的其它语言结构。</p>
+
+<p>进入细节的另外一层，我们可以说row是一系列被逗号分隔的field，而field则是一个数字或字符串。就像以下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>row   : «a sequence of fields separated by commas» ;
+</span><span class='line'>field : «number or string» ;</span></code></pre></td></tr></table></div></figure>
+
+<p>当没有规则再需要定义时，我们就得到了语法的一个粗略的草图。</p>
+
+<p>如果有其它格式的语法作为参考的话设计语法会容易的多，但要小心不要盲目地遵循它，否则你会误入歧途的。非ANTLR格式的语法只是让你知道别人是如何决定分解语言中的短语的，它最大的作用就是可以给我们一份规则名称的列表作为参考。</p>
+
+<p>不推荐从参考手册上复制粘贴语法到ANTLR，然后再通过细微的调整让它工作。把它当作一套指南而不是一段代码是更好的办法。为了清晰地描述语法，参考手册通常是相当松散的。这意味着语法能识别大量不在语言中的句子，或者语法可能不够明确，可以用多种方法匹配相同的输入序列。例如，语法可能会说表达式可以调用一个构建器或者访问一个函数，问题是像T(i)这样的输入可以同时匹配两者。理想情况下，在语法中是不能有这样的二义性的，每个输入句子我们只需要一种解释。</p>
+
+<p>在另一个极端，参考手册中的语法有时过于明确地说明了规则。有些约束是需要在分析完输入后实施的，而不是试图对语法结构实施约束。例如，W3C XML语法就显式地指定标签中什么地方必须要有空格以及什么地方的空格可以省略。但事实是我们可以简单地让词法分析器在把记号发送给语法分析器之前去除空格，不需要在语法中到处测试它。</p>
+
+<p>规格还说&lt;?xml ...&gt;标签可以有两个附加属性encoding和standalone。我们需要知道约束，但它是很容易去允许任何属性名字，然后在语法分析后检查语法分析树，以确保所有这些限制都满足的。
+归根结底，XML只是嵌在文本中的一对标签，因此它的语法结构是相当直白的。唯一的挑战是如何分别对待什么在标签内以及什么在标签外。</p>
+
+<p>识别语法规则并用伪代码表示它们的右侧部分最初是个挑战，但当你为更多的语言构建语法后它会变得越来越容易。一旦我们有了伪代码，我们就需要把它转换成ANTLR表示法，以便能得到一个可以工作的语法。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1295,64 +1374,6 @@ another runner in the night<br>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part8/">ANTLR 4权威参考读书笔记（8）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-03-20T09:57:45+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>20</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>9:57 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><ul>
-<li>sentence 句子</li>
-</ul>
-
-<p>一门语言由有效的句子组成，一个句子由短语组成，一个短语由子短语和词汇符号组成。要实现一门语言，我们必须构建一个能读取句子以及对发现的短语和输入符号作出适当反应的应用。</p>
-
-<p>这样的应用必须能够识别特定语言的所有有效的句子、短语和子短语。识别一个短语意味着我们能够确定短语的各种组件并能指出它与其它短语的区别。例如，我们把输入sp=100识别为赋值语句，这就意味着我们知道sp是赋值目标以及100是要存储的值。识别赋值语句sp=100也意味着应用认为它是明显不同于，比如说，a+b语句的。在识别后，应用将执行适当的操作，例如performAssignment(&quot;sp&quot;, 100)或者translateAssignment(&quot;sp&quot;, 100)。</p>
-
-<p>识别语言的程序被称为语法分析器。语法指代控制语言成员的规则，每条规则都表示一个短语的结构。为了更容易地实现识别语言的程序，通常我们会把识别语言的语法分析拆解成两个相似但不同的任务或阶段。</p>
-
-<p>把字符组成单词或符号（记号）的过程被称为词法分析或简单标记化。我们把标记输入的程序称为词法分析器。词法分析器能把相关的记号组成记号类型，例如INT（整数）、ID（标志符）、FLOAT（浮点数）等。当语法分析器只关心类型的时候，词法分析器会把词汇符号组成类型，而不是单独的符号。记号至少包含两块信息：记号类型（确定词法结构）和匹配记号的文本。</p>
-
-<p>第二阶段是真正的语法分析器，它使用这些记号去识别句子结构，在本例中是赋值语句。默认情况下，ANTLR生成的语法分析器会构建一个称为语法分析树或语法树的数据结构，它记录语法分析器如何识别输入句子的结构和它的组件短语。下图阐明了语言识别器的基本数据流：</p>
-
-<p><img src="/uploads/basic-data-flow.png" title="basic-data-flow" ></p>
-
-<p>语法分析树的内部节点是分组和确认它们子节点的短语名字。根节点是最抽象的短语名字，在本例中是stat（“statement”的缩写）。语法分析树的叶子节点永远是输入记号。</p>
-
-<p>通过生成语法分析树，语法分析器给应用的其余部分提供了方便的数据结构，它们含有关于语法分析器如何把符号组成短语的完整信息。树是非常容易处理的，并且也能被程序员很好的理解。更好的是，语法分析器能自动地生成语法分析树。</p>
-
-<p>通过操作语法分析树，需要识别相同语言的多个应用能复用同一个语法分析器。当然，你也可以选择直接在语法中嵌入特定应用的代码片段，这是语法分析器生成器传统的做法。ANTLR v4仍然允许这样做，但是语法分析树有助于更简洁更解耦的设计。</p>
-
-<p>语法分析树对于需要多次树遍历的转换也是非常有用的，因为在计算依赖关系的阶段通常会需要前一个阶段的信息。相比于在每个阶段都要准备输入字符，我们只需要遍历语法分析树多次，更具有效率。</p>
-
-<p>我们使用一套规则指定短语：语法分析树子树根节点对应于语法规则名。这里的语法规则对应于上图中assign子树的第一层：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>assign : ID '=' expr ;    // 匹配赋值语句像"sp = 100"</span></code></pre></td></tr></table></div></figure>
-
-<p>明白ANTLR如何把这些规则转换为人类可读的语法分析代码是使用和调试语法的基础，可以让我们更深入地挖掘语法分析是如何工作的。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/5">&larr; Older</a>
@@ -1370,6 +1391,10 @@ another runner in the night<br>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/what-should-checked-and-unchecked-translate/">checked/unchecked应该翻译成什么？</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/10x-engineers-take-long-naps/">10x工程师经常的打盹</a>
       </li>
     
@@ -1383,10 +1408,6 @@ another runner in the night<br>
     
       <li class="post">
         <a href="/blog/learn-anything-faster-with-the-feynman-technique/">费曼技巧：最好的学习方法</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/code-coverage-100-percent-tragedy/">100%代码覆盖率的悲剧</a>
       </li>
     
   </ul>
