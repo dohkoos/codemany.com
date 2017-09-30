@@ -9,8 +9,17 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="浪费几个小时，杀死无数脑细胞，最终发现是单词打错了。不过错有错招，这个问题也让我重新温习了一遍关于form数据编码的知识。 在做上传表单时，一直报告如下错误： 1
-undefined method 'original_filename' for "example.csv":String 在 &hellip;">
+  <meta name="description" content="在以前写的博文部署应用到Heroku时的问题里有这么一段话： 股票功能需要导入交割单文件，因为导入后的文本文件不再使用，可以把上传路径由public/uploads改为tmp，这样就避免了Heroku不能写文件的问题。 下面是那时候写的导入代码： 1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -74,6 +83,164 @@ undefined method 'original_filename' for "example.csv":String 在 &hellip;">
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/refactoring-rails-code/">重构Rails代码</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2014-11-18T19:42:59+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>7:42 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在以前写的博文<a href="/blog/problem-when-deploying-application-to-heroku/">部署应用到Heroku时的问题</a>里有这么一段话：</p>
+
+<blockquote>
+<p>股票功能需要导入交割单文件，因为导入后的文本文件不再使用，可以把上传路径由public/uploads改为tmp，这样就避免了Heroku不能写文件的问题。</p>
+</blockquote>
+
+<p>下面是那时候写的导入代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class StocksController &lt; ApplicationController
+</span><span class='line'>  UPLOADS_DIRECTORY = File.join("#{Rails.root}", "public/uploads")
+</span><span class='line'>
+</span><span class='line'>  def import
+</span><span class='line'>    filename = upload_file(params[:file])
+</span><span class='line'>    lines = File.readlines("#{UPLOADS_DIRECTORY}/#{filename}")
+</span><span class='line'>    lines.each do |line|
+</span><span class='line'>      # do something
+</span><span class='line'>    end
+</span><span class='line'>    redirect_to stocks_url
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  protected
+</span><span class='line'>    def upload_file(file)
+</span><span class='line'>      if !file.original_filename.empty?
+</span><span class='line'>        @filename = get_file_name(file.original_filename)
+</span><span class='line'>        Dir.mkdir("#{UPLOADS_DIRECTORY}") unless Dir.exist?("#{UPLOADS_DIRECTORY}")
+</span><span class='line'>        File.open("#{UPLOADS_DIRECTORY}/#{@filename}", "wb") do |f|
+</span><span class='line'>          f.write(file.read)
+</span><span class='line'>        end
+</span><span class='line'>        return @filename
+</span><span class='line'>      end
+</span><span class='line'>    end
+</span><span class='line'>
+</span><span class='line'>    def get_file_name(filename)
+</span><span class='line'>      if !filename.nil?
+</span><span class='line'>        # does not support chinese filename?
+</span><span class='line'>        Time.now.strftime("%Y%m%d%H%M%S") + '.txt'
+</span><span class='line'>      end
+</span><span class='line'>    end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>这里的实现方法是先将上传文件保存到服务器上应用的public/uploads目录中，然后再读取和处理。</p>
+
+<p>其实根本不需要写的这么复杂，因为导入的文件被读取一次后就不再使用了。所以在当时写代码的时候一直有这样的想法，如果能直接获得上传文件的数据，那么就不需要再另外去写保存和读取文件的代码了。</p>
+
+<p>事实也是如此。通过表单提交的file字段数据会首先在服务器上形成临时文件，这时其实可以通过临时文件的路径来读取上传文件的数据。</p>
+
+<p>根据该想法重构后的代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class StocksController &lt; ApplicationController
+</span><span class='line'>  def import
+</span><span class='line'>    lines = File.readlines(params[:file].tempfile.to_path.to_s)
+</span><span class='line'>    lines.each do |line|
+</span><span class='line'>      # do something
+</span><span class='line'>    end
+</span><span class='line'>    redirect_to stocks_url
+</span><span class='line'>  end</span></code></pre></td></tr></table></div></figure>
+
+<p>重构后的代码果然清爽多了，不过还是有改进的空间。</p>
+
+<p>作为控制器，它应该只负责接收请求，并返回响应。而具体的业务逻辑，则应该交由模型去完成。下面是依照该理念再次重构后的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class StocksController &lt; ApplicationController
+</span><span class='line'>  def import
+</span><span class='line'>    Stock.import(params[:file])
+</span><span class='line'>    redirect_to stocks_url
+</span><span class='line'>  end
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>class Stock &lt; ActiveRecord::Base
+</span><span class='line'>  def self.import(file)
+</span><span class='line'>    lines = File.readlines(file.tempfile.to_path.to_s)
+</span><span class='line'>    lines.each do |line|
+</span><span class='line'>      # do something
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -786,64 +953,6 @@ undefined method 'original_filename' for "example.csv":String 在 &hellip;">
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-i-made-ruby-script-156x-faster/">我是如何让Ruby脚本速度提升156倍的</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2014-06-28T13:04:08+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>28</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>1:04 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>以前写过<a href="/blog/using-ruby-to-batch-rename-filename-from-traditional-to-simplified/">使用Ruby批量修改繁体文件名为简体</a>，可惜脚本的性能很有问题，批量重命名时运行速度非常慢。这次准备优化下代码，提升脚本的执行效率。</p>
-
-<p>profile.rb是为Ruby程序准备的profiler，它可以统计并输出各方法的运行时间，以便于找到程序执行的性能瓶颈。这次就用它来剖析脚本的运行时间。使用方法很简单，加上命令行选项-r profile就可以：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ruby -r profile rename.rb</span></code></pre></td></tr></table></div></figure>
-
-<p>运行结束后，会把统计信息输出到标准错误输出中。如下图所示：</p>
-
-<p><img src="/uploads/profile-before-tuning.png" title="profile-before-tuning" ></p>
-
-<p>profile统计的是各方法的运行时间，分为两类。一类是计算的是从方法调用到方法返回之间的时间，称为整体时间；另一类则是从整体时间中扣除在该方法中调用其它方法所耗费时间之后得到的时间，称为实际时间。</p>
-
-<p>上图输出信息每行中各字段含义如下（从左到右）：</p>
-
-<ul>
-<li>该方法执行时间占整体时间的百分比，比例越高越说明这行代码可能需要优化</li>
-<li>整体时间的总和</li>
-<li>实际时间的总和</li>
-<li>被调用的次数</li>
-<li>每次调用的平均实际时间（毫秒）</li>
-<li>每次调用的平均整体时间（毫秒）</li>
-<li>方法名</li>
-</ul>
-
-<p>由上图可以看出，脚本执行的时间大部分耗在了循环上。解决方法有两个：消除循环或减少循环次数。前者很难实现，暂且还没有想到办法，也许根本就没有可能。脚本中mapping的大小为2685，所以每修改一个文件名需要执行2685次循环，且循环中的encode和gsub!都是耗时操作。通常文件名的长度不超过30个字符，通过遍历文件名中每个字符的方式重命名就可以把循环次数缩减到不超过30次。</p>
-
-<p>修改代码后重新执行分析命令，得到的结果是脚本运行时间从379395秒变成2418秒，性能整整提升了156倍，达到2个数量级的效果。</p>
-
-<p><img src="/uploads/profile-after-tuning.png" title="profile-after-tuning" ></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/9">&larr; Older</a>
@@ -861,6 +970,10 @@ undefined method 'original_filename' for "example.csv":String 在 &hellip;">
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/thinking-on-software-version/">软件版本号的思考</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/chasing-the-shiny-and-new-in-software/">追逐时髦的技术</a>
       </li>
     
@@ -874,10 +987,6 @@ undefined method 'original_filename' for "example.csv":String 在 &hellip;">
     
       <li class="post">
         <a href="/blog/the-10x-developer-is-not-myth/">10x开发者不是神话</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/the-mythical-10x-programmer/">神秘的10x程序员</a>
       </li>
     
   </ul>

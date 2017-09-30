@@ -9,7 +9,10 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="在介绍本讲内容之前，先提出一个问题？普通的黑白针式打印机能打出灰度图来吗？如果说能，从针式打印机的打印原理来分析，似乎是不可能的。因为针打是靠撞针击打色带在纸上形成黑点的，不可能打出灰色的点来；如果说不能，可是我们的确见过用针式打印机打印出来的灰色图象。到底是怎么回事呢？ &hellip;">
+  <meta name="description" content="网上关于集成P6Spy到Spring的帖子说：在Spring的配置文件中添加： 1
+2
+3
+&lt;bean id="dataSource" class="com.p6spy.engine.spy.P6DataSource" destroy-method="close"&gt; &lt; &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +76,97 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/problem-does-not-generate-log-file-when-integrate-p6spy-into-spring/">集成P6Spy到Spring后没有产生日志文件的问题</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-01-22T17:41:32+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2007</span></span> <span class='time'>5:41 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>网上关于集成P6Spy到Spring的帖子说：在Spring的配置文件中添加：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;bean id="dataSource" class="com.p6spy.engine.spy.P6DataSource" destroy-method="close"&gt;
+</span><span class='line'>    &lt;constructor-arg ref="dataSourceTarget" /&gt;
+</span><span class='line'>&lt;/bean&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>然后将原来dataSource定义的id值改为dataSourceTarget：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;bean id="dataSourceTarget" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close"&gt;
+</span><span class='line'>    &lt;property name="driverClassName" value="${driver}" /&gt;
+</span><span class='line'>    &lt;property name="url" value="${url}" /&gt;
+</span><span class='line'>    &lt;property name="username" value="${username}" /&gt;
+</span><span class='line'>    &lt;property name="password" value="${password}" /&gt;
+</span><span class='line'>&lt;/bean&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>但是照着这样做了以后却发现没有生成日志文件。</p>
+
+<p>下载P6Spy的源代码进行阅读后找到了问题所在。打开P6Util.java文件，在classPathFile()方法中有这样一条语句：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>fp = classLoadPropertyFile(Thread.currentThread().getContextClassLoader().getResource(file))</span></code></pre></td></tr></table></div></figure>
+
+<p>getResource(file)用来读取spy.properties配置文件，file的值就是spy.properties的文件路径。我的syp.properties放在了C:\Tomcat 5.5\webapps\netlink\WEB-INF\classes目录下，所以它返回的值是C:/Tomcat%205.5/webapps/netlink/WEB-INF/classes/spy.properties，Tomcat 5.5中的空格被编码成了%20。然后在classLoadPropertyFile()方法中就直接使用该值来创建File对象。可想而知，肯定创建失败。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static File classLoadPropertyFile(java.net.URL purl) {
+</span><span class='line'>    try {
+</span><span class='line'>        if (purl != null) {
+</span><span class='line'>            // modified by jayakumar for JDK 1.2 support
+</span><span class='line'>            //return new File(purl.getPath());
+</span><span class='line'>            return new File(getPath(purl));
+</span><span class='line'>            // end of modification
+</span><span class='line'>        }
+</span><span class='line'>    } catch (Exception e) {
+</span><span class='line'>        // we ignore this, since JDK 1.2 does not suppport this method
+</span><span class='line'>    }
+</span><span class='line'>    return null;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>在classPathFile()方法中通过判断fp.exists()来决定是否返回日志文件的路径，既然上面创建File对象失败了，那fp.exists()肯定不可能为true了，日志文件也就不可能被创建了。</p>
+
+<p>解决问题的方法超简单，把Tomcat 5.5中的空格去掉就行了。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1222,118 +1316,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-to-remove-registration-prompt-for-winrar-330/">如何去除WinRAR 3.30的注册提示框</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2006-03-23T22:50:59+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>23</span><span class='date-suffix'>rd</span>, <span class='date-year'>2006</span></span> <span class='time'>10:50 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>WinRAR在使用到期后，每次打开都会弹出如下图所示的对话框窗口，十分烦人。</p>
-
-<p><img src="/uploads/winrar-nag.png" title="winrar-nag" ></p>
-
-<p>去除Nag窗口常用的几种方法是：</p>
-
-<ol>
-<li>使用资源修改工具将可执行文件中的Nag窗口的属性改成透明、不可见，可以变相的去除Nag窗口；</li>
-<li>找到创建和显示Nag窗口的代码，跳过即可。显示窗口的常用函数有MessageBox、MessageBoxEx、DialogBoxParam、CreateWindowEx、CreateWindowEx、ShowWindow等；</li>
-<li>找到创建和显示Nag窗口的函数，更改其参数，让其调用失败就可以了；</li>
-<li>在Nag窗口弹出来后，给可以关闭它的BUTTON 送一个WM_COMMAND消息；</li>
-<li>通过静态和动态分析找到注册码。</li>
-</ol>
-
-<p>由于WinRAR未注册版本没有功能限制，用不着去找注册码注册。所以在这里可以用2和3两种方法去掉WinRAR的注册提示窗口。</p>
-
-<p>使用Resource Hacker打开WinRAR.exe，显示Nag窗口的资源如图所示：</p>
-
-<p><img src="/uploads/winrar-reminder.png" title="winrar-reminder" ></p>
-
-<p>Nag窗口的ID号是1049，换算成16进制是0x419。用W32Dasm打开WinRAR.exe，打开Dialog References查找Dialog: DialogID_0419，结果没找到。由上图可知Nag窗口的资源名是REMINDER，打开String Data References查找REMINDER字符串试试，果然找到了，双击该项就可以来到相关代码处。</p>
-
-<p><img src="/uploads/winrar-w32dasm.png" title="winrar-w32dasm" ></p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>* Referenced by a (U)nconditional or (C)onditional Jump at Address:
-</span><span class='line'>|:0043FE89(C)
-</span><span class='line'>|
-</span><span class='line'>:0043FE8F C6055037490001          mov byte ptr [00493750], 01
-</span><span class='line'>:0043FE96 6A00                    push 00000000
-</span><span class='line'>:0043FE98 68143F4400              push 00443F14
-</span><span class='line'>:0043FE9D FF3588EC4A00            push dword ptr [004AEC88]
-</span><span class='line'>
-</span><span class='line'>* Possible StringData Ref from Data Obj -&gt;"REMINDER"
-</span><span class='line'>|
-</span><span class='line'>:0043FEA3 68C93C4900              push 00493CC9
-</span><span class='line'>:0043FEA8 FF3560D04900            push dword ptr [0049D060]
-</span><span class='line'>
-</span><span class='line'>* Reference To: USER32.DialogBoxParamA, Ord:0000h
-</span><span class='line'>|
-</span><span class='line'>:0043FEAE E837E30400              Call 0048E1EA
-</span><span class='line'>
-</span><span class='line'>* Referenced by a (U)nconditional or (C)onditional Jump at Addresses:
-</span><span class='line'>|:0043FE64(C), :0043FE6D(C), :0043FE76(C), :0043FE7F(C), :0043FE8D(C)
-</span><span class='line'>|
-</span><span class='line'>:0043FEB3 833DF8104B0000          cmp dword ptr [004B10F8], 00000000
-</span><span class='line'>:0043FEBA 752D                    jne 0043FEE9
-</span><span class='line'>:0043FEBC 833DF0104B0000          cmp dword ptr [004B10F0], 00000000
-</span><span class='line'>:0043FEC3 7524                    jne 0043FEE9
-</span><span class='line'>:0043FEC5 833D08114B00FF          cmp dword ptr [004B1108], FFFFFFFF
-</span><span class='line'>:0043FECC 741B                    je 0043FEE9
-</span><span class='line'>:0043FECE 6A0A                    push 0000000A
-</span><span class='line'>:0043FED0 FF3508114B00            push dword ptr [004B1108]</span></code></pre></td></tr></table></div></figure>
-
-<p>可以看到，REMINDER字符串地址是作为参数传给了DialogBoxParamA函数，而DialogBoxParamA函数正是创建对话框的API函数。这时只需将0043FEA3处的push 00493CC9改为push 0，将一个NULL传入DialogBoxParamA函数，这个函数就会调用失败。当然之后它也就不能正常显示了，就达到了去除的目的。</p>
-
-<p>现在再打开WinRAR，呵呵，大功告成，再也不会有Nag窗口出来Nag我了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/29">&larr; Older</a>
@@ -1351,6 +1333,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/thinking-on-software-version/">软件版本号的思考</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/chasing-the-shiny-and-new-in-software/">追逐时髦的技术</a>
       </li>
     
@@ -1364,10 +1350,6 @@
     
       <li class="post">
         <a href="/blog/the-10x-developer-is-not-myth/">10x开发者不是神话</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/the-mythical-10x-programmer/">神秘的10x程序员</a>
       </li>
     
   </ul>
