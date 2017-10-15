@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="">
+  <meta name="description" content="用自顶向下的语法指定和通过手工的递归下降语法分析器识别表达式一直是个麻烦。首先是因为大部分自然语法是模糊的，其次是因为大部分自然语法规格使用一种被称为左递归的特殊类型递归。所以自顶向下的语法和语法分析器不能处理传统形式上的左递归。 为了阐明这个问题，设想一个算术表达式语言， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -79,7 +79,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/test/">test</a></h1>
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part17/">ANTLR 4权威参考读书笔记（17）</a></h1>
     
     
       <p class="meta">
@@ -88,310 +88,68 @@
 
 
 
-<time class='entry-date' datetime='2017-07-07T19:10:09+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>7</span><span class='date-suffix'>th</span>, <span class='date-year'>2017</span></span> <span class='time'>7:10 pm</span></time>
+<time class='entry-date' datetime='2016-06-07T13:09:54+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>7</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>1:09 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"></div>
-  
-  
+  <div class="entry-content"><p>用自顶向下的语法指定和通过手工的递归下降语法分析器识别表达式一直是个麻烦。首先是因为大部分自然语法是模糊的，其次是因为大部分自然语法规格使用一种被称为左递归的特殊类型递归。所以自顶向下的语法和语法分析器不能处理传统形式上的左递归。</p>
 
+<p>为了阐明这个问题，设想一个算术表达式语言，它只有乘法和加法运算符以及整数。表达式是自相似的。也就是说，一个乘法表达式是由“*”运算符连接的两个子表达式。同样的，一个加法表达式是由“+”运算符连接的两个子表达式。我们也可以把整数看作表达式。整个语法规则看起来就像下面显示的那样：</p>
 
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/test/">test</a></h1>
-    
-    
-      <p class="meta">
-        
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>expr : expr '*' expr    // 匹配由“*”运算符连接的子表达式
+</span><span class='line'>     | expr '+' expr    // 匹配由“+”运算符连接的子表达式
+</span><span class='line'>     | INT              // 匹配简单整数
+</span><span class='line'>     ;</span></code></pre></td></tr></table></div></figure>
 
+<p>问题是上述规则对于某些输入短语来说是模棱两可的。换句话说，这个规则能用多种方法匹配单个输入流。对于简单的整数和像1+2和1*2这样的单运算符表达式是没问题的，因为只有一种方法能去匹配它们。例如，规则可以仅用第二个选项匹配1+2。就像下图左边所示的那样：</p>
 
+<p><img src="/uploads/ambiguity-parse-tree.png" title="ambiguity-parse-tree" ></p>
 
+<p>问题在于指定的规则可以像中间和右边语法分析树描绘的那样用两种方法解释1+2*3这样的输入。两者的解释是不同的，因为中间的树说1加到2乘3的结果上，而右边的树说1加2的结果乘以3。这是一个运算符优先级的问题，但常规语法根本没有指定优先级的方法。大部分语法工具使用额外的符号来指定运算符优先级。</p>
 
-<time class='entry-date' datetime='2017-07-02T10:08:14+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2017</span></span> <span class='time'>10:08 am</span></time>
-        
-      </p>
-    
-  </header>
+<p>与此相反的是，ANTLR使用有利于首先给出的选项，隐式地允许我们指定运算符优先级的方法来解决二义性。规则expr有一个乘法选项在加法选项之前，因此，ANTLR解决1+2*3的运算符二义性的方法有利于乘法。</p>
 
+<p>默认情况下，ANTLR是从左到右结合运算符，然而某些像指数这样的运算符则是从右到左。因此，我们必须使用参数assoc手动指定运算符记号上的相关性。这里是一个能正确地把输入<code>2^3^4</code>解释成<code>2^(3^4)</code>的表达式规则：</p>
 
-  <div class="entry-content"></div>
-  
-  
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>expr : expr '^'&lt;assoc=right&gt; expr    // 运算符是右结合的
+</span><span class='line'>     | INT
+</span><span class='line'>     ;</span></code></pre></td></tr></table></div></figure>
 
+<p>下图中的语法分析树阐明了运算符左右结合版本的不同。右边的语法分析树是惯常的解释：</p>
 
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/test/">test</a></h1>
-    
-    
-      <p class="meta">
-        
+<p><img src="/uploads/power-parse-tree.png" title="power-parse-tree" ></p>
 
+<p>为了把指数、乘法和加法这三个运算符合并成一条规则，我们把指数表达式选项放在其它表达式选项之前，因为它的运算符优先级比乘法和加法都要高。合并后的语法如下所示：</p>
 
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>expr : expr '^'&lt;assoc=right&gt; expr    // 运算符是右结合的
+</span><span class='line'>     | expr '*' expr                 // 匹配由“*”运算符连接的子表达式
+</span><span class='line'>     | expr '+' expr                 // 匹配由“+”运算符连接的子表达式
+</span><span class='line'>     | INT                           // 匹配简单整数
+</span><span class='line'>     ;</span></code></pre></td></tr></table></div></figure>
 
+<p>不像其它常规的语法分析器生成器那样，ANTLR v4是可以处理直接左递归的。左递归规则是指在选项的左边缘直接或者间接调用自身的规则。规则expr是直接左递归的，因为除INT选项外的其它所有选项都开始于规则expr自身的引用。如果规则expr的引用处在某些选项的右边缘，那么它就是右递归的。虽然ANTLR v4可以处理直接左递归，但它不能处理间接左递归。</p>
 
-<time class='entry-date' datetime='2017-07-01T10:01:04+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>1</span><span class='date-suffix'>st</span>, <span class='date-year'>2017</span></span> <span class='time'>10:01 am</span></time>
-        
-      </p>
-    
-  </header>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>expr : expo ;    // 通过expo左递归地间接调用expr
+</span><span class='line'>expo : expr '^'&lt;assoc=right&gt; expr ;</span></code></pre></td></tr></table></div></figure>
 
-
-  <div class="entry-content"></div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/test/">test</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2017-06-30T18:02:00+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>30</span><span class='date-suffix'>th</span>, <span class='date-year'>2017</span></span> <span class='time'>6:02 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"></div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/test/">test</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2017-06-25T11:16:10+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>25</span><span class='date-suffix'>th</span>, <span class='date-year'>2017</span></span> <span class='time'>11:16 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"></div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/test/">test</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2017-06-24T11:12:19+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>24</span><span class='date-suffix'>th</span>, <span class='date-year'>2017</span></span> <span class='time'>11:12 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"></div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/test/">test</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2017-06-23T21:45:51+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>23</span><span class='date-suffix'>rd</span>, <span class='date-year'>2017</span></span> <span class='time'>9:45 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"></div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/test/">test</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2017-06-18T08:20:51+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2017</span></span> <span class='time'>8:20 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"></div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/the-10x-developer-is-not-myth/">10x开发者不是神话</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2017-06-17T09:25:44+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>17</span><span class='date-suffix'>th</span>, <span class='date-year'>2017</span></span> <span class='time'>9:25 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="http://www.ybrikman.com/writing/2013/09/29/the-10x-developer-is-not-myth/">http://www.ybrikman.com/writing/2013/09/29/the-10x-developer-is-not-myth/</a></p>
-
-<p>更新：你可以<a href="https://www.campusmvp.es/recursos/post/el-desarrollador-estrella-del-rock-10x-no-es-un-mito.aspx">在这里找到本文的西班牙语翻译</a>。</p>
-
-<p>昨天晚上，我在Twitter发布了以下内容：</p>
-
-<blockquote>
-<p>我被“10x”或者“摇滚明星开发者”是神话的说法所迷惑。明星运动员、艺术家、作家，或者摇滚明星是神话？</p>
-
-<p>— Yevgeniy Brikman (@brikis98) <a href="https://twitter.com/brikis98/status/384208625725497344">September 29, 2013</a></p>
-</blockquote>
-
-<p>我收到了大量的回复和问题，但Twitter是个糟糕的讨论媒介，所以我写这篇博文作为补充。</p>
-
-<p>有大堆的文章[<a href="http://blog.jelastic.com/2012/04/24/7-programming-myths-busted/">1</a>、<a href="http://sdt.bz/36247">2</a>、<a href="http://www.knowing.net/index.php/2011/12/11/why-10x-ticks-me-off/">3</a>、<a href="http://www.hanselman.com/blog/TheMythOfTheRockstarProgrammer.aspx">4</a>]声称10x开发者不存在。反对的理由通常分成3种：</p>
-
-<ol>
-<li>原来的10x数字来自单个的有缺陷的研究（Sackman，Erikson和Grant（1968））。</li>
-<li>生产率是个模糊的事情，很难测量，所以我们不能做出任何10x的声明。</li>
-<li>人才有分布，但没有单个工程师可以做10倍的工作。</li>
-</ol>
-
-<p>我不同意所有这些。让我们逐个地检查这些理由。</p>
-
-<h3 id="这不是一个研究">这不是一个研究</h3>
-
-<p>虽然Twitter和Hacker News上的空谈科学家喜欢严厉谴责已被同行评审的研究，但在那种情况下的证据是相当有吸引力的，不仅限于单项研究。请允许我引用这个问题<a href="http://programmers.stackexchange.com/questions/179616/a-good-programmer-can-be-as-10-times-more-productive-than-a-mediocre-one">在Stack Overflow上的讨论</a>的最顶部的回复：</p>
-
-<blockquote>
-<p>...发现个体编程生产力的巨大差异的原始研究是在20世纪60年代末由Sackman、Erikson和Grant（1968）进行的。他们研究了平均7年经验的专业程序员，发现最佳和最差程序员之间的初始编码时间的比例约为20:1；调试时间超过25:1；程序大小5:1；并且程序执行速度约为10:1。他们发现程序员的丰富经验与代码质量或生产率之间没有任何关系。</p>
-
-<p>对Sackman、Erikson和Grant的发现的详细检查显示出其方法论的一些缺陷。但是，即使考虑到这些缺陷，他们的数据仍然显示出最佳和最差程序员之间的差距超过10倍。</p>
-
-<p>在原始研究之后的几年中，“程序员之间存在数量级差距”的一般性发现已经被许多其它对专业程序员的研究所证实（Curtis 1981、Mills 1983、DeMarco和Lister 1985、Curtis等人1986、Card 1987、Boehm和Papaccio 1988、Valett和McGarry 1989、Boehm等人2000）...</p>
-</blockquote>
-
-<p>想知道更多可以看<a href="http://programmers.stackexchange.com/questions/179616/a-good-programmer-can-be-as-10-times-more-productive-than-a-mediocre-one">这里</a>和<a href="http://www.construx.com/10x_Software_Development/Origins_of_10X_%E2%80%93_How_Valid_is_the_Underlying_Research_/">这里</a>。</p>
-
-<h3 id="如果你不能测量它，你仍然可以推理它">如果你不能测量它，你仍然可以推理它</h3>
-
-<p>即使你忽略上面的研究，并宣称“编程生产力”很难测量——它是的——我们仍然可以讨论10x程序员。只是因为某些东西难以测量并不意味着我们无法推理它。</p>
-
-<p>例如，你是如何为最近的项目挑选编程语言的？你有没有查阅“证明”这门语言比其它语言更有效的研究？就个人而言，我不需要实验来证明，Ruby比起C在构建网站时会是有一个数量级的更有生产力的选择。你可以胡乱拼凑些粗略的指标（库可用性、社区支持、文档），但现实是，大多数人基于直觉推理而不是双盲研究来做出这类语言决策。尽管缺乏过硬的数据，但我敢打赌，大多数时候，采用Ruby而不是C进行网站开发都将是正确的决策。</p>
-
-<p>当然，编程不是唯一这样的事情：什么“指标”可以告诉你一位作家、艺术家、老师或者哲学家比另外一位更好？仅仅观察他们，我不能给出表明莎士比亚、纳博科夫或奥威尔比普通作家好一个数量级的“生产力指标”，但是绝大多数人都会同意这点。</p>
-
-<h3 id="编程不是体力劳动">编程不是体力劳动</h3>
-
-<p>抗拒10x程序员的最大问题是有些人认为编程是手工劳动，而程序员是装配线工人。有些程序员比其他程序员好些，但可以肯定的是，单个程序员不可能持续接近其他程序员的10倍！10个人的团队总是胜过单个编码者！9个女人不能在1个月内生产婴儿！</p>
-
-<p>上面的逻辑听起来像是编程生产力只关乎打字速度。仿佛10x程序员只是能够生产平均水平的10倍代码。这种推理无视编程是创造性行业，不是体力劳动：解决同样问题的方法有很多种。停止简单地类比，更多地考虑罪案解决的类比：10名普通侦探与夏洛克·福尔摩斯。谁能更快地解决罪案？</p>
-
-<p>10x开发者具有洞察力，能找到普通程序员永远不会找到的解决方案。他们将避免花费普通程序员大量时间的整类问题。编写正确代码的单个工程师绝对可以胜过编写错误代码的10个工程师。</p>
-
-<h3 id="编程是关于选择">编程是关于选择</h3>
-
-<p>考虑构建单个软件产品（如网站）的决策有多少：你用哪种语言？什么Web框架？你用什么数据存储？你用什么缓存？你在哪里托管站点？你怎么监控它？你如何推进新的变化？你如何存储代码？你安排什么样的自动化测试？</p>
-
-<p>10个普通程序员将在每个步骤中做出“平均”质量的决策，这些决策的成本或收益将倍增。想象下流量以指数级增长，而这个普通的团队维护着普通的网站，数据存储引擎难以分片，没有足够冗余的主机，版本控制没有正确备份，没有CI环境，也没有监控。如果他们花费所有的时间去灭火，这10个编码者的效率如何？</p>
-
-<p>如果程序员可以以减少一个数量级的工作量的方式对问题进行建模，那么单个程序员可以胜过这个10人团队。从多年的经验来看，伟大的程序员会知道，以后修复错误要花费更多。通过在前面作出良好的决策，10x程序员可以避免几个月的工作。</p>
-
-<p><strong>它不是编写更多的代码，它是编写正确的代码。成为10x程序员不是通过做一个数量级的更多工作，而是通过做出比平常一个数量级的更好的决策。</strong></p>
-
-<p>这不是说10x程序员根本不犯错误。程序员每天都要做出很多选择，而伟大的程序员做出正确的选择比普通程序员多得多。</p>
-
-<p>编程不是唯一这样的事情。你愿意有10名普通科学家还是艾萨克·牛顿？10名普通科学家没有提出运动定律、重力理论、二项式系列、微积分等，艾萨克·牛顿做到了。你愿意让你的球队有迈克尔·乔丹还是10名普通球员（注意：乔丹获得了NBA平均薪水的10倍）？你愿意让史蒂夫·乔布斯（Steve Jobs）或者伊隆·马斯克（Elon Musk）经营一家公司还是把钥匙交给10个普通企业家？</p>
-
-<h3 id="10x程序员很少见">10x程序员很少见</h3>
-
-<p>重要的是以正确的角度看待事情。明星的程序员、运动员、作家和科学家极其少见。我不推荐围绕只雇佣“摇滚明星”来制定招聘策略，它会使你看起来很愚蠢和孤独。不要让完美成为好的敌人：聘请你能得到的最好工程师，并给他们充足的机会去发展和变得更好。</p>
-
-<p>但是，不要陷入所有程序员生而平等的谬误。任何创造性行业都有广泛的能力。一方面是会让组织陷入困境的雇员类型，用他们编写的每行代码积极增加技术债务。另一方面，有些人可以编写带来更多可能的代码，并且具有比平均水平大一个数量级的影响。</p>
+<p>ANTLR v4可以简化直接左递归的表达式规则的工作。这种新的机制不仅更有效率，而且表达式规则也更小和更容易理解。</p>
 </div>
   
   
@@ -404,7 +162,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/test/">test</a></h1>
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part16/">ANTLR 4权威参考读书笔记（16）</a></h1>
     
     
       <p class="meta">
@@ -413,14 +171,1259 @@
 
 
 
-<time class='entry-date' datetime='2017-06-16T18:53:46+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2017</span></span> <span class='time'>6:53 pm</span></time>
+<time class='entry-date' datetime='2016-06-02T10:16:21+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2016</span></span> <span class='time'>10:16 am</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"></div>
+  <div class="entry-content"><ul>
+<li>initializer 初始值设定项</li>
+<li>construct 构造体</li>
+</ul>
+
+<p>现在，我们已经有了一个自顶向下的草拟出语法的通用策略，下面我们要专注于一些常用的语言模式。尽管在过去几十年里有大量的语言被发明，但仍然只有较少的基本语言模式需要被处理。这是因为人们趋向于设计遵循自然语言约束的语言，语言也会因为设计者遵循数学上的常用表示法而趋向于相似。甚至在词法级别，语言趋向于复用一些相同的结构，例如标志符、整数、字符串等。这些单词顺序和依赖的约束来源于自然语言，并逐渐演化成为四种抽象的语言模式：</p>
+
+<h4 id="模式1：序列">模式1：序列</h4>
+
+<p>这是像数组初始值设定项中的值那样的元素序列，也是在计算机语言中最常见的结构。例如，下面是登录到POP服务器时的序列：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>USER parrt
+</span><span class='line'>PASS secret
+</span><span class='line'>RETR 1</span></code></pre></td></tr></table></div></figure>
+
+<p>这些命令本身也是序列。大部分命令是一个关键字（保留标志符，例如USER和RETR）跟随一个运算元再跟随一个换行符。为了在语法中指定此类序列，我们可以按照顺序简单地列出各个元素。以下是检索命令的序列（其中INT表示整数记号类型）：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>retr : 'RETR' INT '\n' ;</span></code></pre></td></tr></table></div></figure>
+
+<p>我们可以给RETR序列打上retr规则的标签，这样在语法的其它地方，我们就能使用规则名字作为简写来引用RETR序列。</p>
+
+<p>对于任意长度的序列像矢量[1 2 3]这样的简单整数列表，虽然它是一个有限序列，但我们不可能通过像INT INT INT ...这样的规则片段来列出所有可能的整数列表。为了编码这样的一个或者多个元素，我们使用“+”子规则运算符。例如，{INT}+表示任意长度的整数序列，或者使用简写INT+也可以。至于可以为空的列表，我们则使用零个或者多个运算符“*”。</p>
+
+<p>这种模式的变体有带终结符的序列和带分隔符的序列，CSV文件就很好地示范了这两者。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>file : (row '\n')* ;           // 带一个“\n”终结符的序列
+</span><span class='line'>row  : field (',' field)* ;    // 带一个“,”分隔符的序列
+</span><span class='line'>field: INT ;                   // 假设字段只是整数</span></code></pre></td></tr></table></div></figure>
+
+<p>规则file使用带终结符模式的列表去匹配零个或者多个row &#39;\n&#39;序列，记号“\n”终结序列的每个元素。规则row使用带分隔符模式的列表去匹配一个field后面有零个或者多个&#39;,&#39; field序列，记号“,”分隔各个字段。</p>
+
+<p>最后，还有个特殊类型的零个或者一个序列，用“?”指定。可以使用它去表达可选的构造体。</p>
+
+<h4 id="模式2：选择">模式2：选择</h4>
+
+<p>这是一个在多个可供替代的短语之间的选择，比如在编程语言中不同种类的语句。为了在语言中表示选择的这个概念，我们使用“|”作为ANTLR中的“or”运算符去分隔被称为“选项”的语法选择。</p>
+
+<p>回到CVS语法，我们可以通过整数或者字符串的选择让规则field变得更灵活。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>field: INT | STRING ;</span></code></pre></td></tr></table></div></figure>
+
+<p>任何时候，如果你发现正在说“语言结构x可以是这个或者那个”，那么你就可以确定应该使用选择模式，在规则x中使用“|”。</p>
+
+<h4 id="模式3：记号依赖">模式3：记号依赖</h4>
+
+<p>记号依赖表示一个记号的存在需要在短语的其它地方有它的对等物的存在，比如匹配的左右括号。前面我们曾经使用INT+去表达矢量[1 2 3]中的整数非空序列。为指定周围有方括号的矢量，我们需要一种方法去表达记号中的依赖。如果我们在句子中看到一个符号，那么我们必须在句子的其它地方找到它的对等物。为表达这种语法，我们必须使用同时指定对等符号的序列，它们通常包围或分组着其它元素。在这个案例中，我们这样指定矢量：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>vector : '[' INT+ ']' ;    // [1], [1 2], [1 2 3], ...</span></code></pre></td></tr></table></div></figure>
+
+<p>扫视任何有效的代码，你会看到必须成对出现的各种分组符号：(...)，[...]，{...}。但是要牢记，依赖符号并不是必须配对的，类C语言都有的a ? b : c三元运算符就指定了当看到“?”符号时需要在接下来的短语中看到“:”符号。</p>
+
+<h4 id="模式4：嵌套短语">模式4：嵌套短语</h4>
+
+<p>嵌套短语有一个自相似的语言结构，它的子短语也遵循相同的结构。表达式是典型的自相似语言结构，由被运算符分隔的嵌套子表达式组成。类似地，while的代码块是嵌套在外部代码块内的一个代码块。我们在语法中使用递归规则表达自相似的语言结构。因此，如果规则的伪代码引用它自身，我们将需要一个递归的自引用规则。</p>
+
+<p>让我们来看下代码块的嵌套是如何工作的。while语句是关键字while后随一个在括号中的条件表达式再后接一条语句。我们也可以把多条语句包裹在花括号里当作一个语句块。表达语法如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>stat : 'while' '(' expr ')' stat    // 匹配WHILE语句
+</span><span class='line'>     | '{' stat* '}'                // 匹配在括号中的语句块
+</span><span class='line'>     ;</span></code></pre></td></tr></table></div></figure>
+
+<p>这里的stat可以是单条语句或者被花括号括起来的一组语句。规则stat是直接递归的，因为它在两个选项中直接引用它自身。如果我们把第二个选项移到它自己的规则中，规则stat和block将是双向间接递归的。语法如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>stat : 'while' '(' expr ')' stat    // 匹配WHILE语句
+</span><span class='line'>     | '{' stat* '}'                // 匹配语句块
+</span><span class='line'>     ;
+</span><span class='line'>block : '{' stat* '}' ;             // 匹配在括号中的语句块</span></code></pre></td></tr></table></div></figure>
+
+<p>看下面仅有3类表达式（索引数组引用、括号表达式和整数）的简单语言的语法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>expr : ID '[' expr ']'    // a[1], a[b[1]], a[(2*b[1])]
+</span><span class='line'>     | '(' expr ')'       // (1), (a[1]), (((1))), (2*a[1])
+</span><span class='line'>     | INT                // 1, 94117
+</span><span class='line'>     ;</span></code></pre></td></tr></table></div></figure>
+
+<p>注意递归是如何自然地发生的。数组索引表达式的索引组件是表达式本身，因此我们只需要在选项中引用expr即可。</p>
+
+<p>下图是关于两个例子输入的语法分析树：</p>
+
+<p><img src="/uploads/expr-parse-tree.png" title="expr-parse-tree" ></p>
+
+<p>分析树中的内部树节点是规则引用，叶子是记号引用。从树根到任何节点的路径表示元素的规则调用栈（或者ANTLR生成的递归下降语法分析器调用栈）。路径代表递归嵌套的子树有多个相同规则的引用。规则节点是其下方子树的标签。根节点是expr，所以整棵树是一个表达式。在1之前的那棵expr子树会把整数当作一个表达式。</p>
+
+<p>实现上述模式，我们只需要由选项、记号引用、规则引用组成的语法规则即可。我们还可以把这些元素组成子规则，子规则是裹在括号内的行内规则。我们也可以将子规则标记为“?”或“*”或“+”循环去识别被包围的语法片段多次。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part15/">ANTLR 4权威参考读书笔记（15）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-05-22T17:51:36+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2016</span></span> <span class='time'>5:51 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在聚焦到具体的语法规则内部结构之前，我们要先讨论下语法的整体剖析以及如何形成一套初始的语法骨架。</p>
+
+<p>语法文件通常是由一个命名语法的头和一系列可以彼此调用的规则组成。就像下面这样：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar MyG;
+</span><span class='line'>
+</span><span class='line'>rule1 : «stuff» ;
+</span><span class='line'>rule2 : «more stuff» ;
+</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
+
+<p>设计语法就是要搞清楚«stuff»是什么？哪个规则是开始规则。这要求我们需要知道给定语言的一系列代表性的输入例子。当然，从语言参考手册甚至另一个语法分析器生成器格式而来的语法也是有帮助的。</p>
+
+<p>正确设计语法的方法是借鉴功能分解或者自顶向下的设计，从粗粒度级别到细粒度级别逐步定义语言结构并把它们编码为语法规则。所以，我们的第一个任务就是找到粗粒度语言结构的名字，同时它也是开始规则。在英语中我们使用sentence，对于XML文件来说它则是document。</p>
+
+<p>设计开始规则的内容是用英语伪代码描述整个输入格式的问题。例如，“a comma-separated-value (CSV) file is a sequence of rows terminated by newlines.”这段文字，在is a左边的至关重要的单词file是规则名字，在is a右边的所有内容则成为在规则定义右则的«stuff»的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>file : «a sequence of rows terminated by newlines» ;</span></code></pre></td></tr></table></div></figure>
+
+<p>然后我们通过描述在开始规则右侧被确定的元素来进行下一个粒度级别的设计。在规则右侧的名词通常是对记号或尚未定义的规则的引用，这些记号是那些我们在正常情况下视为单词、标点符号、运算符的元素。就像单词是英语句子中的原子成分那样，记号在语法规则中也是如此。规则引用则涉及到像row那样需要被分解为更详细部分的其它语言结构。</p>
+
+<p>进入细节的另外一层，我们可以说row是一系列被逗号分隔的field，而field则是一个数字或字符串。就像以下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>row   : «a sequence of fields separated by commas» ;
+</span><span class='line'>field : «number or string» ;</span></code></pre></td></tr></table></div></figure>
+
+<p>当没有规则再需要定义时，我们就得到了语法的一个粗略的草图。</p>
+
+<p>如果有其它格式的语法作为参考的话设计语法会容易的多，但要小心不要盲目地遵循它，否则你会误入歧途的。非ANTLR格式的语法只是让你知道别人是如何决定分解语言中的短语的，它最大的作用就是可以给我们一份规则名称的列表作为参考。</p>
+
+<p>不推荐从参考手册上复制粘贴语法到ANTLR，然后再通过细微的调整让它工作。把它当作一套指南而不是一段代码是更好的办法。为了清晰地描述语法，参考手册通常是相当松散的。这意味着语法能识别大量不在语言中的句子，或者语法可能不够明确，可以用多种方法匹配相同的输入序列。例如，语法可能会说表达式可以调用一个构建器或者访问一个函数，问题是像T(i)这样的输入可以同时匹配两者。理想情况下，在语法中是不能有这样的二义性的，每个输入句子我们只需要一种解释。</p>
+
+<p>在另一个极端，参考手册中的语法有时过于明确地说明了规则。有些约束是需要在分析完输入后实施的，而不是试图对语法结构实施约束。例如，W3C XML语法就显式地指定标签中什么地方必须要有空格以及什么地方的空格可以省略。但事实是我们可以简单地让词法分析器在把记号发送给语法分析器之前去除空格，不需要在语法中到处测试它。</p>
+
+<p>规格还说&lt;?xml ...&gt;标签可以有两个附加属性encoding和standalone。我们需要知道约束，但它是很容易去允许任何属性名字，然后在语法分析后检查语法分析树，以确保所有这些限制都满足的。
+归根结底，XML只是嵌在文本中的一对标签，因此它的语法结构是相当直白的。唯一的挑战是如何分别对待什么在标签内以及什么在标签外。</p>
+
+<p>识别语法规则并用伪代码表示它们的右侧部分最初是个挑战，但当你为更多的语言构建语法后它会变得越来越容易。一旦我们有了伪代码，我们就需要把它转换成ANTLR表示法，以便能得到一个可以工作的语法。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part14/">ANTLR 4权威参考读书笔记（14）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-05-16T20:26:22+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>8:26 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>对于大多数语法而言，注释和空格都是语法分析器可以忽略的东西。如果我们不想让注释和空格在语法中到处都是，那么就需要让词法分析器把它们扔掉。不幸的是，这意味着任何后续的处理步骤都不能再访问注释和空格。保留但忽略注释和空格的秘密是把这些发送给语法分析器的记号放到一个“隐藏通道”中。因为语法分析器只能调谐到单个通道，所以我们可以把任何我们想要的东西传递到其它通道中。这里是如何实现的语法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>COMMENT
+</span><span class='line'>    : '/*' .*? '*/' -&gt; channel(HIDDEN)    // match anything between /* and */
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>WS  : [ \r\t\n]+    -&gt; channel(HIDDEN)
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>就像我们前面讨论过的<code>-&gt; skip</code>那样，<code>-&gt; channel(HIDDEN)</code>也是一个词法分析器指令。在这里，它设置那些记号的通道号码以便它们可以被语法分析器忽略。记号流仍然维护着原始的记号序列，但在传递记号给语法分析器时会略过隐藏通道中的记号。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/logic-problems-who-owns-the-fish/">逻辑题-谁养鱼</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-05-12T18:06:58+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:06 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><ol>
+<li>在一条街上，有5座房子，喷了5种颜色。</li>
+<li>每座房子里住着不同国籍的人。</li>
+<li>每个人喝不同的饮料，抽不同品牌的香烟，养不同的宠物。</li>
+</ol>
+
+<p>问题是：谁养鱼？</p>
+
+<p>提示：</p>
+
+<ol>
+<li>英国人住红色房子。</li>
+<li>瑞典人养狗。</li>
+<li>丹麦人喝茶。</li>
+<li>绿色房子在白色房子左面。</li>
+<li>绿色房子主人喝咖啡。</li>
+<li>抽Pall Mall香烟的人养鸟。</li>
+<li>黄色房子主人抽Dunhill香烟。</li>
+<li>住在中间房子的人喝牛奶。</li>
+<li>挪威人住第一间房子。</li>
+<li>抽Blends香烟的人住在养猫的人隔壁。</li>
+<li>养马的人住抽Dunhill香烟的人隔壁。</li>
+<li>抽Blue Master的人喝啤酒。</li>
+<li>德国人抽Prince香烟。</li>
+<li>挪威人住蓝色房子隔壁。</li>
+<li>抽Blends香烟的人有一个喝水的邻居。</li>
+</ol>
+
+<p>在回答上述问题前先画一个6行5列的表格，从上到下的每一行分别代表房子的顺序（A表示左边第一间房子）、哪国人、房子颜色、饮料、香烟、宠物。下表是问题的初始状态：</p>
+
+<table><thead>
+<tr>
+<th style="text-align: center">A</th>
+<th style="text-align: center">B</th>
+<th style="text-align: center">C</th>
+<th style="text-align: center">D</th>
+<th style="text-align: center">E</th>
+</tr>
+</thead><tbody>
+<tr>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+</tbody></table>
+
+<p>根据提示8、9和14可以得到：</p>
+
+<table><thead>
+<tr>
+<th style="text-align: center">A</th>
+<th style="text-align: center">B</th>
+<th style="text-align: center">C</th>
+<th style="text-align: center">D</th>
+<th style="text-align: center">E</th>
+</tr>
+</thead><tbody>
+<tr>
+<td style="text-align: center">挪威人</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">?</td>
+<td style="text-align: center">蓝色</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">牛奶</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+</tbody></table>
+
+<p>由提示4和5可以判定房子D的颜色是绿色，房子主人喝咖啡，房子E的颜色是白色。如下表所示：</p>
+
+<table><thead>
+<tr>
+<th style="text-align: center">A</th>
+<th style="text-align: center">B</th>
+<th style="text-align: center">C</th>
+<th style="text-align: center">D</th>
+<th style="text-align: center">E</th>
+</tr>
+</thead><tbody>
+<tr>
+<td style="text-align: center">挪威人</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">?</td>
+<td style="text-align: center">蓝色</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">绿色</td>
+<td style="text-align: center">白色</td>
+</tr>
+<tr>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">牛奶</td>
+<td style="text-align: center">咖啡</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+</tbody></table>
+
+<p>结合提示1、7和11可以知道房子C是红色的，住的是英国人，房子A是黄色的。挪威人抽Dunhill香烟。住房子B的人养马。如下表所示：</p>
+
+<table><thead>
+<tr>
+<th style="text-align: center">A</th>
+<th style="text-align: center">B</th>
+<th style="text-align: center">C</th>
+<th style="text-align: center">D</th>
+<th style="text-align: center">E</th>
+</tr>
+</thead><tbody>
+<tr>
+<td style="text-align: center">挪威人</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">英国人</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">黄色</td>
+<td style="text-align: center">蓝色</td>
+<td style="text-align: center">红色</td>
+<td style="text-align: center">绿色</td>
+<td style="text-align: center">白色</td>
+</tr>
+<tr>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">牛奶</td>
+<td style="text-align: center">咖啡</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">Dunhill</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">?</td>
+<td style="text-align: center">马</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+</tbody></table>
+
+<p>依据上表可知，挪威人喝的饮料是水、茶或者啤酒。结合提示3和12可以断定挪威人喝的是水。如下表所示：</p>
+
+<table><thead>
+<tr>
+<th style="text-align: center">A</th>
+<th style="text-align: center">B</th>
+<th style="text-align: center">C</th>
+<th style="text-align: center">D</th>
+<th style="text-align: center">E</th>
+</tr>
+</thead><tbody>
+<tr>
+<td style="text-align: center">挪威人</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">英国人</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">黄色</td>
+<td style="text-align: center">蓝色</td>
+<td style="text-align: center">红色</td>
+<td style="text-align: center">绿色</td>
+<td style="text-align: center">白色</td>
+</tr>
+<tr>
+<td style="text-align: center">水</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">牛奶</td>
+<td style="text-align: center">咖啡</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">Dunhill</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">?</td>
+<td style="text-align: center">马</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+</tbody></table>
+
+<p>通过提示15可以得出住房子B的人抽Blends香烟。如下表所示：</p>
+
+<table><thead>
+<tr>
+<th style="text-align: center">A</th>
+<th style="text-align: center">B</th>
+<th style="text-align: center">C</th>
+<th style="text-align: center">D</th>
+<th style="text-align: center">E</th>
+</tr>
+</thead><tbody>
+<tr>
+<td style="text-align: center">挪威人</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">英国人</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">黄色</td>
+<td style="text-align: center">蓝色</td>
+<td style="text-align: center">红色</td>
+<td style="text-align: center">绿色</td>
+<td style="text-align: center">白色</td>
+</tr>
+<tr>
+<td style="text-align: center">水</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">牛奶</td>
+<td style="text-align: center">咖啡</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">Dunhill</td>
+<td style="text-align: center">Blends</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">?</td>
+<td style="text-align: center">马</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+</tbody></table>
+
+<p>结合提示12可以推断住房子E的人抽Blue Master香烟、喝啤酒。住房子B的人喝茶。如下表所示：</p>
+
+<table><thead>
+<tr>
+<th style="text-align: center">A</th>
+<th style="text-align: center">B</th>
+<th style="text-align: center">C</th>
+<th style="text-align: center">D</th>
+<th style="text-align: center">E</th>
+</tr>
+</thead><tbody>
+<tr>
+<td style="text-align: center">挪威人</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">英国人</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">黄色</td>
+<td style="text-align: center">蓝色</td>
+<td style="text-align: center">红色</td>
+<td style="text-align: center">绿色</td>
+<td style="text-align: center">白色</td>
+</tr>
+<tr>
+<td style="text-align: center">水</td>
+<td style="text-align: center">茶</td>
+<td style="text-align: center">牛奶</td>
+<td style="text-align: center">咖啡</td>
+<td style="text-align: center">啤酒</td>
+</tr>
+<tr>
+<td style="text-align: center">Dunhill</td>
+<td style="text-align: center">Blends</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">Blue Master</td>
+</tr>
+<tr>
+<td style="text-align: center">?</td>
+<td style="text-align: center">马</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+</tbody></table>
+
+<p>由提示3、13得到房子B住的是丹麦人。房子D住的是德国人，抽Prince香烟。如下表所示：</p>
+
+<table><thead>
+<tr>
+<th style="text-align: center">A</th>
+<th style="text-align: center">B</th>
+<th style="text-align: center">C</th>
+<th style="text-align: center">D</th>
+<th style="text-align: center">E</th>
+</tr>
+</thead><tbody>
+<tr>
+<td style="text-align: center">挪威人</td>
+<td style="text-align: center">丹麦人</td>
+<td style="text-align: center">英国人</td>
+<td style="text-align: center">德国人</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">黄色</td>
+<td style="text-align: center">蓝色</td>
+<td style="text-align: center">红色</td>
+<td style="text-align: center">绿色</td>
+<td style="text-align: center">白色</td>
+</tr>
+<tr>
+<td style="text-align: center">水</td>
+<td style="text-align: center">茶</td>
+<td style="text-align: center">牛奶</td>
+<td style="text-align: center">咖啡</td>
+<td style="text-align: center">啤酒</td>
+</tr>
+<tr>
+<td style="text-align: center">Dunhill</td>
+<td style="text-align: center">Blends</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">Prince</td>
+<td style="text-align: center">Blue Master</td>
+</tr>
+<tr>
+<td style="text-align: center">?</td>
+<td style="text-align: center">马</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+</tbody></table>
+
+<p>再由提示6和10确定住房子C的人抽Pall Mall香烟、养鸟。挪威人养猫。如下表所示：</p>
+
+<table><thead>
+<tr>
+<th style="text-align: center">A</th>
+<th style="text-align: center">B</th>
+<th style="text-align: center">C</th>
+<th style="text-align: center">D</th>
+<th style="text-align: center">E</th>
+</tr>
+</thead><tbody>
+<tr>
+<td style="text-align: center">挪威人</td>
+<td style="text-align: center">丹麦人</td>
+<td style="text-align: center">英国人</td>
+<td style="text-align: center">德国人</td>
+<td style="text-align: center">?</td>
+</tr>
+<tr>
+<td style="text-align: center">黄色</td>
+<td style="text-align: center">蓝色</td>
+<td style="text-align: center">红色</td>
+<td style="text-align: center">绿色</td>
+<td style="text-align: center">白色</td>
+</tr>
+<tr>
+<td style="text-align: center">水</td>
+<td style="text-align: center">茶</td>
+<td style="text-align: center">牛奶</td>
+<td style="text-align: center">咖啡</td>
+<td style="text-align: center">啤酒</td>
+</tr>
+<tr>
+<td style="text-align: center">Dunhill</td>
+<td style="text-align: center">Blends</td>
+<td style="text-align: center">Pall Mall</td>
+<td style="text-align: center">Prince</td>
+<td style="text-align: center">Blue Master</td>
+</tr>
+<tr>
+<td style="text-align: center">猫</td>
+<td style="text-align: center">马</td>
+<td style="text-align: center">鸟</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">?</td>
+</tr>
+</tbody></table>
+
+<p>最后结合提示2推断得到房子E住的是瑞典人，养狗。如下表所示：</p>
+
+<table><thead>
+<tr>
+<th style="text-align: center">A</th>
+<th style="text-align: center">B</th>
+<th style="text-align: center">C</th>
+<th style="text-align: center">D</th>
+<th style="text-align: center">E</th>
+</tr>
+</thead><tbody>
+<tr>
+<td style="text-align: center">挪威人</td>
+<td style="text-align: center">丹麦人</td>
+<td style="text-align: center">英国人</td>
+<td style="text-align: center">德国人</td>
+<td style="text-align: center">瑞典人</td>
+</tr>
+<tr>
+<td style="text-align: center">黄色</td>
+<td style="text-align: center">蓝色</td>
+<td style="text-align: center">红色</td>
+<td style="text-align: center">绿色</td>
+<td style="text-align: center">白色</td>
+</tr>
+<tr>
+<td style="text-align: center">水</td>
+<td style="text-align: center">茶</td>
+<td style="text-align: center">牛奶</td>
+<td style="text-align: center">咖啡</td>
+<td style="text-align: center">啤酒</td>
+</tr>
+<tr>
+<td style="text-align: center">Dunhill</td>
+<td style="text-align: center">Blends</td>
+<td style="text-align: center">Pall Mall</td>
+<td style="text-align: center">Prince</td>
+<td style="text-align: center">Blue Master</td>
+</tr>
+<tr>
+<td style="text-align: center">猫</td>
+<td style="text-align: center">马</td>
+<td style="text-align: center">鸟</td>
+<td style="text-align: center">?</td>
+<td style="text-align: center">狗</td>
+</tr>
+</tbody></table>
+
+<p>现在，结果已经出来了：德国人养鱼。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part13/">ANTLR 4权威参考读书笔记（13）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-05-06T18:24:18+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>6</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:24 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>现在我们准备构建一个工具，用来把<a href="/blog/reading-notes-the-definitive-antlr4-reference-part7/">ANTLR 4权威参考读书笔记（7）</a>中idata.txt里的数据按group分行显示，就像这样：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>2 9 10
+</span><span class='line'>3 1 2 3</span></code></pre></td></tr></table></div></figure>
+
+<p>我们可以借助语法分析树的监听器机制来对词法分析结束后生成的记号流进行改写，我们不需要实现每一个监听器接口方法，只需要在捕获到group的时候把换行符插到它末尾就行。实现改写的代码如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class RewriteListener extends IDataBaseListener {
+</span><span class='line'>    TokenStreamRewriter rewriter;
+</span><span class='line'>
+</span><span class='line'>    public RewriteListener(TokenStream tokens) {
+</span><span class='line'>        rewriter = new TokenStreamRewriter(tokens);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void enterGroup(IDataParser.GroupContext ctx) {
+</span><span class='line'>        rewriter.insertAfter(ctx.stop, '\n');
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>接着就是写一个小程序来调用我们上面的改写类：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class IData {
+</span><span class='line'>
+</span><span class='line'>    public static void main(String[] args) throws Exception {
+</span><span class='line'>        InputStream is = args.length &gt; 0 ? new FileInputStream(args[0]) : System.in;
+</span><span class='line'>
+</span><span class='line'>        ANTLRInputStream input = new ANTLRInputStream(is);
+</span><span class='line'>        IDataLexer lexer = new IDataLexer(input);
+</span><span class='line'>        CommonTokenStream tokens = new CommonTokenStream(lexer);
+</span><span class='line'>        IDataParser parser = new IDataParser(tokens);
+</span><span class='line'>        ParseTree tree = parser.file();
+</span><span class='line'>
+</span><span class='line'>        RewriteListener listener = new RewriteListener(tokens);
+</span><span class='line'>
+</span><span class='line'>        System.out.println("Before Rewriting");
+</span><span class='line'>        System.out.println(listener.rewriter.getText());
+</span><span class='line'>
+</span><span class='line'>        ParseTreeWalker walker = new ParseTreeWalker();
+</span><span class='line'>        walker.walk(listener, tree);
+</span><span class='line'>
+</span><span class='line'>        System.out.println("After Rewriting");
+</span><span class='line'>        System.out.println(listener.rewriter.getText());
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>这里的关键是TokenStreamRewriter对象知道如何在不修改流的情况下提供一个记号流的修改过的视图。它把所有的操作方法当作指令并把它们排进队列，等到在遍历记号流把它作为文本渲染回去的时候再执行。每次我们调用getText()时rewriter就会执行那些指令。</p>
+
+<p>最后就是构建和测试应用：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr IData.g
+</span><span class='line'>compile *.java
+</span><span class='line'>run IData idata.txt</span></code></pre></td></tr></table></div></figure>
+
+<p>以下是输出结果：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Before Rewriting
+</span><span class='line'>29103123
+</span><span class='line'>After Rewriting
+</span><span class='line'>2910
+</span><span class='line'>3123</span></code></pre></td></tr></table></div></figure>
+
+<p>仅用几行代码，我们就能够没有任何烦恼地对某些内容做轻微的调整。这种策略对于源代码检测或重构这类一般性的问题是非常有效的。TokenStreamRewriter是一个非常强大且有效的操作记号流的工具。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/developers-are-blinded-by-the-light/">开发者被灯光蒙蔽了双眼</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-04-30T23:08:43+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>30</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>11:08 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>英文原文：<a href="http://programmingzen.com/2008/12/30/developers-are-blinded-by-the-light/">http://programmingzen.com/2008/12/30/developers-are-blinded-by-the-light/</a></p>
+
+<blockquote>
+<p>Blinded by the light,<br>
+revved up like a deuce,<br>
+another runner in the night<br>
+— Bruce Springsteen</p>
+</blockquote>
+
+<p>人类在计算几率方面是异常地差。我们有限的经验强烈地影响着我们对事件的可能性的认知。例如，我们往往极大地高估由恐怖袭击、意外枪支走火或者飓风引起死亡的几率，并且极大地低估像坠落、溺水或者流感死亡的原因。其原因是媒体经常提醒我们恐怖主义、飓风的危险或者关于孩子们被意外射杀的瞬间故事。你很少发现关于一个人溺水、坠落或者由于流感死亡的故事在国家新闻频道上被报道。新闻报道有一种倾向是耸人听闻，为的是引起人们的注意和钩住大量的观众，因此当谈到估计什么可能/不可能发生时它们促成人们的偏见。</p>
+
+<p>同样的，在电视和报纸上过度曝光心花怒放的彩票中奖者举起他们超大的支票往往歪曲人们对通过购买一注彩票胜利的可能性的认知。对这个问题持一个严谨和客观的态度将会很快揭露中奖的几率比它们表面上看起来的要差得多。[1]</p>
+
+<p>我注意到这种情况也正在开发/创业的世界里发生。这是一波新的淘金热。太多的开发者正在试图建立下一个大的社交网络，成为下一个Facebook（或YouTube），聚集数以百万计的人群，希望被大公司以一笔数量荒谬的钱收购。媒体喜欢这类故事。</p>
+
+<p>因此，正在试图构建下一个Facebook的开发者类似于彩票买家。他们中的一些人会成功和获胜，但大部分人会惨遭失败。我们真正需要多少社交网络？广告支撑的模式适合某些设法吸引庞大的人群同时保持其费用最低（例如PlentyOfFish）或者被收购（例如YouTube，它也在花Google的钱）的幸运的公司。在这个过程中其他人都是在烧钱以及浪费VC的钱和诚意。</p>
+
+<p>我担心很多开发者被灯光蒙蔽了双眼。他们对获得成功的真实几率的认知受到了媒体连续报道的百万——如果不是10亿——美元收购和成功故事的扭曲。而且有些VC鼓励这种行为，希望能在他们的投资上看到高回报。毕竟这些都是非常富有的人，他们对小规模的成功不感兴趣。</p>
+
+<p>除了明显的浪费时间和资源之外，我认为许多开发者为了追求极不可能的结果放弃了极好的机会。用一个传统商业计划挣1,000万的可能性和按YouTube的方式挣10亿的可能性的比例，与这些金额能负担得起你的不同生活质量不成正比。如果你破产了，有3万美元的信用卡债务，或者你是中产阶级，你会发现1,000万美元可以提高的生活质量总是远远超过从1,000万到10亿能提高的。而且重要的是，我们要认识到瞄准尽管更小，但更有可能的结果不会以任何方式阻止你以后的“伟大梦想”，一旦你的第一次（或者第一次成功的）创业已经取得了成功。</p>
+
+<p>你愿意参加20次有1次胜利机会的100万美元抽奖，还是50,000,000次有1次机会的5亿美元抽奖？理性的人会选择第1个，然而在今天，大部分创业公司都倾向于选择第2个。他们这么做是因为他们极大地高估了他们以第2个抽奖成功的几率。</p>
+
+<p>创建一个产品并让人们为它付费。不要拿VC的钱，除非你真的不考虑依靠自己的力量启动你的公司。软件世界的主要优点之一是在开始的时候极少量的资本需要。如果你想做Web应用，可以使用软件即服务（SaaS）模型，让你的用户为你提供的软件和服务付费。你将会有更加少的受众，更少的可伸缩性问题和费用，以及有更多的收入和更大的盈利机会。Joel Spolsky（和<a href="http://www.joelonsoftware.com/items/2008/12/29.html">他那华丽的办公空间</a>）挣得数百万收入是因为他的公司在出售一套Web版的bug追踪器。你知道有多少免费的bug追踪器？在这个市场上存在多少竞争对手？我确信有许多。然而，虽然Joel的人气毫无疑问地帮助到了他的公司，但此案例仍然展示了一个企业如何通过构建一个更好的产品而成功。</p>
+
+<p>就像David Heinemeier Hansson提及的，有无数不受关注的公司在像那样挣钱。[2]如果你把视线从聚光灯上移开，你将看到许多公司在它们所做的事情上面非常成功，尽管它们不出名或者没有制造新闻头条。它们中的有些公司实际上努力不去吸引太多的关注到它们的成功上（经常用数百万美元来衡量），以便防止竞争对手的涌现。</p>
+
+<p>不管你的名字是不是家喻户晓，你甚至不必创建Web应用才能非常成功。你可能会想到为智能手机包括iPhone开发移动应用。但是良好的老式桌面应用让各种各样的软件公司继续发展。这就是为什么“你不能再用商业桌面软件挣钱，或者桌面应用都死了”的扭曲的认知太荒谬的原因。作为开发者/微型ISV/创业公司，你用良好设计的桌面软件挣钱的机会远远高于构建任何一款YouTube、Flickr或者Facebook复制品的机会。</p>
+
+<p>要了解我们的认知是怎么被扭曲的，你只需要和那些公开分享它们软件销售统计的公司交谈。你将会被用相对普通的软件挣到钱的数额震惊。Balsamiq制作了一款UI草图应用卖79美元。作者成功挣到了<a href="http://www.balsamiq.com/blog/?p=424">10万美元收入在前5个月</a>，大部分是通过销售应用的桌面版本。在这个产业里他当然远非最大的赢家之一。我提到这个不过是因为它表明那是一个非常不错的想法，很好执行，当你让你的用户付费时能很快带来收入。如果你认为在5个月里10万美元很少，那我来问你有多少免费网站达成一个类似的每月收入净额。如果你正在寻找更大的收入，了解下Omni Graffle，它给<a href="http://www.omnigroup.com/applications/OmniGraffle/">Omni Group</a>赚取了数百万美元，或者把你的目光放到B2B应用上（在那个市场里某些应用卖上千美元一份）。</p>
+
+<p>当许多开发者被灯光蒙蔽了双眼的时候，有创业想法的智者正在建立真正的软件业务。我请你走出来做同样的事情。</p>
+
+<p>脚注</p>
+
+<p>[1] 我在这里总结的概念被Dan Gilbert在<a href="http://www.ted.com/index.php/talks/dan_gilbert_researches_happiness.html">这个TED演讲</a>里更详细地说明了。</p>
+
+<p>[2] David Heinemeier Hansson在<a href="http://www.37signals.com/svn/posts/1495-the-untold-millions">他的一篇帖子</a>中持类似的观点，该帖给了本文以灵感。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part12/">ANTLR 4权威参考读书笔记（12）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-04-26T10:20:44+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>10:20 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><ul>
+<li>sentinel 哨兵</li>
+<li>tag 标签</li>
+</ul>
+
+<p>目前我们看到的输入文件都只包含一种语言，但在实际应用中我们可能会遇到某些包含多种语言的文件格式。例如，Java的文档注释，XML文件等。这些环绕着模板表达式的文本需要不同的处理方式，它们被称为孤岛语言。</p>
+
+<p>ANTLR有提供一个称之为“词法模型”的词法分析器特性，它让我们可以很容易地处理包含混合格式的文件。基本思路是：当词法分析器看到特殊的哨兵字符序列时，就让它在模式之间来回切换。</p>
+
+<p>XML是个很好的例子，它通常会在同一个文件中包含不同的词法结构。一个XML语法分析器会把除标签和实体引用（例如<code>&amp;hearts;</code>）之外的任何东西当作文本块。当词法分析器看到<code>&lt;</code>时，它切换到INSIDE模式；当它看到<code>&gt;</code>或<code>/&gt;</code>时，就切换回默认模式。以下的语法展示了该特性是如何工作的：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>lexer grammar XMLLexer;
+</span><span class='line'>
+</span><span class='line'>// Default "mode": Everything OUTSIDE of a tag
+</span><span class='line'>OPEN        :   '&lt;'                 -&gt; pushMode(INSIDE) ;
+</span><span class='line'>COMMENT     :   '&lt;!--' .*? '--&gt;'    -&gt; skip ;
+</span><span class='line'>EntityRef   :   '&' [a-z]+ ';' ;
+</span><span class='line'>TEXT        :   ~('&lt;'|'&')+ ;    // match any 16 bit char minus &lt; and &
+</span><span class='line'>
+</span><span class='line'>// ----------------- Everything INSIDE of a tag ---------------------
+</span><span class='line'>mode INSIDE;
+</span><span class='line'>
+</span><span class='line'>CLOSE       :   '&gt;'                 -&gt; popMode ;    // back to default mode
+</span><span class='line'>SLASH_CLOSE :   '/&gt;'                -&gt; popMode ;
+</span><span class='line'>EQUALS      :   '=' ;
+</span><span class='line'>STRING      :   '"' .*? '"' ;
+</span><span class='line'>SlashName   :   '/' Name ;
+</span><span class='line'>Name        :   ALPHA (ALPHA|DIGIT)* ;
+</span><span class='line'>S           :   [ \t\r\n]           -&gt; skip ;
+</span><span class='line'>
+</span><span class='line'>fragment
+</span><span class='line'>ALPHA       :   [a-zA-Z] ;
+</span><span class='line'>
+</span><span class='line'>fragment
+</span><span class='line'>DIGIT       :   [0-9] ;</span></code></pre></td></tr></table></div></figure>
+
+<p>把上述语法保存为XMLLexer.g文件，然后使用包含以下内容的t.xml文件作为输入来测试它：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;tools&gt;
+</span><span class='line'>  &lt;tool name="ANTLR"&gt;A parser generator&lt;/tool&gt;
+</span><span class='line'>&lt;/tools&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>以下是构建和运行测试的命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr XMLLexer.g
+</span><span class='line'>compile *.java
+</span><span class='line'>grun XML tokens -tokens t.xml</span></code></pre></td></tr></table></div></figure>
+
+<p>这里是输出的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>[@0,0:0='&lt;',&lt;1&gt;,1:0]
+</span><span class='line'>[@1,1:5='tools',&lt;10&gt;,1:1]
+</span><span class='line'>[@2,6:6='&gt;',&lt;5&gt;,1:6]
+</span><span class='line'>[@3,7:10='\r\n  ',&lt;4&gt;,1:7]
+</span><span class='line'>[@4,11:11='&lt;',&lt;1&gt;,2:2]
+</span><span class='line'>[@5,12:15='tool',&lt;10&gt;,2:3]
+</span><span class='line'>[@6,17:20='name',&lt;10&gt;,2:8]
+</span><span class='line'>[@7,21:21='=',&lt;7&gt;,2:12]
+</span><span class='line'>[@8,22:28='"ANTLR"',&lt;8&gt;,2:13]
+</span><span class='line'>[@9,29:29='&gt;',&lt;5&gt;,2:20]
+</span><span class='line'>[@10,30:47='A parser generator',&lt;4&gt;,2:21]
+</span><span class='line'>[@11,48:48='&lt;',&lt;1&gt;,2:39]
+</span><span class='line'>[@12,49:53='/tool',&lt;9&gt;,2:40]
+</span><span class='line'>[@13,54:54='&gt;',&lt;5&gt;,2:45]
+</span><span class='line'>[@14,55:56='\r\n',&lt;4&gt;,2:46]
+</span><span class='line'>[@15,57:57='&lt;',&lt;1&gt;,3:0]
+</span><span class='line'>[@16,58:63='/tools',&lt;9&gt;,3:1]
+</span><span class='line'>[@17,64:64='&gt;',&lt;5&gt;,3:7]
+</span><span class='line'>[@18,65:66='\r\n',&lt;4&gt;,3:8]
+</span><span class='line'>[@19,67:66='&lt;EOF&gt;',&lt;-1&gt;,4:0]</span></code></pre></td></tr></table></div></figure>
+
+<p>上面输出的每一行代表一个记号，包含记号索引、开始和结束字符、记号文本、记号类型，最后的行和字符位置则告诉我们词法分析器如何标记化输入。</p>
+
+<p>在命令行中，XML tokens序列处通常是一个语法名字后面跟着开始规则，但在这里，我们使用语法名字后面跟着特殊的规则名字tokens来告诉TestRig应该运行词法分析器而不是语法分析器。接着使用选项-tokens打印出匹配的记号列表。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part11/">ANTLR 4权威参考读书笔记（11）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-04-18T18:13:27+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:13 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>为制作语言应用，我们必须为每个输入短语或子短语执行一些适当的代码，那样做最简单的方法是操作由语法分析器自动创建的语法分析树。</p>
+
+<p>早些时候我们已经学习了词法分析器处理字符和把记号传递给语法分析器，然后语法分析器分析语法和创建语法分析树的相关知识。对应的ANTLR类分别是CharStream、Lexer、Token、Parser和ParseTree。连接词法分析器和语法分析器的管道被称为TokenStream。下图说明了这些类型的对象如何连接到内存中其它的对象。</p>
+
+<p><img src="/uploads/basic-data-structure.png" title="basic-data-structure" ></p>
+
+<p>这些ANTLR数据结构共享尽可能多的数据以便节省内存的需要。上图显示在语法分析树中的叶子（记号）节点含有在记号流中记号的点。记号记录开始和结束字符在CharStream中的索引，而不是复制子串。这里没有与空格字符有关的记号，因为我们假设我们的词法分析器扔掉了空格。</p>
+
+<p>下图显示的是ParseTree的子类RuleNode和TerminalNode以及它们所对应的子树根节点和叶子节点。RuleNode包含有方法如getChild()和getParent()等，但RuleNode并不专属于特定语法所有。为了能更好地访问在特定节点中的元素，ANTLR为每个规则生成一个RuleNode的子类。下图显示了赋值语句例子的子树根节点的特定类，它们是StatContext、AssignContext和ExprContext：</p>
+
+<p><img src="/uploads/parse-tree-node.png" title="parse-tree-node" ></p>
+
+<p>它们记录了通过规则对短语识别的每件事情，所以被称为上下文对象。每个上下文对象都知道被识别短语的开始和结束记号以及提供对所有短语的元素的访问。例如，AssignContext提供方法ID()和expr()去访问标志符节点和表达式子树。</p>
+
+<p>给出了具体类型的描述后，我们可以手工编写代码去执行树的深度优先遍历。当我们发现和完成节点时我们可以执行任何我们想要的动作。典型的动作是诸如计算结果，更新数据结构，或者生成输出。相比每次为每个应用编写同样的树遍历样板代码，使用ANTLR自动生成的树遍历机制更方便、更容易。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part10/">ANTLR 4权威参考读书笔记（10）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-04-08T22:11:39+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>8</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>10:11 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>一个模棱两可的短语或句子通常是指它有不止一种解释。换句话说，短语或句子能匹配不止一种语法结构。要解释或转换一个短语，程序必须要能唯一地确认它的含义，这意味着我们必须提供无歧义的语法，以便生成的语法分析器能用明确的一个方法匹配每个输入短语。</p>
+
+<p>在这里，让我们展示一些有歧义的语法以便让二义性的概念更具体。如果你以后在构建语法时陷入二义性，你可以参考本节的内容。</p>
+
+<p>一些明显有歧义的语法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>assign
+</span><span class='line'>    : ID '=' expr    // 匹配一个赋值语句，例如f()
+</span><span class='line'>    | ID '=' expr    // 前面选项的精确复制
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>expr
+</span><span class='line'>    : INT ;</span></code></pre></td></tr></table></div></figure>
+
+<p>大多数时候二义性是不明显的，就像下面的语法，它能通过规则stat的两个选项匹配函数调用：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>stat
+</span><span class='line'>    : expr          // 表达式语句
+</span><span class='line'>    | ID '(' ')'    // 函数调用语句
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>expr
+</span><span class='line'>    : ID '(' ')'
+</span><span class='line'>    | INT
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>这里是输入f()的两个解释，从规则stat开始：</p>
+
+<p><img src="/uploads/fn-parse-tree.png" title="fn-parse-tree" ></p>
+
+<p>左边的语法分析树显示f()匹配规则expr。右边的语法分析树显示f()匹配规则stat的第二个选项。</p>
+
+<p>因为大部分语言它们的语法都被设计成无歧义的，有歧义的语法类似于编程缺陷，所以我们需要识别语法并为每个输入短语提交单一选择给语法分析器。如果语法分析器发现一个有歧义的短语，它必须选一个可行的选项。ANTLR通过选择涉及决定的第一个选项解决二义性。在本例中，语法分析器将选择与左边的语法分析树有关的f()的解释。</p>
+
+<p>二义性可以发生在词法分析器中也能发生在语法分析器中，但ANTLR可以自动地解决它们。ANTLR通过使输入字符串和语法中第一个指定的词法规则匹配来解决词法二义性。为了明白这是如何工作的，让我们看看对大部分编程语言都很普遍的二义性：在关键字和标志符规则中的二义性。关键字begin（后面有个非字母）也是标志符，至少词法上，因此词法分析器可以匹配b-e-g-i-n到两者中的任何一个规则。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>BEGIN : 'begin' ;    // 匹配b-e-g-i-n序列，即把二义性解析为BEGIN
+</span><span class='line'>ID    : [a-z]+ ;     // 匹配一个或多个任意小写字母</span></code></pre></td></tr></table></div></figure>
+
+<p>注意，词法分析器会试着为每个记号尽可能匹配最长的字符串，这意味着输入beginner将仅仅匹配规则ID。词法分析器不会把beginner匹配成BEGIN然后ID匹配输入ner。</p>
+
+<p>有时候语言的语法就明显有歧义，没有任何的语法重组能改变这个事实。例如，算术表达式的自然语法可以用两种方式解释像1+2*3这样的输入，要么从左到右执行运算符，要么像大部分语言那样按优先级顺序。</p>
+
+<p>C语言展示了另一种二义性，但我们可以使用上下文信息比如标志符如何被定义来解决它。考虑代码片段<code>i*j;</code>。在语法上，它看起来像是一个表达式，但它的含义或者语义依赖i是类型名还是变量。如果i是类型名，那么这个片段不是表达式，而是一个声明为指向类型i的指针变量j。</p>
+</div>
   
   
 
@@ -444,23 +1447,23 @@
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/thinking-on-software-version/">软件版本号的思考</a>
       </li>
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/chasing-the-shiny-and-new-in-software/">追逐时髦的技术</a>
       </li>
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/what-should-checked-and-unchecked-translate/">checked/unchecked应该翻译成什么？</a>
       </li>
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/10x-engineers-take-long-naps/">10x工程师经常的打盹</a>
       </li>
     
       <li class="post">
-        <a href="/blog/test/">test</a>
+        <a href="/blog/the-10x-developer-is-not-myth/">10x开发者不是神话</a>
       </li>
     
   </ul>
@@ -474,9 +1477,9 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 145%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 141%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 133%" href="/tags/android/">Android</a>
+<a style="font-size: 132%" href="/tags/android/">Android</a>
 <a style="font-size: 103%" href="/tags/c-plus-plus/">C++</a>
 <a style="font-size: 106%" href="/tags/css/">CSS</a>
 <a style="font-size: 108%" href="/tags/crack/">Crack</a>
@@ -495,10 +1498,10 @@
 <a style="font-size: 115%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
 <a style="font-size: 117%" href="/tags/ruby/">Ruby</a>
-<a style="font-size: 95%" href="/tags/software-engineering/">Software Engineering</a>
 <a style="font-size: 95%" href="/tags/spring/">Spring</a>
 <a style="font-size: 99%" href="/tags/struts/">Struts</a>
 <a style="font-size: 146%" href="/tags/translation/">Translation</a>
+<a style="font-size: 95%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 106%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 106%" href="/tags/wxwidgets/">wxWidgets</a>
 
