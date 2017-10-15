@@ -9,7 +9,8 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="有的时候，可能需要修改某个已提交commit。如果是修改最近提交的commit，可以使用git commit --amend命令；如果是修改更早提交的commit，可以使用git rebase -i HEAD~n。不过这个命令有个缺陷，就是不能修改最早提交的那个commit。假设有如下提交历史： &hellip;">
+  <meta name="description" content="终于解决掉了困扰我多日的一个问题。 部署在Heroku上的项目，在控制器中require &#39;calc&#39;时总是出现： 1
+no such file to load -- calc (MissingSourceFile) 本地机器上运行的好好的， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -79,7 +80,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/git-notes-rebase-onto/">Git笔记之rebase --onto</a></h1>
+      <h1 class="entry-title"><a href="/blog/no-such-file-to-load-xxx-missingsourcefile-on-heroku/">no such file to load -- xxx (MissingSourceFile) on Heroku</a></h1>
     
     
       <p class="meta">
@@ -88,48 +89,27 @@
 
 
 
-<time class='entry-date' datetime='2009-06-26T13:41:19+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>1:41 pm</span></time>
+<time class='entry-date' datetime='2011-05-28T23:08:16+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>28</span><span class='date-suffix'>th</span>, <span class='date-year'>2011</span></span> <span class='time'>11:08 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>有的时候，可能需要修改某个已提交commit。如果是修改最近提交的commit，可以使用git commit --amend命令；如果是修改更早提交的commit，可以使用git rebase -i HEAD~n。不过这个命令有个缺陷，就是不能修改最早提交的那个commit。假设有如下提交历史：</p>
+  <div class="entry-content"><p>终于解决掉了困扰我多日的一个问题。</p>
+
+<p>部署在Heroku上的项目，在控制器中<code>require &#39;calc&#39;</code>时总是出现：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>C1--C2--C3--C4</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>no such file to load -- calc (MissingSourceFile)</span></code></pre></td></tr></table></div></figure>
 
-<p>要修改C4可以使用git commit --amend；要修改C2、C3或C4可以使用git rebase -i HEAD~n；但是如果要修改C1呢？这就需要rebase --onto出场了。下面就来实例讲解如何使用rebase --onto命令。</p>
+<p>本地机器上运行的好好的，在Heroku上就出现<code>Application error</code>，百思不得其解，网上也没有找到类似问题的解决方法。</p>
 
-<p>因为要修改C1这个commit，所以先在它之上创建临时分支tb：</p>
+<p>咨询Heroku的技术支持，几封邮件交流下来对方也没有办法（感觉Heroku的技术支持不咋的）。</p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git checkout -b tb C1</span></code></pre></td></tr></table></div></figure>
+<p>今天把问题解决掉后再回过头来看，发现这其实是个非常简单的问题，就是Linux和Windows对待文件名大小写的差异。因为Linux是区分大小写的，所以用<code>require &#39;calc&#39;</code>引入Calc.rb时就会失败，而Windows则可以成功。将文件名Calc.rb改成calc.rb再push到Heroku就把问题解决了。</p>
 
-<p>然后就可以在tb分支上做想要的修改，改完之后用下面的命令提交更改的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git commit -a --amend</span></code></pre></td></tr></table></div></figure>
-
-<p>这时查看tb分支的提交历史，可以发现SHA1值已经发生了变化（master分支的SHA1值仍然不变）：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>C1'</span></code></pre></td></tr></table></div></figure>
-
-<p>接着可以把修改后的内容和master分支合并：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git rebase --onto tb C1 master</span></code></pre></td></tr></table></div></figure>
-
-<p>表示把master分支上从C1之后的所有commit重新apply到tb分支最新的commit之后。</p>
-
-<p>这里有两点要注意：一个是C1处的开闭问题，rebase --onto的机制是左开右闭，也就是说上述命令只会apply三个提交C2、C3和C4；第二个是rebase --onto之后tb分支的提交历史没有改变，还是只有一个提交C1’，当前分支也切换到了master，并且所有commit的SHA1值都发生了改变。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>C1'--C2'--C3'--C4'</span></code></pre></td></tr></table></div></figure>
-
-<p>最后就是正常的rebase --continue流程了。</p>
+<p>就这么个大写字母竟然让我思考了几天，还真是郁闷啊！</p>
 </div>
   
   
@@ -142,7 +122,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/git-notes-split-commit/">Git笔记之分割提交</a></h1>
+      <h1 class="entry-title"><a href="/blog/implement-listview-with-icon/">实现带Icon的ListView</a></h1>
     
     
       <p class="meta">
@@ -151,25 +131,650 @@
 
 
 
-<time class='entry-date' datetime='2009-04-22T09:25:38+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2009</span></span> <span class='time'>9:25 am</span></time>
+<time class='entry-date' datetime='2011-05-26T08:26:55+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2011</span></span> <span class='time'>8:26 am</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>在rebase命令的交互模式下，你可以对历史提交中的任意提交进行分割操作，即把某个提交分割成多个提交。具体做法如下：</p>
+  <div class="entry-content"><p><img src="/uploads/listview-screenshot.png" title="listview-screenshot" ></p>
+
+<p>main.xml不需要修改，还是用原来的那个：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+</span><span class='line'>    android:orientation="vertical"
+</span><span class='line'>    android:layout_width="fill_parent"
+</span><span class='line'>    android:layout_height="wrap_content"&gt;
+</span><span class='line'>    &lt;ListView
+</span><span class='line'>        android:id="@+id/list_view"
+</span><span class='line'>        android:layout_width="fill_parent"
+</span><span class='line'>        android:layout_height="wrap_content" /&gt;
+</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>在list_item.xml中添加ImageView控件，设置高度和宽度分别为32dip，这是因为有些应用Icon尺寸比较大的缘故，如果不设置的话有些行就会撑大：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+</span><span class='line'>    android:layout_width="fill_parent"
+</span><span class='line'>    android:layout_height="wrap_content"&gt;
+</span><span class='line'>    &lt;ImageView
+</span><span class='line'>        android:id="@+id/app_icon"
+</span><span class='line'>        android:layout_gravity="center_vertical"
+</span><span class='line'>        android:layout_width="32.0dip"
+</span><span class='line'>        android:layout_height="32.0dip"
+</span><span class='line'>        android:layout_marginLeft="3.0dip"
+</span><span class='line'>        android:layout_marginRight="3.0dip" /&gt;
+</span><span class='line'>    &lt;LinearLayout
+</span><span class='line'>        android:orientation="vertical"
+</span><span class='line'>        android:layout_width="fill_parent"
+</span><span class='line'>        android:layout_height="wrap_content"
+</span><span class='line'>        android:layout_weight="1.0"&gt;
+</span><span class='line'>        &lt;TextView
+</span><span class='line'>            android:id="@+id/app_title"
+</span><span class='line'>            android:layout_width="fill_parent"
+</span><span class='line'>            android:layout_height="wrap_content"
+</span><span class='line'>            android:textSize="16.0dip"
+</span><span class='line'>            android:textStyle="bold" /&gt;
+</span><span class='line'>        &lt;TextView
+</span><span class='line'>            android:id="@+id/app_package"
+</span><span class='line'>            android:layout_width="fill_parent"
+</span><span class='line'>            android:layout_height="wrap_content"
+</span><span class='line'>            android:textSize="13.0dip" /&gt;
+</span><span class='line'>    &lt;/LinearLayout&gt;
+</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>新建SimpleIconAdapter类，继承SimpleAdapter适配器：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>import java.util.List;
+</span><span class='line'>import java.util.Map;
+</span><span class='line'>
+</span><span class='line'>import android.content.Context;
+</span><span class='line'>import android.graphics.drawable.Drawable;
+</span><span class='line'>import android.view.View;
+</span><span class='line'>import android.view.ViewGroup;
+</span><span class='line'>import android.widget.ImageView;
+</span><span class='line'>import android.widget.SimpleAdapter;
+</span><span class='line'>
+</span><span class='line'>public class SimpleIconAdapter extends SimpleAdapter {
+</span><span class='line'>
+</span><span class='line'>    public SimpleIconAdapter(Context context, List&lt;? extends Map&lt;String, ?&gt;&gt; data,
+</span><span class='line'>            int resource, String[] from, int[] to) {
+</span><span class='line'>        super(context, data, resource, from, to);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    @SuppressWarnings("rawtypes")
+</span><span class='line'>    @Override
+</span><span class='line'>    public View getView(int position, View convertView, ViewGroup parent) {
+</span><span class='line'>        View view = super.getView(position, convertView, parent);
+</span><span class='line'>        ImageView iv = (ImageView)view.findViewById(R.id.app_icon);
+</span><span class='line'>        iv.setImageDrawable((Drawable)((Map)getItem(position)).get("app_icon"));
+</span><span class='line'>        return view;
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>修改MainActivity文件，更换绑定的适配器：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>import java.util.ArrayList;
+</span><span class='line'>import java.util.HashMap;
+</span><span class='line'>import java.util.List;
+</span><span class='line'>
+</span><span class='line'>import android.app.Activity;
+</span><span class='line'>import android.content.pm.ApplicationInfo;
+</span><span class='line'>import android.content.pm.PackageInfo;
+</span><span class='line'>import android.graphics.drawable.Drawable;
+</span><span class='line'>import android.os.Bundle;
+</span><span class='line'>import android.widget.ListView;
+</span><span class='line'>import android.widget.SimpleAdapter;
+</span><span class='line'>
+</span><span class='line'>public class MainActivity extends Activity {
+</span><span class='line'>    private static final String APP_ICON = "app_icon";
+</span><span class='line'>    private static final String APP_TITLE = "app_title";
+</span><span class='line'>    private static final String APP_PACKAGE = "app_package";
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void onCreate(Bundle savedInstanceState) {
+</span><span class='line'>        super.onCreate(savedInstanceState);
+</span><span class='line'>        setContentView(R.layout.main);
+</span><span class='line'>
+</span><span class='line'>        ListView listView = (ListView)findViewById(R.id.list_view);
+</span><span class='line'>        SimpleAdapter adapter = new SimpleIconAdapter(this,
+</span><span class='line'>                getInstalledApps(false),
+</span><span class='line'>                R.layout.list_item,
+</span><span class='line'>                new String[] {APP_ICON, APP_TITLE, APP_PACKAGE},
+</span><span class='line'>                new int[] {R.id.app_icon, R.id.app_title, R.id.app_package});
+</span><span class='line'>        listView.setAdapter(adapter);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    private List&lt;HashMap&lt;String, Object&gt;&gt; getInstalledApps(boolean getSysPackages) {
+</span><span class='line'>        List&lt;HashMap&lt;String, Object&gt;&gt; listItem = new ArrayList&lt;HashMap&lt;String, Object&gt;&gt;();
+</span><span class='line'>
+</span><span class='line'>        List&lt;PackageInfo&gt; pkgs = getPackageManager().getInstalledPackages(0);
+</span><span class='line'>        for (int i = 0; i&lt; pkgs.size(); i++) {
+</span><span class='line'>            PackageInfo pkg = pkgs.get(i);
+</span><span class='line'>            if (!getSysPackages && (pkg.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) &gt; 0) {
+</span><span class='line'>                continue;
+</span><span class='line'>            }
+</span><span class='line'>            Drawable icon = pkg.applicationInfo.loadIcon(getPackageManager());
+</span><span class='line'>            String label = pkg.applicationInfo.loadLabel(getPackageManager()).toString();
+</span><span class='line'>            String version = pkg.versionName;
+</span><span class='line'>            String pkgName = pkg.packageName;
+</span><span class='line'>
+</span><span class='line'>            HashMap&lt;String, Object&gt; map = new HashMap&lt;String, Object&gt;();
+</span><span class='line'>            map.put(APP_ICON, icon);
+</span><span class='line'>            map.put(APP_TITLE, label + " " + version);
+</span><span class='line'>            map.put(APP_PACKAGE, pkgName);
+</span><span class='line'>            listItem.add(map);
+</span><span class='line'>        }
+</span><span class='line'>        return listItem;
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/implement-listview-without-listactivity/">不使用ListActivity实现ListView</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2011-05-25T21:29:57+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>25</span><span class='date-suffix'>th</span>, <span class='date-year'>2011</span></span> <span class='time'>9:29 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>main.xml</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+</span><span class='line'>    android:orientation="vertical"
+</span><span class='line'>    android:layout_width="fill_parent"
+</span><span class='line'>    android:layout_height="wrap_content"&gt;
+</span><span class='line'>    &lt;ListView
+</span><span class='line'>        android:id="@+id/list_view"
+</span><span class='line'>        android:layout_width="fill_parent"
+</span><span class='line'>        android:layout_height="wrap_content" /&gt;
+</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>list_item.xml</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+</span><span class='line'>    android:layout_width="fill_parent"
+</span><span class='line'>    android:layout_height="wrap_content"&gt;
+</span><span class='line'>    &lt;LinearLayout
+</span><span class='line'>        android:orientation="vertical"
+</span><span class='line'>        android:layout_width="fill_parent"
+</span><span class='line'>        android:layout_height="wrap_content"
+</span><span class='line'>        android:layout_weight="1.0"&gt;
+</span><span class='line'>        &lt;TextView
+</span><span class='line'>            android:id="@+id/app_title"
+</span><span class='line'>            android:layout_width="fill_parent"
+</span><span class='line'>            android:layout_height="wrap_content"
+</span><span class='line'>            android:textSize="16dip" /&gt;
+</span><span class='line'>        &lt;TextView
+</span><span class='line'>            android:id="@+id/app_package"
+</span><span class='line'>            android:layout_width="fill_parent"
+</span><span class='line'>            android:layout_height="wrap_content" /&gt;
+</span><span class='line'>    &lt;/LinearLayout&gt;
+</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>创建一个继承自Activitiy的类，覆写onCreate方法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>import java.util.ArrayList;
+</span><span class='line'>import java.util.HashMap;
+</span><span class='line'>import java.util.List;
+</span><span class='line'>
+</span><span class='line'>import android.app.Activity;
+</span><span class='line'>import android.content.pm.ApplicationInfo;
+</span><span class='line'>import android.content.pm.PackageInfo;
+</span><span class='line'>import android.os.Bundle;
+</span><span class='line'>import android.widget.ListView;
+</span><span class='line'>import android.widget.SimpleAdapter;
+</span><span class='line'>
+</span><span class='line'>public class MainActivity extends Activity {
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void onCreate(Bundle savedInstanceState) {
+</span><span class='line'>        super.onCreate(savedInstanceState);
+</span><span class='line'>        setContentView(R.layout.main);
+</span><span class='line'>
+</span><span class='line'>        ListView listView = (ListView)findViewById(R.id.list_view);
+</span><span class='line'>        SimpleAdapter adapter = new SimpleAdapter(this,
+</span><span class='line'>                getInstalledApps(false),
+</span><span class='line'>                R.layout.list_item,
+</span><span class='line'>                new String[] {"app_title", "app_package"},
+</span><span class='line'>                new int[] {R.id.app_title, R.id.app_package});
+</span><span class='line'>        listView.setAdapter(adapter);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    private List&lt;HashMap&lt;String, Object&gt;&gt; getInstalledApps(boolean getSysPackages) {
+</span><span class='line'>        List&lt;HashMap&lt;String, Object&gt;&gt; listItem = new ArrayList&lt;HashMap&lt;String, Object&gt;&gt;();
+</span><span class='line'>
+</span><span class='line'>        List&lt;PackageInfo&gt; pkgs = getPackageManager().getInstalledPackages(0);
+</span><span class='line'>        for (int i = 0; i&lt; pkgs.size(); i++) {
+</span><span class='line'>            PackageInfo pkg = pkgs.get(i);
+</span><span class='line'>            if (!getSysPackages && (pkg.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) &gt; 0) {
+</span><span class='line'>                continue;
+</span><span class='line'>            }
+</span><span class='line'>            String label = pkg.applicationInfo.loadLabel(getPackageManager()).toString();
+</span><span class='line'>            String version = pkg.versionName;
+</span><span class='line'>            String pkgName = pkg.packageName;
+</span><span class='line'>
+</span><span class='line'>            HashMap&lt;String, Object&gt; map = new HashMap&lt;String, Object&gt;();
+</span><span class='line'>            map.put("app_title", label + " " + version);
+</span><span class='line'>            map.put("app_package", pkgName);
+</span><span class='line'>            listItem.add(map);
+</span><span class='line'>        }
+</span><span class='line'>        return listItem;
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>至此，一个不使用ListActivity的ListView就完成了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/display-name-and-package-of-installed-apps-in-listview/">在ListView中显示已安装应用的名字和包名</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2011-05-18T07:02:47+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2011</span></span> <span class='time'>7:02 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>通过PackageManager获取手机中已安装应用的信息，具体代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>PackageManager packageManager = this.getPackageManager();
+</span><span class='line'>List&lt;PackageInfo&gt; packageInfoList = packageManager.getInstalledPackages(0);</span></code></pre></td></tr></table></div></figure>
+
+<p>通过以上方法，可以得到所有已安装的应用程序，既包括了手动安装的应用程序的信息，也包括了系统预装的应用程序的信息。要区分这两类应用可使用以下方法:</p>
 
 <ol>
-<li>使用<code>git rebase -i &lt;commit&gt;^</code>开启rebase的交互模式，这里的<code>&lt;commit&gt;</code>是你想去分割的那个提交；</li>
-<li>用动作edit标记你想分割的提交；</li>
-<li>回到编辑提交的界面后，执行<code>git reset HEAD^</code>重置索引内容，使HEAD指向上个提交，把要分割的提交中的内容释放回工作目录；</li>
-<li>现在你可以添加、修改或删除工作目录中的文件了，然后使用add -p和commit提交你想包含的任何内容；</li>
-<li>重复第4步创建多个提交；</li>
-<li>分割完成后使用<code>git rebase --continue</code>继续后续的工作。</li>
+<li>从packageInfoList获取的packageInfo，再通过packageInfo.applicationInfo获取applicationInfo；</li>
+<li>判断applicationInfo.flags &amp; ApplicationInfo.FLAG_SYSTEM的值，该值大于0时，表示获取的应用为系统预装的应用，反之则为手动安装的应用。</li>
 </ol>
 
-<p>至此，提交就被分割成功了。</p>
+<p>列表的显示需要三个元素：</p>
+
+<ol>
+<li>用来显示数据的ListView;</li>
+<li>需要显示的数据;</li>
+<li>绑定数据和ListView的Adapter。</li>
+</ol>
+
+<p>Adapter通常有ArrayAdapter、SimpleAdapter和CursorAdapter等。其中SimpleAdapter有最好的扩充性，可以自定义出各种效果。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SimpleAdapter(Context context, List&lt;? extends Map&lt;String, ?&gt;&gt; data, int resource, String[] from, int[] to)</span></code></pre></td></tr></table></div></figure>
+
+<p>参数解释：</p>
+
+<ol>
+<li>context：上下文；</li>
+<li>data：数据列表。列表里的每一项都是一个Map<String, ?>对象，都和ListView里的一项进行数据绑定；</li>
+<li>resource：布局资源。可以引用系统提供的，也可以自定义；</li>
+<li>from：名字数组。每个名字都是用来索引数据列表中每个Map<String, Object>里的Object；</li>
+<li>to：资源索引数组，以R.id.xxx的形式表示。</li>
+</ol>
+
+<p>main.xml布局代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+</span><span class='line'>    android:orientation="vertical"
+</span><span class='line'>    android:layout_width="fill_parent"
+</span><span class='line'>    android:layout_height="fill_parent"&gt;
+</span><span class='line'>    &lt;TextView
+</span><span class='line'>        android:id="@+id/app_title"
+</span><span class='line'>        android:layout_width="wrap_content"
+</span><span class='line'>        android:layout_height="wrap_content"
+</span><span class='line'>        android:textSize="22px" /&gt;
+</span><span class='line'>    &lt;TextView
+</span><span class='line'>        android:id="@+id/app_package"
+</span><span class='line'>        android:layout_width="wrap_content"
+</span><span class='line'>        android:layout_height="wrap_content" /&gt;
+</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>上面代码中的android:orientation=&quot;vertical&quot;很重要，没有它两个TextView就不会显示成两行。</p>
+
+<p>继承了ListActivity的MainActivity代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>import java.util.ArrayList;
+</span><span class='line'>import java.util.HashMap;
+</span><span class='line'>import java.util.List;
+</span><span class='line'>
+</span><span class='line'>import android.app.ListActivity;
+</span><span class='line'>import android.content.pm.ApplicationInfo;
+</span><span class='line'>import android.content.pm.PackageInfo;
+</span><span class='line'>import android.os.Bundle;
+</span><span class='line'>import android.widget.SimpleAdapter;
+</span><span class='line'>
+</span><span class='line'>public class MainActivity extends ListActivity {
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void onCreate(Bundle savedInstanceState) {
+</span><span class='line'>        super.onCreate(savedInstanceState);
+</span><span class='line'>
+</span><span class='line'>        SimpleAdapter adapter = new SimpleAdapter(this,
+</span><span class='line'>                getInstalledApps(false),
+</span><span class='line'>                R.layout.main,
+</span><span class='line'>                new String[] {"app_title", "app_package"},
+</span><span class='line'>                new int[] {R.id.app_title, R.id.app_package});
+</span><span class='line'>        setListAdapter(adapter);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    private List&lt;HashMap&lt;String, Object&gt;&gt; getInstalledApps(boolean getSysPackages) {
+</span><span class='line'>        List&lt;HashMap&lt;String, Object&gt;&gt; list = new ArrayList&lt;HashMap&lt;String, Object&gt;&gt;();
+</span><span class='line'>
+</span><span class='line'>        List&lt;PackageInfo&gt; pkgs = getPackageManager().getInstalledPackages(0);
+</span><span class='line'>        for (int i = 0; i&lt; pkgs.size(); i++) {
+</span><span class='line'>            PackageInfo pkg = pkgs.get(i);
+</span><span class='line'>            if (!getSysPackages && (pkg.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) &gt; 0) {
+</span><span class='line'>                continue;
+</span><span class='line'>            }
+</span><span class='line'>            String label = pkg.applicationInfo.loadLabel(getPackageManager()).toString();
+</span><span class='line'>            String version = pkg.versionName;
+</span><span class='line'>            String pkgName = pkg.packageName;
+</span><span class='line'>
+</span><span class='line'>            HashMap&lt;String, Object&gt; map = new HashMap&lt;String, Object&gt;();
+</span><span class='line'>            map.put("app_title", label + " " + version);
+</span><span class='line'>            map.put("app_package", pkgName);
+</span><span class='line'>            list.add(map);
+</span><span class='line'>        }
+</span><span class='line'>        return list;
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 </div>
   
   
@@ -182,7 +787,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/git-notes-branch-merge-and-rebase/">Git笔记之branch，merge和rebase</a></h1>
+      <h1 class="entry-title"><a href="/blog/build-oauth-enabled-sina-weibo-desktop-client/">构建支持OAuth的新浪微博桌面客户端</a></h1>
     
     
       <p class="meta">
@@ -191,7 +796,419 @@
 
 
 
-<time class='entry-date' datetime='2009-04-05T21:05:02+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>5</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>9:05 pm</span></time>
+<time class='entry-date' datetime='2011-05-08T15:22:11+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>8</span><span class='date-suffix'>th</span>, <span class='date-year'>2011</span></span> <span class='time'>3:22 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>要使用OAuth，首先要去新浪微博注册一个自己的微博应用。注册之后，会得到微博应用的Consumer key和Consumer secret，都是一个字符串。之后就可以进行OAuth的认证过程了。</p>
+
+<p>从 <a href="https://code.google.com/p/sina-weibo4j/">https://code.google.com/p/sina-weibo4j/</a> 下载新浪微博的Java SDK包，当然也可以在 <a href="http://open.weibo.com/wiki/index.php/SDK">http://open.weibo.com/wiki/index.php/SDK</a> 下载。推荐使用前者，已经打好包了。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+<span class='line-number'>72</span>
+<span class='line-number'>73</span>
+<span class='line-number'>74</span>
+<span class='line-number'>75</span>
+<span class='line-number'>76</span>
+<span class='line-number'>77</span>
+<span class='line-number'>78</span>
+<span class='line-number'>79</span>
+<span class='line-number'>80</span>
+<span class='line-number'>81</span>
+<span class='line-number'>82</span>
+<span class='line-number'>83</span>
+<span class='line-number'>84</span>
+<span class='line-number'>85</span>
+<span class='line-number'>86</span>
+<span class='line-number'>87</span>
+<span class='line-number'>88</span>
+<span class='line-number'>89</span>
+<span class='line-number'>90</span>
+<span class='line-number'>91</span>
+<span class='line-number'>92</span>
+<span class='line-number'>93</span>
+<span class='line-number'>94</span>
+<span class='line-number'>95</span>
+<span class='line-number'>96</span>
+<span class='line-number'>97</span>
+<span class='line-number'>98</span>
+<span class='line-number'>99</span>
+<span class='line-number'>100</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>import java.io.BufferedReader;
+</span><span class='line'>import java.io.File;
+</span><span class='line'>import java.io.FileInputStream;
+</span><span class='line'>import java.io.FileOutputStream;
+</span><span class='line'>import java.io.IOException;
+</span><span class='line'>import java.io.InputStream;
+</span><span class='line'>import java.io.InputStreamReader;
+</span><span class='line'>import java.io.OutputStream;
+</span><span class='line'>import java.util.Properties;
+</span><span class='line'>import java.util.PropertyResourceBundle;
+</span><span class='line'>
+</span><span class='line'>import weibo4j.Weibo;
+</span><span class='line'>import weibo4j.WeiboException;
+</span><span class='line'>import weibo4j.http.AccessToken;
+</span><span class='line'>import weibo4j.http.RequestToken;
+</span><span class='line'>
+</span><span class='line'>public class UpdateStatus {
+</span><span class='line'>  private static final String ACCESS_SECRET = "access_secret";
+</span><span class='line'>  private static final String ACCESS_TOKEN = "access_token";
+</span><span class='line'>  private static final String FILE_NAME = "sina_token.properties";
+</span><span class='line'>
+</span><span class='line'>  public static void main(String[] args) {
+</span><span class='line'>    // 在这里填写在应用申请中得到的App Key和App Secret
+</span><span class='line'>    System.setProperty("weibo4j.oauth.consumerKey", YOUR_CONSUMER_KEY);
+</span><span class='line'>    System.setProperty("weibo4j.oauth.consumerSecret", YOUR_CONSUMER_SECRET);
+</span><span class='line'>
+</span><span class='line'>    Weibo weibo = new Weibo();
+</span><span class='line'>
+</span><span class='line'>    try {
+</span><span class='line'>      // 读取存储起来的Access Token
+</span><span class='line'>      AccessToken accessToken = loadAccessToken();
+</span><span class='line'>      if (accessToken == null) {
+</span><span class='line'>        String backUrl = "http://zhubabo.appspot.com";
+</span><span class='line'>
+</span><span class='line'>        // 请求Request Token（未授权令牌）
+</span><span class='line'>        RequestToken requestToken = weibo.getOAuthRequestToken(backUrl);
+</span><span class='line'>        System.out.println("Got request token...");
+</span><span class='line'>        System.out.println("Request token: " + requestToken.getToken());
+</span><span class='line'>        System.out.println("Request token secret: " + requestToken.getTokenSecret());
+</span><span class='line'>
+</span><span class='line'>        // 将以下打印出的授权链接在浏览器中打开，完成应用授权，会自动跳转到
+</span><span class='line'>        // 指定的callback url，并将oauth_verifier一起返回
+</span><span class='line'>        System.out.println("Open the following url in a browser");
+</span><span class='line'>        System.out.println(" http://api.t.sina.com.cn/oauth/authorize?oauth_token=" + requestToken.getToken());
+</span><span class='line'>
+</span><span class='line'>        // 输入上面得到的oauth_verifier的值，取得Access Token，这个Token是长期有效的
+</span><span class='line'>        System.out.println("please input verifier:");
+</span><span class='line'>        String verifier = readLine();
+</span><span class='line'>        accessToken = weibo.getOAuthAccessToken(
+</span><span class='line'>            requestToken.getToken(),
+</span><span class='line'>            requestToken.getTokenSecret(),
+</span><span class='line'>            verifier);
+</span><span class='line'>
+</span><span class='line'>        // 将Access Token保存下来，以后就可以直接通过此Token向新浪围脖发消息了
+</span><span class='line'>        storeAccessToken(accessToken.getToken(), accessToken.getTokenSecret());
+</span><span class='line'>      }
+</span><span class='line'>
+</span><span class='line'>      weibo.setToken(accessToken.getToken(), accessToken.getTokenSecret());
+</span><span class='line'>
+</span><span class='line'>      System.out.println("Input message to sina:");
+</span><span class='line'>      String message = readLine();
+</span><span class='line'>      while (!"exit".equals(message.trim())) {
+</span><span class='line'>        weibo.updateStatus(message);
+</span><span class='line'>        System.out.println("Input message to sina:");
+</span><span class='line'>        message = readLine();
+</span><span class='line'>      }
+</span><span class='line'>    } catch (WeiboException e) {
+</span><span class='line'>      e.printStackTrace();
+</span><span class='line'>    } catch (IOException e) {
+</span><span class='line'>      e.printStackTrace();
+</span><span class='line'>    }
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  private static void storeAccessToken(String token, String tokenSecret) throws IOException {
+</span><span class='line'>    OutputStream out = new FileOutputStream(new File(FILE_NAME));
+</span><span class='line'>    Properties p = new Properties();
+</span><span class='line'>    p.setProperty(ACCESS_TOKEN, token);
+</span><span class='line'>    p.setProperty(ACCESS_SECRET, tokenSecret);
+</span><span class='line'>    p.store(out, "sina access token");
+</span><span class='line'>    out.flush();
+</span><span class='line'>    out.close();
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  private static AccessToken loadAccessToken() throws IOException {
+</span><span class='line'>    File f = new File(FILE_NAME);
+</span><span class='line'>    if (!f.exists()) {
+</span><span class='line'>      return null;
+</span><span class='line'>    }
+</span><span class='line'>    InputStream in = new FileInputStream(f);
+</span><span class='line'>    PropertyResourceBundle bundle = new PropertyResourceBundle(in);
+</span><span class='line'>    in.close();
+</span><span class='line'>    return new AccessToken(bundle.getString(ACCESS_TOKEN), bundle.getString(ACCESS_SECRET));
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  private static String readLine() throws IOException {
+</span><span class='line'>    BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+</span><span class='line'>    byte[] bs = reader.readLine().getBytes("gbk");
+</span><span class='line'>    return new String(bs);
+</span><span class='line'>  }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/upload-multiple-images-with-paperclip-rails-23-improved/">Rails 2.3和Paperclip实现多图片上传（改进版）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2011-04-28T06:48:00+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>28</span><span class='date-suffix'>th</span>, <span class='date-year'>2011</span></span> <span class='time'>6:48 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>从Rails 2.3开始，有了新的方法来处理多模型表单，这就是accepts_nested_attributes_for，它允许直接赋值到子对象上，对于标准的属性使用相同的散列格式。</p>
+
+<p>例如，一个parent有多个children，包含所有类的POST数据将会是下面这样：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>params =&gt;
+</span><span class='line'>  action =&gt; update
+</span><span class='line'>  id =&gt; 1
+</span><span class='line'>  controller =&gt; parents
+</span><span class='line'>  parent =&gt;
+</span><span class='line'>    first_name =&gt; John
+</span><span class='line'>    last_name =&gt; Doe
+</span><span class='line'>    age =&gt; 40
+</span><span class='line'>    children_attributes =&gt;
+</span><span class='line'>      1 =&gt; { id =&gt; 16, :name =&gt; Jack }
+</span><span class='line'>      2 =&gt; { id =&gt; 18, :name =&gt; Mary }</span></code></pre></td></tr></table></div></figure>
+
+<p>注意，那个children_attributes元素在parent的元素中。fields_for会为这些子元素生成必要的POST数据，这些数据会被转换成方便accepts_nested_attributes_for解释的散列。children_attributes不是数组而是散列，它的键是一个简单的索引（不是模型的ID），被用来从一个单一的实体聚合属性。</p>
+
+<p>不用ID的理由是简单的：正在被编辑的模型可能不会被保存，发送到了客户端，这时它的ID为nil。因此为每个被显示的children的id关联一个隐藏字段是个好的实践。</p>
+
+<p>下面我们就用accepts_nested_attributes_for来改写上传多图片的代码。</p>
+
+<p>修改albums_controller.rb中的new方法，删除下面的这句代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>1.upto(3) { @album.photos.build }</span></code></pre></td></tr></table></div></figure>
+
+<p>将album.rb中的</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def photo_attributes=(photo_attributes)
+</span><span class='line'>  photo_attributes.each do |attributes|
+</span><span class='line'>    photos.build(attributes)
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>代码改成</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>accepts_nested_attributes_for :photos</span></code></pre></td></tr></table></div></figure>
+
+<p>修改_form.html.erb中的</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div id="photos"&gt;
+</span><span class='line'>  &lt;% if @album.new_record? %&gt;
+</span><span class='line'>    &lt;%= render :partial =&gt; 'photo', :collection =&gt; @album.photos %&gt;
+</span><span class='line'>  &lt;% end %&gt;
+</span><span class='line'>&lt;/div&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;%= link_to_function "Add Photo" do |page| page.insert_html :bottom, :photos, :partial =&gt; 'photo', :object =&gt; Photo.new end %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>为下面的代码</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div id="photos"&gt;
+</span><span class='line'>  &lt;% if @album.new_record? %&gt;
+</span><span class='line'>    &lt;%= render :partial =&gt; 'photo', :locals =&gt; { :form =&gt; f, :photo =&gt; @album.photos.build } %&gt;
+</span><span class='line'>  &lt;% end %&gt;
+</span><span class='line'>&lt;/div&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;%= add_object_link("Add Photo", f, @album.photos.build, "photo", "#photos") %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>再将_photo.html.erb中的</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;% fields_for "album[photo_attributes][]", photo do |p| %&gt;
+</span><span class='line'>  &lt;%= p.label :photo %&gt;&lt;br /&gt;
+</span><span class='line'>  &lt;%= p.file_field :data, :index =&gt; nil %&gt;
+</span><span class='line'>  &lt;%= link_to_function "delete", "remove_field($(this), ('.photo'))" %&gt;
+</span><span class='line'>&lt;% end %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>改为</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;% form.fields_for :photos, photo, :child_index =&gt; (photo.new_record? ? "index_to_replace_with_js" : nil) do |p| %&gt;
+</span><span class='line'>  &lt;%= p.label :photo %&gt;&lt;br /&gt;
+</span><span class='line'>  &lt;%= p.file_field :data %&gt;
+</span><span class='line'>  &lt;%= link_to_function "delete", "remove_field($(this), ('.photo'))" %&gt;
+</span><span class='line'>&lt;% end %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>在albums_helper中添加两个方法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def add_object_link(name, form, object, partial, where)
+</span><span class='line'>  html = render(:partial =&gt; partial, :locals =&gt; { :form =&gt; form }, :object =&gt; object)
+</span><span class='line'>  link_to_function name, %{
+</span><span class='line'>    var new_object_id = new Date().getTime();
+</span><span class='line'>    var html = jQuery(#{js html}.replace(/index_to_replace_with_js/g, new_object_id)).hide();
+</span><span class='line'>    html.appendTo(jQuery("#{where}")).slideDown('slow');
+</span><span class='line'>  }
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>def js(data)
+</span><span class='line'>  if data.respond_to? :to_json
+</span><span class='line'>    data.to_json
+</span><span class='line'>  else
+</span><span class='line'>    data.inspect.to_json
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>到这里就修改完成了。试试看，是不是和原来的效果一样。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/upload-multiple-images-with-paperclip-rails-23/">Rails 2.3和Paperclip实现多图片上传</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2011-04-24T12:12:29+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>24</span><span class='date-suffix'>th</span>, <span class='date-year'>2011</span></span> <span class='time'>12:12 pm</span></time>
         
       </p>
     
@@ -206,233 +1223,18 @@
 <span class='line-number'>6</span>
 <span class='line-number'>7</span>
 <span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git branch  # 列出所有分支以及当前在哪个分支上
-</span><span class='line'>git branch &lt;branch&gt;  # 建立分支
-</span><span class='line'>git branch -m &lt;oldbranch&gt; &lt;newbranch&gt;  # 修改分支的名字
-</span><span class='line'>git checkout &lt;branch&gt;  # 切换分支
-</span><span class='line'>git checkout -b &lt;branch&gt; &lt;commit&gt;  # 新建分支并切换过去
-</span><span class='line'>git branch -d &lt;branch&gt;  # 刪除分支
-</span><span class='line'>git merge &lt;branch&gt;  # 合并分支到当前分支上
-</span><span class='line'>git rebase &lt;branch&gt;  # 将提交迁移到上游分支</span></code></pre></td></tr></table></div></figure>
-
-<p>在merge/rebase的过程中，也许会出现冲突。在这种情况，Git会停止merge/rebase并让你去解决冲突，冲突内容以如下形式存在：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
-</span><span class='line'>Here is the original change.
-</span><span class='line'>=======
-</span><span class='line'>Here is the modified chagne.
-</span><span class='line'>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>&lt;&lt;&lt;&lt;&lt;&lt;&lt;下面的是当前版本的内容；=======和&gt;&gt;&gt;&gt;&gt;&gt;&gt;之间的则是分支里与之对应的有冲突的内容。修复冲突要做的就是把&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD和&gt;&gt;&gt;&gt;&gt;&gt;&gt;之间的内容改成我们想要的。在解决完冲突后，用git add命令去更新这些内容，如果是rebase，那么你无需执行git commit，只要执行git rebase --continue命令即可，这样Git会继续apply余下的补丁。</p>
-
-<p>rebase的做法是先将HEAD指向目标分支的最新commit，这时HEAD的内容变为目标分支最新commit的SHA1值，然后将当前分支的commit，一个个重新apply到目标分支上，完成后再将HEAD指向新的commit。例如，当前分支是master，然后执行git rebase dev，就会把两个分支的共同祖先的commit之后的所有master的commit记录，重新在dev分支上再commit一遍。</p>
-
-<p><img src="/uploads/git-rebase.png" title="git-rebase" ></p>
-
-<p>fast-forward在Git中是一种merge术语，当dev分支是从master分支的最新commit分出来的时候，那么如果master要把dev分支merge进来，由于dev的parent commit是master的最新commit，所以这两个分支的合并不会有任何冲突，实际上的动作只是把master的HEAD指向dev的最新commit而已。线图上来看两个分支根本是同一条线。</p>
-
-<p><img src="/uploads/git-merge-ff.png" title="git-merge-ff" ></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/git-notes-tag/">Git笔记之tag</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2009-03-29T09:25:20+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>29</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>9:25 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>git tag的主要作用是给某个commit起一个好记的名字。这里列举了一些常用的tag命令：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git tag  # 显示所有标签
-</span><span class='line'>git tag v1.1.0  # 轻量级标签
-</span><span class='line'>git tag -a v1.1.0 -m "Release v1.1.0"  # 带注释的标签
-</span><span class='line'>git tag -d v1.1.0  # 删除特定标签</span></code></pre></td></tr></table></div></figure>
-
-<p>如果想给某个commit添加标签，可以使用如下命令：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git tag -a v1.1.0 &lt;commit&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>查看指定tag的信息可以用：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git show v1.1.0</span></code></pre></td></tr></table></div></figure>
-
-<p>要筛选同类标签的话，可以使用：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git tag -l 'v1.1.*'</span></code></pre></td></tr></table></div></figure>
-
-<p>它会列出前缀为v1.1.的所有标签。</p>
-
-<p>有了标签要在团队之间分享怎么办？可以使用下面的命令把标签推送到远程仓库中：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git push origin v1.1.0  # 推送指定标签
-</span><span class='line'>git push origin --tags  # 推送所有标签</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/git-notes-status/">Git笔记之status</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2009-03-13T11:56:53+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>13</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>11:56 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>git status命令会显示当前项目状态的一个简单总结：</p>
-
-<ul>
-<li>当Git提示说“Untracked files”表示新增加的文件还没有被纳入到Git版本控制系统的追踪；</li>
-<li>如果提示说“Changed but not updated”表示在工作目录下做的修改还没有被添加到索引文件中；</li>
-<li>如果你看到提示说“Changes to be committed”则表示发现了你已经添加到索引文件里，但尚未提交的内容。</li>
-</ul>
-
-<p>当然你也有可能喜欢短小的输出提示，那么可以使用-s选项：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git status -s</span></code></pre></td></tr></table></div></figure>
-
-<ul>
-<li>它会用??表示“Untracked files”的文件；</li>
-<li>用红色的M表示“Changed but not updated”的文件；</li>
-<li>用绿色的M表示“Changes to be committed”；</li>
-<li>用绿色的A表示新增加但“Changes to be committed”的文件。</li>
-</ul>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/git-notes-diff/">Git笔记之diff</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2009-03-09T21:33:41+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>9</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>9:33 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>今天，我们重点来探讨一下git diff的用法。</p>
-
-<p>我们知道在Git提交环节存在三大部分：工作目录、索引文件、仓库。每当你对代码进行了修改，工作目录的状态就发生了改变。索引文件是连接工作目录和仓库的桥梁，每次当我们使用git add命令后，索引文件的内容就改变了，变得和工作目录同步。仓库是提交环节的最后阶段，只有在我们使用git commit命令将索引文件中的内容提交后，我们的代码才真正地进入了仓库。</p>
-
-<p>git diff就是用来比较提交环节三大部分的差别。其中，纯粹的git diff是查看工作目录与索引文件之间的差别；git diff –cached是查看索引文件和仓库之间的差别；git diff HEAD则是查看工作目录和仓库之间的差别。</p>
-
-<p>下图是三种查看方式的说明：</p>
-
-<p><img src="/uploads/git-diff.png" title="git-diff" ></p>
-
-<p>git diff会输出全部的差别内容，但有时我们只想看看修改的内容的汇总，这时就可以使用--stat选项。这里是它的使用实例：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git diff --stat
-</span><span class='line'>git diff --cached --stat
-</span><span class='line'>git diff HEAD --stat</span></code></pre></td></tr></table></div></figure>
-
-<p>如果你想查看其它分支与当前分支的差别，只要运行以下命令即可：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git diff &lt;otherbranch&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>你也可以加上路径限定符，来比较某一个文件或目录：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git diff &lt;otherbranch&gt; &lt;filename&gt;</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/git-notes-log/">Git笔记之log</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2009-02-22T16:34:58+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2009</span></span> <span class='time'>4:34 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>最简单的查看开发日志的命令是git log。如果你觉得git log给出的信息太单薄，那么可以使用git log -p，它不但会给出非常详细的开发日志，而且还会显示每次提交实际修改的内容。</p>
-
-<p>git log支持很多的参数，可以将这些参数结合起来使用。下面是经常使用的一些参数：</p>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rails upload
+</span><span class='line'>cd upload
+</span><span class='line'>script/plugin install git://github.com/thoughtbot/paperclip.git
+</span><span class='line'>script/plugin install git://github.com/aaronchi/jrails.git
+</span><span class='line'>script/generate scaffold album name:string
+</span><span class='line'>script/generate model photo album:references
+</span><span class='line'>script/generate paperclip photo data
+</span><span class='line'>rake db:migrate
+</span><span class='line'>script/server</span></code></pre></td></tr></table></div></figure>
+
+<p>修改album.rb添加photo_attributes属性：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -441,91 +1243,254 @@
 <span class='line-number'>5</span>
 <span class='line-number'>6</span>
 <span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>-–name-only  # 只显示变更文件的名称
-</span><span class='line'>-–oneline    # 将提交信息压缩到一行显示
-</span><span class='line'>-–graph      # 显示所有提交的依赖树
-</span><span class='line'>-–reverse    # 按照逆序显示提交记录（最先提交的在最前面）
-</span><span class='line'>-–since      # 显示某个日期之后发生的提交
-</span><span class='line'>-–until      # 显示某个日期之前发生的提交
-</span><span class='line'>--decorate   # 显示每个commit的引用</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class Album &lt; ActiveRecord::Base
+</span><span class='line'>  has_many :photos
+</span><span class='line'>  validates_presence_of :name
+</span><span class='line'>
+</span><span class='line'>  def photo_attributes=(photo_attributes)
+</span><span class='line'>    photo_attributes.each do |attributes|
+</span><span class='line'>      photos.build(attributes)
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
 
-<p>如果你曾经与很多小伙伴工作在同一个分支上，也许会有这样的经历，master分支上的大量合并同步到你当前的分支。这使得我们很难分辨哪些变更是发生在master分支，哪些变更是发生在当前分支，且尚未合并到master分支。可以使用git log --no-merges master..查看尚未合并的变更。其中--no-merges选项表示着只显示没有合并到任何分支的变更，master..选项表示只显示没有合并到master分支的变更。</p>
-
-<p>如果想查看文件中指定位置的变更怎么办？可以使用以下命令：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git log -L 1,1:&lt;path&gt;  # -L选项告诉Git只要输出指定文件中指定行的变更日志。</span></code></pre></td></tr></table></div></figure>
-
-<p>你还可以通过如下命令来定位具体的历史记录：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git log v3..v7                 # 显示v3之后直至v7的所有历史记录
-</span><span class='line'>git log v3..                   # 显示所有v3之后的历史记录
-</span><span class='line'>git log -–since="2 weeks ago"  # 显示2周前到现在的所有历史记录</span></code></pre></td></tr></table></div></figure>
-
-<p>如果这些都不够好用的话，还有一个--pretty选项，可以用来创建高级的自定义输出。譬如，你可以使用--pretty=raw查看日志的原始信息。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/git-notes-stash/">Git笔记之stash</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2009-02-07T09:41:32+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>7</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>9:41 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在工作中，经常会碰到在修改代码以支持新功能时，发现线上版本出现问题需要在本地查错。因为还在进行中，所以并不想将半成品的代码提交，后面再来修改。这样就需要临时保存修改的文件，然后取出线上版本到工作目录。这个问题的解决之道就是使用git stash命令，它会暂存你的当前工作，这样以后随时可以再来修改：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git stash</span></code></pre></td></tr></table></div></figure>
-
-<p>现在，工作目录变得干净，可以安全地做些别的事情了。</p>
-
-<p>要查看暂存的修改可以使用以下命令：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git stash list</span></code></pre></td></tr></table></div></figure>
-
-<p>稍后，在排除掉线上版本的错误后，你就可以取回所有暂存的修改：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git stash pop</span></code></pre></td></tr></table></div></figure>
-
-<p>现在让我们在脑中想象一个场景：在排除线上版本错误后，没有立即取回暂存的修改，而是做了其它的一些的变更，然后想把暂存的修改并入进来以完成工作。如果两次修改的代码没有冲突，那么事情完美结束；如果后修改的代码和暂存的修改有冲突，那么就会得到Merge conflict的警告。Git没有提供强制pop的功能，所以我们需要一些技巧来解决：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git stash show -p | git apply && git stash drop</span></code></pre></td></tr></table></div></figure>
-
-<p>git stash的其它一些可用选项如下所示：</p>
+<p>修改photo.rb添加附件相关属性：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>git stash pop --index        # 不仅恢复工作目录，还恢复索引
-</span><span class='line'>git stash save "stash name"  # 使用save可以给暂存的修改添加名字
-</span><span class='line'>git stash save --keep-index  # 仅仅暂存未索引的文件
-</span><span class='line'>git stash clear              # 删除所有暂存的修改</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class Photo &lt; ActiveRecord::Base
+</span><span class='line'>  belongs_to :album
+</span><span class='line'>
+</span><span class='line'>  has_attached_file :data,
+</span><span class='line'>    :url =&gt; "/uploads/:style_:basename.:extension",
+</span><span class='line'>    :styles =&gt; { :thumb =&gt; "50x50#", :large =&gt; "640x480#" }
+</span><span class='line'>  validates_attachment_presence :data
+</span><span class='line'>  validates_attachment_content_type :data,
+</span><span class='line'>    :content_type =&gt; ['image/jpeg', 'image/jpg', 'image/png']
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>修改new.html.erb为以下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;h1&gt;New album&lt;/h1&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;% form_for @album, :html =&gt; { :multipart =&gt; true } do |f| %&gt;
+</span><span class='line'>  &lt;%= render :partial =&gt; 'form', :locals =&gt; { :f =&gt; f } %&gt;
+</span><span class='line'>  &lt;p&gt;&lt;%= f.submit "Create" %&gt;&lt;/p&gt;
+</span><span class='line'>&lt;% end %&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;%= link_to 'Back', albums_path %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>对edit.html.erb做同样的修改：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;h1&gt;Editing album&lt;/h1&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;% form_for @album, :html =&gt; { :multipart =&gt; true } do |f| %&gt;
+</span><span class='line'>  &lt;%= render :partial =&gt; 'form', :locals =&gt; { :f =&gt; f } %&gt;
+</span><span class='line'>  &lt;p&gt;&lt;%= f.submit "Update" %&gt;&lt;/p&gt;
+</span><span class='line'>&lt;% end %&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;%= link_to 'Show', @album %&gt; |
+</span><span class='line'>&lt;%= link_to 'Back', albums_path %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>把从new.html.erb和edit.html.erb中抽取出来的代码保存为_form.html.erb文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= f.error_messages %&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;p&gt;
+</span><span class='line'>  &lt;%= f.label :name %&gt;
+</span><span class='line'>  &lt;%= f.text_field :name %&gt;
+</span><span class='line'>&lt;/p&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>然后在后面添加如下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div id="photos"&gt;
+</span><span class='line'>  &lt;% if @album.new_record? %&gt;
+</span><span class='line'>    &lt;%= render :partial =&gt; 'photo', :collection =&gt; @album.photos %&gt;
+</span><span class='line'>  &lt;% end %&gt;
+</span><span class='line'>&lt;/div&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;%= link_to_function "Add Photo" do |page| page.insert_html :bottom, :photos, :partial =&gt; 'photo', :object =&gt; Photo.new end %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>创建_photo.html.erb文件，代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div class="photo"&gt;
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>  &lt;% fields_for "album[photo_attributes][]", photo do |p| %&gt;
+</span><span class='line'>    &lt;%= p.label :photo %&gt;&lt;br /&gt;
+</span><span class='line'>    &lt;%= p.file_field :data, :index =&gt; nil %&gt;
+</span><span class='line'>    &lt;%= link_to_function "delete", "remove_field($(this), ('.photo'))" %&gt;
+</span><span class='line'>  &lt;% end %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>&lt;/div&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>再在application.js中添加下列代码，这样就可以删除file字段了。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>function remove_field(element, item) {
+</span><span class='line'>  element.up(item).remove();
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>然后修改albums_controller.rb中的new方法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def new
+</span><span class='line'>  @album = Album.new
+</span><span class='line'>  1.upto(3) { @album.photos.build }
+</span><span class='line'>
+</span><span class='line'>  respond_to do |format|
+</span><span class='line'>    format.html # new.html.erb
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>这样，上传多文件的功能基本就完成了。下面就来实现显示和修改的功能。</p>
+
+<p>在show.html.erb的末尾添加下列代码，上传成功后用来显示图片：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>#loop through the albums photos
+</span><span class='line'>&lt;% for photo in @album.photos %&gt;
+</span><span class='line'>  &lt;%= image_tag photo.data.url(:thumb) %&gt;
+</span><span class='line'>&lt;% end %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>修改albums_controller.rb中的edit和update方法，用来删除图片：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def edit
+</span><span class='line'>  @album = Album.find(params[:id])
+</span><span class='line'>  if @album.photos.first.nil?
+</span><span class='line'>    1.upto(3) { @album.photos.build }
+</span><span class='line'>  end
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>def update
+</span><span class='line'>  params[:photo_ids] ||= []
+</span><span class='line'>  @album = Album.find(params[:id])
+</span><span class='line'>  unless params[:photo_ids].empty?
+</span><span class='line'>    Photo.destroy_pics(params[:id], params[:photo_ids])
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  respond_to do |format|
+</span><span class='line'>    if @album.update_attributes(params[:album])
+</span><span class='line'>      flash[:notice] = 'Album was successfully updated.'
+</span><span class='line'>      format.html { redirect_to(@album) }
+</span><span class='line'>    else
+</span><span class='line'>      format.html { render :action =&gt; "edit" }
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>en</span></code></pre></td></tr></table></div></figure>
+
+<p>在photo.rb中加上下面的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def self.destroy_pics(album, photos)
+</span><span class='line'>  Photo.find(photos, :conditions =&gt; { :album_id =&gt; album }).each(:destroy)
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>然后新建_album_photo.html.erb，代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;% unless album_photo.new_record? %&gt;
+</span><span class='line'>  &lt;%= image_tag album_photo.data.url(:thumb) %&gt;
+</span><span class='line'>  &lt;%= check_box_tag "photo_ids[]", album_photo.id %&gt;
+</span><span class='line'>&lt;% end rescue nil %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>接着在_form.html.erb中加入下面的代码就可以删除图片了：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div class="album_photos"&gt;
+</span><span class='line'>  &lt;%= render :partial =&gt; 'album_photo', :collection =&gt; @album.photos %&gt;
+</span><span class='line'>&lt;/div&gt;</span></code></pre></td></tr></table></div></figure>
 </div>
   
   
@@ -538,7 +1503,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/make-wireless-work-on-ubuntu-810/">Ubuntu 8.10下实现无线上网</a></h1>
+      <h1 class="entry-title"><a href="/blog/integrate-alipay-into-rails-application/">在Rails应用中集成支付宝</a></h1>
     
     
       <p class="meta">
@@ -547,49 +1512,149 @@
 
 
 
-<time class='entry-date' datetime='2009-02-05T16:50:49+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>5</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>4:50 pm</span></time>
+<time class='entry-date' datetime='2011-03-18T06:28:29+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2011</span></span> <span class='time'>6:28 am</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>机器是ThinkPad X60，自带Inter PRO/Wireless 3945ABG网卡。</p>
+  <div class="entry-content"><p>注意：notify_url为服务器通知，支付宝可以保证99.9999%的通知到达率，前提是你的网络通畅，在notify_url中可以做对数据库的业务操作。return_url中可以做数据库的更新也可以做显示。第一次交易状态改变（即时到帐中的交易完成的交易状态）时，支付宝发起的通知的时间与返回页自动跳转回的时间近乎同时。</p>
 
-<h3 id="查看网络设置">查看网络设置</h3>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ifconfig</span></code></pre></td></tr></table></div></figure>
-
-<p><img src="/uploads/ifconfig.png" title="ifconfig" ></p>
-
-<h3 id="打开无线网卡电源">打开无线网卡电源</h3>
+<p>支付处理代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sudo iwconfig wlan0 txpower on</span></code></pre></td></tr></table></div></figure>
-
-<h3 id="检索区域内的无线网络">检索区域内的无线网络</h3>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>iwlist wlan0 scan</span></code></pre></td></tr></table></div></figure>
-
-<p><img src="/uploads/iwlist-scan.png" title="iwlist-scan" ></p>
-
-<h3 id="无线网络设置">无线网络设置</h3>
-
-<p>打开System -&gt; Preferences -&gt; Network Connections。在Wireless页上点击Add按钮，然后在SSID栏填写检索到的ESSID字符串NETGEAR。</p>
-
-<p><img src="/uploads/wireless-config.png" title="wireless-config" ></p>
-
-<p>如果无线连接需要输入密钥，那么可以在Wireless Security页上设置。譬如，我在路由器端设置的加密方式是WPA/WPA2-PSK (Wi-Fi Protected Access Pre-Shared Key)，如图：</p>
-
-<p><img src="/uploads/netgear-settings.png" title="netgear-settings" ></p>
-
-<p>所以在Wireless Security页上Securiy栏中选择WPA &amp; WPA2 Personal，然后在Password栏输入设置的密码。然后就点OK，Ubuntu就去寻找网络了，等到状态从Never变为Now的时候就表示已经联网了。</p>
-
-<p>2009/3/19更新</p>
-
-<p>今天早上忽然发现笔记本不能无线上网了，iwlist wlan0 scan后发现结果为No scan result。使用sudo iwlist wlan0 scan命令，然后再执行iwlist wlan scan就可以看到AP了（原因为何还不知道）。</p>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class OrdersController &lt; ApplicationController
+</span><span class='line'>  before_filter :login_required
+</span><span class='line'>
+</span><span class='line'>  # place order
+</span><span class='line'>  def place_order
+</span><span class='line'>    parameters = {
+</span><span class='line'>      'service' =&gt; 'create_direct_pay_by_user',
+</span><span class='line'>      'partner' =&gt; ALIPAY_ACCOUNT,
+</span><span class='line'>      'seller_email' =&gt; ALIPAY_EMAIL,
+</span><span class='line'>      'out_trade_no' =&gt; @order.out_trade_no,
+</span><span class='line'>      'subject' =&gt; 'payment subject',
+</span><span class='line'>      'body' =&gt; 'payment body',
+</span><span class='line'>      'price' =&gt; @order.price.to_s,
+</span><span class='line'>      'quantity' =&gt; @order.quantity.to_s,
+</span><span class='line'>      'payment_type' =&gt; '1',
+</span><span class='line'>      '_input_charset' =&gt; 'utf-8',
+</span><span class='line'>      'notify_url' =&gt; url_for(:only_path =&gt; false, :action =&gt; 'notify'),
+</span><span class='line'>      'return_url' =&gt; url_for(:only_path =&gt; false, :action =&gt; 'done')
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    # 即时到帐中交易状态为“等待买家付款”的状态默认是不会发送通知的，自己手动设置一下
+</span><span class='line'>    @order.status = 'WAIT_BUYER_PAY'
+</span><span class='line'>    @order.user = current_user
+</span><span class='line'>    @order.save
+</span><span class='line'>
+</span><span class='line'>    values = {}
+</span><span class='line'>    # 支付宝要求传递的参数必须要按照首字母的顺序传递，所以这里要sort
+</span><span class='line'>    parameters.keys.sort.each do |k|
+</span><span class='line'>      values[k] = parameters[k];
+</span><span class='line'>    end
+</span><span class='line'>
+</span><span class='line'>    # 一定要先unescape后再生成sign，否则支付宝会报ILLEGAL SIGN
+</span><span class='line'>    sign = Digest::MD5.hexdigest(CGI.unescape(values.to_query) + ALIPAY_KEY)
+</span><span class='line'>    gateway = 'https://www.alipay.com/cooperate/gateway.do?'
+</span><span class='line'>    redirect_to gateway + values.to_query + '&sign=' + sign + '&sign_type=MD5'
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  # 返回success或fail。如果返回fail，支付宝会每隔一段时间就自动调用notify_url通信接口
+</span><span class='line'>  def notify
+</span><span class='line'>    render :text =&gt; 'success'
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  def done
+</span><span class='line'>    if verify_sign
+</span><span class='line'>      order = Order.find_by_out_trade_no(params[:out_trade_no])
+</span><span class='line'>      # 支付宝即时到帐接口只有一种交易状态，就是“交易成功”，更新一下
+</span><span class='line'>      order.update_attributes(params[:trade_status])
+</span><span class='line'>      render :text =&gt; 'Payment successful'
+</span><span class='line'>    else
+</span><span class='line'>      render :text =&gt; 'Alipay Error: ILLEGAL_SIGN'
+</span><span class='line'>    end
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>protected
+</span><span class='line'>  def verify_sign
+</span><span class='line'>    params.delete("sign_type")
+</span><span class='line'>    sign = params.delete("sign")
+</span><span class='line'>
+</span><span class='line'>    values = {}
+</span><span class='line'>    params.keys.sort.each do |k|
+</span><span class='line'>      values[k] = params[k];
+</span><span class='line'>    end
+</span><span class='line'>
+</span><span class='line'>    sign.downcase == Digest::MD5.hexdigest(CGI.unescape(values.to_query) + ALIPAY_KEY)
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
 </div>
   
   
@@ -602,7 +1667,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/git-notes-gitignore/">Git笔记之gitignore</a></h1>
+      <h1 class="entry-title"><a href="/blog/create-multi-step-wizard-with-wizardly-plugin/">使用wizardly插件创建multi-step wizard</a></h1>
     
     
       <p class="meta">
@@ -611,26 +1676,98 @@
 
 
 
-<time class='entry-date' datetime='2009-01-25T18:53:36+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>25</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>6:53 pm</span></time>
+<time class='entry-date' datetime='2011-03-14T18:53:51+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>14</span><span class='date-suffix'>th</span>, <span class='date-year'>2011</span></span> <span class='time'>6:53 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>通常我们会有些文件不希望纳入Git的管理，也不希望它们总是出现在未跟踪文件列表中。这些文件大多是些自动生成的文件，譬如编译过程中生成的临时文件，或者一些本地的配置文件。为解决此类问题，Git提供了文件忽略机制，我们可以创建一个名为.gitignore的文件，在其中列出需要忽略的文件模式。文件.gitignore的格式规范如下：</p>
+  <div class="entry-content"><p><a href="https://github.com/jeffp/wizardly">wizardly</a>是一个非常容易使用的创建multi-step wizard的Rails插件，只需要三步就可以。</p>
 
-<ul>
-<li>所有空行或者以#开头的行都会被忽略；</li>
-<li>可以使用标准的glob模式匹配；</li>
-<li>匹配模式可以以“/”开头防止递归；</li>
-<li>匹配模式可以以“/”结尾指定目录；</li>
-<li>要忽略指定模式以外的文件或目录，可以在模式前加上“!”取反。</li>
-</ul>
+<p>安装插件：</p>
 
-<p>上面所谓的glob模式是指简化了的正则表达式：<code>“*”</code>匹配零个或多个任意字符；“[abc]”匹配任何一个列在方括号中的字符；“?”匹配一个任意字符；“[a-z]”匹配所有在这两个字符范围内的字符。<code>“**”</code>匹配任意中间目录，比如<code>a/**/z</code>可以匹配a/z，a/b/z或a/b/c/z等。</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>gem install wizardly
+</span><span class='line'>script/generate scaffold user first_name:string last_name:string age:integer gender:boolean</span></code></pre></td></tr></table></div></figure>
 
-<p>要养成一开始就设置好.gitignore文件的习惯，避免将来误提交一些无用的文件。</p>
+<p>第一步：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class User &lt; ActiveRecord::Base
+</span><span class='line'>  validation_group :step1, :fields =&gt; [:first_name, :last_name]
+</span><span class='line'>  validation_group :step2, :fields =&gt; [:age, :gender]</span></code></pre></td></tr></table></div></figure>
+
+<p>第二步：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class UsersController &lt; ApplicationController
+</span><span class='line'>  act_wizardly_for :user</span></code></pre></td></tr></table></div></figure>
+
+<p>第三步：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>script/generate wizardly_scaffold users</span></code></pre></td></tr></table></div></figure>
+
+<p>现在你就可以通过访问<code>http://localhost:3000/users/step1</code>来查看效果了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/randomize-upload-filename-in-paperclip/">随机化Paperclip的上传文件名</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2011-03-10T09:56:32+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>10</span><span class='date-suffix'>th</span>, <span class='date-year'>2011</span></span> <span class='time'>9:56 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>有时我们希望可以设定上传文件名的格式。一是可以统一文件名，而不是一些乱七八糟的名字；二是可以让文件名不是那么容易被猜测出来。下面的这段代码就是在网上找到的：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class Photo &lt; ActiveRecord::Base
+</span><span class='line'>  has_attached_file :image, :url =&gt; "/uploads/:basename.:extension"
+</span><span class='line'>
+</span><span class='line'>  before_create :randomize_file_name
+</span><span class='line'>
+</span><span class='line'>  private
+</span><span class='line'>  def randomize_file_name
+</span><span class='line'>    extension = File.extname(image_file_name).downcase
+</span><span class='line'>    self.image.instance_write(:file_name, "#{Time.now.strftime("%Y%m%d%H%M%S")}#{rand(1000)}#{extension}")
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>代码是从 <a href="http://trevorturk.com/2009/03/22/randomize-filename-in-paperclip/">http://trevorturk.com/2009/03/22/randomize-filename-in-paperclip/</a> 找到的，这里我把随机参数给改了，这样文件名的格式就类似20110310095632768这样。还有要注意的就是在:url中必须使用:basename参数，因为修改的:file_name就是它。</p>
 </div>
   
   
@@ -655,23 +1792,23 @@
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/thinking-on-software-version/">软件版本号的思考</a>
+        <a href="/blog/test/">test</a>
       </li>
     
       <li class="post">
-        <a href="/blog/chasing-the-shiny-and-new-in-software/">追逐时髦的技术</a>
+        <a href="/blog/test/">test</a>
       </li>
     
       <li class="post">
-        <a href="/blog/what-should-checked-and-unchecked-translate/">checked/unchecked应该翻译成什么？</a>
+        <a href="/blog/test/">test</a>
       </li>
     
       <li class="post">
-        <a href="/blog/10x-engineers-take-long-naps/">10x工程师经常的打盹</a>
+        <a href="/blog/test/">test</a>
       </li>
     
       <li class="post">
-        <a href="/blog/the-10x-developer-is-not-myth/">10x开发者不是神话</a>
+        <a href="/blog/test/">test</a>
       </li>
     
   </ul>
@@ -685,9 +1822,9 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 141%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 145%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 132%" href="/tags/android/">Android</a>
+<a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 103%" href="/tags/c-plus-plus/">C++</a>
 <a style="font-size: 106%" href="/tags/css/">CSS</a>
 <a style="font-size: 108%" href="/tags/crack/">Crack</a>
@@ -706,10 +1843,10 @@
 <a style="font-size: 115%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
 <a style="font-size: 117%" href="/tags/ruby/">Ruby</a>
+<a style="font-size: 95%" href="/tags/software-engineering/">Software Engineering</a>
 <a style="font-size: 95%" href="/tags/spring/">Spring</a>
 <a style="font-size: 99%" href="/tags/struts/">Struts</a>
 <a style="font-size: 146%" href="/tags/translation/">Translation</a>
-<a style="font-size: 95%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 106%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 106%" href="/tags/wxwidgets/">wxWidgets</a>
 

@@ -9,14 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="把webwork-2.1.7.jar、spring-1.2.1.jar以及webwork2-srping.jar复制到WEB-INF/lib目录下。 添加以下内容到web.xml文件中： 1
-2
-3
-4
-5
-6
-7
-&lt;listener&gt; &lt;listener-class&gt; &hellip;">
+  <meta name="description" content="基本表达式的语法规则构建完毕，那么表达式的语法规则构建就颇为简单了。使用ANTLR构建PowerScript语法分析器（4）中已经说过表达式是由运算元和运算符复合组成。所以在编写表达式语法规则前先要分析下PowerScript的运算符以及它们的优先级。 PowerScript支持四种类型的运算符， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -86,7 +79,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/webwork-and-spring-integration-step-by-step/">一步一步整合WebWork和Spring</a></h1>
+      <h1 class="entry-title"><a href="/blog/using-antlr-to-build-powerscript-parser-part5/">使用ANTLR构建PowerScript语法分析器（5）</a></h1>
     
     
       <p class="meta">
@@ -95,686 +88,178 @@
 
 
 
-<time class='entry-date' datetime='2005-09-26T10:50:27+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>10:50 am</span></time>
+<time class='entry-date' datetime='2008-05-02T19:27:12+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2008</span></span> <span class='time'>7:27 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>把webwork-2.1.7.jar、spring-1.2.1.jar以及webwork2-srping.jar复制到WEB-INF/lib目录下。</p>
+  <div class="entry-content"><p>基本表达式的语法规则构建完毕，那么表达式的语法规则构建就颇为简单了。<a href="/blog/using-antlr-to-build-powerscript-parser-part4/">使用ANTLR构建PowerScript语法分析器（4）</a>中已经说过表达式是由运算元和运算符复合组成。所以在编写表达式语法规则前先要分析下PowerScript的运算符以及它们的优先级。</p>
 
-<p>添加以下内容到web.xml文件中：</p>
+<p>PowerScript支持四种类型的运算符，分别是：</p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;listener&gt;
-</span><span class='line'>    &lt;listener-class&gt;org.springframework.web.context.ContextLoaderListener&lt;/listener-class&gt;
-</span><span class='line'>&lt;/listener&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;listener&gt;
-</span><span class='line'>    &lt;listener-class&gt;com.atlassian.xwork.ext.ResolverSetupServletContextListener&lt;/listener-class&gt;
-</span><span class='line'>&lt;/listener&gt;</span></code></pre></td></tr></table></div></figure>
+<ul>
+<li>针对数字数据类型的算术运算符，执行算术计算；</li>
+<li>针对所有类型的关系运算符，比较数字，文本和布尔值；</li>
+<li>针对布尔类型的逻辑运算符，执行布尔值上的关系运算符</li>
+<li>针对字符串类型连接运算符，连接字符串和二进制大对象。</li>
+</ul>
 
-<p>applicationContext.xml中的内容如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;beans&gt;
-</span><span class='line'>    &lt;bean id="dataSource" class="org.springframework.jdbc.datasource.SingleConnectionDataSource"&gt;
-</span><span class='line'>        &lt;property name="driverClassName" value="${driver}" /&gt;
-</span><span class='line'>        &lt;property name="url" value="${url}" /&gt;
-</span><span class='line'>        &lt;property name="username" value="${username}" /&gt;
-</span><span class='line'>        &lt;property name="password" value="${password}" /&gt;
-</span><span class='line'>    &lt;/bean&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;bean id="sqlMapClient" class="org.springframework.orm.ibatis.SqlMapClientFactoryBean"&gt;
-</span><span class='line'>        &lt;property name="configLocation" value="/WEB-INF/sql-map-config.xml" /&gt;
-</span><span class='line'>        &lt;property name="dataSource" ref="dataSource" /&gt;
-</span><span class='line'>    &lt;/bean&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;bean id="userManager" class="com.codemany.netlink.service.impl.UserManagerImpl" singleton="true"&gt;
-</span><span class='line'>        &lt;property name="sqlMapClient" ref="sqlMapClient" /&gt;
-</span><span class='line'>    &lt;/bean&gt;
-</span><span class='line'>&lt;/beans&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>配置文件sql-map-config.xml中的内容如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;sqlMapConfig&gt;
-</span><span class='line'>    &lt;sqlMap resource="com/codemany/netlink/dao/impl/User.xml" /&gt;
-</span><span class='line'>&lt;/sqlMapConfig&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>在xwork.xml中添加以下内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;package name="default" extends="webwork-default"
-</span><span class='line'>        externalReferenceResolver="com.atlassian.xwork.ext.SpringServletContextReferenceResolver"&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;interceptors&gt;
-</span><span class='line'>        &lt;interceptor name="reference-resolver"
-</span><span class='line'>                class="com.opensymphony.xwork.interceptor.ExternalReferencesInterceptor" /&gt;
-</span><span class='line'>
-</span><span class='line'>        &lt;interceptor-stack name="interceptors"&gt;
-</span><span class='line'>            &lt;interceptor-ref name="params" /&gt;
-</span><span class='line'>            &lt;interceptor-ref name="reference-resolver" /&gt;
-</span><span class='line'>        &lt;/interceptor-stack&gt;
-</span><span class='line'>    &lt;/interceptors&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;default-interceptor-ref name="default-interceptor" /&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;action name="login" class="com.codemany.netlink.action.LoginAction"&gt;
-</span><span class='line'>        &lt;external-ref name="userManager"&gt;userManager&lt;/external-ref&gt;
-</span><span class='line'>        &lt;result name="success" type="dispatcher"&gt;/success.jsp&lt;/result&gt;
-</span><span class='line'>        &lt;result name="error" type="dispatcher"&gt;/error.jsp&lt;/result&gt;
-</span><span class='line'>    &lt;/action&gt;
-</span><span class='line'>&lt;/package&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>在LoginAction.java中添加代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>private UserManager userManager = null;
-</span><span class='line'>
-</span><span class='line'>public void setUserManager(UserManager userManager) {
-</span><span class='line'>    this.userManager = userManager;</span></code></pre></td></tr></table></div></figure>
-
-<p>建立UserManager.java接口文件：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public interface UserManager {
-</span><span class='line'>    public User login(String username, String password) throws UserLoginException;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>UserManagerImpl.java实现代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class UserManagerImpl extends SqlMapClientDaoSupport implements UserManager {
-</span><span class='line'>
-</span><span class='line'>    public User login(String username, String password) throws UserLoginException {
-</span><span class='line'>        // do something
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/system-io-address-table/">系统I/O地址表</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-09-13T19:00:03+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>13</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>7:00 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>PC机中仅使用A[0]-A[9]地址位来表示I/O地址，即可有1024个地址。前512个供系统电路使用，后512个供扩充插槽使用。当A[9]=0时表示为系统板上的I/O地址；A[9]=1时表示为扩充插槽接口卡上的地址。</p>
-
-<p>系统I/O地址使用情况：</p>
+<h3 id="算术运算符">算术运算符</h3>
 
 <table><thead>
 <tr>
-<th style="text-align: center">I/O地址范围</th>
-<th>用途</th>
-<th style="text-align: center">I/O地址范围</th>
-<th>用途</th>
+<th>Operator</th>
+<th>Meaning</th>
 </tr>
 </thead><tbody>
 <tr>
-<td style="text-align: center">0000-001F</td>
-<td>8237A DMA控制器1</td>
-<td style="text-align: center">00E0-00EF</td>
-<td></td>
+<td>+</td>
+<td>Addition</td>
 </tr>
 <tr>
-<td style="text-align: center">0020-003F</td>
-<td>8259A中断控制器1</td>
-<td style="text-align: center">00F0</td>
-<td>重置协处理器总线</td>
+<td>-</td>
+<td>Subtraction</td>
 </tr>
 <tr>
-<td style="text-align: center">0040-005F</td>
-<td>8253/8254定时/计数器（PIT）</td>
-<td style="text-align: center">00F1</td>
-<td>设置协处理器总线</td>
+<td>*</td>
+<td>Multiplication</td>
 </tr>
 <tr>
-<td style="text-align: center">0060-006F</td>
-<td>8042键盘控制器（AT）</td>
-<td style="text-align: center">00F2-00F7</td>
-<td></td>
+<td>/</td>
+<td>Division</td>
 </tr>
 <tr>
-<td style="text-align: center">0070-007F</td>
-<td>CMOS RAM与NMI屏蔽寄存器（AT）</td>
-<td style="text-align: center">00F8-00FF</td>
-<td>协处理器</td>
-</tr>
-<tr>
-<td style="text-align: center">0080-009F</td>
-<td>DMA页寄存器</td>
-<td style="text-align: center">0100-01EF</td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center">00A0-00BF</td>
-<td>8259A中断控制器2</td>
-<td style="text-align: center">01F0-01F7</td>
-<td>硬盘</td>
-</tr>
-<tr>
-<td style="text-align: center">00C0-00DF</td>
-<td>8237A DMA控制器2</td>
-<td style="text-align: center">01F8-01FF</td>
-<td></td>
+<td>^</td>
+<td>Exponentiation</td>
 </tr>
 </tbody></table>
 
-<p>扩充插槽I/O地址使用情况：</p>
+<h3 id="关系运算符">关系运算符</h3>
 
 <table><thead>
 <tr>
-<th style="text-align: center">I/O地址范围</th>
-<th>用途</th>
-<th style="text-align: center">I/O地址范围</th>
-<th>用途</th>
+<th>Operator</th>
+<th>Meaning</th>
 </tr>
 </thead><tbody>
 <tr>
-<td style="text-align: center">0200-0207</td>
-<td>游戏卡I/O</td>
-<td style="text-align: center">0360-036F</td>
-<td>保留</td>
+<td>=</td>
+<td>Equals</td>
 </tr>
 <tr>
-<td style="text-align: center">0208-020F</td>
-<td></td>
-<td style="text-align: center">0370-0377</td>
-<td></td>
+<td>&gt;</td>
+<td>Greater than</td>
 </tr>
 <tr>
-<td style="text-align: center">0210-0217</td>
-<td>扩展部件（仅XT用）</td>
-<td style="text-align: center">0378-037F</td>
-<td>并行口打印机1</td>
+<td>&lt;</td>
+<td>Less than</td>
 </tr>
 <tr>
-<td style="text-align: center">0218-021F</td>
-<td></td>
-<td style="text-align: center">0380-038F</td>
-<td>SDLC 通信及同步通信1</td>
+<td>&lt;&gt;</td>
+<td>Not equal</td>
 </tr>
 <tr>
-<td style="text-align: center">0220-024F</td>
-<td>保留</td>
-<td style="text-align: center">0390-039F</td>
-<td></td>
+<td>&gt;=</td>
+<td>Greater than or equal</td>
 </tr>
 <tr>
-<td style="text-align: center">0250-0277</td>
-<td></td>
-<td style="text-align: center">03A0-03AF</td>
-<td>同步通信2</td>
-</tr>
-<tr>
-<td style="text-align: center">0278-027F</td>
-<td>并行口打印机2</td>
-<td style="text-align: center">03B0-03BF</td>
-<td>MDA 单色显示器</td>
-</tr>
-<tr>
-<td style="text-align: center">0280-02EF</td>
-<td></td>
-<td style="text-align: center">03C0-03CF</td>
-<td>保留</td>
-</tr>
-<tr>
-<td style="text-align: center">02F0-02F7</td>
-<td>保留</td>
-<td style="text-align: center">03D0-03DF</td>
-<td>彩色图形适配器</td>
-</tr>
-<tr>
-<td style="text-align: center">02F8-02FF</td>
-<td>串行口2</td>
-<td style="text-align: center">03E0-03EF</td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center">0300-031F</td>
-<td>试验卡</td>
-<td style="text-align: center">03F0-03F7</td>
-<td>软盘适配器</td>
-</tr>
-<tr>
-<td style="text-align: center">0320-032F</td>
-<td>硬盘适配器</td>
-<td style="text-align: center">03F8-03FF</td>
-<td>串行口1</td>
-</tr>
-<tr>
-<td style="text-align: center">0330-035F</td>
-<td></td>
-<td style="text-align: center"></td>
-<td></td>
+<td>&lt;=</td>
+<td>Less than or equal</td>
 </tr>
 </tbody></table>
-</div>
-  
-  
 
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/posix-conventions-for-command-line-arguments/">POSIX Conventions for Command Line Arguments</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-09-10T00:03:07+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>10</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>12:03 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><ol>
-<li>An option is a hyphen followed by a single alphanumeric character, like this: -o.</li>
-<li>An option may require an argument (which must appear immediately after the option); for example, -oargument or -o argument.</li>
-<li>Options that do not require arguments can be grouped after a hyphen, so, for example, -lst is equivalent to -t -l -s.</li>
-<li>Options can appear in any order; thus -lst is equivalent to -tls.</li>
-<li>Options can appear multiple times.</li>
-<li>Options precede other nonoption arguments: -lst nonoption.</li>
-<li>The -- argument terminates options.</li>
-<li>The - option is typically used to represent one of the standard input streams.</li>
-</ol>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-to-write-perfect-equals-method/">如何编写完美的equals方法</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-09-07T17:47:41+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>7</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>5:47 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Java语言规范要求equals方法具有下面的特点：</p>
-
-<ol>
-<li>自反性（reflexive）：对于任意非空引用x，x.equals(x)应返回true；</li>
-<li>对称性（symmetric）：对于任意引用x、y，当且仅当y.equals(x)返回true时，x.equals(y)返回true；</li>
-<li>传递性（transitive）：对于任意引用x、y、z，如果x.equals(y)返回true，且y.equals(z)也返回true，那么x.equals(z)应返回true；</li>
-<li>一致性（consistent）：如果x和y引用的对象没有改变，那么对x.equals(y)的重复调用应返回同一结果；</li>
-<li>对任意非空引用x，x.equals(null)应返回false。</li>
-</ol>
-
-<p>下面是编写完美equals方法的建议：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>// 测试this和other是否是同一个对象
-</span><span class='line'>if (this == other) return true;
-</span><span class='line'>// 测试other是否为null，如果是就返回false
-</span><span class='line'>if (other == null) return false;
-</span><span class='line'>// 测试this和other是否属于同一个类
-</span><span class='line'>if (getClass() != other.getClass()) {
-</span><span class='line'>    return false;
-</span><span class='line'>}
-</span><span class='line'>// 将other对象的类型转换为你的类所属的类型
-</span><span class='line'>ClassName obj = (ClassName)other;
-</span><span class='line'>// 最后测试需要比较的字段。使用==比较基本类型字段，使用equals比较对象类型字段</span></code></pre></td></tr></table></div></figure>
-
-<p>如果遵循以上的规则定义了一个类的equals方法，定义其子类的equals方法时，首先调用父类的equals方法，如果这项测试能通过，那么再比较子类的字段。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if (!super.equals(other)) return false;</span></code></pre></td></tr></table></div></figure>
-
-<p>这里有个问题是如果this和other两个对象不是同一个类，equals方法该如何工作？有些程序员可能会使用instanceof代替getClass()来做判断，但这种方法是错误的，因为它违反了规则2所要求的对称性。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/best-practices-for-exception-handling/">异常处理最佳实践</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2005-08-12T10:02:48+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>10:02 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="http://www.onjava.com/pub/a/onjava/2003/11/19/exceptions.html">http://www.onjava.com/pub/a/onjava/2003/11/19/exceptions.html</a></p>
-
-<p>异常处理的问题之一是知道何时以及如何使用它。在这篇文章中，我将讨论一些异常处理的最佳实践。我也会总结最近关于使用检查型异常的争论。</p>
-
-<p>作为程序员，我们想要编写解决问题的高质量的代码。不幸的是，异常作为我们代码的意外结果出现。没有人喜欢意外结果，因此我们很快找到我们自己的方法去解决它们。我曾经见过一些聪明的程序员以下列方式处理异常：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void consumeAndForgetAllExceptions() {
-</span><span class='line'>    try {
-</span><span class='line'>        // some code that throws exceptions
-</span><span class='line'>    } catch (Exception ex) {
-</span><span class='line'>        ex.printStacktrace();
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>上面的代码有什么问题？</p>
-
-<p>一旦一个异常被抛出，正常的程序执行被挂起，并且控制权转移到catch块。catch块捕获异常后什么也没做。在catch块后面的程序继续执行，就好象什么也没发生。</p>
-
-<p>下面的代码怎么样？</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void someMethod() throws Exception {
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>这是一个空方法，它里面没有任何代码。空方法如何能抛出异常呢？Java不能阻止你这么做。最近我正好遇见过类似的代码：方法声明抛出异常，但方法里没有实际产生那个异常的代码。当我问那个程序员时，他回复说：“我知道，它会让API变得糟糕，但我一直都是这么做的，而且这样做很管用。”</p>
-
-<p>C++社区花了好几年去确定如何使用异常。这种争论在Java社区刚刚开始。我曾经见过几个Java程序员与异常的使用作斗争。如果没有正确使用，异常会减缓你的程序，因为它需要内存和CPU能力去创建、抛出和捕获异常。如果过度使用，会使代码难以阅读，让使用API的程序员感到挫折。我们都知道挫折感（frustrations）会导致特殊技巧（ hacks）和代码味道。客户端代码只要忽略异常或者抛出它们就可以规避这个问题，就像前面的两个例子。</p>
-
-<h3 id="异常的本质">异常的本质</h3>
-
-<p>大体上说，有三种不同的情况可以导致异常被抛出：</p>
-
-<ul>
-<li><strong>由于编程错误的异常：</strong> 在此类别中，异常是由于编程错误产生的（比如，NullPointerException和IllegalArgumentException）。客户端代码通常不能做关于编程错误的任何事情。</li>
-<li><strong>由于客户端代码错误的异常：</strong> 客户端代码尝试API不允许的东西，从而违反了它的契约。客户端可以采取一些替代的做法，如果在异常中有提供有用的信息。例如：当分析一个非格式良好的XML文档时一个异常被抛出。异常包含有XML文档中引起问题的位置信息。客户端可以使用该信息去采取恢复措施。</li>
-<li><strong>由于资源失败的异常：</strong> 当资源失败时生成的异常。例如：系统内存不足或者网络连接失败。资源失败的客户端响应是上下文驱动的。客户端可以过一段时间后重试操作或者仅仅记录资源失败和使应用程序停止。</li>
-</ul>
-
-<h3 id="java中异常的类型">Java中异常的类型</h3>
-
-<p>Java定义了两类异常：</p>
-
-<ul>
-<li><strong>检查型异常：</strong> 继承自Exception类的异常是检查型异常。客户端代码必须处理被API抛出的检查型异常，不是在catch子句中就是通过throw子句向外转发。</li>
-<li><strong>非检查型异常：</strong> RuntimeException也是扩展自Exception。不过，所有从RuntimeException继承的异常享有特殊待遇。对客户端代码是否处理它们没有要求，因此它们被称为非检查型异常。</li>
-</ul>
-
-<p>举例来说，图1显示了NullPointerException的层次结构。</p>
-
-<p><img src="/uploads/nullpointer-exception-hierarchy.gif" title="nullpointer-exception-hierarchy" ></p>
-
-<p>在这个图中，NullPointerException扩展自RuntimeException，因此是一个非检查型异常。</p>
-
-<p>我曾经见过检查型异常的重度使用和非检查型异常的最小使用。最近，在Java社区有激烈的争论关于检查型异常和其真正的价值。这场争论源于Java似乎是第一个带有检查型异常的主流OO语言这个事实。C++和C#根本没有检查型异常，在这些语言中所有的异常都是非检查型的。</p>
-
-<p>由较低层引发的检查型异常是强制性的，要求调用层必须捕获或者抛出它。如果客户端代码无法有效地处理异常，在API和它客户端之间的检查型异常契约很快就会转变为不必要的负担。客户端代码的程序员可能会走捷径，通过使用一个空的catch块抑制异常或者仅仅抛出它。实际上，它只是把负担放到了客户端调用者身上。</p>
-
-<p>检查型异常也被指责破坏了封装。考虑以下代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public List getAllAccounts() throws FileNotFoundException, SQLException {
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>方法getAllAccounts()抛出两个检查型异常。该方法的客户端必须显式地处理这些特定实现的异常，即使它不知道在getAllAccounts()中什么文件或数据库调用失败，或者没有业务提供文件系统或数据库逻辑。因此，异常处理在方法和它的调用者之间强制造成了一个不适当的紧密耦合。</p>
-
-<h3 id="设计api的最佳实践">设计API的最佳实践</h3>
-
-<p>说了这么多，现在让我们谈谈如何设计一个正确抛出异常的API。</p>
-
-<h4 id="1-当确定使用检查型异常还是非检查型异常时，问问你自己：“当异常发生时客户端代码可以采取什么动作？”">1. 当确定使用检查型异常还是非检查型异常时，问问你自己：“当异常发生时客户端代码可以采取什么动作？”</h4>
-
-<p>如果客户端可以采取一些替代动作从异常中恢复，把它设置为检查型异常。如果客户端不能做任何有用的事情，那就把它设置为非检查型异常。这里的有用的的意思是采取措施从异常中恢复而不是仅仅记录异常。总结来说：</p>
+<h3 id="逻辑运算符">逻辑运算符</h3>
 
 <table><thead>
 <tr>
-<th>当异常发生时客户端的反应</th>
-<th>异常类型</th>
+<th>Operator</th>
+<th>Meaning</th>
 </tr>
 </thead><tbody>
 <tr>
-<td>客户端代码不能做任何事情</td>
-<td>把它设置为非检查型异常</td>
+<td>NOT</td>
+<td>Logical negation</td>
 </tr>
 <tr>
-<td>客户端代码将基于异常中的信息采取一些有用的恢复操作</td>
-<td>把它设置为检查型异常</td>
+<td>AND</td>
+<td>Logical and</td>
+</tr>
+<tr>
+<td>OR</td>
+<td>Logical or</td>
 </tr>
 </tbody></table>
 
-<p>此外，对于所有的编程错误尽量使用非检查型异常。非检查型异常有个好处就是不会强制客户端API显式地处理它们。它们传播到你想捕获它们的地方，或者直接就是报告异常。Java的API有许多非检查型异常，像NullPointerException、IllegalArgumentException和IllegalStateException。我更倾向于使用Java提供的标准异常而不是创建自己的。这会让我的代码容易理解和避免增加代码的内存占用。</p>
+<h3 id="连接运算符">连接运算符</h3>
 
-<h4 id="2-保持封装性。">2. 保持封装性。</h4>
+<table><thead>
+<tr>
+<th>Operator</th>
+<th>Meaning</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>+</td>
+<td>Concatenate</td>
+</tr>
+</tbody></table>
 
-<p>不要把特定实现的检查型异常逐步上升到更高的层。例如，不要把来自数据访问代码中的SQLException传播到业务对象层。业务对象层不需要了解SQLException。你有两个选择：</p>
+<h3 id="运算符优先级">运算符优先级</h3>
 
-<ul>
-<li>如果客户端代码期望从异常中恢复，把SQLException转换成别的检查型异常。</li>
-<li>如果客户端代码不能做关于它的任何事情，把SQLException转换成一个非检查型异常。</li>
-</ul>
+<table><thead>
+<tr>
+<th>Operator</th>
+<th>Purpose</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>( )</td>
+<td>Grouping (see note below on overriding)</td>
+</tr>
+<tr>
+<td>+, -</td>
+<td>Unary plus and unary minus (indicates positive or negative number)</td>
+</tr>
+<tr>
+<td>^</td>
+<td>Exponentiation</td>
+</tr>
+<tr>
+<td>*, /</td>
+<td>Multiplication and division</td>
+</tr>
+<tr>
+<td>+, -</td>
+<td>Addition and subtraction; string concatenation</td>
+</tr>
+<tr>
+<td>=, &gt;, &lt;, &lt;=, &gt;=, &lt;&gt;</td>
+<td>Relational operators</td>
+</tr>
+<tr>
+<td>NOT</td>
+<td>Negation</td>
+</tr>
+<tr>
+<td>AND</td>
+<td>Logical and</td>
+</tr>
+<tr>
+<td>OR</td>
+<td>Logical or</td>
+</tr>
+</tbody></table>
 
-<p>大多数时候，客户端代码不能做关于SQLException的任何事情。不要犹豫去把它们转换成非检查型异常。考虑下面的代码片段：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void dataAccessCode() {
-</span><span class='line'>    try {
-</span><span class='line'>        // some code that throws SQLException
-</span><span class='line'>    } catch(SQLException ex) {
-</span><span class='line'>        ex.printStacktrace();
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>这里的catch块只是抑制异常而且什么也不做。理由是关于SQLException我的客户端没有什么能做的。以下列方式处理它怎么样？</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void dataAccessCode() {
-</span><span class='line'>    try {
-</span><span class='line'>        // some code that throws SQLException
-</span><span class='line'>    } catch(SQLException ex) {
-</span><span class='line'>        throw new RuntimeException(ex);
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>它把SQLException转换成RuntimeException。如果SQLException发生，catch子句会抛出一个新的RuntimeException。执行线程挂起，报告异常。不管怎样，我没有用不必要的异常处理让我的业务对象层变得糟糕，特别是因为它不能做关于SQLException的任何事情。如果我的捕获需要根异常的原因，我可以利用自JDK 1.4起在所有异常类中有效的getCause()方法。</p>
-
-<p>当SQLException发生时如果你确信业务层能采取一些恢复动作，你可以把它转换成一个更有意义的检查型异常。但我发现大多数时间仅仅抛出RuntimeException就足够。</p>
-
-<h4 id="3-如果不能给客户端代码提供有用的信息就不要试图去创建新的定制异常。">3. 如果不能给客户端代码提供有用的信息就不要试图去创建新的定制异常。</h4>
-
-<p>下面的代码有什么问题？</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class DuplicateUsernameException extends Exception {
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>它没有给客户端代码提供任何有用的信息，除了一个指示的异常名字。不要忘记Java的异常类就像其它类，在其中你可以添加你认为客户端代码将会调用以便获得更多信息的方法。</p>
-
-<p>我们可以给DuplicateUsernameException添加有用的方法，像：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class DuplicateUsernameException extends Exception {
-</span><span class='line'>    public DuplicateUsernameException(String username) {}
-</span><span class='line'>    public String requestedUsername() {}
-</span><span class='line'>    public String[] availableNames() {}
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>新版本提供两个有用的方法：requestedUsername()返回请求的名字；availableNames()返回与请求的名字相似的一组有效用户名。客户端可以使用这些方法去告知请求的用户名是无效的和其它的用户名是有效的。但如果你不打算添加额外的信息，那么就抛出一个标准的异常：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>throw new Exception("Username already taken");</span></code></pre></td></tr></table></div></figure>
-
-<p>如果你认为当用户名已被占用时客户端代码除了日志记录不打算采取任何动作，那么抛出一个非检查型异常就更好：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>throw new RuntimeException("Username already taken");</span></code></pre></td></tr></table></div></figure>
-
-<p>或者，你甚至可以提供一个方法检查是否用户名已被占用。</p>
-
-<p>值得重复的是，检查型异常被用于那些客户端API可以基于异常中的信息采取一些富有成效的动作的情况中。对于所有的编程式错误尽量使用非检查型异常。它们让你的代码可读性更强。</p>
-
-<h4 id="4-用文档说明异常。">4. 用文档说明异常。</h4>
-
-<p>你可以使用Javadoc的@throws标签来说明API抛出的检查型和非检查型异常。不过，我倾向于编写单元测试来说明异常。测试允许我看见动作中的异常，因此能被当作可以执行的文档。无论你做什么，都有一些办法让客户端代码可以通过它们了解你的API抛出的异常。这里是一个用于测试IndexOutOfBoundsException的示例单元测试：</p>
+<p>清楚运算符和优先级后，该如何表示这些表达式的语法关系呢？有个标准的分析表达式的递归定义可以套用，大部分表达式都遵循这个模式：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void testIndexOutOfBoundsException() {
-</span><span class='line'>    ArrayList blankList = new ArrayList();
-</span><span class='line'>    try {
-</span><span class='line'>        blankList.get(10);
-</span><span class='line'>        fail("Should raise an IndexOutOfBoundsException");
-</span><span class='line'>    } catch (IndexOutOfBoundsException success) {
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>thisLevelExpression
+</span><span class='line'>    : nextHigherPrecedenceExpression (OPERATOR nextHigherPrecedenceExpression)*</span></code></pre></td></tr></table></div></figure>
 
-<p>当blankList.get(10)被调用时上面的代码将会抛出IndexOutOfBoundsException。如果没有抛出异常，fail(&quot;Should raise an IndexOutOfBoundsException&quot;)语句会显式地让测试失败。通过为异常编写单元测试，你不仅说明异常是如何工作的，也通过测试特殊场景让你的代码更加健壮。</p>
-
-<h3 id="使用异常的最佳实践">使用异常的最佳实践</h3>
-
-<p>下一组最佳实践显示客户端代码将如何处理抛出检查型异常的API。</p>
-
-<h4 id="1-总是要做些清理工作">1.总是要做些清理工作</h4>
-
-<p>如果你使用像数据库连接或网络连接这样的资源，确保你已经把它们清理干净。如果你调用的API只使用非检查型异常，你仍然应该在使用后用try-finally块清理资源。</p>
+<p>现在我们就可以根据PowerScript的运算符优先级写出表达式的语法规则了：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -798,106 +283,54 @@
 <span class='line-number'>20</span>
 <span class='line-number'>21</span>
 <span class='line-number'>22</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void dataAccessCode() {
-</span><span class='line'>    Connection conn = null;
-</span><span class='line'>    try {
-</span><span class='line'>        conn = getConnection();
-</span><span class='line'>        // some code that throws SQLException
-</span><span class='line'>    } catch(SQLException ex) {
-</span><span class='line'>        ex.printStacktrace();
-</span><span class='line'>    } finally {
-</span><span class='line'>        DBUtil.closeConnection(conn);
-</span><span class='line'>    }
-</span><span class='line'>}
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>expression
+</span><span class='line'>    : logical_or_expression
+</span><span class='line'>    ;
 </span><span class='line'>
-</span><span class='line'>class DBUtil {
-</span><span class='line'>    public static void closeConnection(Connection conn) {
-</span><span class='line'>        try {
-</span><span class='line'>            conn.close();
-</span><span class='line'>        } catch(SQLException ex) {
-</span><span class='line'>            logger.error("Cannot close connection");
-</span><span class='line'>            throw new RuntimeException(ex);
-</span><span class='line'>        }
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>DBUtil是一个可以关闭连接的实用工具类。重点是finally块的使用，无论异常是否被捕获它都会执行。在这个例子中，finally关闭连接，如果关闭连接有问题就抛出一个RuntimeException。</p>
-
-<h4 id="2-不要使用异常控制流程">2. 不要使用异常控制流程</h4>
-
-<p>生成栈跟踪是昂贵的，栈跟踪的价值是在调试。在一个流程控制的情况中，栈跟踪将被忽略，因为客户端仅仅想知道如何处理。</p>
-
-<p>在下面的代码中，一个定制的异常MaximumCountReachedException被用来控制流程。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void useExceptionsForFlowControl() {
-</span><span class='line'>    try {
-</span><span class='line'>        while (true) {
-</span><span class='line'>            increaseCount();
-</span><span class='line'>        }
-</span><span class='line'>    } catch (MaximumCountReachedException ex) {
-</span><span class='line'>    }
-</span><span class='line'>    // continue execution
-</span><span class='line'>}
+</span><span class='line'>logical_or_expression
+</span><span class='line'>    : logical_and_expression ('or' logical_and_expression)*
+</span><span class='line'>    ;
 </span><span class='line'>
-</span><span class='line'>public void increaseCount()
-</span><span class='line'>    throws MaximumCountReachedException {
-</span><span class='line'>    if (count &gt;= 5000)
-</span><span class='line'>        throw new MaximumCountReachedException();
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>useExceptionsForFlowControl()使用一个无限循环增加计数直到异常被抛出。这不仅使代码难以阅读，而且让代码变得更慢。仅在特殊情况下使用异常处理。</p>
-
-<h4 id="3-不要抑制或忽略异常">3. 不要抑制或忽略异常</h4>
-
-<p>当来自API的一个方法抛出检查型异常时，它试图告诉你应该采取一些反向动作。如果检查型异常对你毫无意义，不要犹豫去把它转换成一个非检查型异常并且再次抛出它，但是不要通过用{}捕获异常来忽略它，然后继续，好像什么也没发生过。</p>
-
-<h4 id="4-不要捕获顶级异常">4. 不要捕获顶级异常</h4>
-
-<p>非检查型异常继承自RuntimeException类，RuntimeException又继承自Exception。通过捕获Exception类，你也捕获了RuntimeException，如以下代码所示：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>try {
-</span><span class='line'>} catch(Exception ex) {
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>上面的代码同样忽略了非检查型异常。</p>
-
-<h4 id="5-只记录异常一次">5. 只记录异常一次</h4>
-
-<p>多次记录相同的异常栈跟踪可能会让程序员在检查关于异常原始源的栈跟踪时被迷惑。因此，只记录它一次。</p>
-
-<h3 id="总结">总结</h3>
-
-<p>这些都是异常处理最佳实践的一些建议。我无意开始一场检查型异常与非检查型异常之间的宗教战争。你必须根据你的需求自定义设计和用法。我相信，假以时日，我们会找到更好的用异常编码的方法。</p>
-
-<p>我要感谢Bruce Eckel、Joshua Kerievsky和Somik Raha他们对我在写这篇文章时的支持。</p>
-
-<h3 id="相关资源">相关资源</h3>
-
-<ul>
-<li><a href="http://www.mindview.net/Etc/Discussions/CheckedExceptions">&quot;Does Java need Checked Exceptions?&quot;</a> by Bruce Eckel</li>
-<li><a href="http://www.octopull.demon.co.uk/java/ExceptionalJava.html">&quot;Exceptional Java&quot;</a> by Alan Griffiths</li>
-<li><a href="http://www.artima.com/intv/handcuffs.html">&quot;The trouble with checked exceptions: A conversation with Anders Hejlsberg, Part II&quot;</a> on Artima.com</li>
-<li><a href="http://www.c2.com/cgi/wiki?CheckedExceptionsAreOfDubiousValue">&quot;Checked exceptions are of dubious value&quot;</a> on C2.com</li>
-<li><a href="http://www.artima.com/intv/solid.html">Conversation with James Gosling</a> by Bill Venners</li>
-</ul>
+</span><span class='line'>logical_and_expression
+</span><span class='line'>    : logical_not_expression ('and' logical_not_expression)*
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>logical_not_expression
+</span><span class='line'>    : 'not'? relational_expression
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>relational_expression
+</span><span class='line'>    : additive_expression (('='|'&gt;'|'&lt;'|'&lt;&gt;'|'&gt;='|'&lt;=') additive_expression)*
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>additive_expression
+</span><span class='line'>    : multiplicative_expression (('+'|'-') multiplicative_expression)*
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>multiplicative_expression
+</span><span class='line'>    : exponentive_expression (('*'|'/') exponentive_expression)*
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>exponentive_expression
+</span><span class='line'>    : unary_expression ('^' unary_expression)*
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>unary_expression
+</span><span class='line'>    : ('+'|'-')? primary_expression
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
 </div>
   
   
@@ -910,7 +343,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/how-to-solve-sitemesh-truncate-the-page-containing-chinese-character/">如何解决含有中文的页面末尾内容会被SiteMesh截掉的问题</a></h1>
+      <h1 class="entry-title"><a href="/blog/using-antlr-to-build-powerscript-parser-part4/">使用ANTLR构建PowerScript语法分析器（4）</a></h1>
     
     
       <p class="meta">
@@ -919,14 +352,40 @@
 
 
 
-<time class='entry-date' datetime='2005-07-22T14:33:59+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2005</span></span> <span class='time'>2:33 pm</span></time>
+<time class='entry-date' datetime='2008-04-26T22:17:05+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>10:17 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>首先，我们要了解一下ServletResponse.setContentLength(int len)的含义。setContentLength是设置返回内容体长度的方法，len是内容体的长度。由于网络上传输内容是以字节（byte）为单位的，所以len就是指内容体有多少个字节。假设现在有长度为100个字节的数据，在输出数据到客户端前我们用setContentLength(90)设置内容体的长度为90个字节。那么在客户端接收到的数据长度就是90个字节而不是100。下面我们来做个试验：</p>
+  <div class="entry-content"><p>到目前为止，PowerScript的词法分析已经完成的差不多了，接下来就要开始实现它的语法规则。我们准备先从表达式（expression）开始下手，因为它是语法规则中最核心的部分。</p>
+
+<p>简单的来说，表达式是计算的最小单元，是可以被计算产生值的代码的任何部分。一般是由一个或多个运算元和通常是一个运算符构成，运算元本身也可以是表达式。这样层层递归嵌套，直到被称为基本表达式（primary expression）的最简单部分。</p>
+
+<p>基本表达式包含有标志符、字面量（literal）、字段存取、函数调用和数组存取等，圆括号括起的表达式通常也被认为是基本表达式。以下是它们的大致表现形式：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rating
+</span><span class='line'>'This is a string'
+</span><span class='line'>x.y
+</span><span class='line'>f(x)
+</span><span class='line'>a[x]
+</span><span class='line'>(x)</span></code></pre></td></tr></table></div></figure>
+
+<p>在PowerScript中调用函数和事件的语法如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>{ objectname. } { ancestorname :: } { type } { calltype } { when } name ( { argumentlist } )</span></code></pre></td></tr></table></div></figure>
+
+<p>其中，花括号中的项表示可以有可以无。type有两个值function和event，calltype有两个值static和dynamic，when有两个值trigger和post，并且type，calltype和when的顺序可以任意调换。如果ancestorclass是当前对象的直接父类的话，那么可以使用super关键字代替。</p>
+
+<p>这里是收集的一些基本表达式：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -950,32 +409,40 @@
 <span class='line-number'>20</span>
 <span class='line-number'>21</span>
 <span class='line-number'>22</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class PageTruncateFilter implements Filter {
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>this.ls_array[1]
+</span><span class='line'>this.event pfc_addrow()
+</span><span class='line'>this.event rowfocuschanged(ll_row)
+</span><span class='line'>this.event post doubleclicked(xpos, ypos, row, dwo)
+</span><span class='line'>this.uo_1.function hallo()
+</span><span class='line'>post function column_order_update_from_grid()
+</span><span class='line'>event ue_process()
 </span><span class='line'>
-</span><span class='line'>    public void init(FilterConfig config) throws ServletException {
-</span><span class='line'>    }
+</span><span class='line'>close(parent)
+</span><span class='line'>parent.enabled
+</span><span class='line'>parent.hide()
+</span><span class='line'>parent.event ue_postconstructor()
+</span><span class='line'>parent.function static trigger wf_process( )
+</span><span class='line'>parent.post uf_process_item ()
 </span><span class='line'>
-</span><span class='line'>    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
-</span><span class='line'>                        throws IOException, ServletException {
-</span><span class='line'>        HttpServletRequest request = (HttpServletRequest)req;
-</span><span class='line'>        HttpServletResponse response = (HttpServletResponse)res;
+</span><span class='line'>super::create
+</span><span class='line'>super::event clicked()
+</span><span class='line'>super::event clicked(xpos, ypos, row, dwo)
+</span><span class='line'>super::of_remove_tail(anv_tailnode)
+</span><span class='line'>super::event trigger selectionchanging(oldindex, newindex)
 </span><span class='line'>
-</span><span class='line'>        String content = "&lt;html&gt;&lt;head&gt;&lt;title&gt;Truncated Page&lt;/title&gt;&lt;/head&gt;";
-</span><span class='line'>               content += "&lt;body&gt;这个页面的内容will be truncated.&lt;/body&gt;&lt;/html&gt;";
-</span><span class='line'>        response.setCharacterEncoding("gbk");
-</span><span class='line'>        response.setContentLength(content.length());
-</span><span class='line'>        PrintWriter out = response.getWriter();
-</span><span class='line'>        out.println(content);
-</span><span class='line'>        out.close();
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void destroy() {
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>iu_tab_postings.post of_enable_sort(dw_main, dw_detail, false)
+</span><span class='line'>lw_sheet.dynamic event pfc_close()
+</span><span class='line'>w_main.event doubleclicked(flags, xpos, ypos)
+</span><span class='line'>dw_main.event pfc_retrieve()
+</span><span class='line'>cb_ok.event trigger clicked()
+</span><span class='line'>cb_ok.triggerevent(clicked!)</span></code></pre></td></tr></table></div></figure>
 
-<p>由于content字符串含有两个中文字符，每一个中文字符又是由两个字节组成，所以content.length()的值比content的字节数要少2。在客户端显示的内容也会因此少2个字节，即缺少“l&gt;”这两个字符。</p>
-
-<p>现在我们来浏览SiteMesh的源代码找出问题的原因。首先从PageFilter.java的doFilter方法开始。由于页面没有在decorators.xml中注册修饰，所以writeOriginal方法会被调用。下面是writeOriginal方法的源代码：</p>
+<p>有了以上的这些信息，我们就可以很容易地得到基本表达式的语法规则：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -993,42 +460,105 @@
 <span class='line-number'>14</span>
 <span class='line-number'>15</span>
 <span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>/** Write the original page data to the response. */
-</span><span class='line'>private void writeOriginal(HttpServletRequest request, HttpServletResponse response,
-</span><span class='line'>                          Page page) throws IOException {
-</span><span class='line'>    response.setContentLength(page.getContentLength());
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>expression_list
+</span><span class='line'>    : expression (',' expression)*
+</span><span class='line'>    ;
 </span><span class='line'>
-</span><span class='line'>    if (request.getAttribute(USING_STREAM).equals(Boolean.TRUE)) {
-</span><span class='line'>        PrintWriter writer = new PrintWriter(response.getOutputStream());
-</span><span class='line'>        page.writePage(writer);
-</span><span class='line'>        // flush writer to underlying outputStream
-</span><span class='line'>        writer.flush();
-</span><span class='line'>        response.getOutputStream().flush();
-</span><span class='line'>    } else {
-</span><span class='line'>        page.writePage(response.getWriter());
-</span><span class='line'>        response.getWriter().flush();
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>expression
+</span><span class='line'>    : primary_expression
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>primary_expression
+</span><span class='line'>    : '(' expression ')'
+</span><span class='line'>    | (object_name '.')* (ancestor_name '::')? call_specifier* IDENTIFIER identifier_suffix?
+</span><span class='line'>    | literal
+</span><span class='line'>    | '::'? object_name
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>object_name
+</span><span class='line'>    : 'this'
+</span><span class='line'>    | 'parent'
+</span><span class='line'>    | IDENTIFIER
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>ancestor_name
+</span><span class='line'>    : 'super'
+</span><span class='line'>    | IDENTIFIER
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>call_specifier
+</span><span class='line'>    : 'function'
+</span><span class='line'>    | 'event'
+</span><span class='line'>    | 'static'
+</span><span class='line'>    | 'dynamic'
+</span><span class='line'>    | 'trigger'
+</span><span class='line'>    | 'post'
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>identifier_suffix
+</span><span class='line'>    : arguments ('.' IDENTIFIER arguments)*    // cascaded calling
+</span><span class='line'>    | '[' expression_list? ']'
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>arguments
+</span><span class='line'>    : '(' expression_list? ')'
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>literal
+</span><span class='line'>    : STRING_LITERAL
+</span><span class='line'>    | INTEGER_LITERAL
+</span><span class='line'>    | FLOAT_LITERAL
+</span><span class='line'>    | BOOLEAN_LITERAL
+</span><span class='line'>    | LINE_COMMENT
+</span><span class='line'>    | BLOCK_COMMENT
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
 
-<p>首行代码就是设置内容体长度的，让我们追到page.getContentLength()里面去看看（Page接口的getContentLength方法是由AbstractPage.java实现的）：</p>
+<p>不过，如果到这里就开始用ANTLR工具生成词法分析器和语法分析器的话，你会得到一堆的警告信息。要消除这些警告需要在语法文件头部添加：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public int getContentLength() {
-</span><span class='line'>    return pageData.length;
+</pre></td><td class='code'><pre><code class=''><span class='line'>options {
+</span><span class='line'>    backtrack=true;
 </span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>它返回pageData数组的长度。但是pageData数组是char类型的，假如pageData中有中文内容时，设置的内容体长度就会小于pageData的字节数。这时就会出现输出到客户端的数据截掉的问题。所以只要修改getContentLength方法返回的值就可以了，下面是修改后的getContentLength方法：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public int getContentLength() {
-</span><span class='line'>    String content = new String(pageData);
-</span><span class='line'>    return content.getBytes().length;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+<p>它的作用是告诉ANTLR在LL(*)语法分析失败的时候要去尝试匹配其它选项。</p>
 </div>
   
   
@@ -1041,7 +571,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/using-ssh2-to-access-gro-clinux-org-cvs-server-in-eclipse3/">在Eclipse 3中使用SSH2访问gro.clinux.org的CVS服务器</a></h1>
+      <h1 class="entry-title"><a href="/blog/cannot-launch-the-remote-parser-because-port-49153-is-already-in-use/">Cannot launch the remote parser because port 49153 is already in use</a></h1>
     
     
       <p class="meta">
@@ -1050,48 +580,137 @@
 
 
 
-<time class='entry-date' datetime='2005-07-07T19:48:08+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>7</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>7:48 pm</span></time>
+<time class='entry-date' datetime='2008-04-25T16:03:53+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>25</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>4:03 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>在Eclipse中生成公钥和私钥</p>
+  <div class="entry-content"><p>在Windows Server 2008中使用ANTLRWorks调试语法时，总是提示说什么端口49153已被占用。使用netstat -an发现这个端口正在被别的进程监听着，虽然知道问题原因，但是不知道如何解决。后来从<a href="http://www.cnblogs.com/zhoujg/archive/2008/03/29/1129281.html">如果AntlrWorks的Debug报错“当前端口已被占用”，可能是防火墙的原因</a>得到启示：AntlrWorks是可以修改远程调试端口的。不过我没有像该文作者介绍的那样将调试端口改成49253，因为那样可能需要设置防火墙。而是直接将之设置到了一个不在使用的端口49151上。</p>
 
-<p>打开Eclipse，进入Window -&gt; Preferences -&gt; Team -&gt; CVS -&gt; SSH2 Connection Method -&gt; Key Management，点击“Generate RSA Key...”，然后填写Passphrase和Confirm Passphrase，接着点击“Save Private Key...”保存公钥和私钥（公钥和私钥文件保存在~/.ssh/目录下，id_rsa是私钥文件，id_rsa.pub 是公钥文件）。</p>
+<p>设置调试端口的路径如下：</p>
 
-<p>将公钥上传至gro.clinux.org服务器</p>
+<p>File -&gt; Preferences -&gt; Debugger -&gt; Default local port</p>
+</div>
+  
+  
 
-<p>登陆gro服务器，进入[帐号维护]，在页面底部你可以看到如下信息：</p>
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/install-radiant-on-lunarpages-shared-server/">在Lunarpages虚拟主机上安装Radiant</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2008-04-20T06:55:11+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>20</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>6:55 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>安裝Rails、Mongrel和Radiant</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Shell帐号信息
-</span><span class='line'>
-</span><span class='line'>Shell box：
-</span><span class='line'>CVS/SSH 共享认证Key：0 [编辑Keys]</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>gem install rails --include-dependencies
+</span><span class='line'>gem install mongrel --include-dependencies
+</span><span class='line'>gem install radiant --include-dependencies</span></code></pre></td></tr></table></div></figure>
 
-<p>点击[编辑Keys]，然后把刚才生成的文件id_rsa.pub中的内容粘贴到文本框中（看看是不是符合它上面的要求，千万要仔细看看），如果没有问题的话，就更新吧。大约6个小时后Cron会自动更新，在服务器上你的目录下会自动添加文件夹/.ssh/，里面包含了名为authorized_keys2的文件，你的公钥就保存在这里。</p>
+<p>建立Radiant项目</p>
 
-<p>在Eclipse中建立CVS连接</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>radiant --database mysql rcms</span></code></pre></td></tr></table></div></figure>
 
-<p>打开CVS Repository Exploring Perspective，进入New -&gt; Repository Location，填入以下内容：</p>
+<p>登录Lunarpages cPanel面板，创建数据库rcms及访问该数据库的账号，设置该帐号的访问权限。然后进入MySQL的数据库管理工具phpMyAdmin，导入在本地建立好的创建数据表的SQL文件，执行之。然后修改config/database.yml文件，填入前面创建的访问数据库的用户名和密码。</p>
+
+<p>将config/environment.rb中的</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>#ENV['RAILS_ENV'] ||= 'production'</span></code></pre></td></tr></table></div></figure>
+
+<p>去掉注释</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ENV['RAILS_ENV'] ||= 'production'</span></code></pre></td></tr></table></div></figure>
+
+<p>再将public/dispatch.fcgi中的</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>#!/usr/bin/env ruby</span></code></pre></td></tr></table></div></figure>
+
+<p>修改为</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>#!/usr/local/bin/ruby</span></code></pre></td></tr></table></div></figure>
+
+<p>然后将rcms上传到Lunarpages虚拟主机的根目录下，上传后的目录结构如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>/public_html
+</span><span class='line'>/www
+</span><span class='line'>/rcms</span></code></pre></td></tr></table></div></figure>
+
+<p>在cPanel中点击“Cron Jobs” -&gt; “Advanced (Unix Style)”进入Cron管理页面。</p>
+
+<p><img src="/uploads/lunarpages-cron-jobs.png" title="lunarpages-cron-jobs" ></p>
+
+<p>创建如下Cron指令（使用默认时间设置，指令会每分钟被执行一次）。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Host：cvs.unixname.gro.clinux.org
-</span><span class='line'>Repository Path：/cvsroot/unixname
-</span><span class='line'>User：你在gro.clinux.org上注册的帐户
-</span><span class='line'>Password：先前保存公钥和私钥时输入的Passphrase
-</span><span class='line'>Connection Type：extssh</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>cd /home/&lt;username&gt;
+</span><span class='line'>mv public_html public_html.bak
+</span><span class='line'>ln -s /home/&lt;username&gt;/rcms/public public_html
+</span><span class='line'>mkdir public_html/cgi-bin
+</span><span class='line'>chown -R username:&lt;username&gt; /home/&lt;username&gt;/rcms
+</span><span class='line'>chmod 755 /home/&lt;username&gt;/rcms
+</span><span class='line'>chmod 755 /home/&lt;username&gt;/rcms/public</span></code></pre></td></tr></table></div></figure>
 
-<p>点击Finish。如果你是第一次登录的话，将会弹出一个对话框，不用看那么仔细，直接点击OK就好了。</p>
+<p>再填好接收执行结果的邮件地址，然后等个2-3分钟后查收邮件就可以了，在收到邮件后切记要删除上面创建的指令。</p>
+
+<p>现在就可以通过浏览器访问部署在Lunarpages上的Radiant了。</p>
+
+<p>如果你想让Radiant跑在类似<code>http://example.com/rcms</code>这样的域名下，那么可以将上面的指令替换成：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>cd /home/&lt;username&gt;/public_html
+</span><span class='line'>ln -s ../rcms/public rcms
+</span><span class='line'>chown -R username:&lt;username&gt; /home/&lt;username&gt;/rcms
+</span><span class='line'>chmod 755 /home/&lt;username&gt;/rcms</span></code></pre></td></tr></table></div></figure>
+
+<p>如果Radiant不工作的话可以在Cron Jobs中使用下列指令检查出了什么问题。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>cd /home/&lt;username&gt;/rcms/public
+</span><span class='line'>chmod 777 dispatch.fcgi
+</span><span class='line'>./dispatch.fcgi
+</span><span class='line'>chmod 644 dispatch.fcgi</span></code></pre></td></tr></table></div></figure>
 </div>
   
   
@@ -1104,7 +723,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/how-to-generate-executable-jar-file/">如何生成可执行的jar文件</a></h1>
+      <h1 class="entry-title"><a href="/blog/running-mongrel-and-radiant-on-windows/">在Windows上面跑Mongrel和Radiant</a></h1>
     
     
       <p class="meta">
@@ -1113,14 +732,123 @@
 
 
 
-<time class='entry-date' datetime='2005-06-21T21:16:56+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>21</span><span class='date-suffix'>st</span>, <span class='date-year'>2005</span></span> <span class='time'>9:16 pm</span></time>
+<time class='entry-date' datetime='2008-04-16T16:16:41+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>4:16 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>首先用jar cvf executable.jar *.class命令生成jar文件，然后编辑jar文件中META-INF目录下的MAINFEST文件。在其尾部加上main-class: main-class-name就可以让它变成可执行的了。</p>
+  <div class="entry-content"><p>安裝Rails、Mongrel和Radiant</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>gem install rails --include-dependencies
+</span><span class='line'>gem install mongrel --include-dependencies
+</span><span class='line'>gem install radiant --include-dependencies</span></code></pre></td></tr></table></div></figure>
+
+<p>建立Radiant项目</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>radiant --database mysql rcms</span></code></pre></td></tr></table></div></figure>
+
+<p>编辑数据库配置文件config/database.yml，填写连接数据库时的用户名和密码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>development:
+</span><span class='line'>  adapter: mysql
+</span><span class='line'>  database: rcms_development
+</span><span class='line'>  username: root
+</span><span class='line'>  password: 123456
+</span><span class='line'>  host: localhost
+</span><span class='line'>
+</span><span class='line'>test:
+</span><span class='line'>  adapter: mysql
+</span><span class='line'>  database: rcms_test
+</span><span class='line'>  username: root
+</span><span class='line'>  password: 123456
+</span><span class='line'>  host: localhost
+</span><span class='line'>
+</span><span class='line'>production:
+</span><span class='line'>  adapter: mysql
+</span><span class='line'>  database: rcms_production
+</span><span class='line'>  username: root
+</span><span class='line'>  password: 123456
+</span><span class='line'>  host: localhost</span></code></pre></td></tr></table></div></figure>
+
+<p>在MySQL中创建数据库，因为是开发环境，所以创建的数据库名为rcms_development。</p>
+
+<p>进入rcms目录，在命令行下敲入以下命令创建数据表：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rake development db:bootstrap</span></code></pre></td></tr></table></div></figure>
+
+<p>一切都准备好后，就可以启动Mongrel服务器了：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>mongrel_rails start</span></code></pre></td></tr></table></div></figure>
+
+<p>不出意料的话，应该会看到如下图的信息。</p>
+
+<p><img src="/uploads/mongrel-rails.png" title="mongrel-rails" ></p>
+
+<p>如果在启动Mongrel时遇到下面的错误：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>!!! Path to log file not valid: log/mongrel.log
+</span><span class='line'>mongrel::start reported an error. Use mongrel_rails mongrel::start -h to get help.</span></code></pre></td></tr></table></div></figure>
+
+<p>可以通过指定应用目录来解决，因为Mongrel在创建log之前会先验证应用目录。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>mongrel_rails start -c rcms</span></code></pre></td></tr></table></div></figure>
+
+<p>如果想把Mongrel作为Windows服务的形式启动，需要安装mongrel_service插件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>gem install mongrel_service</span></code></pre></td></tr></table></div></figure>
+
+<p>注意：某些文档会叫你用gem install win32-service安装win32-service，但实际上不是很必要。因为在安装mongrel_service时系统会问你是否要安装win32-service。</p>
+
+<p>安装好后就可以创建Windows服务了：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>mongrel_rails service::install -N rcms -c rcms -e development</span></code></pre></td></tr></table></div></figure>
+
+<p>其中-N指明service名称，-c指明Rails应用的目录，-e指启动模式。</p>
+
+<p>在“控制面版” -&gt; “管理工具” -&gt; “服务”中可以发现多了名为rcms的服务。如果要取消该服务，可以使用以下命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>mongrel_rails service::remove -N rcms</span></code></pre></td></tr></table></div></figure>
+
+<p>启动和关闭该服务的命令是：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>mongrel_rails service::start -N rcms
+</span><span class='line'>mongrel_rails service::stop -N rcms</span></code></pre></td></tr></table></div></figure>
 </div>
   
   
@@ -1133,7 +861,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/why-should-software-modeling/">为什么要软件建模</a></h1>
+      <h1 class="entry-title"><a href="/blog/backup-foxmail-mail-using-win32/">使用Win32备份Foxmail的邮件</a></h1>
     
     
       <p class="meta">
@@ -1142,23 +870,77 @@
 
 
 
-<time class='entry-date' datetime='2005-05-16T06:23:07+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>6:23 am</span></time>
+<time class='entry-date' datetime='2008-04-13T07:38:52+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>13</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>7:38 am</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>模型是对现实的简化。需要进行建模的原因有以下几点：</p>
+  <div class="entry-content"><p>Foxmail是一个非常不错的邮件客户端，可惜在对邮箱内邮件的备份上做的不是很好，只能手工一封一封地将邮件导出，在邮件比较少时这样处理还可以应付，但假如有成百上千封邮件时还要这样处理显然是相当郁闷的。因此写了一个可以自动将某个邮箱中所有邮件导出为独立的eml格式邮件文件（该格式可以被OutLook邮件程序识别并打开）的小程序。</p>
+
+<p>在Foxmail的安装目录下有一个mail文件夹，该文件夹中的每个子目录分别对应着一个邮件账号。进入某个帐号对应的文件夹，可以发现文件夹中有以in.BOX、out.BOX、send.BOX、spam.BOX和trash.BOX等文件，它们分别对应于收件箱、发件箱、已发送邮件箱、垃圾邮件箱和废件箱。根据<a href="http://www.yesky.com/72/1663572.shtml">VC++实现Foxmail邮件的批量导出</a>一文可以知道每个邮件头以下面的16个字符开始：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>0x10 0x10 0x10 0x10 0x10 0x10 0x10
+</span><span class='line'>0x11 0x11 0x11 0x11 0x11 0x11
+</span><span class='line'>0x53 0x0D 0x0A</span></code></pre></td></tr></table></div></figure>
+
+<p>知道了邮箱所对应存储文件的格式后，以下的事情就变的简单了。</p>
 
 <ol>
-<li>人们对复杂问题的理解能力是有限的；</li>
-<li>我们要开发的软件系统是复杂的；</li>
-<li>对系统的完整的理解有助于正确地实施工作（但不一定能使开发工作进展的更快）；</li>
-<li>我们不能完整的理解一个复杂的系统，为了能够更好地理解正在开发的系统，因此要对它进行建模。</li>
+<li>获取要备份的文件夹路径；</li>
+<li>遍历该文件夹，找出以BOX为后缀名的邮箱存储文件；</li>
+<li>分析存储文件，将邮件导出为eml格式的邮件文本。</li>
 </ol>
 
-<p>那么，是不是任何情况下都要建模呢？未必尽然。是否要进行软件建模是由系统的复杂程度决定的。如果系统的复杂性在我们的控制范围之内，那么就不需要建模。不过，有一个自然趋势：随着时间的推移，几乎所有的应用系统变得越来越复杂。因此要记住的是：狗窝总有一天会膨胀成大厦，并且因为不堪承受其自身的重量而倒塌。</p>
+<p>下面是需要用到的一些Win32 API函数：</p>
+
+<p>创建非模态对话框</p>
+
+<ul>
+<li>CreateDialog</li>
+</ul>
+
+<p>获取目录信息</p>
+
+<ul>
+<li>BROWSEINFO</li>
+<li>LPITEMIDLIST</li>
+<li>SHBrowseForFolder</li>
+<li>SHGetPathFromIDList</li>
+</ul>
+
+<p>遍历某个目录下的文件</p>
+
+<ul>
+<li>SetCurrentDirectory</li>
+<li>FindFileFirst</li>
+<li>FindNextFile</li>
+<li>FindClose</li>
+</ul>
+
+<p>备份邮件</p>
+
+<ul>
+<li>CreateDirectory</li>
+<li>CreateFile</li>
+<li>ReadFile</li>
+<li>WriteFile</li>
+<li>CloseHandle</li>
+</ul>
+
+<p>还有，如果在对话框模版里用到了不一般的控件(比如说进度条)，那么还需要</p>
+
+<ol>
+<li>引用头文件commctrl.h；</li>
+<li>并链接comctl32.lib；</li>
+<li>在WinMain中创建对话框前调用InitCommonControls()方法。</li>
+</ol>
+
+<p><a href="/uploads/box2eml.zip" title="box2eml.zip">代码下载</a></p>
 </div>
   
   
@@ -1171,7 +953,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/anemic-domain-model/">贫血领域模型</a></h1>
+      <h1 class="entry-title"><a href="/blog/tips-for-windows-server-2008-configuration/">Windows Server 2008配置技巧</a></h1>
     
     
       <p class="meta">
@@ -1180,44 +962,249 @@
 
 
 
-<time class='entry-date' datetime='2005-05-12T08:33:42+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>8:33 am</span></time>
+<time class='entry-date' datetime='2008-04-11T13:20:39+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>11</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>1:20 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>英文原文：<a href="https://martinfowler.com/bliki/AnemicDomainModel.html">https://martinfowler.com/bliki/AnemicDomainModel.html</a></p>
+  <div class="entry-content"><h3 id="如何取消登录时要按ctrl-alt-delete组合键">如何取消登录时要按Ctrl+Alt+Delete组合键</h3>
 
-<p>贫血领域模型是那些已近存在了相当长时间的反模式中的一份子，然而目前似乎有一个特定的高潮。我和Eric Evans聊过这个，并且我们都注意到它们似乎越来越流行。作为真正的<a href="https://martinfowler.com/eaaCatalog/domainModel.html">领域模型</a>支持者，这不是一件好事。</p>
+<p>开始 -&gt; 运行 -&gt; gpedit.msc -&gt; 计算机配置 -&gt; Windows设置 -&gt; 安全设置 -&gt; 本地策略，点击“安全选项”，在右侧的框内找到“交互式登录：不要按CTRL+ALT+DEL” -&gt; 启用。</p>
 
-<p>贫血领域模型的基本症状是乍一看它就像真的领域模型一样。这些对象大多以领域空间中的名词命名，并且它们被真正的领域模型拥有的丰富的关系和结构连接。当你观察行为时问题来了，你意识到这些对象几乎没有任何行为，仅仅只是封装了getter和setter方法。这些模型的设计规则往往说不要把任何领域逻辑放到领域对象里。取而代之的是一组服务对象捕获了所有的领域逻辑。这些在领域对象上层的服务把领域对象当数据使用。</p>
+<h3 id="如何取消关机时出现的关机理由选择项">如何取消关机时出现的关机理由选择项</h3>
 
-<p>这种反模式最根本的恐怖在于它和面向对象设计的基本理念完全相反，它只是把数据和处理结合在一起。贫血领域模型其实只是一种过程式风格的设计，正是那种像我（和Eric）自Smalltalk早期以来一直在与之作斗争的顽固者。更糟糕的是，许多人认为贫血对象是真正的对象，因此完全没有抓住面向对象设计是怎么回事的要领。</p>
+<p>开始 -&gt; 运行 -&gt; gpedit.msc -&gt; 计算机配置 -&gt; 管理模板，点击“系统”，在右侧的框内找到“显示关机事件跟踪” -&gt; 禁用。</p>
 
-<p>现在面向对象的纯粹主义当然很好，但我意识到我需要更多的基本论据来反对这种贫血症。本质上贫血领域模型的问题是它们承担了领域模型所有的成本，没有产生任何的好处。主要成本是映射到数据库的笨拙，它通常会导致一整层的O/R映射。在而且只有在你使用强大的面向对象技术去组织复杂的逻辑时这才值得。通过把所有的行为拉取到服务中，不管用什么方法，基本上你最后得到的都是<a href="https://martinfowler.com/eaaCatalog/transactionScript.html">事务脚本</a>，从而失去领域模型能带来的优势。正如我在<a href="https://martinfowler.com/books/eaa.html">《企业应用架构模式》</a>中讨论过的，领域模型并不总是最好的工具。</p>
+<h3 id="如何禁止远程用户的匿名访问">如何禁止远程用户的匿名访问</h3>
 
-<p>值得强调的是，把行为放进领域对象不应违背利用分层将领域逻辑从诸如持久和表现责任中分离的坚实方法。在领域对象中的逻辑应该是领域逻辑——验证、计算、业务规则——无论你喜欢叫它什么。（某些情况下，你会产生把数据源和表现逻辑放到领域对象里的争论，但它和我对贫血症的看法无关。）</p>
+<p>开始 -&gt; 运行 -&gt; regedit，定位到HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa，修改右侧框内restrictanonymous的值为1。</p>
 
-<p>这一切混乱的来源是许多OO专家强烈推荐在领域模型顶部放一层过程式服务，来形成一个<a href="https://martinfowler.com/eaaCatalog/serviceLayer.html">服务层</a>。但这不是让领域模型完全没有行为的一个论据，其实服务层主张服务层要和行为丰富的领域模型一起使用。</p>
+<h3 id="如何在退出系统时清除最近打开的文档的历史">如何在退出系统时清除最近打开的文档的历史</h3>
 
-<p>Eric Evans的精彩书籍<a href="http://domaindrivendesign.org/books/">《领域驱动设计》</a>有如下的文字谈及这些层：</p>
+<p>开始 -&gt; 运行 -&gt; gpedit.msc -&gt; 用户配置 -&gt; 管理模板 -&gt; 开始菜单和任务栏 -&gt; 在右侧的框内找到“退出系统时清除最近打开文档的历史” -&gt; 启用。</p>
 
-<blockquote>
-<p>应用层【他对服务层的命名】：定义软件可以完成的工作，并且指挥具有丰富含义的领域对象来解决问题。这个层所负责的任务对业务影响深远，对跟其它系统的应用层进行交互非常必要。这个层要保持简练。它不包括处理业务规则或知识，只是给下一层中相互协作的领域对象协调任务、委托工作。在这个层次中不反映业务情况的状态，但反映用户或程序的任务进度的状态。</p>
+<h3 id="如何取消必须输入密码登录系统">如何取消必须输入密码登录系统</h3>
 
-<p>领域层（或者模型层）：负责表示业务概念、业务状况的信息以及业务规则。并且保持这些内容的技术细节由基础结构层来完成，反映业务状况的状态在该层中被控制和使用。这一层是业务软件的核心。</p>
-</blockquote>
+<p>开始 -&gt; 运行 -&gt; rundll32 netplwiz.dll,UsersRunDll，选中要自动登陆的账户，取消“要使用本机，用户必须输入用户名密码”，输入该帐户的密码即可（前提是要关闭UAC）。</p>
 
-<p>这里的关键点是服务层是瘦的——所有的关键逻辑存在于领域层。他在服务模式中重申了这个观点：</p>
+<h3 id="如何关闭uac">如何关闭UAC</h3>
 
-<blockquote>
-<p>现在，最常犯的错误就是太轻易地放弃把这种行为配置到合适的对象上，逐渐地滑向过程式编程。</p>
-</blockquote>
+<p>控制面板 -&gt; 用户帐户 -&gt; 打开或关闭用户账户控制 -&gt; 取消“使用用户账户控制(UAC)帮助保护您的计算机”。</p>
 
-<p>我不知道为什么这个反模式如此常见。我猜想它是因为大多数人还没有真正地和正确的领域模型工作过，特别是如果他们有数据背景。有些技术鼓励正确的领域模型，例如J2EE的实体Bean，它是我偏爱<a href="https://martinfowler.com/bliki/POJO.html">POJO</a>领域模型的理由之一。</p>
+<h3 id="如何关闭ie增强安全配置">如何关闭IE增强安全配置</h3>
 
-<p>总之，你在服务中发现越多的行为，你就越难体会到领域模型的好处。如果你所有的逻辑都在服务中，那你将得不到任何好处。</p>
+<p>控制面板 -&gt; 管理工具 -&gt; 服务器管理器 -&gt; 在右侧的框内找到“配置 IE SEC”并打开 -&gt; 禁用。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-switch-between-http-and-https-in-web-application/">如何在Web应用的HTTP与HTTPS间的相互切换</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2008-03-27T16:26:53+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>27</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>4:26 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>对于HTTPS和HTTP的不同请求，Web容器会生成两个不同的session对象。因此，如果在同一个Web应用中只有部分页面使用SSL，要保证使用SSL的页面与不使用SSL的页面间的相互切换（也就是HTTPS请求与HTTP请求间的切换）会话保持连续，那么可以通过在访问的URL中传递sessionId来实现，也就是说在进入或退出HTTPS的URL上绑定一个sessionId。比如从HTTP切换到HTTPS时，URL为<code>https://example.com/login.do;jsessionid=&lt;%=session.getId()%&gt;</code>，从HTTPS切换到HTTP时为<code>http://example.com/welcome.do;jsessionid=&lt;%=session.getId()%&gt;</code>。这样Web容器会根据这个sessionId获取session对象，而不是生成新的session对象。就可以保证HTTP和HTTPS切换时会话不变。</p>
+
+<p>由于在URL上绑定的sessionId容易被窃取，为了保证用户安全，会话认证时需要结合客户端IP地址。即当用户登录后，通过session.setAttribute(&quot;clientIp&quot;, request.getRemoteAddr())保存客户端的IP地址，在后继认证会话的合法性时判断客户端的IP是否是原先存储在session对象的clientIP属性的IP地址，如果不是则该会话是非法会话。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/features-i-want-to-see-in-java7/">希望能在Java 7中看到的特性</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2008-03-18T13:34:33+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>1:34 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>1、支持@前缀的字符串，这样就不必再为到底是写几个反斜杠绞尽脑汁了。</p>
+
+<p>2、支持String类型的switch。</p>
+
+<p>3、支持静态equals方法的String类或扩展方法（Extension methods）。不明白为什么Java总是使劲地支持一些丑陋又复杂的语法。像比较两个字符串就偏偏要写成这种样式：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if (str1 != null && !str1.equals(str2))</span></code></pre></td></tr></table></div></figure>
+
+<p>难道就不能写成下面的格式吗？</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if (str1 != str2)</span></code></pre></td></tr></table></div></figure>
+
+<p>或</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if (!String.equals(str1, str2))</span></code></pre></td></tr></table></div></figure>
+
+<p>其中str1或str2中任何一个值为null时返回false。</p>
+
+<p>4、对泛型进行一些适当的修正。比如：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class GenericsTest {
+</span><span class='line'>
+</span><span class='line'>//    public void output(List&lt;String&gt; list) {
+</span><span class='line'>//        System.out.println("List&lt;String&gt;");
+</span><span class='line'>//    }
+</span><span class='line'>
+</span><span class='line'>    public void output(List&lt;Object&gt; list) {
+</span><span class='line'>        System.out.println("List&lt;Object&gt;");
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public static void main(String[] args) {
+</span><span class='line'>        GenericsTest gt = new GenericsTest();
+</span><span class='line'>
+</span><span class='line'>        gt.output(new ArrayList&lt;Object&gt;());
+</span><span class='line'>        gt.output(new ArrayList&lt;String&gt;());    // 竟然不能通过编译，想不通！
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>5、可以通过[]来访问List和Map。然后，下面的代码</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>List content = new LinkedList(10);
+</span><span class='line'>content.add(0, "Fred");
+</span><span class='line'>content.add(1, "Barney");
+</span><span class='line'>String name = content.get(0);</span></code></pre></td></tr></table></div></figure>
+
+<p>就可以写成</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>List content = new LinkedList(10);
+</span><span class='line'>content[0] = "Fred";
+</span><span class='line'>content[1] = "Barney";
+</span><span class='line'>String name = content[0];</span></code></pre></td></tr></table></div></figure>
+
+<p>还有可能的就是允许为列表使用数组初始化程序语法。例如：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>LinkedList content = {"Fred", "Barney", "Wilma", "Betty"};</span></code></pre></td></tr></table></div></figure>
+
+<p>6、添加decimal或money关键字作为原生类型，或者使BigDecimal支持+，-，*，/等运算符。处理金融相关的数据时总是要使用到BigDecimal类型。可由于BigDecimal不支持运算符，在比较大小时就会很繁琐。例如，比较两个金额的大小：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>BigDecimal zero = new BigDecimal(0);
+</span><span class='line'>if (amount.compareTo(zero) &gt; 0) {
+</span><span class='line'>  return true;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>7、支持ref/out关键字或支持返回Tuples。例如：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>(int, int, int) transform(int x, int y, int z)
+</span><span class='line'>
+</span><span class='line'>(r, g, b) = transform(x, y, z);
+</span><span class='line'>(l, a, b) = transform(transform(x, y, z));</span></code></pre></td></tr></table></div></figure>
+
+<p>当某个方法中有多个返回值或方法需要修改传递进来的String参数并返回修改后的值时，当前的Java语法处理起来就会比较麻烦。</p>
+
+<p>8、重新整理简化I/O和Collection中的API，使之更易使用。</p>
+
+<p>9、简单而强大的Date和Time实现，将java.util包中的Date和Calendar类合并成一个。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-vertical-center-align-text-with-icon/">如何使文字与图标垂直居中对齐</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2008-03-15T20:33:09+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>15</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>8:33 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在做网页的时候，经常会需要在某段文字前加上一个图标。然后就会发现增加的图标和文字的位置不齐，文字总是比图标低点。</p>
+
+<p><img src="/uploads/smiley-smile.gif" title="smiley-smile" >微笑</p>
+
+<p>解决的方法有两个：一个是设置图标的vertical-align为top；还有就是将margin-bottom设为-3px。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;img style="vertical-align: top" src="/uploads/smiley-smile.gif" border="0" /&gt;微笑
+</span><span class='line'>&lt;img style="margin-bottom: -3px" src="/uploads/smiley-smile.gif" border="0" /&gt;微笑</span></code></pre></td></tr></table></div></figure>
 </div>
   
   
@@ -1242,23 +1229,23 @@
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/thinking-on-software-version/">软件版本号的思考</a>
+        <a href="/blog/test/">test</a>
       </li>
     
       <li class="post">
-        <a href="/blog/chasing-the-shiny-and-new-in-software/">追逐时髦的技术</a>
+        <a href="/blog/test/">test</a>
       </li>
     
       <li class="post">
-        <a href="/blog/what-should-checked-and-unchecked-translate/">checked/unchecked应该翻译成什么？</a>
+        <a href="/blog/test/">test</a>
       </li>
     
       <li class="post">
-        <a href="/blog/10x-engineers-take-long-naps/">10x工程师经常的打盹</a>
+        <a href="/blog/test/">test</a>
       </li>
     
       <li class="post">
-        <a href="/blog/the-10x-developer-is-not-myth/">10x开发者不是神话</a>
+        <a href="/blog/test/">test</a>
       </li>
     
   </ul>
@@ -1272,9 +1259,9 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 141%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 145%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 132%" href="/tags/android/">Android</a>
+<a style="font-size: 133%" href="/tags/android/">Android</a>
 <a style="font-size: 103%" href="/tags/c-plus-plus/">C++</a>
 <a style="font-size: 106%" href="/tags/css/">CSS</a>
 <a style="font-size: 108%" href="/tags/crack/">Crack</a>
@@ -1293,10 +1280,10 @@
 <a style="font-size: 115%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
 <a style="font-size: 117%" href="/tags/ruby/">Ruby</a>
+<a style="font-size: 95%" href="/tags/software-engineering/">Software Engineering</a>
 <a style="font-size: 95%" href="/tags/spring/">Spring</a>
 <a style="font-size: 99%" href="/tags/struts/">Struts</a>
 <a style="font-size: 146%" href="/tags/translation/">Translation</a>
-<a style="font-size: 95%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 106%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 106%" href="/tags/wxwidgets/">wxWidgets</a>
 
