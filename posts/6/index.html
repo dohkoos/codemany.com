@@ -9,8 +9,11 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="token 记号
-ambiguity 二义性 安装ANTLR ANTLR是由Java写成的，所以在安装ANTLR前必须保证已经安装有Java 1.6或以上版本。你可以到 http://www.antlr.org/download.html 下载ANTLR的最新版本，或者也可使用命令行工具下载： &hellip;">
+  <meta name="description" content="lexical 词法的
+alternative 选项
+notation 表示法
+directive 指令
+label 标签 了解ANTLR最好的方法就是实例。构建一个简单的计算器是个不错的主意。为了使它容易理解且保持简单，我们将只允许基本的算术运算符（加、减、乘、除）、括号表达式、整数和变量。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -74,6 +77,387 @@ ambiguity 二义性 安装ANTLR ANTLR是由Java写成的，所以在安装ANTLR�
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part3/">ANTLR 4权威参考读书笔记（3）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-01-05T16:48:16+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>5</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>4:48 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><ul>
+<li>lexical 词法的</li>
+<li>alternative 选项</li>
+<li>notation 表示法</li>
+<li>directive 指令</li>
+<li>label 标签</li>
+</ul>
+
+<p>了解ANTLR最好的方法就是实例。构建一个简单的计算器是个不错的主意。为了使它容易理解且保持简单，我们将只允许基本的算术运算符（加、减、乘、除）、括号表达式、整数和变量。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Calc;
+</span><span class='line'>
+</span><span class='line'>prog
+</span><span class='line'>    : stat+
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>stat
+</span><span class='line'>    : expr
+</span><span class='line'>    | ID '=' expr
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>expr
+</span><span class='line'>    : expr ('*'|'/') expr
+</span><span class='line'>    | expr ('+'|'-') expr
+</span><span class='line'>    | INT
+</span><span class='line'>    | ID
+</span><span class='line'>    | '(' expr ')'
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>ID  : [a-zA-Z]+ ;
+</span><span class='line'>
+</span><span class='line'>INT : [0-9]+ ;
+</span><span class='line'>
+</span><span class='line'>WS  : [ \t\r\n]+ -&gt; skip ;    // toss out whitespace</span></code></pre></td></tr></table></div></figure>
+
+<p>在上述的语法中，程序是由空格（换行符也被当作空格）终止的语句序列，语句可以是表达式或者赋值。那些以小写字母开头的像stat和expr是语法规则；由大写字母开头的诸如ID和INT为词法规则，用于识别标志符和整数这样的记号。我们用“|”分隔规则的选项，我们也可以用“()”把符号分组成子规则。例如，子规则<code>(&#39;*&#39;|&#39;/&#39;)</code>匹配乘法符号或者除法符号。</p>
+
+<p>ANTLR v4最重要的新特性是它有能力处理（大多数类型的）左递归规则。例如，规则expr前两个选项就在左边缘递归地调用了expr自身。这种指定算术表达式表示法的方法比那些典型的自顶向下语法分析器策略更容易。当然，在这种策略下，我们需要定义多个规则，每个运算符优先级一个规则。</p>
+
+<p>记号定义的表示法对那些有正则表达式经验的应该很熟悉。唯一不寻常的是在WS规则上的<code>-&gt; skip</code>指令，它告诉词法分析器去匹配但丢弃空格，不要把它们放到记号流中，这样在语法分析树上空格就不会有对应的记号。（每个可能的输入字符都必须被至少一个词法规则匹配。）我们通过使用形式化的ANTLR表示法避免捆绑语法到某个特定的目标语言，而不是在语法中插入任意代码片段来告诉词法分析器去忽略。</p>
+
+<p>这里是一些用来评估所有语法特性的测试序列：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>193
+</span><span class='line'>a=5
+</span><span class='line'>b=6
+</span><span class='line'>a+b*2
+</span><span class='line'>(1+2)*3</span></code></pre></td></tr></table></div></figure>
+
+<p>把它们放入文件calc.txt中，然后执行以下命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr Calc.g
+</span><span class='line'>compile *.java
+</span><span class='line'>grun Calc prog -gui calc.txt</span></code></pre></td></tr></table></div></figure>
+
+<p>TestRig会弹出一个显示语法分析树的窗口：</p>
+
+<p><img src="/uploads/calc-parse-tree.png" title="calc-parse-tree" ></p>
+
+<h3 id="使用访问者模式计算结果">使用访问者模式计算结果</h3>
+
+<p>为了让前面的算术表达式语法分析器计算出结果，我们还需要做些其它的事情。</p>
+
+<p>ANTLR v4鼓励我们使用语法分析树访问者和其它遍历器来实现语言应用，以保持语法的整洁。不过在接触这些之前，我们需要对语法做些修改。</p>
+
+<p>首先，我们需要用标签标明规则的选项，标签可以是和规则名没有冲突的任意标志符。如果选项上没有标签，ANTLR只会为每个规则生成一个visit方法。</p>
+
+<p>在本例中，我们希望为每个选项生成一个不同的visit方法，以便每种输入短语都能得到不同的事件。在新的语法中，标签出现在选项的右边缘，且以“#”符号开头：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>stat
+</span><span class='line'>    : expr                   # printExpr
+</span><span class='line'>    | ID '=' expr            # assign
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>expr
+</span><span class='line'>    : expr op=(MUL|DIV) expr # MulDiv
+</span><span class='line'>    | expr op=(ADD|SUB) expr # AddSub
+</span><span class='line'>    | INT                    # int
+</span><span class='line'>    | ID                     # id
+</span><span class='line'>    | '(' expr ')'           # parens
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>接下来，让我们为运算符字面量定义一些记号名字，以便以后可以在visit方法中引用作为Java常量的它们：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>MUL : '*' ;
+</span><span class='line'>
+</span><span class='line'>DIV : '/' ;
+</span><span class='line'>
+</span><span class='line'>ADD : '+' ;
+</span><span class='line'>
+</span><span class='line'>SUB : '-' ;</span></code></pre></td></tr></table></div></figure>
+
+<p>现在，我们有了一个增强型的语法。接下来要做的事情是实现一个EvalVisitor类，它通过遍历表达式语法分析树计算和返回值。</p>
+
+<p>执行下面的命令，让ANTLR生成访问者接口和它的默认实现，其中-no-listener参数是告诉ANTLR不再生成监听器相关的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr -no-listener -visitor Calc.g</span></code></pre></td></tr></table></div></figure>
+
+<p>所有被标签标明的选项在生成的访问者接口中都定义了一个visit方法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public interface CalcVisitor&lt;T&gt; extends ParseTreeVisitor&lt;T&gt; {
+</span><span class='line'>    T visitProg(CalcParser.ProgContext ctx);
+</span><span class='line'>    T visitPrintExpr(CalcParser.PrintExprContext ctx);
+</span><span class='line'>    T visitAssign(CalcParser.AssignContext ctx);
+</span><span class='line'>    ...
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>接口定义使用的是Java泛型，visit方法的返回值为参数化类型，这允许我们根据表达式计算返回值的类型去设定实现的泛型参数。因为表达式的计算结果是整型，所以我们的EvalVisitor应该继承<code>CalcBaseVisitor&lt;Integer&gt;</code>类。为计算语法分析树的每个节点，我们需要覆写与语句和表达式选项相关的方法。这里是全部的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class EvalVisitor extends CalcBaseVisitor&lt;Integer&gt; {
+</span><span class='line'>    /** "memory" for our calculator; variable/value pairs go here */
+</span><span class='line'>    Map&lt;String, Integer&gt; memory = new HashMap&lt;String, Integer&gt;();
+</span><span class='line'>
+</span><span class='line'>    /** ID '=' expr */
+</span><span class='line'>    @Override
+</span><span class='line'>    public Integer visitAssign(CalcParser.AssignContext ctx) {
+</span><span class='line'>        String id = ctx.ID().getText();  // id is left-hand side of '='
+</span><span class='line'>        int value = visit(ctx.expr());   // compute value of expression on right
+</span><span class='line'>        memory.put(id, value);           // store it in our memory
+</span><span class='line'>        return value;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    /** expr */
+</span><span class='line'>    @Override
+</span><span class='line'>    public Integer visitPrintExpr(CalcParser.PrintExprContext ctx) {
+</span><span class='line'>        Integer value = visit(ctx.expr()); // evaluate the expr child
+</span><span class='line'>        System.out.println(value);         // print the result
+</span><span class='line'>        return 0;                          // return dummy value
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    /** INT */
+</span><span class='line'>    @Override
+</span><span class='line'>    public Integer visitInt(CalcParser.IntContext ctx) {
+</span><span class='line'>        return Integer.valueOf(ctx.INT().getText());
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    /** ID */
+</span><span class='line'>    @Override
+</span><span class='line'>    public Integer visitId(CalcParser.IdContext ctx) {
+</span><span class='line'>        String id = ctx.ID().getText();
+</span><span class='line'>        if ( memory.containsKey(id) ) return memory.get(id);
+</span><span class='line'>        return 0;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    /** expr op=('*'|'/') expr */
+</span><span class='line'>    @Override
+</span><span class='line'>    public Integer visitMulDiv(CalcParser.MulDivContext ctx) {
+</span><span class='line'>        int left = visit(ctx.expr(0));  // get value of left subexpression
+</span><span class='line'>        int right = visit(ctx.expr(1)); // get value of right subexpression
+</span><span class='line'>        if ( ctx.op.getType() == CalcParser.MUL ) return left * right;
+</span><span class='line'>        return left / right; // must be DIV
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    /** expr op=('+'|'-') expr */
+</span><span class='line'>    @Override
+</span><span class='line'>    public Integer visitAddSub(CalcParser.AddSubContext ctx) {
+</span><span class='line'>        int left = visit(ctx.expr(0));  // get value of left subexpression
+</span><span class='line'>        int right = visit(ctx.expr(1)); // get value of right subexpression
+</span><span class='line'>        if ( ctx.op.getType() == CalcParser.ADD ) return left + right;
+</span><span class='line'>        return left - right; // must be SUB
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    /** '(' expr ')' */
+</span><span class='line'>    @Override
+</span><span class='line'>    public Integer visitParens(CalcParser.ParensContext ctx) {
+</span><span class='line'>        return visit(ctx.expr()); // return child expr's value
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>以前开发和测试语法都是使用的TestRig，这次我们试着编写计算器的主程序来启动代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class Calc {
+</span><span class='line'>
+</span><span class='line'>    public static void main(String[] args) throws Exception {
+</span><span class='line'>        InputStream is = args.length &gt; 0 ? new FileInputStream(args[0]) : System.in;
+</span><span class='line'>
+</span><span class='line'>        ANTLRInputStream input = new ANTLRInputStream(is);
+</span><span class='line'>        CalcLexer lexer = new CalcLexer(input);
+</span><span class='line'>        CommonTokenStream tokens = new CommonTokenStream(lexer);
+</span><span class='line'>        CalcParser parser = new CalcParser(tokens);
+</span><span class='line'>        ParseTree tree = parser.prog();
+</span><span class='line'>
+</span><span class='line'>        EvalVisitor eval = new EvalVisitor();
+</span><span class='line'>        // 开始遍历语法分析树
+</span><span class='line'>        eval.visit(tree);
+</span><span class='line'>
+</span><span class='line'>        System.out.println(tree.toStringTree(parser));
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>创建一个运行主程序的脚本：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>#!/bin/sh
+</span><span class='line'>java -cp .:./antlr-4.5.1-complete.jar:$CLASSPATH $*</span></code></pre></td></tr></table></div></figure>
+
+<p>把它保存为run.sh后，执行以下命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>compile *.java
+</span><span class='line'>run Calc calc.txt</span></code></pre></td></tr></table></div></figure>
+
+<p>然后你就会看到文本形式的语法分析树以及计算结果：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>193
+</span><span class='line'>17
+</span><span class='line'>9
+</span><span class='line'>(prog (stat (expr 193)) (stat a = (expr 5)) (stat b = (expr 6))
+</span><span class='line'> (stat (expr (expr a) + (expr (expr b) * (expr 2)))) (stat (expr
+</span><span class='line'> (expr ( (expr (expr 1) + (expr 2)) )) * (expr 3))))</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1467,142 +1851,6 @@ ambiguity 二义性 安装ANTLR ANTLR是由Java写成的，所以在安装ANTLR�
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-to-detect-java-memory-leak-using-visualvm/">如何使用VisualVM检测Java内存泄漏</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2015-10-12T13:08:19+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>1:08 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Java的一个重要优点是通过垃圾收集器（Garbage Collection）自动管理内存的回收，程序员不需要关注它。程序员真的不需要关注内存管理吗？只要你碰到过OutOfMemoryError你就知道它不是真的。</p>
-
-<p>这里我会展示如何使用VisualVM快速定位内存泄漏。先看下面这段代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>import java.util.List;
-</span><span class='line'>import java.util.ArrayList;
-</span><span class='line'>
-</span><span class='line'>public class MemoryLeakDemo {
-</span><span class='line'>    public static void main(String[] args) {
-</span><span class='line'>        new Thread(new MemoryLeak(), "MemoryLeak").start();
-</span><span class='line'>    }
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>class MemoryLeak implements Runnable {
-</span><span class='line'>    public static List&lt;Integer&gt; leakList = new ArrayList&lt;Integer&gt;();
-</span><span class='line'>
-</span><span class='line'>    public void run() {
-</span><span class='line'>        int count = 0;
-</span><span class='line'>        while (true) {
-</span><span class='line'>            try {
-</span><span class='line'>                Thread.sleep(3);
-</span><span class='line'>            } catch (InterruptedException e) {
-</span><span class='line'>            }
-</span><span class='line'>            count++;
-</span><span class='line'>            Integer i = new Integer(count);
-</span><span class='line'>            leakList.add(i);
-</span><span class='line'>        }
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>执行下列命令：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>java -verbose:gc -XX:+PrintGCDetails -Xmx20m MemoryLeakDemo</span></code></pre></td></tr></table></div></figure>
-
-<p>等待一段时间后，你会看到：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Exception in thread "MemoryLeak" java.lang.OutOfMemoryError: Java heap space
-</span><span class='line'>        at java.util.Arrays.copyOf(Arrays.java:3181)
-</span><span class='line'>        at java.util.ArrayList.grow(ArrayList.java:261)
-</span><span class='line'>        at java.util.ArrayList.ensureExplicitCapacity(ArrayList.java:235)
-</span><span class='line'>        at java.util.ArrayList.ensureCapacityInternal(ArrayList.java:227)
-</span><span class='line'>        at java.util.ArrayList.add(ArrayList.java:458)
-</span><span class='line'>        at MemoryLeak.run(MemoryLeakDemo.java:22)
-</span><span class='line'>        at java.lang.Thread.run(Thread.java:745)
-</span><span class='line'>Heap
-</span><span class='line'> PSYoungGen      total 3584K, used 298K [0x00000000ff980000, 0x00000000ffe80000, 0x0000000100000000)
-</span><span class='line'>  eden space 3072K, 9% used [0x00000000ff980000,0x00000000ff9ca908,0x00000000ffc80000)
-</span><span class='line'>  from space 512K, 0% used [0x00000000ffc80000,0x00000000ffc80000,0x00000000ffd00000)
-</span><span class='line'>  to   space 512K, 0% used [0x00000000ffe00000,0x00000000ffe00000,0x00000000ffe80000)
-</span><span class='line'> ParOldGen       total 13824K, used 12156K [0x00000000fec00000, 0x00000000ff980000, 0x00000000ff980000)
-</span><span class='line'>  object space 13824K, 87% used [0x00000000fec00000,0x00000000ff7df3e8,0x00000000ff980000)
-</span><span class='line'> Metaspace       used 7993K, capacity 8164K, committed 8448K, reserved 1056768K
-</span><span class='line'>  class space    used 912K, capacity 954K, committed 1024K, reserved 1048576K</span></code></pre></td></tr></table></div></figure>
-
-<p>打开VisualVM开始监测MemoryLeakDemo，在Monitor标签页我们可以看到实时的程序内存堆的使用情况：</p>
-
-<p><img src="/uploads/visualvm-heap.png" title="visualvm-heap" ></p>
-
-<p>波峰到波谷处是执行了GC的，明显可以看到执行GC后内存曲线仍旧呈上扬趋势，也就是说，内存占用是只升不降。到底是什么原因导致的呢？</p>
-
-<p>打开Sampler标签页，点击Memory按钮启动一个内存分析会话，VisualVM会定期获取所有执行线程的转储，分析栈跟踪信息，实时显示成堆直方图。通过堆直方图，我们就可以知道哪个对象占用了较多的内存，以便做进一步的优化。</p>
-
-<p><img src="/uploads/visualvm-sampler.png" title="visualvm-sampler" ></p>
-
-<p>如上图所示，第1行的Integer对象占用内存最大，已经有41万多实例了，并且还在持续增加中。很显然，罪魁祸首就是它了！</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/7">&larr; Older</a>
@@ -1650,7 +1898,7 @@ ambiguity 二义性 安装ANTLR ANTLR是由Java写成的，所以在安装ANTLR�
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 141%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 142%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 132%" href="/tags/android/">Android</a>
 <a style="font-size: 103%" href="/tags/c-plus-plus/">C++</a>

@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: ANTLR | 乐者为王]]></title>
   <link href="http://codemany.com/tags/antlr/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-10-15T19:06:13+08:00</updated>
+  <updated>2017-10-16T10:24:17+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,35 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（31）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part31/"/>
+    <updated>2016-11-12T14:21:50+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part31</id>
+    <content type="html"><![CDATA[<ul>
+<li>lookahead 前导符</li>
+</ul>
+
+<p>现在我们已经对ANTLR语法分析器生成的消息种类以及如何调整和重定向它们有很好的了解，让我们来探讨错误恢复。</p>
+
+<h3 id="自动错误恢复策略">自动错误恢复策略</h3>
+
+<p>错误恢复是允许语法分析器找到语法错误后还能继续的东西。ANTLR的错误恢复机制是：如果可能的话，语法分析器在不匹配的记号错误上执行单次记号插入和单次记号删除。如果不能，语法分析器会吞掉记号直到它找到可以合理遵循当前规则的记号然后返回它，继续下去，就好像什么事都没发生。在本节中，我们将探讨ANTLR如何在各种情况下从错误中恢复。让我们从ANTLR使用的基本恢复策略开始。</p>
+
+<h4 id="通过扫描后续记号恢复">通过扫描后续记号恢复</h4>
+
+<p>当真正面对残缺的输入时，当前规则不能继续，因此语法分析器通过吞掉记号来恢复，直到它认为它已经重新同步然后返回到调用规则。我们可以称之为“同步和返回策略”。有些人称它是“恐慌模式”，但它工作的非常好。语法分析器知道它不能用当前规则匹配当前输入。它只能抛出记号直到前导符与语法分析器退出规则后应该匹配的内容一致。例如，如果在赋值语句中有个语法错误，在语法分析器看到分号或其它语句终结符之前抛出记号是非常有意义的。激烈但有效。正如我们将看到的，ANTLR试图在规则中恢复，然后在撤回到这个基本策略。</p>
+
+<p>每个ANTLR生成的规则方法都被包裹在try-catch中，通过报告错误并在返回之前尝试恢复来响应语法错误。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">try {
+    ...
+} catch (RecognitionException re) {
+    _errHandler.reportError(this, re);
+    _errHandler.recover(this, re);
+}
+</code></pre></div>]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（30）]]></title>
@@ -157,7 +186,7 @@ parser.addErrorListener(new DiagnosticErrorListener());
 <div class="highlight"><pre><code class="language-text" data-lang="text">line 1:3 reportAttemptingFullContext d=0, input=&#39;f();&#39;
 line 1:3 reportAmbiguity d=0: ambigAlts={1, 2}, input=&#39;f();&#39;
 </code></pre></div>
-<p>输出显示语法分析器也会调用reportAttemptingFullContext()。当SLL(<em>)分析失败并且语法分析器进行更强大的全ALL(</em>)机制时，ANTLR调用这个方法。</p>
+<p>输出显示语法分析器也会调用reportAttemptingFullContext()。当<code>SLL(*)</code>分析失败并且语法分析器进行更强大的全<code>ALL(*)</code>机制时，ANTLR调用这个方法。</p>
 
 <p>在开发中使用诊断错误监听器是个好主意，因为ANTLR工具不能给你有关歧义语法结构的警告（当生成语法分析器时）。只有在运行时语法分析器才可以侦测到二义性。</p>
 ]]></content>
@@ -640,144 +669,6 @@ ranksep=.25;
 edge [arrowsize=.5]
 ...
 </code></pre></div>]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（26）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part26/"/>
-    <updated>2016-09-09T22:22:47+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part26</id>
-    <content type="html"><![CDATA[<p>今天准备做的是把JSON文本文件转换成XML文本文件。</p>
-
-<h3 id="把json转换成xml">把JSON转换成XML</h3>
-
-<p>许多Web服务返回的是JSON数据，但是我们可能会遇到一种情况，需要把JSON数据送给那些只接受XML数据的代码。这就需要我们构建一个JSON到XML的转换器。我们的目标是读入像下面这样的JSON数据：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">{
-&quot;description&quot; : &quot;An imaginary server config file&quot;,
-&quot;logs&quot; : {&quot;level&quot;:&quot;verbose&quot;, &quot;dir&quot;:&quot;/var/log&quot;},
-&quot;host&quot; : &quot;antlr.org&quot;,
-&quot;admin&quot;: [&quot;parrt&quot;, &quot;tombu&quot;],
-&quot;aliases&quot;: []
-}
-</code></pre></div>
-<p>放出等价的XML数据，就像下面这样的：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;description&gt;An imaginary server config file&lt;/description&gt;
-&lt;logs&gt;
-  &lt;level&gt;verbose&lt;/level&gt;
-  &lt;dir&gt;/var/log&lt;/dir&gt;
-&lt;/logs&gt;
-&lt;host&gt;antlr.org&lt;/host&gt;
-&lt;admin&gt;
-  &lt;element&gt;parrt&lt;/element&gt;
-  &lt;element&gt;tombu&lt;/element&gt;
-&lt;/admin&gt;
-&lt;aliases&gt;&lt;/aliases&gt;
-</code></pre></div>
-<p>正如我们对CSV做的那样，让我们给JSON语法中的一些选项打上标签，以便让ANTLR生成更精确的监听器方法。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">object
-    : &#39;{&#39; pair (&#39;,&#39; pair)* &#39;}&#39;    # AnObject
-    | &#39;{&#39; &#39;}&#39;                     # EmptyObject
-    ;
-array
-    : &#39;[&#39; value (&#39;,&#39; value)* &#39;]&#39;  # ArrayOfValues
-    | &#39;[&#39; &#39;]&#39;                     # EmptyArray
-    ;
-</code></pre></div>
-<p>我们将对规则value做同样的事，但是稍有不同。除3个选项外的其它所有选项只需要返回被匹配的值的文本，所以我们可以为其它所有选项使用相同的标签，使语法分析树遍历器为那些选项触发相同的监听器方法。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">value
-    : STRING    # String
-    | NUMBER    # Atom
-    | object    # ObjectValue
-    | array     # ArrayValue
-    | &#39;true&#39;    # Atom
-    | &#39;false&#39;   # Atom
-    | &#39;null&#39;    # Atom
-    ;
-</code></pre></div>
-<p>为构建这样的转换器，明智的做法是让每个规则返回被它匹配的输入短语的XML等价物。为追踪部分结构，我们使用字段xml和两个帮助方法来注解语法分析树。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public static class XMLEmitter extends JSONBaseListener {
-    ParseTreeProperty&lt;String&gt; xml = new ParseTreeProperty&lt;String&gt;();
-    String getXML(ParseTree ctx) { return xml.get(ctx); }
-    void setXML(ParseTree ctx, String s) { xml.put(ctx, s); }
-</code></pre></div>
-<p>我们把每棵子树转换后的字符串挂载到该子树的根节点。在语法分析树更高节点上工作的方法可以捕获这些值以便计算更大的字符串。然后挂载在根节点上的字符串完成计算。</p>
-
-<p>让我们从最简单的转换开始。value的Atom选项返回匹配记号的文本。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitAtom(JSONParser.AtomContext ctx) {
-    setXML(ctx, ctx.getText());
-}
-</code></pre></div>
-<p>字符串基本上是相同的，只是我们必须去除双引号。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitString(JSONParser.StringContext ctx) {
-    setXML(ctx, stripQuotes(ctx.getText()));
-}
-</code></pre></div>
-<p>如果value()规则方法找到一个对象或数组，它可以把组合元素的部分转换拷贝到它自己的语法分析树节点。以下代码是找到对象时的处理：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitObjectValue(JSONParser.ObjectValueContext ctx) {
-    // analogous to String value() {return object();}
-    setXML(ctx, getXML(ctx.object()));
-}
-</code></pre></div>
-<p>一旦我们可以转换所有的值，我们需要担心名-值对以及把它们转换成标签和文本。生成的XML的标签名字来源于STRING &#39;:&#39; value选项中的STRING。在左右尖括号之间的文本来源于挂载在value子节点上的文本。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitPair(JSONParser.PairContext ctx) {
-    String tag = stripQuotes(ctx.STRING().getText());
-    JSONParser.ValueContext vctx = ctx.value();
-    String x = String.format(&quot;&lt;%s&gt;%s&lt;/%s&gt;\n&quot;, tag, getXML(vctx), tag);
-    setXML(ctx, x);
-}
-</code></pre></div>
-<p>JSON对象由名-值对组成。因此，对于被选项中标记为AnObject的object找到的每个对，我们把计算后的结果追加在语法分析树。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitAnObject(JSONParser.AnObjectContext ctx) {
-    StringBuilder buf = new StringBuilder();
-    buf.append(&quot;\n&quot;);
-    for (JSONParser.PairContext pctx : ctx.pair()) {
-        buf.append(getXML(pctx));
-    }
-    setXML(ctx, buf.toString());
-}
-public void exitEmptyObject(JSONParser.EmptyObjectContext ctx) {
-    setXML(ctx, &quot;&quot;);
-}
-</code></pre></div>
-<p>处理数组遵循相似的模式，只是简单地连接来自子节点的结果列表，然后把它们包裹在<code>&lt;element&gt;</code>标签中。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitArrayOfValues(JSONParser.ArrayOfValuesContext ctx) {
-    StringBuilder buf = new StringBuilder();
-    buf.append(&quot;\n&quot;);
-    for (JSONParser.ValueContext vctx : ctx.value()) {
-        buf.append(&quot;&lt;element&gt;&quot;); // conjure up element for valid XML
-        buf.append(getXML(vctx));
-        buf.append(&quot;&lt;/element&gt;&quot;);
-        buf.append(&quot;\n&quot;);
-    }
-    setXML(ctx, buf.toString());
-}
-public void exitEmptyArray(JSONParser.EmptyArrayContext ctx) {
-    setXML(ctx, &quot;&quot;);
-}
-</code></pre></div>
-<p>最后，我们需要使用从一个对象或数组收集来的全部转换注解语法分析树的根节点。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">json: object
-    | array
-    ;
-</code></pre></div>
-<p>我们可以在监听器里用一个集合运算做到这点。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitJson(JSONParser.JsonContext ctx) {
-    setXML(ctx, getXML(ctx.getChild(0)));
-}
-</code></pre></div>
-<p>以下是构建和测试序列：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">antlr JSON.g
-compile *.java
-run JSON2XML t.json
-</code></pre></div>
-<p>下面的是部分的输出结果：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&lt;description&gt;An imaginary server config file&lt;/description&gt;
-&lt;logs&gt;
-&lt;level&gt;verbose&lt;/level&gt;
-...
-</code></pre></div>
-<p>有些转换不总是像JSON到XML那样直白的。但是，这个例子向我们表明如何通过拼凑部分翻译短语处理句子转换问题。</p>
-]]></content>
   </entry>
   
 </feed>
