@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="基本表达式的语法规则构建完毕，那么表达式的语法规则构建就颇为简单了。使用ANTLR构建PowerScript语法分析器（4）中已经说过表达式是由运算元和运算符复合组成。所以在编写表达式语法规则前先要分析下PowerScript的运算符以及它们的优先级。 PowerScript支持四种类型的运算符， &hellip;">
+  <meta name="description" content="构建完表达式的语法规则后就可以开始分析语句（statement）的语法规则。不过在这之前还需要先修复两个小缺陷：没有识别日期、时间和内建常量的词法规则。 在PowerScript中，日期的格式是0000-00-00，年份是4位数从1000到3000，月份从01到12，天数从01到31； &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,94 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/using-antlr-to-build-powerscript-parser-part6/">使用ANTLR构建PowerScript语法分析器（6）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2008-05-03T19:07:10+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2008</span></span> <span class='time'>7:07 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>构建完表达式的语法规则后就可以开始分析语句（statement）的语法规则。不过在这之前还需要先修复两个小缺陷：没有识别日期、时间和内建常量的词法规则。</p>
+
+<p>在PowerScript中，日期的格式是0000-00-00，年份是4位数从1000到3000，月份从01到12，天数从01到31；时间是24小时格式00:00:00:000000，秒的小数部分可有可无，最多能有6位数字，所以时间范围是从00:00:00到23:59:59:999999。内建常量则以字母开头，字母数字组合，以“!”符号结束的字符串。</p>
+
+<p>根据这些描述我们可以得到日期、时间和内建常量的词法规则：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>DATE_LITERAL    // 1996-09-26
+</span><span class='line'>    : '1'..'3' '0'..'9' '0'..'9' '0'..'9' '-' '0'..'1' '0'..'9' '-' '0'..'3' '0'..'9'
+</span><span class='line'>      {
+</span><span class='line'>          System.out.println("date&gt;" + getText());
+</span><span class='line'>      }
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>TIME_LITERAL    // 00:00:00:000000
+</span><span class='line'>    : '0'..'2' '0'..'9' ':' '0'..'5' '0'..'9' ':' '0'..'5' '0'..'9'
+</span><span class='line'>      ( '.' '0'..'9'
+</span><span class='line'>      | '0'..'9' '0'..'9'
+</span><span class='line'>      | '0'..'9' '0'..'9' '0'..'9'
+</span><span class='line'>      | '0'..'9' '0'..'9' '0'..'9' '0'..'9'
+</span><span class='line'>      | '0'..'9' '0'..'9' '0'..'9' '0'..'9' '0'..'9'
+</span><span class='line'>      | '0'..'9' '0'..'9' '0'..'9' '0'..'9' '0'..'9' '0'..'9'
+</span><span class='line'>      )?
+</span><span class='line'>      {
+</span><span class='line'>          System.out.println("time&gt;" + getText());
+</span><span class='line'>      }
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>ENUM_LITERAL
+</span><span class='line'>    : Letter (Letter|'0'..'9')* '!'
+</span><span class='line'>      {
+</span><span class='line'>          System.out.println("enum&gt;" + getText());
+</span><span class='line'>      }
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1174,44 +1262,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-to-vertical-center-align-text-with-icon/">如何使文字与图标垂直居中对齐</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2008-03-15T20:33:09+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>15</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>8:33 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在做网页的时候，经常会需要在某段文字前加上一个图标。然后就会发现增加的图标和文字的位置不齐，文字总是比图标低点。</p>
-
-<p><img src="/uploads/smiley-smile.gif" alt="smiley-smile">微笑</p>
-
-<p>解决的方法有两个：一个是设置图标的vertical-align为top；还有就是将margin-bottom设为-3px。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;img style="vertical-align: top" src="/uploads/smiley-smile.gif" border="0" /&gt;微笑
-</span><span class='line'>&lt;img style="margin-bottom: -3px" src="/uploads/smiley-smile.gif" border="0" /&gt;微笑</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/25">&larr; Older</a>
@@ -1229,6 +1279,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/crawl-a-novel-with-scrapy-part1/">使用Scrapy爬取小说（1）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/thinking-on-software-version/">软件版本号的思考</a>
       </li>
     
@@ -1242,10 +1296,6 @@
     
       <li class="post">
         <a href="/blog/10x-engineers-take-long-naps/">10x工程师经常的打盹</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/the-10x-developer-is-not-myth/">10x开发者不是神话</a>
       </li>
     
   </ul>

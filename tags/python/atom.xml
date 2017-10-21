@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Tag: Python | 乐者为王]]></title>
+  <link href="http://codemany.com/tags/python/atom.xml" rel="self"/>
+  <link href="http://codemany.com/"/>
+  <updated>2017-10-21T08:11:21+08:00</updated>
+  <id>http://codemany.com/</id>
+  <author>
+    <name><![CDATA[dohkoos]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[使用Scrapy爬取小说（1）]]></title>
+    <link href="http://codemany.com/blog/crawl-a-novel-with-scrapy-part1/"/>
+    <updated>2017-10-21T08:49:54+08:00</updated>
+    <id>http://codemany.com/blog/crawl-a-novel-with-scrapy-part1</id>
+    <content type="html"><![CDATA[<p>这几天正在看《Python网络数据采集》，在这过程中觉得有必要写个爬虫来实践学到的知识。便给自己定个小目标：试着用Scrapy爬取小说《蜀山剑侠传》，并把内容保存到本地文件中。</p>
+
+<p>Scrapy是一个开源的Python数据抓取框架，速度快且强大，而且使用简单，可以很方便地抓取网站页面并从中提取结构化的数据。Scrapy用途广泛，可以用于数据挖掘、监测和自动化测试。</p>
+
+<p>好吧，废话不多说，让我们直接开干！</p>
+
+<h3 id="创建项目">创建项目</h3>
+
+<p>在抓取之前，必须先创建一个Scrapy项目，可以直接用以下命令生成：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">scrapy startproject novel
+</code></pre></div>
+<p>这是新建项目的目录结构：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">.
+├── novel                # 项目模块
+│   ├── __init__.py
+│   ├── items.py         # 定义爬取的数据
+│   ├── middlewares.py   # 定义爬取时的中间件
+│   ├── pipelines.py     # 定义数据管道
+│   ├── __pycache__
+│   ├── settings.py      # 项目的设置文件
+│   └── spiders          # 放置爬虫代码的文件夹
+│       ├── __init__.py
+│       └── __pycache__
+└── scrapy.cfg           # Scrapy部署时的配置文件
+</code></pre></div>
+<h3 id="分析页面结构">分析页面结构</h3>
+
+<p>主要分析两个页面。一是小说的目录页面，目的是获取小说所有章节的链接以备抓取。二是任意章节页面，用于爬取其中的标题和正文。</p>
+
+<p>通过观察目录页面的源码可以发现，所有章节的链接都类似<code>NUMBER.htm</code>。其中，NUMBER是3位整数，从001到309。</p>
+
+<p><img src="/uploads/novel-chapter-urls.png" alt="novel-chapter-urls"></p>
+
+<p>使用浏览器的检查器（Inspector）查看章节页面，尝试把光标放在正文上，你应该可以看到正文周围的蓝色方块（如下图左侧所示），如果你点击这个方块，就可以选中检查器中相应的HTML代码。可以看到小说的标题和正文都在td标签中。</p>
+
+<p><img src="/uploads/novel-page-inspector.png" alt="novel-page-inspector"></p>
+
+<p>与此对应的XPath表达式分别是：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">//center/table/tr[2]/td/text()  # 标题的XPath路径
+//center/table/tr[4]/td/text()  # 正文的XPath路径
+</code></pre></div>
+<p>需要注意的是，上面XPath表达式里的中括号内的数字为节点索引，是从1开始的，而不是0。</p>
+
+<h3 id="定义爬取的数据">定义爬取的数据</h3>
+
+<p>当需要从某个网站抓取信息时，首先是定义我们要爬取的数据。在Scrapy中，可以通过Item来完成。以下是我们定义的Item：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">import scrapy
+
+class NovelItem(scrapy.Item):
+  title = scrapy.Field()
+  content = scrapy.Field()
+</code></pre></div>
+<h3 id="编写爬取数据的spider">编写爬取数据的Spider</h3>
+
+<p>现在我们需要添加一个爬虫来真正做点什么。创建文件novel/spiders/novel_spider.py，添加如下内容：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">import scrapy
+from novel.items import NovelItem
+
+class NovelSpider(scrapy.Spider):
+  name = &#39;novelspider&#39;
+  allowed_domains = [&#39;example.com&#39;]
+  start_urls = [&#39;http://example.com/wuxia/hzlz/ssjx/&#39;]
+
+  def parse(self, response):
+    # 还记得前面分析目录页面时的结果吗：000、001...309。
+    for i in range(1, 310):
+      # 生成每个章节的绝对链接
+      next = response.urljoin(&#39;{0:03d}.htm&#39;.format(i))
+      # 生成新的请求对象解析小说的标题和正文
+      yield scrapy.Request(next, callback=self.parse_chapter)
+
+  def parse_chapter(self, response):
+    item = NovelItem()
+    title = response.xpath(&#39;//center/table/tr[2]/td/text()&#39;).extract()
+    print(&#39;Title is&#39;, title)
+    content = response.xpath(&#39;//center/table/tr[4]/td/text()&#39;).extract()
+    print(&#39;Content is&#39;, content)
+    item[&#39;title&#39;] = title
+    item[&#39;content&#39;] = content
+    return item
+</code></pre></div>
+<h3 id="运行spider">运行Spider</h3>
+
+<p>完成爬虫后，如何通过它来得到我们想要的结果呢？在项目的根目录中执行如下的命令：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">scrapy crawl novelspider -o novel.json
+</code></pre></div>
+<p>没有报错的话，等个几分钟，就能看到一个完整的JSON数据文件躺在自己的电脑上面。</p>
+
+<p>不过如果打开的话，可能只会看到“\uXXXX”这样的乱码，它们都是中文字符的Unicode编码。要直接显示成中文的话，需要在novel/settings.py中添加以下设置：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">FEED_EXPORT_ENCODING = &#39;utf-8&#39;
+</code></pre></div>
+<p>最终的结果如图：</p>
+
+<p><img src="/uploads/novel-json-chinese.png" alt="novel-json-chinese"></p>
+]]></content>
+  </entry>
+  
+</feed>

@@ -9,7 +9,19 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="在Rails生成的控制器模版中，包含的destroy方法只能处理单个对象，而批量删除要求能够同时处理多个对象，这需要自定义一个批量操作action。批量删除的效果图如下： 每一行记录的第一列设置成Checkbox，用于标记此行是否被选中。表下方放置一个全选Checkbox，表示全部选中或全部反选。 &hellip;">
+  <meta name="description" content="图书的MySQL数据库创建脚本： 1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+CREATE TABLE books ( id int NOT NULL AUTO_INCREMENT, title varchar(255) NOT NULL, description text, &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +85,691 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/implement-crud-for-books/">实现图书的增删查改（CRUD）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2012-12-22T14:25:20+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2012</span></span> <span class='time'>2:25 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>图书的MySQL数据库创建脚本：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>CREATE TABLE books (
+</span><span class='line'>    id int NOT NULL AUTO_INCREMENT,
+</span><span class='line'>    title varchar(255) NOT NULL,
+</span><span class='line'>    description text,
+</span><span class='line'>    image_url varchar(255),
+</span><span class='line'>    price decimal(8, 2) NOT NULL,
+</span><span class='line'>    author varchar(255) NOT NULL,
+</span><span class='line'>    isbn varchar(255) NOT NULL,
+</span><span class='line'>    publisher varchar(255) NOT NULL,
+</span><span class='line'>    user_id int NOT NULL,
+</span><span class='line'>    PRIMARY KEY (id)
+</span><span class='line'>) ENGINE=InnoDB DEFAULT CHARSET=utf-8;</span></code></pre></td></tr></table></div></figure>
+
+<p>图书实体类文件Book.java主要代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class Book {
+</span><span class='line'>    private Long id;
+</span><span class='line'>    private String title;
+</span><span class='line'>    private String description;
+</span><span class='line'>    private String image_url;
+</span><span class='line'>    private double price;
+</span><span class='line'>    private String author;
+</span><span class='line'>    private String isbn;
+</span><span class='line'>    private String publisher;
+</span><span class='line'>    private User user;</span></code></pre></td></tr></table></div></figure>
+
+<p>在User类中添加集合变量books：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class User {
+</span><span class='line'>    private Set&lt;Book&gt; books = new HashSet&lt;Book&gt;();</span></code></pre></td></tr></table></div></figure>
+
+<p>在User.hbm.xml中配置和图书的一对多关联：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;!-- Bidirectional one-to-many association to Book --&gt;
+</span><span class='line'>&lt;set name="books" inverse="true"&gt;
+</span><span class='line'>    &lt;key column="user_id" not-null="true" /&gt;
+</span><span class='line'>    &lt;one-to-many class="com.codemany.book.model.Book" /&gt;
+</span><span class='line'>&lt;/set&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>图书的表映射文件Book.hbm.xml代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;hibernate-mapping&gt;
+</span><span class='line'>    &lt;class name="com.codemany.book.model.Book" table="books"&gt;
+</span><span class='line'>        &lt;id name="id"&gt;
+</span><span class='line'>            &lt;generator class="increment" /&gt;
+</span><span class='line'>        &lt;/id&gt;
+</span><span class='line'>
+</span><span class='line'>        &lt;property name="title" not-null="true" /&gt;
+</span><span class='line'>        &lt;property name="description" /&gt;
+</span><span class='line'>        &lt;property name="image_url" /&gt;
+</span><span class='line'>        &lt;property name="price" not-null="true" /&gt;
+</span><span class='line'>        &lt;property name="author" not-null="true" /&gt;
+</span><span class='line'>        &lt;property name="isbn" not-null="true" /&gt;
+</span><span class='line'>        &lt;property name="publisher" not-null="true" /&gt;
+</span><span class='line'>
+</span><span class='line'>        &lt;many-to-one name="user" column="user_id" not-null="true" /&gt;
+</span><span class='line'>    &lt;/class&gt;
+</span><span class='line'>&lt;/hibernate-mapping&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>BookService.java中的代码相对简单，因为没什么复杂的业务逻辑，只是负责把Action和Dao这两层连接起来。</p>
+
+<p>BookDao.java中的代码主要实现图书的读取，更新和删除：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.book.dao;
+</span><span class='line'>
+</span><span class='line'>import java.util.List;
+</span><span class='line'>
+</span><span class='line'>import org.hibernate.Query;
+</span><span class='line'>import org.hibernate.Session;
+</span><span class='line'>import org.hibernate.SessionFactory;
+</span><span class='line'>import org.hibernate.Transaction;
+</span><span class='line'>
+</span><span class='line'>import com.codemany.book.model.Book;
+</span><span class='line'>
+</span><span class='line'>public class BookDao {
+</span><span class='line'>    private SessionFactory sessionFactory;
+</span><span class='line'>
+</span><span class='line'>    public void setSessionFactory(SessionFactory sessionFactory) {
+</span><span class='line'>        this.sessionFactory = sessionFactory;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public List&lt;Book&gt; getBookList() {
+</span><span class='line'>        Session session = sessionFactory.openSession();
+</span><span class='line'>        try {
+</span><span class='line'>            Query query = session.createQuery("from Book b");
+</span><span class='line'>            List&lt;Book&gt; bookList = query.list();
+</span><span class='line'>            return bookList;
+</span><span class='line'>        } finally {
+</span><span class='line'>            session.close();
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public Book getBook(Long bookId) {
+</span><span class='line'>        Session session = sessionFactory.openSession();
+</span><span class='line'>        try {
+</span><span class='line'>            Query query = session.createQuery("from Book b where b.id = :id");
+</span><span class='line'>            query.setLong("id", bookId);
+</span><span class='line'>            query.setMaxResults(1);
+</span><span class='line'>            return (Book)query.uniqueResult();
+</span><span class='line'>        } finally {
+</span><span class='line'>            session.close();
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public void saveOrUpdateBook(Book book) {
+</span><span class='line'>        Session session = sessionFactory.openSession();
+</span><span class='line'>        Transaction ts = null;
+</span><span class='line'>        try {
+</span><span class='line'>            ts = session.beginTransaction();
+</span><span class='line'>            session.saveOrUpdate(book);
+</span><span class='line'>            ts.commit();
+</span><span class='line'>        } finally {
+</span><span class='line'>            session.close();
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public void deleteBook(Long bookId) {
+</span><span class='line'>        Session session = sessionFactory.openSession();
+</span><span class='line'>        Transaction ts = null;
+</span><span class='line'>        try {
+</span><span class='line'>            ts = session.beginTransaction();
+</span><span class='line'>            Book book = (Book)session.get(Book.class, bookId);
+</span><span class='line'>            session.delete(book);
+</span><span class='line'>            ts.commit();
+</span><span class='line'>        } finally {
+</span><span class='line'>            session.close();
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>BookAction.java负责协调图书应用程序间的运转。接收访问请求，与模型进行交互，将合适的视图展示给用户：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.book.action;
+</span><span class='line'>
+</span><span class='line'>import java.util.List;
+</span><span class='line'>
+</span><span class='line'>import com.codemany.account.model.User;
+</span><span class='line'>import com.codemany.book.model.Book;
+</span><span class='line'>import com.codemany.book.service.BookService;
+</span><span class='line'>
+</span><span class='line'>import com.opensymphony.xwork2.ActionContext;
+</span><span class='line'>import com.opensymphony.xwork2.ActionSupport;
+</span><span class='line'>
+</span><span class='line'>public class BookAction extends ActionSupport {
+</span><span class='line'>    private static final long serialVersionUID = 2538923417705852774L;
+</span><span class='line'>
+</span><span class='line'>    private Long bookId;
+</span><span class='line'>    private Book book;
+</span><span class='line'>    private List&lt;Book&gt; bookList;
+</span><span class='line'>    private BookService bookService;
+</span><span class='line'>
+</span><span class='line'>    public String list() throws Exception {
+</span><span class='line'>        bookList = bookService.getBookList();
+</span><span class='line'>        return "list";
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public String show() throws Exception {
+</span><span class='line'>        book = bookService.getBook(bookId);
+</span><span class='line'>        return "show";
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public String input() throws Exception {
+</span><span class='line'>        if (bookId != null) {
+</span><span class='line'>            book = bookService.getBook(bookId);
+</span><span class='line'>        }
+</span><span class='line'>        return INPUT;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public String saveOrUpdate() throws Exception {
+</span><span class='line'>        User user = (User)ActionContext.getContext().getSession().get("user");
+</span><span class='line'>        book.setUser(user);
+</span><span class='line'>        bookService.saveOrUpdateBook(book);
+</span><span class='line'>        return SUCCESS;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public String delete() throws Exception {
+</span><span class='line'>        bookService.deleteBook(bookId);
+</span><span class='line'>        return SUCCESS;
+</span><span class='line'>    }</span></code></pre></td></tr></table></div></figure>
+
+<p>在applicationContext.xml中添加Book的相关配置，如下面代码所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;bean id="sessionFactory" class="org.springframework.orm.hibernate4.LocalSessionFactoryBean"&gt;
+</span><span class='line'>    &lt;property name="mappingResources"&gt;
+</span><span class='line'>        &lt;list&gt;
+</span><span class='line'>            &lt;value&gt;com/codemany/book/model/Book.hbm.xml&lt;/value&gt;
+</span><span class='line'>        &lt;/list&gt;
+</span><span class='line'>    &lt;/property&gt;
+</span><span class='line'>&lt;/bean&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;!-- book --&gt;
+</span><span class='line'>&lt;bean id="bookDao" class="com.codemany.book.dao.BookDao"&gt;
+</span><span class='line'>    &lt;property name="sessionFactory" ref="sessionFactory" /&gt;
+</span><span class='line'>&lt;/bean&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;bean id="bookService" class="com.codemany.book.service.BookService"&gt;
+</span><span class='line'>    &lt;property name="bookDao" ref="bookDao" /&gt;
+</span><span class='line'>&lt;/bean&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;bean id="bookAction" class="com.codemany.book.action.BookAction" scope="prototype"&gt;
+</span><span class='line'>    &lt;property name="bookService" ref="bookService" /&gt;
+</span><span class='line'>&lt;/bean&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>在Struts 2配置文件struts.xml中include文件book.xml。以下是book.xml文件的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;!DOCTYPE struts PUBLIC
+</span><span class='line'>    "-//Apache Software Foundation//DTD Struts Configuration 2.0//EN"
+</span><span class='line'>    "http://struts.apache.org/dtds/struts-2.0.dtd"&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;struts&gt;
+</span><span class='line'>    &lt;package name="book" extends="struts-default"&gt;
+</span><span class='line'>        &lt;action name="*Book" method="{1}" class="bookAction"&gt;
+</span><span class='line'>            &lt;result name="list"&gt;/books/list.jsp&lt;/result&gt;
+</span><span class='line'>            &lt;result name="show"&gt;/books/show.jsp&lt;/result&gt;
+</span><span class='line'>            &lt;result name="input"&gt;/books/form.jsp&lt;/result&gt;
+</span><span class='line'>            &lt;result type="redirectAction"&gt;listBook&lt;/result&gt;
+</span><span class='line'>        &lt;/action&gt;
+</span><span class='line'>    &lt;/package&gt;
+</span><span class='line'>&lt;/struts&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>视图文件show.jsp作为显示单本图书的信息，代码很简单，就不放出来了，只把list.jsp和form.jsp的代码列出来。</p>
+
+<p>list.jsp用来显示所有的图书：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;body&gt;
+</span><span class='line'>    &lt;h1&gt;Listing books&lt;/h1&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;table&gt;
+</span><span class='line'>        &lt;tr&gt;
+</span><span class='line'>            &lt;th&gt;Title&lt;/th&gt;
+</span><span class='line'>            &lt;th&gt;Description&lt;/th&gt;
+</span><span class='line'>            &lt;th&gt;Image url&lt;/th&gt;
+</span><span class='line'>            &lt;th&gt;Price&lt;/th&gt;
+</span><span class='line'>            &lt;th&gt;Author&lt;/th&gt;
+</span><span class='line'>            &lt;th&gt;ISBN&lt;/th&gt;
+</span><span class='line'>            &lt;th&gt;Publisher&lt;/th&gt;
+</span><span class='line'>            &lt;th&gt;Action&lt;/th&gt;
+</span><span class='line'>        &lt;/tr&gt;
+</span><span class='line'>
+</span><span class='line'>        &lt;s:iterator value="bookList"&gt;
+</span><span class='line'>        &lt;tr&gt;
+</span><span class='line'>            &lt;td&gt;&lt;s:property value="title" /&gt;&lt;/td&gt;
+</span><span class='line'>            &lt;td&gt;&lt;s:property value="description" /&gt;&lt;/td&gt;
+</span><span class='line'>            &lt;td&gt;&lt;s:property value="image_url" /&gt;&lt;/td&gt;
+</span><span class='line'>            &lt;td&gt;&lt;s:property value="price" /&gt;&lt;/td&gt;
+</span><span class='line'>            &lt;td&gt;&lt;s:property value="author" /&gt;&lt;/td&gt;
+</span><span class='line'>            &lt;td&gt;&lt;s:property value="isbn" /&gt;&lt;/td&gt;
+</span><span class='line'>            &lt;td&gt;&lt;s:property value="publisher" /&gt;&lt;/td&gt;
+</span><span class='line'>            &lt;td&gt;
+</span><span class='line'>                &lt;s:a href="showBook.action?bookId=%{id}"&gt;Show&lt;/s:a&gt;
+</span><span class='line'>                &lt;s:a href="inputBook.action?bookId=%{id}"&gt;Edit&lt;/s:a&gt;
+</span><span class='line'>                &lt;s:a href="deleteBook.action?bookId=%{id}" method="delete"&gt;Destroy&lt;/s:a&gt;
+</span><span class='line'>            &lt;/td&gt;
+</span><span class='line'>        &lt;/tr&gt;
+</span><span class='line'>        &lt;/s:iterator&gt;
+</span><span class='line'>    &lt;/table&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;s:a action="inputBook"&gt;Add&lt;/s:a&gt;
+</span><span class='line'>&lt;/body&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>当用户新建或者更新图书时，视图form.jsp就上场了。因为被两个逻辑使用，显示的标题等信息也不相同，所以需要判断图书的id是否存在，如果不存在的话即是新建业务，否则就是更新操作。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;body&gt;
+</span><span class='line'>    &lt;s:if test="book.id != null"&gt;
+</span><span class='line'>        &lt;h1&gt;Editing book&lt;/h1&gt;
+</span><span class='line'>    &lt;/s:if&gt;
+</span><span class='line'>    &lt;s:else&gt;
+</span><span class='line'>        &lt;h1&gt;Add book&lt;/h1&gt;
+</span><span class='line'>    &lt;/s:else&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;s:form action="saveOrUpdateBook" method="post"&gt;
+</span><span class='line'>        &lt;div class="field"&gt;
+</span><span class='line'>            &lt;s:hidden name="book.id" value="%{book.id}" /&gt;
+</span><span class='line'>        &lt;/div&gt;
+</span><span class='line'>        &lt;div class="field"&gt;
+</span><span class='line'>            &lt;s:textfield name="book.title" label="Title" /&gt;
+</span><span class='line'>        &lt;/div&gt;
+</span><span class='line'>        &lt;div class="field"&gt;
+</span><span class='line'>            &lt;s:textarea name="book.description" label="Description" rows="5" cols="25" /&gt;
+</span><span class='line'>        &lt;/div&gt;
+</span><span class='line'>        &lt;div class="field"&gt;
+</span><span class='line'>            &lt;s:textfield name="book.image_url" label="Image URL" /&gt;
+</span><span class='line'>        &lt;/div&gt;
+</span><span class='line'>        &lt;div class="field"&gt;
+</span><span class='line'>            &lt;s:textfield name="book.price" label="Price" /&gt;
+</span><span class='line'>        &lt;/div&gt;
+</span><span class='line'>        &lt;div class="field"&gt;
+</span><span class='line'>            &lt;s:textfield name="book.author" label="Author" /&gt;
+</span><span class='line'>        &lt;/div&gt;
+</span><span class='line'>        &lt;div class="field"&gt;
+</span><span class='line'>            &lt;s:textfield name="book.isbn" label="ISBN" /&gt;
+</span><span class='line'>        &lt;/div&gt;
+</span><span class='line'>        &lt;div class="field"&gt;
+</span><span class='line'>            &lt;s:textfield name="book.publisher" label="Publisher" /&gt;
+</span><span class='line'>        &lt;/div&gt;
+</span><span class='line'>        &lt;div class="actions"&gt;
+</span><span class='line'>            &lt;s:if test="book.id != null"&gt;
+</span><span class='line'>            &lt;s:submit value="Update" /&gt;
+</span><span class='line'>            &lt;/s:if&gt;
+</span><span class='line'>            &lt;s:else&gt;
+</span><span class='line'>            &lt;s:submit value="Save" /&gt;
+</span><span class='line'>            &lt;/s:else&gt;
+</span><span class='line'>      &lt;/div&gt;
+</span><span class='line'>    &lt;/s:form&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;s:if test="book.id != null"&gt;
+</span><span class='line'>        &lt;s:a href="showBook.action?bookId=%{book.id}"&gt;Show&lt;/s:a&gt; |
+</span><span class='line'>    &lt;/s:if&gt;
+</span><span class='line'>    &lt;s:a action="listBook"&gt;Back&lt;/s:a&gt;
+</span><span class='line'>&lt;/body&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>最后还要完成图书模型的服务端校验。Struts 2的校验文件有两种格式：ActionName-validation.xml和ActionName-alias-validation.xml。第一种会对该Action中的每个方法进行校验，不符合只对saveOrUpdate校验的要求。在BookAction.java同目录下创建BookAction-saveOrUpdateBook-validation.xml文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;validators&gt;
+</span><span class='line'>    &lt;field name="book"&gt;
+</span><span class='line'>        &lt;field-validator type="visitor"&gt;
+</span><span class='line'>            &lt;param name="appendPrefix"&gt;true&lt;/param&gt;
+</span><span class='line'>            &lt;message /&gt;
+</span><span class='line'>        &lt;/field-validator&gt;
+</span><span class='line'>    &lt;/field&gt;
+</span><span class='line'>&lt;/validators&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>当然，还要在Book.java所在的位置创建Book-validation.xml文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;validators&gt;
+</span><span class='line'>    &lt;field name="title"&gt;
+</span><span class='line'>        &lt;field-validator type="required"&gt;
+</span><span class='line'>            &lt;message&gt;Price is required&lt;/message&gt;
+</span><span class='line'>        &lt;/field-validator&gt;
+</span><span class='line'>    &lt;/field&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;field name="price"&gt;
+</span><span class='line'>        &lt;field-validator type="required"&gt;
+</span><span class='line'>            &lt;message&gt;Price is required&lt;/message&gt;
+</span><span class='line'>        &lt;/field-validator&gt;
+</span><span class='line'>        &lt;field-validator type="double"&gt;
+</span><span class='line'>            &lt;param name="minInclusive"&gt;0.01&lt;/param&gt;
+</span><span class='line'>            &lt;message&gt;Price should be at least 0.01&lt;/message&gt;
+</span><span class='line'>        &lt;/field-validator&gt;
+</span><span class='line'>    &lt;/field&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>看着BookAction-saveOrUpdateBook-validation.xml这么长的文件名是不是有点无语，没关系，BookAction-validation.xml配置文件还是可以用的，只要在BookAction.java中那些不需要进行校验的方法上添加@SkipValidation；也可以在action配置中启用validation.excludeMethods参数：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;action name="*Book" method="{1}" class="bookAction"&gt;
+</span><span class='line'>    &lt;interceptor-ref name="defaultStack"&gt;
+</span><span class='line'>        &lt;param name="validation.excludeMethods"&gt;list,show,input,delete&lt;/param&gt;
+</span><span class='line'>    &lt;/interceptor-ref&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1857,261 +2554,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/struts2-login-sample/">Struts 2登录实例</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2012-08-24T06:33:20+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>24</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>6:33 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>新的Eclipse已经包含Maven插件了，不过还需要到Eclipse Marketplace中去安装一个m2-wtp（Maven Integeration for Eclipse WTP）插件，不然启动Tomcat时会报错。</p>
-
-<p>安装好后创建新Maven项目，填写groupId和artifactId。</p>
-
-<p>在pom.xml中加入Struts 2的依赖配置：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;dependencies&gt;
-</span><span class='line'>    &lt;dependency&gt;
-</span><span class='line'>        &lt;groupId&gt;org.apache.struts&lt;/groupId&gt;
-</span><span class='line'>        &lt;artifactId&gt;struts2-core&lt;/artifactId&gt;
-</span><span class='line'>        &lt;version&gt;2.3.4&lt;/version&gt;
-</span><span class='line'>    &lt;/dependency&gt;
-</span><span class='line'>&lt;/dependencies&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>在web.xml文件中添加Struts 2的Filter：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;filter&gt;
-</span><span class='line'>    &lt;filter-name&gt;struts2&lt;/filter-name&gt;
-</span><span class='line'>    &lt;filter-class&gt;
-</span><span class='line'>        org.apache.struts2.dispatcher.ng.filter.StrutsPrepareAndExecuteFilter
-</span><span class='line'>    &lt;/filter-class&gt;
-</span><span class='line'>&lt;/filter&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;filter-mapping&gt;
-</span><span class='line'>    &lt;filter-name&gt;struts2&lt;/filter-name&gt;
-</span><span class='line'>    &lt;url-pattern&gt;/*&lt;/url-pattern&gt;
-</span><span class='line'>&lt;/filter-mapping&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>配置resources/struts.xml文件：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;struts&gt;
-</span><span class='line'>    &lt;package name="default" extends="struts-default"&gt;
-</span><span class='line'>        &lt;action name="login" class="com.codemany.account.action.LoginAction"&gt;
-</span><span class='line'>            &lt;result name="success"&gt;/index.jsp&lt;/result&gt;
-</span><span class='line'>            &lt;result name="input"&gt;/index.jsp&lt;/result&gt;
-</span><span class='line'>        &lt;/action&gt;
-</span><span class='line'>
-</span><span class='line'>        &lt;action name="logout" class="com.codemany.account.action.LogoutAction"&gt;
-</span><span class='line'>            &lt;result name="success" type="redirect"&gt;/index.jsp&lt;/result&gt;
-</span><span class='line'>        &lt;/action&gt;
-</span><span class='line'>    &lt;/package&gt;
-</span><span class='line'>&lt;/struts&gt;</span></code></pre></td></tr></table></div></figure>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.account.action;
-</span><span class='line'>
-</span><span class='line'>import com.codemany.account.model.User;
-</span><span class='line'>
-</span><span class='line'>import com.opensymphony.xwork2.ActionContext;
-</span><span class='line'>import com.opensymphony.xwork2.ActionSupport;
-</span><span class='line'>
-</span><span class='line'>public class LoginAction extends ActionSupport {
-</span><span class='line'>    private static final long serialVersionUID = -389833745243649130L;
-</span><span class='line'>
-</span><span class='line'>    private String username;
-</span><span class='line'>    private String password;
-</span><span class='line'>
-</span><span class='line'>    public String execute() throws Exception {
-</span><span class='line'>        if (username == null || username.length() != 0
-</span><span class='line'>                || password == null || password.length() != 0) {
-</span><span class='line'>            return INPUT;
-</span><span class='line'>        }
-</span><span class='line'>
-</span><span class='line'>        if ("test".equals(username) && "test".equals(password)) {
-</span><span class='line'>            ActionContext.getContext().getSession().put("logined", true);
-</span><span class='line'>            return SUCCESS;
-</span><span class='line'>        }
-</span><span class='line'>
-</span><span class='line'>        return INPUT;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void setUsername(String username) {
-</span><span class='line'>        this.username = username;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void setPassword(String password) {
-</span><span class='line'>        this.password = password;
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.account.action;
-</span><span class='line'>
-</span><span class='line'>import com.opensymphony.xwork2.ActionContext;
-</span><span class='line'>import com.opensymphony.xwork2.ActionSupport;
-</span><span class='line'>
-</span><span class='line'>public class LogoutAction extends ActionSupport {
-</span><span class='line'>    private static final long serialVersionUID = -518996422060716751L;
-</span><span class='line'>
-</span><span class='line'>    public String execute() throws Exception {
-</span><span class='line'>        ActionContext.getContext().getSession().put("logined", false);
-</span><span class='line'>        return SUCCESS;
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>index.jsp内容如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%@ page contentType="text/html; charset=utf-8" pageEncoding="utf-8" %&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;%@ taglib uri="/struts-tags" prefix="s" %&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;!DOCTYPE html&gt;
-</span><span class='line'>&lt;html&gt;
-</span><span class='line'>&lt;head&gt;
-</span><span class='line'>    &lt;meta charset="utf-8"&gt;
-</span><span class='line'>    &lt;title&gt;Struts2 Login Sample&lt;/title&gt;
-</span><span class='line'>&lt;/head&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;body&gt;
-</span><span class='line'>    &lt;s:if test="#session.logined"&gt;
-</span><span class='line'>        Welcome, you have logined. &lt;a href="&lt;%= request.getContextPath() %&gt;/logout.action"&gt;Logout&lt;/a&gt;
-</span><span class='line'>    &lt;/s:if&gt;
-</span><span class='line'>    &lt;s:else&gt;
-</span><span class='line'>        &lt;p&gt;User: test/test&lt;/p&gt;
-</span><span class='line'>        &lt;s:form action="login"&gt;
-</span><span class='line'>            &lt;s:textfield key="username" label="Username" /&gt;
-</span><span class='line'>            &lt;s:password key="password" label="Password" /&gt;
-</span><span class='line'>            &lt;s:submit value="Login" /&gt;
-</span><span class='line'>        &lt;/s:form&gt;
-</span><span class='line'>    &lt;/s:else&gt;
-</span><span class='line'>&lt;/body&gt;
-</span><span class='line'>&lt;/html&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>在项目上点击右键 -&gt; Run As -&gt; Maven build运行项目。在Goals栏中填写tomcat:run，Maven会自动下载Tomcat到项目的target目录下后启动服务器。</p>
-
-<p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/12">&larr; Older</a>
@@ -2129,6 +2571,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/crawl-a-novel-with-scrapy-part1/">使用Scrapy爬取小说（1）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/thinking-on-software-version/">软件版本号的思考</a>
       </li>
     
@@ -2142,10 +2588,6 @@
     
       <li class="post">
         <a href="/blog/10x-engineers-take-long-naps/">10x工程师经常的打盹</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/the-10x-developer-is-not-myth/">10x开发者不是神话</a>
       </li>
     
   </ul>

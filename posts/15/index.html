@@ -9,8 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="终于解决掉了困扰我多日的一个问题。 部署在Heroku上的项目，在控制器中require &#39;calc&#39;时总是出现： 1
-no such file to load -- calc (MissingSourceFile) 本地机器上运行的好好的， &hellip;">
+  <meta name="description" content="带图标的ListView工作起来还不错，但是如果手机里安装的软件比较多的话就有问题了。在程序启动时会黑屏一段时间，就好像程序挂起了一样。所以这时需要显示一个对话框，告诉用户正在加载数据，最好还能准确告诉用户加载的进度。 显示对话框用ProgressDialog，它有两种样式： &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -80,6 +79,243 @@ no such file to load -- calc (MissingSourceFile) 本地机器上运行的好好�
       
   <header>
     
+      <h1 class="entry-title"><a href="/blog/implement-listview-with-icon-improved/">实现带图标的ListView（改进版）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2011-06-02T18:47:58+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2011</span></span> <span class='time'>6:47 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>带图标的ListView工作起来还不错，但是如果手机里安装的软件比较多的话就有问题了。在程序启动时会黑屏一段时间，就好像程序挂起了一样。所以这时需要显示一个对话框，告诉用户正在加载数据，最好还能准确告诉用户加载的进度。</p>
+
+<p>显示对话框用ProgressDialog，它有两种样式：HORIZONTAL和SPINNER。这里暂时选择SPINNER，等以后有机会再改成HORIZONTAL。</p>
+
+<p>我们在加载数据前显示ProgressDialog，在之后关闭对话框。示例代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ProgressDialog pd = ProgressDialog.show(this, "Wait", "loading...");
+</span><span class='line'>
+</span><span class='line'>ListView lv = (ListView)findViewById(R.id.list_view);
+</span><span class='line'>adapter = new SimpleIconAdapter(this,
+</span><span class='line'>        getInstalledApps(false),
+</span><span class='line'>        R.layout.list_item,
+</span><span class='line'>        new String[] {APP_ICON, APP_TITLE, APP_PACKAGE},
+</span><span class='line'>        new int[] {R.id.app_icon, R.id.app_title, R.id.app_package});
+</span><span class='line'>lv.setAdapter(adapter);
+</span><span class='line'>
+</span><span class='line'>pd.dismiss();</span></code></pre></td></tr></table></div></figure>
+
+<p>但结果ProgressDialog没有显示出来，因为加载数据的代码也执行在UI线程中，所以对话框的显示被阻塞了。怎么办呢？可以试着创建一个新线程，然后把加载数据这个耗时的操作放到这个非UI线程中去执行，这样不就可以了么：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ProgressDialog pd = ProgressDialog.show(this, "Wait", "loading...");
+</span><span class='line'>
+</span><span class='line'>new Thread() {
+</span><span class='line'>    @Override
+</span><span class='line'>    public void run() {
+</span><span class='line'>        ListView lv = (ListView)findViewById(R.id.list_view);
+</span><span class='line'>        adapter = new SimpleIconAdapter(Main.this,
+</span><span class='line'>                getInstalledApps(false),
+</span><span class='line'>                R.layout.list_item,
+</span><span class='line'>                new String[] {APP_ICON, APP_TITLE, APP_PACKAGE},
+</span><span class='line'>                new int[] {R.id.app_icon, R.id.app_title, R.id.app_package});
+</span><span class='line'>        lv.setAdapter(adapter);
+</span><span class='line'>    }
+</span><span class='line'>}.start();
+</span><span class='line'>
+</span><span class='line'>pd.dismiss();</span></code></pre></td></tr></table></div></figure>
+
+<p>这下更惨了，直接报RuntimeException，连界面都打不开了。</p>
+
+<p>深入研究一下Android的线程模型，看看Android到底是怎么处理UI线程和其它线程的交互的，为什么上面的代码会报异常?</p>
+
+<blockquote>
+<p>When an application is launched, the system creates a thread called &quot;main&quot; for the application. The main thread, also called the UI thread, is very important because it is in charge of dispatching the events to the appropriate widgets, including drawing events. It is also the thread where your application interacts with running components of the Android UI toolkit.</p>
+
+<p>For instance, if you touch the a button on screen, the UI thread dispatches the touch event to the widget, which in turn sets its pressed state and posts an invalidate request to the event queue. The UI thread dequeues the request and notifies the widget to redraw itself.</p>
+
+<p>This single-thread model can yield poor performance unless your application is implemented properly. Specifically, if everything is happening in a single thread, performing long operations such as network access or database queries on the UI thread will block the whole user interface. No event can be dispatched, including drawing events, while the long operation is underway. From the user&#39;s perspective, the application appears hung. Even worse, if the UI thread is blocked for more than a few seconds (about 5 seconds currently) the user is presented with the infamous &quot;application not responding&quot; (ANR) dialog.</p>
+</blockquote>
+
+<p>看了上面这段话可以知道为啥程序一打开就黑屏，像挂掉了一样。</p>
+
+<p>那为什么用新建线程来执行耗时操作的代码也有问题呢？这是因为它虽然没有阻塞UI线程，但它违背了单线程模型，Android的UI操作并不是线程安全的，并且这些操作必须在UI线程中执行。在这段代码片段中，在另一个线程中执行数据加载绑定，这会引起一些古怪的问题。</p>
+
+<p>Andriod提供了几种在其它线程中访问UI线程的方法：</p>
+
+<ul>
+<li><a href="http://developer.android.com/reference/android/app/Activity.html#runOnUiThread(java.lang.Runnable)">Activity.runOnUiThread(Runnable)</a></li>
+<li><a href="http://developer.android.com/reference/android/view/View.html#post(java.lang.Runnable)">View.post(Runnable)</a></li>
+<li><a href="http://developer.android.com/reference/android/view/View.html#postDelayed(java.lang.Runnable,%20long)">View.postDelayed(Runnable, long)</a></li>
+<li><a href="http://developer.android.com/reference/android/os/Handler.html">Hanlder</a></li>
+</ul>
+
+<p>上面的任何一个类或方法都可以修复我们前面代码中遇到的问题，很不幸的是这些类或方法同样会使你的代码变的很复杂很难理解。而且当你需要实现一些很复杂的操作并需要频繁地更新UI时会变得更糟糕。为了解决这个问题，Android 1.5提供了一个工具类AsyncTask，它使创建需要与用户界面交互的长时间运行的任务变得更简单。在Android 1.0和1.1中具有与AsyncTask相同功能的类UserTask，它提供了完全一样的API，你需要做的只是把它的代码拷贝的你的程序中。</p>
+
+<p>其实这些方案背后采用的都是Handler。所以这里仍然使用旧有的，复杂的Handler来修复上述问题。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>import java.util.ArrayList;
+</span><span class='line'>import java.util.HashMap;
+</span><span class='line'>import java.util.List;
+</span><span class='line'>
+</span><span class='line'>import android.app.Activity;
+</span><span class='line'>import android.app.ProgressDialog;
+</span><span class='line'>import android.content.pm.ApplicationInfo;
+</span><span class='line'>import android.content.pm.PackageInfo;
+</span><span class='line'>import android.graphics.drawable.Drawable;
+</span><span class='line'>import android.os.Bundle;
+</span><span class='line'>import android.os.Handler;
+</span><span class='line'>import android.os.Message;
+</span><span class='line'>import android.widget.ListView;
+</span><span class='line'>
+</span><span class='line'>public class MainActivity extends Activity {
+</span><span class='line'>    private static final String APP_ICON = "app_icon";
+</span><span class='line'>    private static final String APP_TITLE = "app_title";
+</span><span class='line'>    private static final String APP_PACKAGE = "app_package";
+</span><span class='line'>
+</span><span class='line'>    private SimpleIconAdapter adapter;
+</span><span class='line'>    private List&lt;HashMap&lt;String, Object&gt;&gt; listData;
+</span><span class='line'>    private ProgressDialog pd;
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void onCreate(Bundle savedInstanceState) {
+</span><span class='line'>        super.onCreate(savedInstanceState);
+</span><span class='line'>        setContentView(R.layout.main);
+</span><span class='line'>
+</span><span class='line'>        ListView lv = (ListView)findViewById(R.id.list_view);
+</span><span class='line'>        listData = new ArrayList&lt;HashMap&lt;String, Object&gt;&gt;();
+</span><span class='line'>        adapter = new SimpleIconAdapter(this,
+</span><span class='line'>                listData,
+</span><span class='line'>                R.layout.list_item,
+</span><span class='line'>                new String[] {APP_ICON, APP_TITLE, APP_PACKAGE},
+</span><span class='line'>                new int[] {R.id.app_icon, R.id.app_title, R.id.app_package});
+</span><span class='line'>        lv.setAdapter(adapter);
+</span><span class='line'>
+</span><span class='line'>        pd = ProgressDialog.show(this, "Wait", "loading...");
+</span><span class='line'>
+</span><span class='line'>        new Thread() {
+</span><span class='line'>            @Override
+</span><span class='line'>            public void run() {
+</span><span class='line'>                // 耗时操作，加载数据
+</span><span class='line'>                listData.addAll(getInstalledApps(false));
+</span><span class='line'>                handler.sendEmptyMessage(0);
+</span><span class='line'>            }
+</span><span class='line'>        }.start();
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    private Handler handler = new Handler() {
+</span><span class='line'>        @Override
+</span><span class='line'>        public void handleMessage(Message msg) {
+</span><span class='line'>            // 通知UI更新。必须要放在这里
+</span><span class='line'>            adapter.notifyDataSetChanged();
+</span><span class='line'>
+</span><span class='line'>            pd.dismiss();
+</span><span class='line'>        }
+</span><span class='line'>    };</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
       <h1 class="entry-title"><a href="/blog/no-such-file-to-load-xxx-missingsourcefile-on-heroku/">no such file to load -- xxx (MissingSourceFile) on Heroku</a></h1>
     
     
@@ -122,7 +358,7 @@ no such file to load -- calc (MissingSourceFile) 本地机器上运行的好好�
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/implement-listview-with-icon/">实现带Icon的ListView</a></h1>
+      <h1 class="entry-title"><a href="/blog/implement-listview-with-icon/">实现带图标的ListView</a></h1>
     
     
       <p class="meta">
@@ -140,30 +376,9 @@ no such file to load -- calc (MissingSourceFile) 本地机器上运行的好好�
 
   <div class="entry-content"><p><img src="/uploads/listview-screenshot.png" alt="listview-screenshot"></p>
 
-<p>main.xml不需要修改，还是用原来的那个：</p>
+<p>main.xml不需要修改，还是用<a href="/blog/implement-listview-without-listactivity/">不使用ListActivity实现ListView</a>中的那个。</p>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
-</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-</span><span class='line'>    android:orientation="vertical"
-</span><span class='line'>    android:layout_width="fill_parent"
-</span><span class='line'>    android:layout_height="wrap_content"&gt;
-</span><span class='line'>    &lt;ListView
-</span><span class='line'>        android:id="@+id/list_view"
-</span><span class='line'>        android:layout_width="fill_parent"
-</span><span class='line'>        android:layout_height="wrap_content" /&gt;
-</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>在list_item.xml中添加ImageView控件，设置高度和宽度分别为32dip，这是因为有些应用Icon尺寸比较大的缘故，如果不设置的话有些行就会撑大：</p>
+<p>在list_item.xml中添加ImageView控件，设置高度和宽度分别为32dip，这是因为有些应用图标尺寸比较大的缘故，如果不设置的话有些行就会撑大：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -335,6 +550,7 @@ no such file to load -- calc (MissingSourceFile) 本地机器上运行的好好�
 <span class='line-number'>52</span>
 <span class='line-number'>53</span>
 <span class='line-number'>54</span>
+<span class='line-number'>55</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'>import java.util.ArrayList;
 </span><span class='line'>import java.util.HashMap;
 </span><span class='line'>import java.util.List;
@@ -372,7 +588,8 @@ no such file to load -- calc (MissingSourceFile) 本地机器上运行的好好�
 </span><span class='line'>        List&lt;PackageInfo&gt; pkgs = getPackageManager().getInstalledPackages(0);
 </span><span class='line'>        for (int i = 0; i&lt; pkgs.size(); i++) {
 </span><span class='line'>            PackageInfo pkg = pkgs.get(i);
-</span><span class='line'>            if (!getSysPackages && (pkg.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) &gt; 0) {
+</span><span class='line'>            if (!getSysPackages
+</span><span class='line'>                    && (pkg.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) &gt; 0) {
 </span><span class='line'>                continue;
 </span><span class='line'>            }
 </span><span class='line'>            Drawable icon = pkg.applicationInfo.loadIcon(getPackageManager());
@@ -417,7 +634,7 @@ no such file to load -- calc (MissingSourceFile) 本地机器上运行的好好�
   </header>
 
 
-  <div class="entry-content"><p>main.xml</p>
+  <div class="entry-content"><p>main.xml布局代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -440,7 +657,7 @@ no such file to load -- calc (MissingSourceFile) 本地机器上运行的好好�
 </span><span class='line'>        android:layout_height="wrap_content" /&gt;
 </span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p>list_item.xml</p>
+<p>list_item.xml布局代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -533,6 +750,7 @@ no such file to load -- calc (MissingSourceFile) 本地机器上运行的好好�
 <span class='line-number'>46</span>
 <span class='line-number'>47</span>
 <span class='line-number'>48</span>
+<span class='line-number'>49</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'>import java.util.ArrayList;
 </span><span class='line'>import java.util.HashMap;
 </span><span class='line'>import java.util.List;
@@ -566,7 +784,8 @@ no such file to load -- calc (MissingSourceFile) 本地机器上运行的好好�
 </span><span class='line'>        List&lt;PackageInfo&gt; pkgs = getPackageManager().getInstalledPackages(0);
 </span><span class='line'>        for (int i = 0; i&lt; pkgs.size(); i++) {
 </span><span class='line'>            PackageInfo pkg = pkgs.get(i);
-</span><span class='line'>            if (!getSysPackages && (pkg.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) &gt; 0) {
+</span><span class='line'>            if (!getSysPackages
+</span><span class='line'>                    && (pkg.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) &gt; 0) {
 </span><span class='line'>                continue;
 </span><span class='line'>            }
 </span><span class='line'>            String label = pkg.applicationInfo.loadLabel(getPackageManager()).toString();
@@ -636,7 +855,9 @@ no such file to load -- calc (MissingSourceFile) 本地机器上运行的好好�
 <p>Adapter通常有ArrayAdapter、SimpleAdapter和CursorAdapter等。其中SimpleAdapter有最好的扩充性，可以自定义出各种效果。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>SimpleAdapter(Context context, List&lt;? extends Map&lt;String, ?&gt;&gt; data, int resource, String[] from, int[] to)</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SimpleAdapter(Context context, List&lt;? extends Map&lt;String, ?&gt;&gt; data,
+</span><span class='line'>              int resource, String[] from, int[] to)</span></code></pre></td></tr></table></div></figure>
 
 <p>参数解释：</p>
 
@@ -730,6 +951,7 @@ no such file to load -- calc (MissingSourceFile) 本地机器上运行的好好�
 <span class='line-number'>43</span>
 <span class='line-number'>44</span>
 <span class='line-number'>45</span>
+<span class='line-number'>46</span>
 </pre></td><td class='code'><pre><code class=''><span class='line'>import java.util.ArrayList;
 </span><span class='line'>import java.util.HashMap;
 </span><span class='line'>import java.util.List;
@@ -760,7 +982,8 @@ no such file to load -- calc (MissingSourceFile) 本地机器上运行的好好�
 </span><span class='line'>        List&lt;PackageInfo&gt; pkgs = getPackageManager().getInstalledPackages(0);
 </span><span class='line'>        for (int i = 0; i&lt; pkgs.size(); i++) {
 </span><span class='line'>            PackageInfo pkg = pkgs.get(i);
-</span><span class='line'>            if (!getSysPackages && (pkg.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) &gt; 0) {
+</span><span class='line'>            if (!getSysPackages
+</span><span class='line'>                    && (pkg.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) &gt; 0) {
 </span><span class='line'>                continue;
 </span><span class='line'>            }
 </span><span class='line'>            String label = pkg.applicationInfo.loadLabel(getPackageManager()).toString();
@@ -1721,60 +1944,6 @@ no such file to load -- calc (MissingSourceFile) 本地机器上运行的好好�
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/randomize-upload-filename-in-paperclip/">随机化Paperclip的上传文件名</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2011-03-10T09:56:32+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>10</span><span class='date-suffix'>th</span>, <span class='date-year'>2011</span></span> <span class='time'>9:56 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>有时我们希望可以设定上传文件名的格式。一是可以统一文件名，而不是一些乱七八糟的名字；二是可以让文件名不是那么容易被猜测出来。下面的这段代码就是在网上找到的：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class Photo &lt; ActiveRecord::Base
-</span><span class='line'>  has_attached_file :image, :url =&gt; "/uploads/:basename.:extension"
-</span><span class='line'>
-</span><span class='line'>  before_create :randomize_file_name
-</span><span class='line'>
-</span><span class='line'>  private
-</span><span class='line'>  def randomize_file_name
-</span><span class='line'>    extension = File.extname(image_file_name).downcase
-</span><span class='line'>    self.image.instance_write(:file_name, "#{Time.now.strftime("%Y%m%d%H%M%S")}#{rand(1000)}#{extension}")
-</span><span class='line'>  end
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<p>代码是从 <a href="http://trevorturk.com/2009/03/22/randomize-filename-in-paperclip/">http://trevorturk.com/2009/03/22/randomize-filename-in-paperclip/</a> 找到的，这里我把随机参数给改了，这样文件名的格式就类似20110310095632768这样。还有要注意的就是在:url中必须使用:basename参数，因为修改的:file_name就是它。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/16">&larr; Older</a>
@@ -1792,6 +1961,10 @@ no such file to load -- calc (MissingSourceFile) 本地机器上运行的好好�
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/crawl-a-novel-with-scrapy-part1/">使用Scrapy爬取小说（1）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/thinking-on-software-version/">软件版本号的思考</a>
       </li>
     
@@ -1805,10 +1978,6 @@ no such file to load -- calc (MissingSourceFile) 本地机器上运行的好好�
     
       <li class="post">
         <a href="/blog/10x-engineers-take-long-naps/">10x工程师经常的打盹</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/the-10x-developer-is-not-myth/">10x开发者不是神话</a>
       </li>
     
   </ul>
