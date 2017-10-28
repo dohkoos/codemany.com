@@ -5,11 +5,11 @@
 <!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  <title>使用Scrapy爬取小说（1） - 乐者为王</title>
+  <title>使用Scrapy爬取小说（2） - 乐者为王</title>
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="这几天正在看《Python网络数据采集》，在这过程中觉得有必要写个爬虫来实践学到的知识。便给自己定个小目标：试着用Scrapy爬取小说《蜀山剑侠传》，并把内容保存到本地文件中。 Scrapy是一个开源的Python数据抓取框架，速度快且强大，而且使用简单， &hellip;">
+  <meta name="description" content="在使用Scrapy爬取小说（1）中将抓取的小说内容保存成本地文件是通过在命令行指定-o选项实现的。虽然工作的很好，但是有两个缺点：一是把所有小说内容保存到单个文件会导致该文件太大，用文本编辑器打开随机浏览的速度非常慢；二是小说章节不是按照顺序保存的，导致阅读指定的章节内容很不方便。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -18,7 +18,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   
-  <link rel="canonical" href="http://codemany.com/blog/crawl-a-novel-with-scrapy-part1/">
+  <link rel="canonical" href="http://codemany.com/blog/crawl-novel-with-scrapy-part2/">
   <link href="/favicon.png" rel="icon">
   <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
   <link href="/atom.xml" rel="alternate" title="乐者为王" type="application/atom+xml">
@@ -76,7 +76,7 @@
   
   <header>
     
-      <h1 class="entry-title">使用Scrapy爬取小说（1）</h1>
+      <h1 class="entry-title">使用Scrapy爬取小说（2）</h1>
     
     
       <p class="meta">
@@ -85,92 +85,45 @@
 
 
 
-<time class='entry-date' datetime='2017-10-21T08:49:54+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>21</span><span class='date-suffix'>st</span>, <span class='date-year'>2017</span></span> <span class='time'>8:49 am</span></time>
+<time class='entry-date' datetime='2017-10-28T20:35:23+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>28</span><span class='date-suffix'>th</span>, <span class='date-year'>2017</span></span> <span class='time'>8:35 pm</span></time>
         
       </p>
     
   </header>
 
 
-<div class="entry-content"><p>这几天正在看《Python网络数据采集》，在这过程中觉得有必要写个爬虫来实践学到的知识。便给自己定个小目标：试着用Scrapy爬取小说《蜀山剑侠传》，并把内容保存到本地文件中。</p>
+<div class="entry-content"><p>在<a href="/blog/crawl-novel-with-scrapy-part1/">使用Scrapy爬取小说（1）</a>中将抓取的小说内容保存成本地文件是通过在命令行指定<code>-o</code>选项实现的。虽然工作的很好，但是有两个缺点：一是把所有小说内容保存到单个文件会导致该文件太大，用文本编辑器打开随机浏览的速度非常慢；二是小说章节不是按照顺序保存的，导致阅读指定的章节内容很不方便。</p>
 
-<p>Scrapy是一个开源的Python数据抓取框架，速度快且强大，而且使用简单，可以很方便地抓取网站页面并从中提取结构化的数据。Scrapy用途广泛，可以用于数据挖掘、监测和自动化测试。</p>
+<p>再写个小工具按章节内容分割小说文件？无需如此麻烦。我们可以在Scrapy中直接将每个章节保存为独立的文本文件。Scrapy中的Item Pipeline就是干这类事情的。看下面的Scrapy架构图：</p>
 
-<p>好吧，废话不多说，让我们直接开干！</p>
+<p><img src="/uploads/scrapy-architecture.png" alt="scrapy-architecture"></p>
 
-<h3 id="创建项目">创建项目</h3>
+<p>当Item在Spider中被收集之后，它们会被传递到Item Pipeline，这些Pipeline组件按照一定的顺序执行对Item的处理，同时也决定此Item是否继续通过，或是被丢弃而不再进行处理。</p>
 
-<p>在抓取之前，必须先创建一个Scrapy项目，可以直接用以下命令生成：</p>
+<p>以下是Item Pipeline的一些典型应用：</p>
+
+<ul>
+<li>清理HTML数据</li>
+<li>验证爬取的数据</li>
+<li>查重</li>
+<li>将爬取结果保存到数据库中</li>
+</ul>
+
+<h3 id="编写item-pipeline">编写Item Pipeline</h3>
+
+<p>编写自己的Item Pipeline非常简单，每个Item Pipeline都是一个独立的Python类，但是必须实现以下方法：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>scrapy startproject novel</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>process_item(self, item, spider)</span></code></pre></td></tr></table></div></figure>
 
-<p>这是新建项目的目录结构：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>.
-</span><span class='line'>├── novel                # 项目模块
-</span><span class='line'>│   ├── __init__.py
-</span><span class='line'>│   ├── items.py         # 定义爬取的数据
-</span><span class='line'>│   ├── middlewares.py   # 定义爬取时的中间件
-</span><span class='line'>│   ├── pipelines.py     # 定义数据管道
-</span><span class='line'>│   ├── __pycache__
-</span><span class='line'>│   ├── settings.py      # 项目的设置文件
-</span><span class='line'>│   └── spiders          # 放置爬虫代码的文件夹
-</span><span class='line'>│       ├── __init__.py
-</span><span class='line'>│       └── __pycache__
-</span><span class='line'>└── scrapy.cfg           # Scrapy部署时的配置文件</span></code></pre></td></tr></table></div></figure>
-
-<h3 id="分析页面结构">分析页面结构</h3>
-
-<p>主要分析两个页面。一是小说的目录页面，目的是获取小说所有章节的链接以备抓取。二是任意章节页面，用于爬取其中的标题和正文。</p>
-
-<p>通过观察目录页面的源码可以发现，所有章节的链接都类似<code>NUMBER.htm</code>。其中，NUMBER是3位整数，从001到309。</p>
-
-<p><img src="/uploads/novel-chapter-urls.png" alt="novel-chapter-urls"></p>
-
-<p>使用浏览器的检查器（Inspector）查看章节页面，尝试把光标放在正文上，你应该可以看到正文周围的蓝色方块（如下图左侧所示），如果你点击这个方块，就可以选中检查器中相应的HTML代码。可以看到小说的标题和正文都在td标签中。</p>
-
-<p><img src="/uploads/novel-page-inspector.png" alt="novel-page-inspector"></p>
-
-<p>与此对应的XPath表达式分别是：</p>
+<p>此外，下面的方法是可选实现的：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>//center/table/tr[2]/td/text()  # 标题的XPath路径
-</span><span class='line'>//center/table/tr[4]/td/text()  # 正文的XPath路径</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>open_spider(self, spider)  # 该方法在Spider被开启时调用
+</span><span class='line'>close_spider(spider)       # 该方法在Spider被关闭时调用</span></code></pre></td></tr></table></div></figure>
 
-<p>需要注意的是，上面XPath表达式里的中括号内的数字为节点索引，是从1开始的，而不是0。</p>
-
-<h3 id="定义爬取的数据">定义爬取的数据</h3>
-
-<p>当需要从某个网站抓取信息时，首先是定义我们要爬取的数据。在Scrapy中，可以通过Item来完成。以下是我们定义的Item：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>import scrapy
-</span><span class='line'>
-</span><span class='line'>class NovelItem(scrapy.Item):
-</span><span class='line'>  title = scrapy.Field()
-</span><span class='line'>  content = scrapy.Field()</span></code></pre></td></tr></table></div></figure>
-
-<h3 id="编写爬取数据的spider">编写爬取数据的Spider</h3>
-
-<p>现在我们需要添加一个爬虫来真正做点什么。创建文件novel/spiders/novel_spider.py，添加如下内容：</p>
+<p>明白原理后，我们就可以开始编写自己的Item Pipeline。以下就是将小说的每个章节写成独立文本文件的代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -185,61 +138,43 @@
 <span class='line-number'>11</span>
 <span class='line-number'>12</span>
 <span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>import scrapy
-</span><span class='line'>from novel.items import NovelItem
-</span><span class='line'>
-</span><span class='line'>class NovelSpider(scrapy.Spider):
-</span><span class='line'>  name = 'novelspider'
-</span><span class='line'>  allowed_domains = ['example.com']
-</span><span class='line'>  start_urls = ['http://example.com/wuxia/hzlz/ssjx/']
-</span><span class='line'>
-</span><span class='line'>  def parse(self, response):
-</span><span class='line'>    # 还记得前面分析目录页面时的结果吗：000、001...309。
-</span><span class='line'>    for i in range(1, 310):
-</span><span class='line'>      # 生成每个章节的绝对链接
-</span><span class='line'>      next = response.urljoin('{0:03d}.htm'.format(i))
-</span><span class='line'>      # 生成新的请求对象解析小说的标题和正文
-</span><span class='line'>      yield scrapy.Request(next, callback=self.parse_chapter)
-</span><span class='line'>
-</span><span class='line'>  def parse_chapter(self, response):
-</span><span class='line'>    item = NovelItem()
-</span><span class='line'>    title = response.xpath('//center/table/tr[2]/td/text()').extract()
-</span><span class='line'>    print('Title is', title)
-</span><span class='line'>    content = response.xpath('//center/table/tr[4]/td/text()').extract()
-</span><span class='line'>    print('Content is', content)
-</span><span class='line'>    item['title'] = title
-</span><span class='line'>    item['content'] = content
+</pre></td><td class='code'><pre><code class=''><span class='line'>class TxtPipeline(object):
+</span><span class='line'>  def process_item(self, item, spider):
+</span><span class='line'>    # 标题和内容都是列表类型，必须先转换成字符串
+</span><span class='line'>    title = ''.join(item['title'])
+</span><span class='line'>    content = ''.join(item['content'])
+</span><span class='line'>    # 使用章节名来创建文件
+</span><span class='line'>    # 使用strip()来过滤非法字符r'\/:*?"&lt;&gt;|'
+</span><span class='line'>    filename = '{}.txt'.format(title.strip())
+</span><span class='line'>    f = open(filename, 'w')
+</span><span class='line'>    f.write(title)
+</span><span class='line'>    f.write(content)
+</span><span class='line'>    f.close()
 </span><span class='line'>    return item</span></code></pre></td></tr></table></div></figure>
+
+<h3 id="启用item-pipeline">启用Item Pipeline</h3>
+
+<p>要启用Pipeline组件，你必须将它添加到novel/settings.py的ITEM_PIPELINES配置中，就像下面这样:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ITEM_PIPELINES = {
+</span><span class='line'>  'novel.pipelines.TxtPipeline' : 300,
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>Pipeline后面的整数值确定它们的运行顺序，Item按数字从低到高通过每个Pipeline。通常将这些值定义在0-1000范围内。</p>
 
 <h3 id="运行spider">运行Spider</h3>
 
-<p>完成爬虫后，如何通过它来得到我们想要的结果呢？在项目的根目录中执行如下的命令：</p>
+<p>在项目的根目录中执行如下的命令（因为不再把所有的小说内容保存为单个文件，所有不需要指定<code>-o</code>选项）：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>scrapy crawl novelspider -o novel.json</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>scrapy crawl novelspider</span></code></pre></td></tr></table></div></figure>
 
-<p>没有报错的话，等个几分钟，就能看到一个完整的JSON数据文件躺在自己的电脑上面。</p>
+<p>没有报错的话，等个几分钟，就能看到很多文本文件躺在自己的电脑上面。</p>
 
-<p>不过如果打开的话，可能只会看到“\uXXXX”这样的乱码，它们都是中文字符的Unicode编码。要直接显示成中文的话，需要在novel/settings.py中添加以下设置：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>FEED_EXPORT_ENCODING = 'utf-8'</span></code></pre></td></tr></table></div></figure>
-
-<p>最终的结果如图：</p>
-
-<p><img src="/uploads/novel-json-chinese.png" alt="novel-json-chinese"></p>
+<p><img src="/uploads/novel-txt-list.png" alt="novel-txt-list"></p>
 </div>
 
 
@@ -255,7 +190,7 @@
 
 
 
-<time class='entry-date' datetime='2017-10-21T08:49:54+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>21</span><span class='date-suffix'>st</span>, <span class='date-year'>2017</span></span> <span class='time'>8:49 am</span></time>
+<time class='entry-date' datetime='2017-10-28T20:35:23+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>28</span><span class='date-suffix'>th</span>, <span class='date-year'>2017</span></span> <span class='time'>8:35 pm</span></time>
       
 
 
@@ -272,6 +207,10 @@
     
   <h3>Related Posts</h3>
   <ul class="posts">
+  
+    <li class="related">
+      <a href="/blog/crawl-novel-with-scrapy-part1/">使用Scrapy爬取小说（1）</a>
+    </li>
   
   </ul>
 
@@ -291,7 +230,7 @@
     
     <p class="meta">
       
-        <a class="basic-alignment left" href="/blog/thinking-on-software-version/" title="Previous Post: 软件版本号的思考">&laquo; 软件版本号的思考</a>
+        <a class="basic-alignment left" href="/blog/crawl-novel-with-scrapy-part1/" title="Previous Post: 使用Scrapy爬取小说（1）">&laquo; 使用Scrapy爬取小说（1）</a>
       
       
     </p>
@@ -313,7 +252,11 @@
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/crawl-a-novel-with-scrapy-part1/">使用Scrapy爬取小说（1）</a>
+        <a href="/blog/crawl-novel-with-scrapy-part2/">使用Scrapy爬取小说（2）</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/crawl-novel-with-scrapy-part1/">使用Scrapy爬取小说（1）</a>
       </li>
     
       <li class="post">
@@ -326,10 +269,6 @@
     
       <li class="post">
         <a href="/blog/what-should-checked-and-unchecked-translate/">checked/unchecked应该翻译成什么？</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/10x-engineers-take-long-naps/">10x工程师经常的打盹</a>
       </li>
     
   </ul>
@@ -440,8 +379,8 @@
       
         
         // var disqus_developer = 1;
-        var disqus_identifier = 'http://codemany.com/blog/crawl-a-novel-with-scrapy-part1/';
-        var disqus_url = 'http://codemany.com/blog/crawl-a-novel-with-scrapy-part1/';
+        var disqus_identifier = 'http://codemany.com/blog/crawl-novel-with-scrapy-part2/';
+        var disqus_url = 'http://codemany.com/blog/crawl-novel-with-scrapy-part2/';
         var disqus_script = 'embed.js';
       
     (function () {

@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="这几天正在看《Python网络数据采集》，在这过程中觉得有必要写个爬虫来实践学到的知识。便给自己定个小目标：试着用Scrapy爬取小说《蜀山剑侠传》，并把内容保存到本地文件中。 Scrapy是一个开源的Python数据抓取框架，速度快且强大，而且使用简单， &hellip;">
+  <meta name="description" content="在使用Scrapy爬取小说（1）中将抓取的小说内容保存成本地文件是通过在命令行指定-o选项实现的。虽然工作的很好，但是有两个缺点：一是把所有小说内容保存到单个文件会导致该文件太大，用文本编辑器打开随机浏览的速度非常慢；二是小说章节不是按照顺序保存的，导致阅读指定的章节内容很不方便。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -79,7 +79,118 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/crawl-a-novel-with-scrapy-part1/">使用Scrapy爬取小说（1）</a></h1>
+      <h1 class="entry-title"><a href="/blog/crawl-novel-with-scrapy-part2/">使用Scrapy爬取小说（2）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2017-10-28T20:35:23+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>28</span><span class='date-suffix'>th</span>, <span class='date-year'>2017</span></span> <span class='time'>8:35 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在<a href="/blog/crawl-novel-with-scrapy-part1/">使用Scrapy爬取小说（1）</a>中将抓取的小说内容保存成本地文件是通过在命令行指定<code>-o</code>选项实现的。虽然工作的很好，但是有两个缺点：一是把所有小说内容保存到单个文件会导致该文件太大，用文本编辑器打开随机浏览的速度非常慢；二是小说章节不是按照顺序保存的，导致阅读指定的章节内容很不方便。</p>
+
+<p>再写个小工具按章节内容分割小说文件？无需如此麻烦。我们可以在Scrapy中直接将每个章节保存为独立的文本文件。Scrapy中的Item Pipeline就是干这类事情的。看下面的Scrapy架构图：</p>
+
+<p><img src="/uploads/scrapy-architecture.png" alt="scrapy-architecture"></p>
+
+<p>当Item在Spider中被收集之后，它们会被传递到Item Pipeline，这些Pipeline组件按照一定的顺序执行对Item的处理，同时也决定此Item是否继续通过，或是被丢弃而不再进行处理。</p>
+
+<p>以下是Item Pipeline的一些典型应用：</p>
+
+<ul>
+<li>清理HTML数据</li>
+<li>验证爬取的数据</li>
+<li>查重</li>
+<li>将爬取结果保存到数据库中</li>
+</ul>
+
+<h3 id="编写item-pipeline">编写Item Pipeline</h3>
+
+<p>编写自己的Item Pipeline非常简单，每个Item Pipeline都是一个独立的Python类，但是必须实现以下方法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>process_item(self, item, spider)</span></code></pre></td></tr></table></div></figure>
+
+<p>此外，下面的方法是可选实现的：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>open_spider(self, spider)  # 该方法在Spider被开启时调用
+</span><span class='line'>close_spider(spider)       # 该方法在Spider被关闭时调用</span></code></pre></td></tr></table></div></figure>
+
+<p>明白原理后，我们就可以开始编写自己的Item Pipeline。以下就是将小说的每个章节写成独立文本文件的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class TxtPipeline(object):
+</span><span class='line'>  def process_item(self, item, spider):
+</span><span class='line'>    # 标题和内容都是列表类型，必须先转换成字符串
+</span><span class='line'>    title = ''.join(item['title'])
+</span><span class='line'>    content = ''.join(item['content'])
+</span><span class='line'>    # 使用章节名来创建文件
+</span><span class='line'>    # 使用strip()来过滤非法字符r'\/:*?"&lt;&gt;|'
+</span><span class='line'>    filename = '{}.txt'.format(title.strip())
+</span><span class='line'>    f = open(filename, 'w')
+</span><span class='line'>    f.write(title)
+</span><span class='line'>    f.write(content)
+</span><span class='line'>    f.close()
+</span><span class='line'>    return item</span></code></pre></td></tr></table></div></figure>
+
+<h3 id="启用item-pipeline">启用Item Pipeline</h3>
+
+<p>要启用Pipeline组件，你必须将它添加到novel/settings.py的ITEM_PIPELINES配置中，就像下面这样:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ITEM_PIPELINES = {
+</span><span class='line'>  'novel.pipelines.TxtPipeline' : 300,
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>Pipeline后面的整数值确定它们的运行顺序，Item按数字从低到高通过每个Pipeline。通常将这些值定义在0-1000范围内。</p>
+
+<h3 id="运行spider">运行Spider</h3>
+
+<p>在项目的根目录中执行如下的命令（因为不再把所有的小说内容保存为单个文件，所有不需要指定<code>-o</code>选项）：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>scrapy crawl novelspider</span></code></pre></td></tr></table></div></figure>
+
+<p>没有报错的话，等个几分钟，就能看到很多文本文件躺在自己的电脑上面。</p>
+
+<p><img src="/uploads/novel-txt-list.png" alt="novel-txt-list"></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/crawl-novel-with-scrapy-part1/">使用Scrapy爬取小说（1）</a></h1>
     
     
       <p class="meta">
@@ -956,141 +1067,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/unconventional-way-of-learning-a-new-programming-language/">学习新编程语言的非传统方式</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2017-04-08T09:23:59+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>8</span><span class='date-suffix'>th</span>, <span class='date-year'>2017</span></span> <span class='time'>9:23 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="https://hackernoon.com/unconventional-way-of-learning-a-new-programming-language-e4d1f600342c">https://hackernoon.com/unconventional-way-of-learning-a-new-programming-language-e4d1f600342c</a></p>
-
-<p>现在已经有500多种编程语言。因此，开始学习新的编程语言对你来说是很正常的。你可能知道C++和Java，但是你的工作需要Python；或者你精通Python，但是需要用Java编写代码；或者也许你想要学习这种很酷的语言只是为了扩展你的编程技能。</p>
-
-<p>如果你想学习新的编程语言，你会选择哪种方式？</p>
-
-<ul>
-<li>从若干在线教程中学习</li>
-<li>或者从若干在线课程（MOOC）中学习</li>
-</ul>
-
-<p>有些人甚至可能认为，学习新语言的最佳方式应该是这样的：</p>
-
-<ul>
-<li>学习这门新的编程语言的语法</li>
-<li>再用这门语言构建一些个人项目</li>
-</ul>
-
-<p>有道理！这样可以确保你能够应用学习语言的语法而获得的知识。</p>
-
-<p>我开发过20多个迷你项目，同时学习不同的语言。相信我，当你为个人项目编写代码的时候，不管这些项目是周末项目还是紧急快速补丁，你编写代码都只是为了完成任务。你只会关注——“我的代码是否工作？”你几乎不关心代码的质量。</p>
-
-<blockquote>
-<p>任何傻瓜都能写出计算机可以理解的代码。好的程序员能写出人类可以理解的代码。——Martin Fowler</p>
-</blockquote>
-
-<p>那么，你是如何学习你正在尝试学习的新的编程语言的良好实践呢？</p>
-
-<h3 id="向该语言的开源项目贡献代码">向该语言的开源项目贡献代码</h3>
-
-<p>惊讶吗？有些人可能在想——“等等，开源是很难的。只有当我们是该语言的专家时，我们才能为开源项目贡献代码，对吗？”答案是不。</p>
-
-<p>让我给你们讲个故事。</p>
-
-<p>去年，我收到Booking.com全职工作的邀请，而且我知道我将使用Perl（这是该公司后端使用的主要语言）工作。2016年6月，当我完成大学学位后，我开始学习Perl，以便为自己在大学毕业后的首份工作做准备。因为我会在7月的第二周入职，所以我差不多有1个月的时间。</p>
-
-<p>我开始阅读Perl的语法，并开始理解这门语言的一些常见模式。现在，我真的想使用Perl构建一些东西，以便我可以应用我的这门语言的知识和实践这门语言的各种概念。当我在寻找使用Perl构建某些东西的想法时，我在GitHub偶遇DuckDuckGo的开源组织。我注意到这个组织的某些开放项目是用Perl写的。我浏览这些项目的Issues发现有很多“新手”问题。我立即开始去解决它们，并提交了几个pull request。到今天为止，我已经是该组织的几个开放项目的主要贡献者之一，也是DuckDuckGo的20个开源社区领袖之一。</p>
-
-<blockquote>
-<p>故事的寓意——通过向用Perl编写的开源项目贡献代码我学会了Perl。</p>
-</blockquote>
-
-<h3 id="为什么这种方法奏效呢？">为什么这种方法奏效呢？</h3>
-
-<p>就在我学会Perl的语法之后，我开始向开源项目贡献代码。当这样做的时候，我总是习惯看看现有的模块。我经常留意在Perl中使用的模式。此后，我开始在自己的代码中吸收这些良好的实践，它帮助我学习如何使用Perl编写好的代码。</p>
-
-<p>这并不是偶然。让我给你们讲个另外类似的故事。</p>
-
-<p>最近，当我在Booking.com工作的时候，我挑选了一些任务，包括给用Go语言编写的服务之一添加新功能。以下是我和队友的对话：</p>
-
-<blockquote>
-<p>我：我真的喜欢这项任务。我想做它。你怎么看？</p>
-
-<p>他：是的，它的确很有意思。但是，它需要Go的知识。你知道Go吗？</p>
-
-<p>我：不知道。</p>
-
-<p>他：你想学习Go吗？</p>
-
-<p>我：是的！</p>
-
-<p>他：&#x1f60a; 那就去吧！</p>
-</blockquote>
-
-<p>我去了，那也是我学习另外一门编程语言——Go的起点！</p>
-
-<p>我开始阅读Go的语法，并在它的官方网站上发现了一个非常棒的初学者语言教程。它足以让我熟悉该语言的所有基本概念。</p>
-
-<p>再次地，我开始寻找含有“新手”或“易于修复”问题的Go开源项目。我发现了一个Google的项目，它基本上是GitHub的REST API的Go包装器。</p>
-
-<p>在我开始学习Go的2天后，我有了这个项目的第一个PR。下图是我过去1年的<a href="https://github.com/sahildua2305">贡献图表</a>：</p>
-
-<p><img src="/uploads/contribution-graph.png" alt="contribution-graph"></p>
-
-<h3 id="开源是如何帮助的？">开源是如何帮助的？</h3>
-
-<p>现在你可能会疑惑给开源贡献代码如何帮助你学习一门语言的良好实践。它有多个方面。让我们来逐个讨论。</p>
-
-<h4 id="代码质量">代码质量</h4>
-
-<p>大多数良好的开源项目都有严格的编码指导原则，你必须遵守它们才能使你的代码被合并。参与开源将帮助你适应这些指导原则，从而编写优质的代码，即使你只是在学习这门语言。</p>
-
-<p>不仅如此，你还有机会查看其余的代码，学习别人是如何写代码和/或写文档的。</p>
-
-<h4 id="代码审查">代码审查</h4>
-
-<p>给开源贡献代码的最好部分是代码审查。当你推送代码时，你将获得与该项目相关的专家的反馈，因此可以让你有机会提升对语言的理解。</p>
-
-<p>这就像获得了关于如何编写好代码的一次免费的个人指导。</p>
-
-<h4 id="赞赏">赞赏</h4>
-
-<p>下图是我在Go语言上的第一个PR的首个<a href="https://github.com/google/go-github/pull/497">评论</a>：</p>
-
-<p><img src="/uploads/go-appreciation-comment.png" alt="go-appreciation-comment"></p>
-
-<p>作为软件开发者，我们的工作真的需要得到赞赏。而开源社区能够确保这些。在我的整个开源贡献经历中，我从来没有收到过甚至一条侮辱或者挫伤的评论。每个人都善于鼓舞和乐于助人。</p>
-
-<p>下图是DuckDuckGo社区中另个人的评论：</p>
-
-<p><img src="/uploads/duckduckgo-appreciation-comment.png" alt="duckduckgo-appreciation-comment"></p>
-
-<p>所以，下次你想学习一门新语言，只管去学！找个开源项目贡献代码，在学习这门语言和它微妙之处的道路上奋勇前进吧;)</p>
-
-<p>务必让我知道这种非传统方式是否对你有效。另外，如果你认为这种方式对某人有用，请推荐（&#10084;）这篇文章。</p>
-
-<p>如果有任何其它有效的方法也请告诉我。可以在Twitter上关注我<a href="https://twitter.com/sahildua2305">@sahildua2305</a>。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/2">&larr; Older</a>
@@ -1106,7 +1082,11 @@
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/crawl-a-novel-with-scrapy-part1/">使用Scrapy爬取小说（1）</a>
+        <a href="/blog/crawl-novel-with-scrapy-part2/">使用Scrapy爬取小说（2）</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/crawl-novel-with-scrapy-part1/">使用Scrapy爬取小说（1）</a>
       </li>
     
       <li class="post">
@@ -1119,10 +1099,6 @@
     
       <li class="post">
         <a href="/blog/what-should-checked-and-unchecked-translate/">checked/unchecked应该翻译成什么？</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/10x-engineers-take-long-naps/">10x工程师经常的打盹</a>
       </li>
     
   </ul>

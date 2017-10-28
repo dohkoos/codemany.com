@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Scrapy | 乐者为王]]></title>
   <link href="http://codemany.com/tags/scrapy/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-10-28T00:53:37+08:00</updated>
+  <updated>2017-10-29T00:16:50+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -14,10 +14,76 @@
 
   
   <entry>
+    <title type="html"><![CDATA[使用Scrapy爬取小说（2）]]></title>
+    <link href="http://codemany.com/blog/crawl-novel-with-scrapy-part2/"/>
+    <updated>2017-10-28T20:35:23+08:00</updated>
+    <id>http://codemany.com/blog/crawl-novel-with-scrapy-part2</id>
+    <content type="html"><![CDATA[<p>在<a href="/blog/crawl-novel-with-scrapy-part1/">使用Scrapy爬取小说（1）</a>中将抓取的小说内容保存成本地文件是通过在命令行指定<code>-o</code>选项实现的。虽然工作的很好，但是有两个缺点：一是把所有小说内容保存到单个文件会导致该文件太大，用文本编辑器打开随机浏览的速度非常慢；二是小说章节不是按照顺序保存的，导致阅读指定的章节内容很不方便。</p>
+
+<p>再写个小工具按章节内容分割小说文件？无需如此麻烦。我们可以在Scrapy中直接将每个章节保存为独立的文本文件。Scrapy中的Item Pipeline就是干这类事情的。看下面的Scrapy架构图：</p>
+
+<p><img src="/uploads/scrapy-architecture.png" alt="scrapy-architecture"></p>
+
+<p>当Item在Spider中被收集之后，它们会被传递到Item Pipeline，这些Pipeline组件按照一定的顺序执行对Item的处理，同时也决定此Item是否继续通过，或是被丢弃而不再进行处理。</p>
+
+<p>以下是Item Pipeline的一些典型应用：</p>
+
+<ul>
+<li>清理HTML数据</li>
+<li>验证爬取的数据</li>
+<li>查重</li>
+<li>将爬取结果保存到数据库中</li>
+</ul>
+
+<h3 id="编写item-pipeline">编写Item Pipeline</h3>
+
+<p>编写自己的Item Pipeline非常简单，每个Item Pipeline都是一个独立的Python类，但是必须实现以下方法：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">process_item(self, item, spider)
+</code></pre></div>
+<p>此外，下面的方法是可选实现的：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">open_spider(self, spider)  # 该方法在Spider被开启时调用
+close_spider(spider)       # 该方法在Spider被关闭时调用
+</code></pre></div>
+<p>明白原理后，我们就可以开始编写自己的Item Pipeline。以下就是将小说的每个章节写成独立文本文件的代码：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">class TxtPipeline(object):
+  def process_item(self, item, spider):
+    # 标题和内容都是列表类型，必须先转换成字符串
+    title = &#39;&#39;.join(item[&#39;title&#39;])
+    content = &#39;&#39;.join(item[&#39;content&#39;])
+    # 使用章节名来创建文件
+    # 使用strip()来过滤非法字符r&#39;\/:*?&quot;&lt;&gt;|&#39;
+    filename = &#39;{}.txt&#39;.format(title.strip())
+    f = open(filename, &#39;w&#39;)
+    f.write(title)
+    f.write(content)
+    f.close()
+    return item
+</code></pre></div>
+<h3 id="启用item-pipeline">启用Item Pipeline</h3>
+
+<p>要启用Pipeline组件，你必须将它添加到novel/settings.py的ITEM_PIPELINES配置中，就像下面这样:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">ITEM_PIPELINES = {
+  &#39;novel.pipelines.TxtPipeline&#39; : 300,
+}
+</code></pre></div>
+<p>Pipeline后面的整数值确定它们的运行顺序，Item按数字从低到高通过每个Pipeline。通常将这些值定义在0-1000范围内。</p>
+
+<h3 id="运行spider">运行Spider</h3>
+
+<p>在项目的根目录中执行如下的命令（因为不再把所有的小说内容保存为单个文件，所有不需要指定<code>-o</code>选项）：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">scrapy crawl novelspider
+</code></pre></div>
+<p>没有报错的话，等个几分钟，就能看到很多文本文件躺在自己的电脑上面。</p>
+
+<p><img src="/uploads/novel-txt-list.png" alt="novel-txt-list"></p>
+]]></content>
+  </entry>
+  
+  <entry>
     <title type="html"><![CDATA[使用Scrapy爬取小说（1）]]></title>
-    <link href="http://codemany.com/blog/crawl-a-novel-with-scrapy-part1/"/>
+    <link href="http://codemany.com/blog/crawl-novel-with-scrapy-part1/"/>
     <updated>2017-10-21T08:49:54+08:00</updated>
-    <id>http://codemany.com/blog/crawl-a-novel-with-scrapy-part1</id>
+    <id>http://codemany.com/blog/crawl-novel-with-scrapy-part1</id>
     <content type="html"><![CDATA[<p>这几天正在看《Python网络数据采集》，在这过程中觉得有必要写个爬虫来实践学到的知识。便给自己定个小目标：试着用Scrapy爬取小说《蜀山剑侠传》，并把内容保存到本地文件中。</p>
 
 <p>Scrapy是一个开源的Python数据抓取框架，速度快且强大，而且使用简单，可以很方便地抓取网站页面并从中提取结构化的数据。Scrapy用途广泛，可以用于数据挖掘、监测和自动化测试。</p>
