@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="在使用Scrapy爬取小说（1）中将抓取的小说内容保存成本地文件是通过在命令行指定-o选项实现的。虽然工作的很好，但是有两个缺点：一是把所有小说内容保存到单个文件会导致该文件太大，用文本编辑器打开随机浏览的速度非常慢；二是小说章节不是按照顺序保存的，导致阅读指定的章节内容很不方便。 &hellip;">
+  <meta name="description" content="在使用Scrapy爬取小说（2）中，我们将小说的每个章节保存为独立的文本文件。今天我们准备把小说内容输出到数据库。对于数据存储，我选择MongoDB。为什么是MongoDB而不是其它？原因是以前没用过，想尝试下。 现在我们已经知道，要把抓取来的数据保存到数据库，只需实现Item &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,98 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/crawl-novel-with-scrapy-part3/">使用Scrapy爬取小说（3）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2017-11-04T09:55:53+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>4</span><span class='date-suffix'>th</span>, <span class='date-year'>2017</span></span> <span class='time'>9:55 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在<a href="/blog/crawl-novel-with-scrapy-part2/">使用Scrapy爬取小说（2）</a>中，我们将小说的每个章节保存为独立的文本文件。今天我们准备把小说内容输出到数据库。对于数据存储，我选择MongoDB。为什么是MongoDB而不是其它？原因是以前没用过，想尝试下。</p>
+
+<p>现在我们已经知道，要把抓取来的数据保存到数据库，只需实现Item Pipeline即可。我们可以仿照前面的实现依葫芦画瓢。</p>
+
+<p>以下是将小说内容保存到MongoDB的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>import pymongo
+</span><span class='line'>
+</span><span class='line'>class MongoPipeline(object):
+</span><span class='line'>  def open_spider(self, spider):
+</span><span class='line'>    self.client = pymongo.MongoClient('localhost', 27017)
+</span><span class='line'>    self.novel = self.client['novel']
+</span><span class='line'>    self.ssjx = self.novel['ssjx']
+</span><span class='line'>
+</span><span class='line'>  def process_item(self, item, spider):
+</span><span class='line'>    data = {
+</span><span class='line'>      # 标题和内容都是列表类型，必须先转换成字符串
+</span><span class='line'>      'title' : ''.join(item['title']),
+</span><span class='line'>      'content' : ''.join(item['content']),
+</span><span class='line'>    }
+</span><span class='line'>    self.ssjx.insert(data)
+</span><span class='line'>    return item
+</span><span class='line'>
+</span><span class='line'>  def close_spider(self, spider):
+</span><span class='line'>    self.client.close()</span></code></pre></td></tr></table></div></figure>
+
+<p>将组件添加到novel/settings.py的ITEM_PIPELINES配置中以启用它：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ITEM_PIPELINES = {
+</span><span class='line'>  'novel.pipelines.TxtPipeline' : 300,
+</span><span class='line'>  'novel.pipelines.MongoPipeline' : 400,
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>在项目的根目录中使用下面的指令运行Spider：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>scrapy crawl novelspider</span></code></pre></td></tr></table></div></figure>
+
+<p>如果没有问题的话，爬虫会不停地运行，小说的章节内容也会被一个个地保存到数据库。下面的截图是最终的抓取结果：</p>
+
+<p><img src="/uploads/novel-mongo-gui.png" alt="novel-mongo-gui"></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -950,123 +1042,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/code-coverage-100-percent-tragedy/">100%代码覆盖率的悲剧</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2017-05-13T19:00:41+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>13</span><span class='date-suffix'>th</span>, <span class='date-year'>2017</span></span> <span class='time'>7:00 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="http://labs.ig.com/code-coverage-100-percent-tragedy">http://labs.ig.com/code-coverage-100-percent-tragedy</a></p>
-
-<p>有趣的是，我对测试的观点正在发生变化。十五年来，我一直在宣扬TDD（测试驱动开发，或者被称为测试先行方法），或至少让开发者写些单元测试。不过，最近我发现自己更经常地说，“你为什么要写测试？”而不是“你应该写测试”。</p>
-
-<h3 id="怎么回事？">怎么回事？</h3>
-
-<p>在办公室四处走走时，开发者要求我帮助他进行单元测试。看来他在使用Mockito测试以下代码时遇到了麻烦：</p>
-
-<p><img src="/uploads/initialise-method.png" alt="initialise-method"></p>
-
-<p>我想他是非常惊讶于我的回应：“你不需要测试。”</p>
-
-<p>“但我不得不测啊！”他说。“否则如何知道这段代码是正常的？”</p>
-
-<p>“这段代码很明显。没有条件，没有循环，没有转换，没有任何东西。它们只是一些普通的旧式胶水代码。”</p>
-
-<p>“但没有测试，任何人都可以来修改和破坏这段代码呀！”</p>
-
-<p>“看，如果那个虚构的邪恶/无知的开发者来了，破坏了这些简单的代码，如果相关的单元测试中断，你认为他会做什么？他只会删除它。”</p>
-
-<p>“但是如果非要写测试怎么办？”</p>
-
-<p>“在这种情况下，我将这样写测试：”</p>
-
-<p><img src="/uploads/initialise-test.png" alt="initialise-test"></p>
-
-<p>“但是你没有使用Mockito啊！”</p>
-
-<p>“那又怎么样呢？Mockito没有帮助你。恰恰相反：它会妨碍你，并且它也不会使测试变得更易读或更简单。”</p>
-
-<p>“但是我们决定使用Mockito进行所有测试！”</p>
-
-<p>我：“……”</p>
-
-<p>后来我碰到他，他自豪地说，他已经设法用Mockito写了测试。我明白让测试代码正常运行的心理满足感，但尽管如此，这种解决方案让我难过。</p>
-
-<h3 id="另一个例子">另一个例子</h3>
-
-<p>我加入的某个开发团队，他们对新应用程序的高代码覆盖率以及对BDD（行为驱动设计）的新发现感到兴奋。查看代码，可以发现如下的Cucumber测试：</p>
-
-<p><img src="/uploads/cucumber-test.png" alt="cucumber-test"></p>
-
-<p>如果你以前使用过Cucumber，你就不会震惊于它所需的支持代码的数量：</p>
-
-<p><img src="/uploads/cucumber-support.png" alt="cucumber-support"></p>
-
-<p><img src="/uploads/cucumber-support2.png" alt="cucumber-support2"></p>
-
-<p>和所有要测试的代码：</p>
-
-<p><img src="/uploads/cucumber-code.png" alt="cucumber-code"></p>
-
-<p>是的，一个简单的地图查找。我和这个开发者有足够的信任去直言不讳地说，“这是在浪费时间。”</p>
-
-<p>“但我的老板希望我能为所有的类写测试，”他回答。</p>
-
-<p>“代价是什么？”</p>
-
-<p>“费用？”</p>
-
-<p>“无论如何，这些测试与BDD无关。”</p>
-
-<p>“我知道，但是我们决定使用Cucumber进行所有测试”</p>
-
-<p>我：“……”</p>
-
-<p>我明白按照自己意愿改造工具的心理满足感，但尽管如此，这种解决方案让我难过。</p>
-
-<h3 id="悲剧在哪里？">悲剧在哪里？</h3>
-
-<p>悲剧是两位聪明的开发者（我需要带他们去团队面试）浪费时间写那种测试，测试是毫无意义的，但需要后来的IG开发者维护。</p>
-
-<p>悲剧是不使用正确的工具，因为没有特别好的理由，我们决定坚持不懈地使用错误的工具。</p>
-
-<p>悲剧是一旦某个“良好实践”成为主流，我们似乎就忘记它是怎么来的，它的好处是什么，最主要的是，使用它的代价是什么。</p>
-
-<p>如果我们只是机械地应用它而没有太多的思考，这通常意味着我们最终得到最平庸的结果，失去大部分的好处，但支付所有（甚至更多）的成本。根据我的经验，编写好的单元测试并非易事。</p>
-
-<h3 id="那么100-的代码覆盖率值得追求吗？">那么100%的代码覆盖率值得追求吗？</h3>
-
-<p>是的，每个人都应该实现它……在一个项目中。我认为你必须用极端的手段去了解限制是什么。</p>
-
-<p>我们已经有了一个极端的大量经验：0个单元测试的项目，所以我们知道在这上面工作的痛苦。我们通常缺乏的是在另一个极端的经验：强制100%代码覆盖率和一切都是TDD的项目。单元测试（尤其是测试先行方法）是一个非常好的实践，但我们应该学习哪些测试是有用的，哪些是适得其反的。</p>
-
-<p>要记住没有什么是免费的，没有什么是银弹。使用工具前请停下来想一想。</p>
-
-<h4 id="关于作者">关于作者</h4>
-
-<p>Daniel Lebrero在IG的大数据团队担任技术架构师。拥有超过15年的Java经验和4年的Clojure经验，他现在是函数式编程的大力倡导者。可以在<a href="https://twitter.com/DanLebrero">Twitter</a>，<a href="https://www.linkedin.com/in/daniel-lebrero-4729906">LinkedIn</a>或者他的个人<a href="http://danlebrero.com/">博客</a>找到他。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/2">&larr; Older</a>
@@ -1082,6 +1057,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/crawl-novel-with-scrapy-part3/">使用Scrapy爬取小说（3）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/crawl-novel-with-scrapy-part2/">使用Scrapy爬取小说（2）</a>
       </li>
     
@@ -1095,10 +1074,6 @@
     
       <li class="post">
         <a href="/blog/chasing-the-shiny-and-new-in-software/">追逐时髦的技术</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/what-should-checked-and-unchecked-translate/">checked/unchecked应该翻译成什么？</a>
       </li>
     
   </ul>

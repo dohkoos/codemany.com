@@ -9,7 +9,10 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="首先，让我们从最简单的做起，先实现一套能正确分析PowerScript注释的词法规则。PowerScript支持两种注释形式：单行注释（//）和多行注释（/* ... */）。 单行注释以双斜杠（//）起头，直到遇到行结束符为止，所以在这里要先明确一下行结束符用什么表示。在DOS系统中行结束符用 &hellip;">
+  <meta name="description" content="在使用ANTLR构建PowerScript语法分析器（1）中写的词法规则存在几个小问题： 换行符和回车符同时存在于WS和EndOfLine两个词法规则中，属于重复定义；
+输出单行注释时紧随其后会额外多输出一个空行；
+单行注释是文件的最后一行时不能被词法分析器识别；
+像/* comments /* &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +76,94 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/using-antlr-to-build-powerscript-parser-part2/">使用ANTLR构建PowerScript语法分析器（2）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-09-02T16:44:22+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2007</span></span> <span class='time'>4:44 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在<a href="/blog/using-antlr-to-build-powerscript-parser-part1/">使用ANTLR构建PowerScript语法分析器（1）</a>中写的词法规则存在几个小问题：</p>
+
+<ol>
+<li>换行符和回车符同时存在于WS和EndOfLine两个词法规则中，属于重复定义；</li>
+<li>输出单行注释时紧随其后会额外多输出一个空行；</li>
+<li>单行注释是文件的最后一行时不能被词法分析器识别；</li>
+<li>像<code>/* comments /* nested comments */ */</code>这种嵌套注释会被输出成：</li>
+</ol>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>bc&gt;/* comments /* nested comments */
+</span><span class='line'>bc&gt;/* comments /* nested comments */ */</span></code></pre></td></tr></table></div></figure>
+
+<p>下面我们将逐个修复它们。</p>
+
+<p>解决第1个问题前先要问问自己，单行注释的词法规则中真的需要包含EndOfLine这个词法规则吗？真的需要吗？如果没有的话，当词法分析器识别到换行符或回车符时，就会去匹配词法规则WS。这样看来，EndOfLine这个词法规则在这里其实是不必要的，完全可以删除掉。</p>
+
+<p>第2个问题因为词法规则EndOfLine已经被删除，所以也就不存在了。这儿仅仅分析下问题的原因。词法分析器分析单行注释时，EndOfLine会被当作单行注释的一部分予以识别。翻看生成的词法识别器代码，可以看到打印代码块出现在词法规则EndOfLine调用的后面。打印代码块中的getText()方法是从CharStream中获取文本的，如果在词法规则EndOfLine被调用后才执行，因为词法规则EndOfLine被调用时会将CharStream的当前索引向尾部移动，这时获得的文本就会包含EndOfLine，导致打印时额外输出一个空行。</p>
+
+<p>第3个问题同样也由于第1个问题的修复而不存在了。它出现的原因是因为文件最后一行的结尾字符是EOF，无法匹配词法规则EndOfLine。</p>
+
+<p>第4个问题则可以通过计数器来处理。先初始化一个计数器变量depthOfComments来标记块注释的深度，当遇到<code>“/*”</code>时就加1，遇到<code>“*/”</code>时则减1。输出时只要判断depthOfComments是否等于0就行了。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>@lexer::members {
+</span><span class='line'>    int depthOfComments = 0;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>BLOCK_COMMENT
+</span><span class='line'>    : '/*' {depthOfComments++;}
+</span><span class='line'>      ( options {greedy=false;}
+</span><span class='line'>      : ('/' '*')=&gt; BLOCK_COMMENT
+</span><span class='line'>      | '/' ~('*')
+</span><span class='line'>      | ~('/')
+</span><span class='line'>      )*
+</span><span class='line'>      '*/' {depthOfComments--;}
+</span><span class='line'>      {
+</span><span class='line'>          if (depthOfComments == 0) {
+</span><span class='line'>              System.out.println("bc&gt;" + getText());
+</span><span class='line'>          }
+</span><span class='line'>      }
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1203,113 +1294,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/javascript-undefined/">JavaScript中的undefined</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2007-04-20T16:03:06+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>20</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>4:03 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>JavaScript有6种类型，undefined、null、boolean、number、string和object。其中，null类型只有一个值null。undefined类型也只有一个值，即undefined，当声明的变量没有被赋值的时候，该变量的默认值就是undefined。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>var foo;</span></code></pre></td></tr></table></div></figure>
-
-<p>上面这行代码声明了变量foo，没有赋值。脚本引擎在处理代码的时候会给该变量赋予值undefined。实际上，该行代码等价于</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>var foo = undefined;</span></code></pre></td></tr></table></div></figure>
-
-<p>可以用下面的代码测试：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>var foo;
-</span><span class='line'>alert(foo == undefined);    // true
-</span><span class='line'>alert(foo === undefined);    // true
-</span><span class='line'>alert(typeof(foo));    // undefined</span></code></pre></td></tr></table></div></figure>
-
-<p>JavaScript另一个有趣的方面是在使用变量之前不必声明。例如：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>var foo = "Hello ";
-</span><span class='line'>bar = foo + "world!";
-</span><span class='line'>alert(bar);    // Hello world!</span></code></pre></td></tr></table></div></figure>
-
-<p>变量bar并没有用var运算符定义，这里只是使用了它，就像已经声明过它一样。脚本引擎遇到未声明过的标识符时，用该变量名创建一个全局变量，并将其初始化为指定的值（这里是foo + &quot;world&quot;）。这是该语言的便利之处，不过如果不能紧密跟踪变量，这样做也很危险。考虑下面的代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>var foo;
-</span><span class='line'>// Make sure this variable isn't defined
-</span><span class='line'>//var bar;
-</span><span class='line'>alert(foo);
-</span><span class='line'>alert(bar);</span></code></pre></td></tr></table></div></figure>
-
-<p>执行的结果是：</p>
-
-<p><img src="/uploads/undefined.png" alt="undefined"></p>
-
-<p><img src="/uploads/undefined-error.png" alt="undefined-error"></p>
-
-<p>alert(bar)出现错误是因为bar被创建成全局变量后没有被初始化，还处在未初始化（uninitialized）状态。但是，typeof运算符并不真正区分这两种值。考虑下面的代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>var foo;
-</span><span class='line'>// Make sure this variable isn't defined
-</span><span class='line'>//var bar;
-</span><span class='line'>alert(typeof(foo));    // undefined
-</span><span class='line'>alert(typeof(bar));    // undefined</span></code></pre></td></tr></table></div></figure>
-
-<p>前面的代码对两个变量的输出都是“undefined”，即使变量bar在使用前没有被声明。</p>
-
-<p>当函数无明确返回值时，返回的也是值undefined，如下所示：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>function foobar() { }
-</span><span class='line'>alert(foobar() == undefined);    // true
-</span><span class='line'>alert(foobar() === undefined);    // true</span></code></pre></td></tr></table></div></figure>
-
-<p>ECMAScript认为undefined是从null派生出来的，所以把它们定义为相等的：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>alert(null == undefined);    // true</span></code></pre></td></tr></table></div></figure>
-
-<p>尽管这两个值相等，但它们的含义不同。undefined是声明了变量但未赋值时赋予该变量的值，null则用于表示尚未存在的对象（但从技术上来说，null仍然是原始值）。如果要区分两者，要使用===或typeof运算符。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/28">&larr; Older</a>
@@ -1327,6 +1311,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/crawl-novel-with-scrapy-part3/">使用Scrapy爬取小说（3）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/crawl-novel-with-scrapy-part2/">使用Scrapy爬取小说（2）</a>
       </li>
     
@@ -1340,10 +1328,6 @@
     
       <li class="post">
         <a href="/blog/chasing-the-shiny-and-new-in-software/">追逐时髦的技术</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/what-should-checked-and-unchecked-translate/">checked/unchecked应该翻译成什么？</a>
       </li>
     
   </ul>

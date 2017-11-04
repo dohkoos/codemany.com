@@ -1,0 +1,383 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>使用Scrapy爬取小说（3） - 乐者为王</title>
+  <meta name="author" content="dohkoos">
+
+  
+  <meta name="description" content="在使用Scrapy爬取小说（2）中，我们将小说的每个章节保存为独立的文本文件。今天我们准备把小说内容输出到数据库。对于数据存储，我选择MongoDB。为什么是MongoDB而不是其它？原因是以前没用过，想尝试下。 现在我们已经知道，要把抓取来的数据保存到数据库，只需实现Item &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://codemany.com/blog/crawl-novel-with-scrapy-part3/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/atom.xml" rel="alternate" title="乐者为王" type="application/atom+xml">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script>!window.jQuery && document.write(unescape('%3Cscript src="/javascripts/libs/jquery.min.js"%3E%3C/script%3E'))</script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  
+  
+  <script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-46570161-1']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">乐者为王</a></h1>
+  
+    <h2>Do one thing, and do it well.</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="https://www.google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="sitesearch" value="codemany.com">
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">使用Scrapy爬取小说（3）</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2017-11-04T09:55:53+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>4</span><span class='date-suffix'>th</span>, <span class='date-year'>2017</span></span> <span class='time'>9:55 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>在<a href="/blog/crawl-novel-with-scrapy-part2/">使用Scrapy爬取小说（2）</a>中，我们将小说的每个章节保存为独立的文本文件。今天我们准备把小说内容输出到数据库。对于数据存储，我选择MongoDB。为什么是MongoDB而不是其它？原因是以前没用过，想尝试下。</p>
+
+<p>现在我们已经知道，要把抓取来的数据保存到数据库，只需实现Item Pipeline即可。我们可以仿照前面的实现依葫芦画瓢。</p>
+
+<p>以下是将小说内容保存到MongoDB的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>import pymongo
+</span><span class='line'>
+</span><span class='line'>class MongoPipeline(object):
+</span><span class='line'>  def open_spider(self, spider):
+</span><span class='line'>    self.client = pymongo.MongoClient('localhost', 27017)
+</span><span class='line'>    self.novel = self.client['novel']
+</span><span class='line'>    self.ssjx = self.novel['ssjx']
+</span><span class='line'>
+</span><span class='line'>  def process_item(self, item, spider):
+</span><span class='line'>    data = {
+</span><span class='line'>      # 标题和内容都是列表类型，必须先转换成字符串
+</span><span class='line'>      'title' : ''.join(item['title']),
+</span><span class='line'>      'content' : ''.join(item['content']),
+</span><span class='line'>    }
+</span><span class='line'>    self.ssjx.insert(data)
+</span><span class='line'>    return item
+</span><span class='line'>
+</span><span class='line'>  def close_spider(self, spider):
+</span><span class='line'>    self.client.close()</span></code></pre></td></tr></table></div></figure>
+
+<p>将组件添加到novel/settings.py的ITEM_PIPELINES配置中以启用它：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ITEM_PIPELINES = {
+</span><span class='line'>  'novel.pipelines.TxtPipeline' : 300,
+</span><span class='line'>  'novel.pipelines.MongoPipeline' : 400,
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>在项目的根目录中使用下面的指令运行Spider：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>scrapy crawl novelspider</span></code></pre></td></tr></table></div></figure>
+
+<p>如果没有问题的话，爬虫会不停地运行，小说的章节内容也会被一个个地保存到数据库。下面的截图是最终的抓取结果：</p>
+
+<p><img src="/uploads/novel-mongo-gui.png" alt="novel-mongo-gui"></p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">dohkoos</span></span>
+
+      
+
+
+
+
+<time class='entry-date' datetime='2017-11-04T09:55:53+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>4</span><span class='date-suffix'>th</span>, <span class='date-year'>2017</span></span> <span class='time'>9:55 am</span></time>
+      
+
+
+      
+
+<span class="tags">
+  
+    <a class='tag' href='/tags/mongodb/'>MongoDB</a>, <a class='tag' href='/tags/python/'>Python</a>, <a class='tag' href='/tags/scrapy/'>Scrapy</a>
+  
+</span>
+
+
+    </p>
+    
+  <h3>Related Posts</h3>
+  <ul class="posts">
+  
+    <li class="related">
+      <a href="/blog/crawl-novel-with-scrapy-part2/">使用Scrapy爬取小说（2）</a>
+    </li>
+  
+    <li class="related">
+      <a href="/blog/crawl-novel-with-scrapy-part1/">使用Scrapy爬取小说（1）</a>
+    </li>
+  
+  </ul>
+
+
+    
+      <div id="jiathis_style_32x32">
+	<a class="jiathis_button_qzone"></a>
+	<a class="jiathis_button_tsina"></a>
+	<a class="jiathis_button_tqq"></a>
+    <a class="jiathis_button_weixin"></a>
+	<a class="jiathis_button_renren"></a>
+	<a href="http://www.jiathis.com/share/" class="jiathis jiathis_txt jtico jtico_jiathis" target="_blank"></a>
+	<a class="jiathis_counter_style"></a>
+</div>
+<script type="text/javascript" src="http://v2.jiathis.com/code/jia.js" charset="utf-8"></script>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/crawl-novel-with-scrapy-part2/" title="Previous Post: 使用Scrapy爬取小说（2）">&laquo; 使用Scrapy爬取小说（2）</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/crawl-novel-with-scrapy-part3/">使用Scrapy爬取小说（3）</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/crawl-novel-with-scrapy-part2/">使用Scrapy爬取小说（2）</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/crawl-novel-with-scrapy-part1/">使用Scrapy爬取小说（1）</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/thinking-on-software-version/">软件版本号的思考</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/chasing-the-shiny-and-new-in-software/">追逐时髦的技术</a>
+      </li>
+    
+  </ul>
+</section>
+<section>
+  <h1>Recent Comments</h1>
+  <div class="dsq-widget">
+    <script type="text/javascript" src="http://codemany.disqus.com/recent_comments_widget.js"></script>
+  </div>
+</section>
+<section>
+  <h1>Tags</h1>
+  <ul class="tag-cloud">
+    <a style="font-size: 142%" href="/tags/antlr/">ANTLR</a>
+<a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
+<a style="font-size: 132%" href="/tags/android/">Android</a>
+<a style="font-size: 103%" href="/tags/c-plus-plus/">C++</a>
+<a style="font-size: 106%" href="/tags/css/">CSS</a>
+<a style="font-size: 108%" href="/tags/crack/">Crack</a>
+<a style="font-size: 106%" href="/tags/database/">Database</a>
+<a style="font-size: 95%" href="/tags/eclipse/">Eclipse</a>
+<a style="font-size: 113%" href="/tags/git/">Git</a>
+<a style="font-size: 95%" href="/tags/html/">HTML</a>
+<a style="font-size: 103%" href="/tags/jbookshelf/">JBookShelf</a>
+<a style="font-size: 146%" href="/tags/java/">Java</a>
+<a style="font-size: 99%" href="/tags/javascript/">JavaScript</a>
+<a style="font-size: 95%" href="/tags/listview/">ListView</a>
+<a style="font-size: 103%" href="/tags/mysql/">MySQL</a>
+<a style="font-size: 103%" href="/tags/paperclip/">Paperclip</a>
+<a style="font-size: 117%" href="/tags/powerbuilder/">PowerBuilder</a>
+<a style="font-size: 99%" href="/tags/powerscript/">PowerScript</a>
+<a style="font-size: 115%" href="/tags/qianbao/">Qianbao</a>
+<a style="font-size: 150%" href="/tags/rails/">Rails</a>
+<a style="font-size: 117%" href="/tags/ruby/">Ruby</a>
+<a style="font-size: 95%" href="/tags/spring/">Spring</a>
+<a style="font-size: 99%" href="/tags/struts/">Struts</a>
+<a style="font-size: 146%" href="/tags/translation/">Translation</a>
+<a style="font-size: 95%" href="/tags/ubuntu/">Ubuntu</a>
+<a style="font-size: 106%" href="/tags/windows-server-2008/">Windows Server 2008</a>
+<a style="font-size: 106%" href="/tags/wxwidgets/">wxWidgets</a>
+
+  </ul>
+</section>
+<section>
+  <h1>Blogroll</h1>
+  <ul>
+    <li><a href="http://mindhacks.cn/">刘未鹏MIND HACKS</a></li>
+    <li><a href="http://www.importnew.com/">ImportNew</a></li>
+    <li><a href="http://ifeve.com/">并发编程网</a></li>
+    <li><a href="http://codingnow.com/">云风的 BLOG</a></li>
+    <li><a href="http://dbanotes.net/">DBA Notes</a></li>
+    <li><a href="http://www.ruanyifeng.com/blog/">阮一峰的网络日志</a></li>
+    <li><a href="http://advdbg.org/">高端调试</a></li>
+    <li><a href="http://www.cs.usfca.edu/~galles/visualization/Algorithms.html">Data Structure Visualization</a></li>
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/dohkoos">@dohkoos</a> on GitHub
+  
+  <script type="text/javascript">
+    $(document).ready(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'dohkoos',
+            count: 5,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+<section>
+  <a rel="license" href="https://creativecommons.org/licenses/by-nc-sa/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nc-sa/4.0/88x31.png" /></a>
+  <div>This work is licensed under a <a rel="license" href="https://creativecommons.org/licenses/by-nc-sa/4.0/">Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License</a>.</div>
+</section>
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2017 - dohkoos -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'codemany';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://codemany.com/blog/crawl-novel-with-scrapy-part3/';
+        var disqus_url = 'http://codemany.com/blog/crawl-novel-with-scrapy-part3/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = '//' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+</body>
+</html>

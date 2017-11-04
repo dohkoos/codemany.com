@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="英文原文：https://weblogs.java.net/blog/2008/10/03/writing-great-oo-code-day-one 没有获取经验的捷径。编写良好的面向对象代码需要经验。尽管如此，这里有三个实践可以帮助你一开始就有个良好的开端： 使用测试驱动开发（TDD） &hellip;">
+  <meta name="description" content="看到Don&#39;t Store Data in the Application Object讲，在Application对象中存储共享数据会引起NullPointerException。顿时心里就咯噔了一下，用了四分之三秒，想起自己有个业余项目就干了这样的事。赶紧地测试看看。 打开应用， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,62 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/trap-for-storing-data-in-the-application-object/">在Application对象里存储数据的陷阱</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2015-10-27T20:57:41+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>27</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>8:57 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>看到<a href="http://www.developerphil.com/dont-store-data-in-the-application-object/">Don&#39;t Store Data in the Application Object</a>讲，在Application对象中存储共享数据会引起NullPointerException。顿时心里就咯噔了一下，用了四分之三秒，想起自己有个业余项目就干了这样的事。赶紧地测试看看。</p>
+
+<p>打开应用，从MainActivity进入TxtViewerActivity界面（这里MainActivity主要是读取目录数据，然后保存在继承自Application的MainApp中，供TxtViewerActivity调用）。按手机Home键退出应用，这时你按菜单键可以看到该应用的缩图。然后在Eclipse中打开Window -&gt; Show View -&gt; Other -&gt; Android -&gt; Devices视图，双击窗口内的设备，然后点击设备下对应的进程，点击右上方红色的“Stop Process”图标。</p>
+
+<p><img src="/uploads/android-devices.png" alt="android-devices"></p>
+
+<p>重新按菜单键打开应用，然后……然后果然在LogCat中看到了有NullPointerException的大段红色警告文字。</p>
+
+<h3 id="为什么会crash的？">为什么会Crash的？</h3>
+
+<p>根本原因在于：当应用被kill掉后，通过菜单键重新打开时，应用不会开始重新启动。Android系统会新建一个Application对象，然后启动上次离开时的TxtViewerActivity以造成这个应用从来没有被kill掉的假象。因为没有经过MainActivity的数据读取，所以在TxtViewerActivity中读取数据当然要抛出异常了。</p>
+
+<h3 id="有没有替代方法呢？">有没有替代方法呢？</h3>
+
+<ul>
+<li>直接将数据通过Intent传递给TxtViewerActivity？当然也会碰到上述同样的问题。</li>
+<li>使用SharedPreferences？可惜只能存储boolean、int、long、float和String五种数据类型，不支持List的存储；</li>
+<li>使用持久化存储？也不支持List的存储，而且太笨重了；</li>
+<li>使用Singleton对象保存共享数据，然后通过Intent传递呢？这个想法不错，还可以将读取assets资源等操作移到该对象中，做到单一职责原则，改善设计。不过这样一来Singleton对象会对MainActivity的context有长期引用，容易造成内存泄露。如果不把读取操作放进去……那根本就不可能，你能让一个追求完美的程序猿忍受糟糕的代码设计吗！</li>
+</ul>
+
+<p>幸好早就有人总结出来经验了：使用Application的context代替Activity的context。</p>
+
+<p>创建Singleton对象，在Application对该对象保持引用，把原来存储在Application中共享的数据全部移到Singleton对象中，将Activity中读取assets资源等操作也放入该对象，Activity中原来对Application对象的访问改成通过Application对象对Singleton对象的访问。</p>
+
+<p>这样修改后，不光解决了应用的崩溃，还预防了内存泄漏，更改进代码的设计。</p>
+
+<p>代码下载：<a href="https://github.com/dohkoos/txtReader">https://github.com/dohkoos/txtReader</a></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1927,120 +1983,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/elasticsearch-installation/">Elasticsearch安装</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2015-02-10T23:50:34+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>10</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>11:50 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p><a href="http://elastic.co/">Elasticsearch</a>是一款基于<a href="http://lucene.apache.org/">Lucene</a>构建的开源分布式全文检索服务器。提供RESTful API，采用多shard的方式保证数据安全，提供自动resharding的功能，能够很轻松地进行大规模的横向扩展，以支撑PB级的结构化和非结构化海量数据的处理。</p>
-
-<p>安装Java 1.7</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mkdir /usr/java
-</span><span class='line'>cd /usr/java
-</span><span class='line'>wget --no-check-certificate --no-cookies --header "Cookie: oraclelicense=accept-securebackup-cookie" http://download.oracle.com/otn-pub/java/jdk/7u67-b01/jdk-7u67-linux-x64.rpm
-</span><span class='line'>rpm -ivh jdk-7u67-linux-x64.rpm
-</span><span class='line'>java -version
-</span><span class='line'>echo $JAVA_HOME</span></code></pre></td></tr></table></div></figure>
-
-<p>安装Elasticsearch 1.4.1</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>mkdir /usr/elasticsearch
-</span><span class='line'>cd /usr/elasticsearch
-</span><span class='line'>wget https://download.elastic.co/elasticsearch/elasticsearch/elasticsearch-1.4.1.tar.gz
-</span><span class='line'>tar -xvf elasticsearch-1.4.1.tar.gz
-</span><span class='line'>cd elasticsearch-1.4.1
-</span><span class='line'>./bin/elasticsearch</span></code></pre></td></tr></table></div></figure>
-
-<p>然后访问<code>http://localhost:9200/?pretty</code>就可以看到类似下面的返回：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>{
-</span><span class='line'>  "status" : 200,
-</span><span class='line'>  "name" : "Powerpax",
-</span><span class='line'>  "cluster_name" : "elasticsearch",
-</span><span class='line'>  "version" : {
-</span><span class='line'>    "number" : "1.4.1",
-</span><span class='line'>    "lucene_version" : "4.10.2"
-</span><span class='line'>  },
-</span><span class='line'>  "tagline" : "You Know, for Search"
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>只是运行起来是不够的，通常我们需要将Elasticsearch安装成服务，设置成开机自启动什么的。这要用到<a href="https://github.com/elasticsearch/elasticsearch-servicewrapper">elasticsearch-servicewrapper</a>了。下载解压后把service文件夹拷贝到elasticsearch-1.4.1/bin目录下。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>./bin/service/elasticsearch install  # 安装服务
-</span><span class='line'>./bin/service/elasticsearch start  # 运行服务</span></code></pre></td></tr></table></div></figure>
-
-<p>其它选项：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>console 以前台方式运行Elasticsearch
-</span><span class='line'>stop 停止Elasticsearch
-</span><span class='line'>remove 移除系统启动中的Elasticsearch服务（init.d/service）</span></code></pre></td></tr></table></div></figure>
-
-<p>需要注意的是，在小内存机器上运行时，需要限制下内存大小，否则服务会无法启动，出现如下警告信息：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Starting Elasticsearch...
-</span><span class='line'>Waiting for Elasticsearch......................
-</span><span class='line'>WARNING: Elasticsearch may have failed to start.</span></code></pre></td></tr></table></div></figure>
-
-<p>打开bin/service/elasticsearch.conf文件，设置Elasticsearch能够分配的JVM内存大小。一般情况下，设置成总内存的50%比较好。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>set.default.ES_HEAP_SIZE=512</span></code></pre></td></tr></table></div></figure>
-
-<p>如果要限制ES_MIN_MEM和ES_MAX_MEM，建议设置成一样大，避免出现频繁的内存分配。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/8">&larr; Older</a>
@@ -2058,6 +2000,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/crawl-novel-with-scrapy-part3/">使用Scrapy爬取小说（3）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/crawl-novel-with-scrapy-part2/">使用Scrapy爬取小说（2）</a>
       </li>
     
@@ -2071,10 +2017,6 @@
     
       <li class="post">
         <a href="/blog/chasing-the-shiny-and-new-in-software/">追逐时髦的技术</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/what-should-checked-and-unchecked-translate/">checked/unchecked应该翻译成什么？</a>
       </li>
     
   </ul>

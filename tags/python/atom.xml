@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: Python | 乐者为王]]></title>
   <link href="http://codemany.com/tags/python/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-11-04T09:37:36+08:00</updated>
+  <updated>2017-11-04T15:32:33+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,51 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[使用Scrapy爬取小说（3）]]></title>
+    <link href="http://codemany.com/blog/crawl-novel-with-scrapy-part3/"/>
+    <updated>2017-11-04T09:55:53+08:00</updated>
+    <id>http://codemany.com/blog/crawl-novel-with-scrapy-part3</id>
+    <content type="html"><![CDATA[<p>在<a href="/blog/crawl-novel-with-scrapy-part2/">使用Scrapy爬取小说（2）</a>中，我们将小说的每个章节保存为独立的文本文件。今天我们准备把小说内容输出到数据库。对于数据存储，我选择MongoDB。为什么是MongoDB而不是其它？原因是以前没用过，想尝试下。</p>
+
+<p>现在我们已经知道，要把抓取来的数据保存到数据库，只需实现Item Pipeline即可。我们可以仿照前面的实现依葫芦画瓢。</p>
+
+<p>以下是将小说内容保存到MongoDB的代码：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">import pymongo
+
+class MongoPipeline(object):
+  def open_spider(self, spider):
+    self.client = pymongo.MongoClient(&#39;localhost&#39;, 27017)
+    self.novel = self.client[&#39;novel&#39;]
+    self.ssjx = self.novel[&#39;ssjx&#39;]
+
+  def process_item(self, item, spider):
+    data = {
+      # 标题和内容都是列表类型，必须先转换成字符串
+      &#39;title&#39; : &#39;&#39;.join(item[&#39;title&#39;]),
+      &#39;content&#39; : &#39;&#39;.join(item[&#39;content&#39;]),
+    }
+    self.ssjx.insert(data)
+    return item
+
+  def close_spider(self, spider):
+    self.client.close()
+</code></pre></div>
+<p>将组件添加到novel/settings.py的ITEM_PIPELINES配置中以启用它：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">ITEM_PIPELINES = {
+  &#39;novel.pipelines.TxtPipeline&#39; : 300,
+  &#39;novel.pipelines.MongoPipeline&#39; : 400,
+}
+</code></pre></div>
+<p>在项目的根目录中使用下面的指令运行Spider：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">scrapy crawl novelspider
+</code></pre></div>
+<p>如果没有问题的话，爬虫会不停地运行，小说的章节内容也会被一个个地保存到数据库。下面的截图是最终的抓取结果：</p>
+
+<p><img src="/uploads/novel-mongo-gui.png" alt="novel-mongo-gui"></p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[使用Scrapy爬取小说（2）]]></title>

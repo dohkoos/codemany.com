@@ -9,7 +9,9 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="英文原文：http://thatextramile.be/blog/2008/11/agile-development-going-downhill James Shore（非常精彩的书《The Art Of Agile Development》的作者）在他的博客上写了一篇很有趣的帖子：The &hellip;">
+  <meta name="description" content="Heroku现在已经是纯粹的只读PaaS了，也就是说以前还支持的SQlite现在也不能使用了。因此部署到Heroku上的Rails应用需要把使用的数据库改成PostgreSQL，并且要关闭assets的预编译功能。 修改Gemfile，将SQLite换成PostgreSQL： 1
+2
+# gem &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +75,83 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/problem-when-deploying-application-to-heroku/">部署应用到Heroku时的问题</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2013-05-21T06:25:33+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>21</span><span class='date-suffix'>st</span>, <span class='date-year'>2013</span></span> <span class='time'>6:25 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Heroku现在已经是纯粹的只读PaaS了，也就是说以前还支持的SQlite现在也不能使用了。因此部署到Heroku上的Rails应用需要把使用的数据库改成PostgreSQL，并且要关闭assets的预编译功能。</p>
+
+<p>修改Gemfile，将SQLite换成PostgreSQL：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># gem 'sqlite3'
+</span><span class='line'>gem 'pg'</span></code></pre></td></tr></table></div></figure>
+
+<p>在config/application.rb中添加：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>config.assets.initialize_on_precompile = false</span></code></pre></td></tr></table></div></figure>
+
+<p>股票功能需要导入交割单文件，因为导入后的文本文件不再使用，可以把上传路径由public/uploads改为tmp，这样就避免了Heroku不能写文件的问题。</p>
+
+<p>应用上传后运行时出现异常，使用heroku logs -t查看日志发现有如下错误：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Error: column "stocks.share_name" must appear in the GROUP BY clause or be used in an aggregate function</span></code></pre></td></tr></table></div></figure>
+
+<p>这是因为在控制器中有这么一行代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>current_user.stocks.select("share_code, share_name, sum(actual_amount) as amount").group("share_code")</span></code></pre></td></tr></table></div></figure>
+
+<p>在PostgreSQL中这会有问题。比如下面的数据表：</p>
+
+<p><img src="/uploads/stocks-table.png" alt="stocks-table"></p>
+
+<p>执行上面的SQL语句后，share_name的值到底是取Ruby呢还是ST Ruby？解决这个问题的方法是使用aggregate函数。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>current_user.stocks.select("share_code, max(share_name) as share_name, sum(actual_amount) as amount").group("share_code")</span></code></pre></td></tr></table></div></figure>
+
+<p>使用PostgreSQL还有个问题，就是decimal类型的字段，取出来的值是字符串类型。例如：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if stock.amount &lt; 0</span></code></pre></td></tr></table></div></figure>
+
+<p>它会报错误：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ArgumentError (comparison of String with 0 failed)</span></code></pre></td></tr></table></div></figure>
+
+<p>这个可以使用to_f函数解决：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if stock.amount.to_f &lt; 0</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1077,405 +1156,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/using-interceptor-to-prohibit-users-from-accessing-unauthorized-books-information/">使用Interceptor禁止用户访问未授权的图书信息</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2013-02-01T18:50:02+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>1</span><span class='date-suffix'>st</span>, <span class='date-year'>2013</span></span> <span class='time'>6:50 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>现在的JBookShelf有两个问题：</p>
-
-<ol>
-<li>未登录的用户可以访问图书信息；</li>
-<li>登录后的用户可以访问其他用户的图书信息。</li>
-</ol>
-
-<p>第一个问题可以使用Struts 2的Interceptor来解决：</p>
-
-<ol>
-<li>创建一个实现了Interceptor接口的类；</li>
-<li>在struts.xml配置中定义这个拦截器；</li>
-<li>在struts.xml中定义一个使用了上面拦截器的拦截栈；</li>
-<li>在struts.xml中定义一个全局转向配置。</li>
-</ol>
-
-<p>实现自己的拦截器有点要注意的是，拦截器必须是无状态的，不要使用在API提供的ActionInvocation之外的任何东西。要求拦截器是无状态的原因是Struts 2不能保证为每一个请求或者action创建一个实例，所以如果拦截器带有状态，会引发并发问题。</p>
-
-<p>创建AuthorizationInterceptor类，继承类AbstractInterceptor。为什么继承它呢？而不是直接实现接口Interceptor。这是因为AbstractInterceptor已经实现了Interceptor接口，并且实现了接口中的init和destroy方法。而在这个拦截器中，我们并不需要使用这两个方法。下面上代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.account.interceptor;
-</span><span class='line'>
-</span><span class='line'>import java.util.Collections;
-</span><span class='line'>import java.util.Set;
-</span><span class='line'>
-</span><span class='line'>import com.codemany.account.model.User;
-</span><span class='line'>
-</span><span class='line'>import com.opensymphony.xwork2.Action;
-</span><span class='line'>import com.opensymphony.xwork2.ActionInvocation;
-</span><span class='line'>import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
-</span><span class='line'>import com.opensymphony.xwork2.util.TextParseUtil;
-</span><span class='line'>
-</span><span class='line'>public class AuthorizationInterceptor extends AbstractInterceptor {
-</span><span class='line'>    private static final long serialVersionUID = -5140884040684756043L;
-</span><span class='line'>
-</span><span class='line'>    protected Set&lt;String&gt; skipActions = Collections.emptySet();
-</span><span class='line'>
-</span><span class='line'>    public void setSkipActions(String skipActions) {
-</span><span class='line'>        this.skipActions = TextParseUtil.commaDelimitedStringToSet(skipActions);
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    @Override
-</span><span class='line'>    public String intercept(ActionInvocation invocation) throws Exception {
-</span><span class='line'>        User user = (User)invocation.getInvocationContext()
-</span><span class='line'>                .getSession().get(User.SESSION_KEY);
-</span><span class='line'>
-</span><span class='line'>        boolean isLogined = user != null;
-</span><span class='line'>        String action = invocation.getProxy().getActionName();
-</span><span class='line'>        // 如果用户未登录，并且访问的是需要登录权限的Action，就跳转到全局转向配置login上
-</span><span class='line'>        if (isLogined || skipActions.contains(action)) {
-</span><span class='line'>            return invocation.invoke();
-</span><span class='line'>        } else {
-</span><span class='line'>            return Action.LOGIN;
-</span><span class='line'>        }
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>这里的skipActions目的是为了跳过一些不需要拦截的Action。因为默认情况下，拦截器会拦截Action中的所有的方法。像login，register这类Action是任何用户在任何状态下都可以访问的，所以不需要拦截，这里就可以将这些Action放到skipActions中来跳过拦截。</p>
-
-<p>实现了拦截类后还要在struts.xml进行配置使它起作用，以下是struts.xml的完整代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
-</span><span class='line'>&lt;!DOCTYPE struts PUBLIC
-</span><span class='line'>    "-//Apache Software Foundation//DTD Struts Configuration 2.3//EN"
-</span><span class='line'>    "http://struts.apache.org/dtds/struts-2.3.dtd"&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;struts&gt;
-</span><span class='line'>    &lt;constant name="struts.enable.DynamicMethodInvocation" value="true" /&gt;
-</span><span class='line'>    &lt;constant name="struts.devMode" value="true" /&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;package name="default" extends="struts-default"&gt;
-</span><span class='line'>        &lt;interceptors&gt;
-</span><span class='line'>            &lt;interceptor name="authorization"
-</span><span class='line'>                class="com.codemany.account.interceptor.AuthorizationInterceptor" /&gt;
-</span><span class='line'>
-</span><span class='line'>            &lt;interceptor-stack name="authorizationStack"&gt;
-</span><span class='line'>                &lt;interceptor-ref name="authorization"&gt;
-</span><span class='line'>                    &lt;param name="skipActions"&gt;login, logout, register&lt;/param&gt;
-</span><span class='line'>                &lt;/interceptor-ref&gt;
-</span><span class='line'>                &lt;interceptor-ref name="defaultStack" /&gt;
-</span><span class='line'>            &lt;/interceptor-stack&gt;
-</span><span class='line'>        &lt;/interceptors&gt;
-</span><span class='line'>
-</span><span class='line'>        &lt;default-interceptor-ref name="authorizationStack" /&gt;
-</span><span class='line'>
-</span><span class='line'>        &lt;!-- 全局转向配置 --&gt;
-</span><span class='line'>        &lt;!-- 还记得拦截器里面的return Action.LOGIN这句吧，当程序执行完这一行后，--&gt;
-</span><span class='line'>        &lt;!-- 就会到struts.xml文件的global-results中找name为login的全局转向配置。--&gt;
-</span><span class='line'>        &lt;global-results&gt;
-</span><span class='line'>            &lt;result name="login" type="redirectAction"&gt;login!input&lt;/result&gt;
-</span><span class='line'>        &lt;/global-results&gt;
-</span><span class='line'>    &lt;/package&gt;
-</span><span class='line'>
-</span><span class='line'>    &lt;include file="account.xml" /&gt;
-</span><span class='line'>    &lt;include file="book.xml" /&gt;
-</span><span class='line'>&lt;/struts&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>然后将account.xml和book.xml中package继承的父包改成struts.xml配置中的default包：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;package name="account" extends="default"&gt;
-</span><span class='line'>
-</span><span class='line'>&lt;package name="book" extends="default"&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>第二个问题的解决就是修改BookAction.java的代码，不再从数据库中读取Book数据，而是从当前登录用户的books属性中查找Book信息。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-<span class='line-number'>44</span>
-<span class='line-number'>45</span>
-<span class='line-number'>46</span>
-<span class='line-number'>47</span>
-<span class='line-number'>48</span>
-<span class='line-number'>49</span>
-<span class='line-number'>50</span>
-<span class='line-number'>51</span>
-<span class='line-number'>52</span>
-<span class='line-number'>53</span>
-<span class='line-number'>54</span>
-<span class='line-number'>55</span>
-<span class='line-number'>56</span>
-<span class='line-number'>57</span>
-<span class='line-number'>58</span>
-<span class='line-number'>59</span>
-<span class='line-number'>60</span>
-<span class='line-number'>61</span>
-<span class='line-number'>62</span>
-<span class='line-number'>63</span>
-<span class='line-number'>64</span>
-<span class='line-number'>65</span>
-<span class='line-number'>66</span>
-<span class='line-number'>67</span>
-<span class='line-number'>68</span>
-<span class='line-number'>69</span>
-<span class='line-number'>70</span>
-<span class='line-number'>71</span>
-<span class='line-number'>72</span>
-<span class='line-number'>73</span>
-<span class='line-number'>74</span>
-<span class='line-number'>75</span>
-<span class='line-number'>76</span>
-<span class='line-number'>77</span>
-<span class='line-number'>78</span>
-<span class='line-number'>79</span>
-<span class='line-number'>80</span>
-<span class='line-number'>81</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>package com.codemany.book.action;
-</span><span class='line'>
-</span><span class='line'>import java.util.ArrayList;
-</span><span class='line'>import java.util.List;
-</span><span class='line'>
-</span><span class='line'>import com.codemany.account.model.User;
-</span><span class='line'>import com.codemany.book.model.Book;
-</span><span class='line'>import com.codemany.book.service.BookService;
-</span><span class='line'>
-</span><span class='line'>import com.opensymphony.xwork2.ActionContext;
-</span><span class='line'>import com.opensymphony.xwork2.ActionSupport;
-</span><span class='line'>
-</span><span class='line'>public class BookAction extends ActionSupport {
-</span><span class='line'>    private static final long serialVersionUID = 2538923417705852774L;
-</span><span class='line'>
-</span><span class='line'>    private Long bookId;
-</span><span class='line'>    private Book book;
-</span><span class='line'>    private List&lt;Book&gt; bookList;
-</span><span class='line'>
-</span><span class='line'>    private BookService bookService;
-</span><span class='line'>
-</span><span class='line'>    public String list() throws Exception {
-</span><span class='line'>        if (bookList == null) {
-</span><span class='line'>            bookList = new ArrayList&lt;Book&gt;();
-</span><span class='line'>        }
-</span><span class='line'>        bookList.addAll(getCurrentUser().getBooks());
-</span><span class='line'>        return "list";
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public String show() throws Exception {
-</span><span class='line'>        book = getCurrentUser().getBook(bookId);
-</span><span class='line'>        return "show";
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public String input() throws Exception {
-</span><span class='line'>        if (bookId != null) {
-</span><span class='line'>            book = getCurrentUser().getBook(bookId);
-</span><span class='line'>        }
-</span><span class='line'>        return INPUT;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public String saveOrUpdate() throws Exception {
-</span><span class='line'>        book.setUser(getCurrentUser());
-</span><span class='line'>        bookService.saveOrUpdateBook(book);
-</span><span class='line'>        return SUCCESS;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public String delete() throws Exception {
-</span><span class='line'>        Book book = getCurrentUser().getBook(bookId);
-</span><span class='line'>        if (book != null) {
-</span><span class='line'>            bookService.deleteBook(bookId);
-</span><span class='line'>            getCurrentUser().getBooks().remove(book);
-</span><span class='line'>        }
-</span><span class='line'>        return SUCCESS;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public List&lt;Book&gt; getBookList() {
-</span><span class='line'>        return bookList;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public Book getBook() {
-</span><span class='line'>        return book;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void setBook(Book book) {
-</span><span class='line'>        this.book = book;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void setBookId(Long bookId) {
-</span><span class='line'>        this.bookId = bookId;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public void setBookService(BookService bookService) {
-</span><span class='line'>        this.bookService = bookService;
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    private User getCurrentUser() {
-</span><span class='line'>        return (User)ActionContext.getContext()
-</span><span class='line'>                .getSession().get(User.SESSION_KEY);
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>上面的代码会产生异常，提示取出的Book数据为空，所以要在User.hbm.xml中set标签后添加属性lazy=“false”，这样Hibernate从数据库中读取User数据时会连带取出对应的Book数据：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;set name="books" inverse="true" lazy="false"&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>下面是BookAction类中用到的User.getBook(bookId)代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class User {
-</span><span class='line'>
-</span><span class='line'>    public Book getBook(Long bookId) {
-</span><span class='line'>        for (Book book : books) {
-</span><span class='line'>            if (bookId != null && bookId.equals(book.getId())) {
-</span><span class='line'>                return book;
-</span><span class='line'>            }
-</span><span class='line'>        }
-</span><span class='line'>        return null;
-</span><span class='line'>    }</span></code></pre></td></tr></table></div></figure>
-
-<p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/11">&larr; Older</a>
@@ -1493,6 +1173,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/crawl-novel-with-scrapy-part3/">使用Scrapy爬取小说（3）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/crawl-novel-with-scrapy-part2/">使用Scrapy爬取小说（2）</a>
       </li>
     
@@ -1506,10 +1190,6 @@
     
       <li class="post">
         <a href="/blog/chasing-the-shiny-and-new-in-software/">追逐时髦的技术</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/what-should-checked-and-unchecked-translate/">checked/unchecked应该翻译成什么？</a>
       </li>
     
   </ul>
