@@ -172,7 +172,7 @@
 
 <p>在许多情况下，ANTLR可以比单纯消费更智能地恢复，直到重新同步集合并从当前规则返回。尝试“修复”输入并在相同的规则内继续是值得的。在接下来的几个部分，我们将看看语法分析器如何从不匹配的记号以及子规则里的错误中恢复。</p>
 
-<h3 id="从不匹配记号中恢复">从不匹配记号中恢复</h3>
+<h4 id="从不匹配记号中恢复">从不匹配记号中恢复</h4>
 
 <p>在语法分析过程中最常见的操作之一是“匹配记号”。对于语法中的每个记号引用T，语法分析器调用match(T)。如果当前的记号不是T，match()通知错误监听器并尝试重新同步。要重新同步，它有3个选择。它可以删除一个记号，它可以想象出一个，或者可以放弃并抛出异常以便从事基本的同步和返回机制。</p>
 
@@ -223,7 +223,7 @@
 
 <p>当然，带有文本<code>&lt;missing ID&gt;</code>的标识符对于任何我们试图完成的目标都不是很有用，但至少错误恢复不会导致一堆空指针异常。现在我们知道ANTLR如何对简单的记号引用进行规则内恢复，下面让我们来探讨如何从以前和子规则识别期间的错误中恢复。</p>
 
-<h3 id="从子错误中恢复">从子错误中恢复</h3>
+<h4 id="从子规则的错误中恢复">从子规则的错误中恢复</h4>
 
 <p>为避免刚碰到错误就从子规则循环中抽身，对周围规则强制同步和返回恢复，ANTLR v4会在开始和循环继续测试处自动插入同步检查。机制看起来是这样：</p>
 
@@ -284,6 +284,41 @@
 </span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
 
 <p>语法分析器重新同步并停留在循环中是因为它确定了变量z。语法分析器消费<code>y;;;</code>直到看到另一个成员的开始（就如前面所说的集合3），然后循环回到member。如果输入不包含<code>int z</code>，语法分析器会一直消费下去直到看到<code>}</code>（前面的集合2）并退出循环。语法分析树突出显示已被删除的记号并说明语法分析器仍然把<code>int z;</code>解释为有效的成员。</p>
+
+<p><img src="/uploads/parse-tree-10.png" alt="parse-tree-10"></p>
+
+<p>如果提供的规则member有语法错误并且没有<code>}</code>，在语法分析器找到<code>}</code>之前我们不希望它进行扫描。语法分析器重新同步可以为查找<code>}</code>抛出整个下面的类定义。相反，语法分析器如果看到集合3中的记号会停止消费，就如同下面的会话那样:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>$ grun Simple prog
+</span><span class='line'>class T {
+</span><span class='line'>  int x;
+</span><span class='line'>  ;
+</span><span class='line'>class U { int y; }
+</span><span class='line'>EOF
+</span><span class='line'>var x
+</span><span class='line'>line 3:2 extraneous input ';' expecting {'int', '}'}
+</span><span class='line'>class T
+</span><span class='line'>var y
+</span><span class='line'>class U</span></code></pre></td></tr></table></div></figure>
+
+<p>如我们所见，语法分析器在看到关键字class时会停止从语法分析树重新同步。</p>
+
+<p><img src="/uploads/parse-tree-11.png" alt="parse-tree-11"></p>
+
+<p>除了记号和子规则的识别之外，语法分析器也可能无法匹配语义谓词。</p>
+
+<h4 id="捕捉失败的语义谓词">捕捉失败的语义谓词</h4>
 </div>
 
 
