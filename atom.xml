@@ -4,7 +4,7 @@
   <title><![CDATA[乐者为王]]></title>
   <link href="http://codemany.com/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-11-10T20:11:00+08:00</updated>
+  <updated>2017-11-11T14:35:35+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,39 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[使用Scrapy爬取小说（4）]]></title>
+    <link href="http://codemany.com/blog/crawl-novel-with-scrapy-part4/"/>
+    <updated>2017-11-11T14:17:36+08:00</updated>
+    <id>http://codemany.com/blog/crawl-novel-with-scrapy-part4</id>
+    <content type="html"><![CDATA[<p>在<a href="http://codemany.com/blog/crawl-novel-with-scrapy-part1/">使用Scrapy爬取小说（1）</a>中我们使用range(1, 310)来确定章节链接的范围，这很不好。我们编程的时候应该要尽量注意减少代码中的硬编码和魔数，提高代码的可移植性。如果小说章节的链接不是这种连续的数字，或者章节的数量是在逐步增加的，那么这段代码就是无效的，或者会慢慢变得无效。</p>
+
+<p>如何才能把这段代码写得更具可移植性呢？</p>
+
+<p><img src="http://codemany.com/uploads/novel-chapter-urls.png" alt="novel-chapter-urls"></p>
+
+<p>我们不必关心章节链接的格式，我们只要知道它是个链接，一定是以<code>&lt;a href=&quot;url&quot;&gt;text&lt;/a&gt;</code>这种形式呈现（如上图所示）。我们也不必关心章节数量是否变化，只要把所有这种形式的链接抓取下来即可。与此对应的XPath表达式是：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>//center/table[@bordercolorlight]//a/@href</span></code></pre></td></tr></table></div></figure>
+
+<p>因为页面文档中可能有多个表格，所以要在table后面添加@bordercolorlight属性来指定我们要查找的那个。</p>
+
+<p>那么在Scrapy中如何实现这样的能力呢？以下是具体的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def parse(self, response):
+</span><span class='line'>  links = response.xpath('//center/table[@bordercolorlight]//a/@href').extract()
+</span><span class='line'>  for link in links:
+</span><span class='line'>    next = response.urljoin(link)
+</span><span class='line'>    yield scrapy.Request(next, callback=self.parse_chapter)</span></code></pre></td></tr></table></div></figure>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[使用Scrapy爬取小说（3）]]></title>
@@ -2315,218 +2348,6 @@
 <p>输出显示语法分析器也会调用reportAttemptingFullContext()。当<code>SLL(*)</code>分析失败并且语法分析器进行更强大的全<code>ALL(*)</code>机制时，ANTLR调用这个方法。</p>
 
 <p>在开发中使用诊断错误监听器是个好主意，因为ANTLR工具不能给你有关歧义语法结构的警告（当生成语法分析器时）。只有在运行时语法分析器才可以侦测到二义性。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（29）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part29/"/>
-    <updated>2016-10-18T11:22:11+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part29</id>
-    <content type="html"><![CDATA[<p>当我们开发一套语法时，会有很多错误要去修复。在完成语法前，生成的语法分析器不会识别所有有效的句子。在这期间，提供有用信息的错误消息帮助我们追踪到语法问题。一旦我们有了一套正确的语法，然后我们就必须处理用户输入的不合语法的句子，或者甚至由其它程序发生故障生成的不合语法的句子。在这两种情况下，语法分析器对不合语法的输入的响应方式是一个需要重点考虑的问题。</p>
-
-<p>在这里，我们将学习被ANTLR生成的语法分析器使用的自动错误报告和恢复策略。</p>
-
-<h3 id="错误展示">错误展示</h3>
-
-<p>描述ANTLR的错误恢复策略的最好方式是观察由它生成的语法分析器对错误输入的响应。让我们看一个类Java语言的语法，它包含带有字段和方法成员的类定义。该方法有简单的语句和表达式。嵌入动作在语法分析器找到元素时就打印它们。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Simple;
-</span><span class='line'>
-</span><span class='line'>prog: classDef+ ; // match one or more class definitions
-</span><span class='line'>
-</span><span class='line'>classDef
-</span><span class='line'>    : 'class' ID '{' member+ '}' // a class has one or more members
-</span><span class='line'>      {System.out.println("class "+$ID.text);}
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>member
-</span><span class='line'>    : 'int' ID ';'    // field definition
-</span><span class='line'>      {System.out.println("var "+$ID.text);}
-</span><span class='line'>    | 'int' f=ID '(' ID ')' '{' stat '}'    // method definition
-</span><span class='line'>      {System.out.println("method: "+$f.text);}
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>stat: expr ';'
-</span><span class='line'>      {System.out.println("found expr: "+$stat.text);}
-</span><span class='line'>    | ID '=' expr ';'
-</span><span class='line'>      {System.out.println("found assign: "+$stat.text);}
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>expr: INT
-</span><span class='line'>    | ID '(' INT ')'
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>INT : [0-9]+ ;
-</span><span class='line'>ID  : [a-zA-Z]+ ;
-</span><span class='line'>WS  : [ \t\r\n]+ -&gt; skip ;</span></code></pre></td></tr></table></div></figure>
-
-<p>现在，先让我们使用一些有效的输入运行语法分析器，借以观测正常的输出。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr Simple.g
-</span><span class='line'>compile *.java
-</span><span class='line'>grun Simple prog</span></code></pre></td></tr></table></div></figure>
-
-<p>输入以下数据：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class T { int i; }</span></code></pre></td></tr></table></div></figure>
-
-<p>你就会看到：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>var i
-</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
-
-<p>语法分析器没有显示任何错误，它执行打印语句，报告关于变量i和类定义T的正确识别。</p>
-
-<p>接下来，让我们尝试一个带有方法定义的类，该方法含有一个虚假赋值表达式。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grun Simple prog -gui</span></code></pre></td></tr></table></div></figure>
-
-<p>输入测试数据：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class T {
-</span><span class='line'>  int f(x) { a = 3 4 5; }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>然后你就会看到：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>line 2:19 mismatched input '4' expecting ';'
-</span><span class='line'>method: f
-</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
-
-<p>在4记号处，语法分析器没有找到它期待的“;”，所以它报告一个错误。line 2:19指出有问题的标记是在第2行第19列的字符位置（字符位置从0开始）。因为使用了-gui参数，我们可以看到带有高亮错误节点的语法分析树。</p>
-
-<p><img src="http://codemany.com/uploads/simple-parse-tree.png" alt="simple-parse-tree"></p>
-
-<p>在这里，有两个额外的记号，并且语法分析器给出一个不匹配的通用错误消息。如果只有单个的额外记号，语法分析器可能会智能一点，指出它是一个额外的记号。在接下来的运行测试中，有个额外的“;”在类名和类体之间：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grun Simple prog</span></code></pre></td></tr></table></div></figure>
-
-<p>输入如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class T ; { int i; }</span></code></pre></td></tr></table></div></figure>
-
-<p>输出结果：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>line 1:8 extraneous input ';' expecting '{'
-</span><span class='line'>var i
-</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
-
-<p>在“;”处语法分析器报告一个错误，但给出了一个稍微翔实的答案，因为它知道下一个记号就是它实际上在寻找的那个。这个特性被称为单个记号删除（single-token deletion），因为语法分析器可以简单地装作额外的记号不存在并继续执行。</p>
-
-<p>同样的，语法分析器可以在侦测到缺少一个记号时做单个记号插入（single-token insertion）。让我们删掉结束的“}”看看会发生什么。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grun Simple prog</span></code></pre></td></tr></table></div></figure>
-
-<p>然后输入：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class T {
-</span><span class='line'>  int f(x) { a = 3; }</span></code></pre></td></tr></table></div></figure>
-
-<p>结果是：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>found assign: a=3;
-</span><span class='line'>method: f
-</span><span class='line'>line 3:0 missing '}' at '&lt;EOF&gt;'
-</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
-
-<p>语法分析器报告它不能找到必须的结束记号“}”。</p>
-
-<p>当语法分析器处于决策点时，会出现另一个常见的语法错误，并且剩余的输入与规则或子规则的任何选项都不一致。例如，如果我们忘记字段声明中的变量名，规则member中的选项都不匹配。语法分析器报告没有可行的选项。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grun Simple prog</span></code></pre></td></tr></table></div></figure>
-
-<p>输入以下代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class T { int ; }</span></code></pre></td></tr></table></div></figure>
-
-<p>然后结果是：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>line 1:14 no viable alternative at input 'int;'
-</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
-
-<p>在“int”和“;”之间没有空格，因为我们在WS()规则中告诉词法分析器skip()。</p>
-
-<p>如果有词法错误，ANTLR也会放出错误消息，指出哪些字符不能匹配为记号。例如，如果我们提交一个完全未知的字符，我们将得到一个记号识别错误。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grun Simple prog</span></code></pre></td></tr></table></div></figure>
-
-<p>输入：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class # { int i; }</span></code></pre></td></tr></table></div></figure>
-
-<p>输出：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>line 1:6 token recognition error at: '#'
-</span><span class='line'>line 1:8 missing ID at '{'
-</span><span class='line'>var i
-</span><span class='line'>class &lt;missing ID&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>因为没有给出有效的类名，单个记号插入机制召唤了“missing ID”名字，以致类名记号是非空值。如果想控制语法分析器如何召唤记号，可以覆盖DefaultErrorStrategy中的getMissingSymbol()。</p>
 ]]></content>
   </entry>
   

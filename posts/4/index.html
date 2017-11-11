@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="单独的语法不是很有用，因为相关的语法分析器只能告诉我们某个输入句子是否遵守语言规格。为构建语言应用，我们需要语法分析器在看到特定的输入句子、短语或者记号时触发特定的动作。这些短语-动作对的集合表示语言应用或者至少是在语法和一个更大的周边应用之间的接口。 &hellip;">
+  <meta name="description" content="前文的语法仍然存在问题，因为它限制我们只能使用Java生成语法分析器。为使语法可复用和语言无关，我们需要完全避免嵌入动作。接下来就将展示如何用监听器做到这点。 使用语法分析树监听器实现应用 在构建语言应用时要避免应用和语法纠缠在一起，关键是让语法分析器生成语法分析树， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,153 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part21/">ANTLR 4权威参考读书笔记（21）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-07-14T18:38:42+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>14</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:38 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>前文的语法仍然存在问题，因为它限制我们只能使用Java生成语法分析器。为使语法可复用和语言无关，我们需要完全避免嵌入动作。接下来就将展示如何用监听器做到这点。</p>
+
+<h3 id="使用语法分析树监听器实现应用">使用语法分析树监听器实现应用</h3>
+
+<p>在构建语言应用时要避免应用和语法纠缠在一起，关键是让语法分析器生成语法分析树，然后遍历该树去触发特定的应用代码。我们可以使用我们最喜欢的技术遍历树，也可以使用ANTLR生成的树遍历机制中的一个。在本节中，我们将使用ANTLR内建的ParseTreeWalker构建一个基于监听器版本的属性文件应用。</p>
+
+<p>让我们从属性文件语法的原始版本开始：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>file : prop+ ;
+</span><span class='line'>prop : ID '=' STRING '\n' ;</span></code></pre></td></tr></table></div></figure>
+
+<p>下面是属性示例文件t.properties的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>user="parrt"
+</span><span class='line'>machine="maniac"</span></code></pre></td></tr></table></div></figure>
+
+<p>通过上述语法，ANTLR生成PropertyFileParser，该语法分析器会自动构建如下图所示的语法分析树：</p>
+
+<p><img src="/uploads/propertyfile-parse-tree.png" alt="propertyfile-parse-tree"></p>
+
+<p>有了语法分析树，我们就可以使用ParseTreeWalker去访问所有的节点，触发进入和退出方法。</p>
+
+<p>现在来看一下ANTLR通过语法PropertyFile生成的监听器接口PropertyFileListener，当ANTLR的ParseTreeWalker发现和完成节点时，它会为每个规则子树分别触发进入和退出方法。因为在语法PropertyFile中只有两条语法规则，所以在接口中有4个方法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public interface PropertyFileListener extends ParseTreeListener {
+</span><span class='line'>    void enterFile(PropertyFileParser.FileContext ctx);
+</span><span class='line'>    void exitFile(PropertyFileParser.FileContext ctx);
+</span><span class='line'>    void enterProp(PropertyFileParser.PropContext ctx);
+</span><span class='line'>    void exitProp(PropertyFileParser.PropContext ctx);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>FileContext和PropContext对象是针对每条语法规则的语法分析树节点的实现，它们包含一些有用的方法。</p>
+
+<p>为方便起见，ANTLR也会生成带有默认实现的类PropertyFileBaseListener，这些默认实现模仿在前文语法中@member区域我们手写的空白方法。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class PropertyFileBaseVisitor&lt;T&gt; extends AbstractParseTreeVisitor&lt;T&gt;
+</span><span class='line'>                                        implements PropertyFileVisitor&lt;T&gt; {
+</span><span class='line'>    @Override
+</span><span class='line'>    public T visitFile(PropertyFileParser.FileContext ctx) { }
+</span><span class='line'>    @Override
+</span><span class='line'>    public T visitProp(PropertyFileParser.PropContext ctx) { }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>默认实现让我们只需要覆盖和实现那些我们关心的方法。例如，以下是属性文件加载器的一个重新实现，像前面那样它只有一个方法，但使用监听器机制：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static class PropertyFileLoader extends PropertyFileBaseListener {
+</span><span class='line'>    Map&lt;String,String&gt; props = new OrderedHashMap&lt;String, String&gt;();
+</span><span class='line'>    public void exitProp(PropertyFileParser.PropContext ctx) {
+</span><span class='line'>        String id = ctx.ID().getText();    // prop : ID '=' STRING '\n' ;
+</span><span class='line'>        String value = ctx.STRING().getText();
+</span><span class='line'>        props.put(id, value);
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>主要的不同是这个版本扩展了基类监听器，而不是语法分析器，监听器方法在语法分析器完成后被触发。</p>
+
+<p>这里面有很多的接口和类，让我们看一下在这些关键元素间的继承关系。</p>
+
+<p><img src="/uploads/propertyfile-listener-hierarchy.png" alt="propertyfile-listener-hierarchy"></p>
+
+<p>处于ANTLR运行库中的接口ParseTreeListener要求每个监听器对事件visitTerminal()、enterEveryRule()和exitEveryRule()作出反应，如果有语法错误的还要加上visitErrorNode()。ANTLR从语法文件PropertyFile生成接口PropertyFileListener，并且为类PropertyFileBaseListener的所有方法生成默认实现。我们仅需要构建PropertyFileLoader，它继承了PropertyFileBaseListener中的所有空方法。</p>
+
+<p>方法exitProp()可以访问与规则prop相关的规则上下文对象PropContext，该上下文对象持有在规则prop中提到的每个元素（ID和STRING）的对应方法。因为这些元素是语法中的记号引用，所以方法返回语法分析树节点TerminalNode。我们既可以通过getText()直接访问记号的文本，也可以通过getSymbol()首先获取Token。</p>
+
+<p>现在让我们创建测试文件TestPropertyFile.java遍历树，倾听来自PropertyFileLoader的声音：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>// create a standard ANTLR parse tree walker
+</span><span class='line'>ParseTreeWalker walker = new ParseTreeWalker();
+</span><span class='line'>// create listener then feed to walker
+</span><span class='line'>PropertyFileLoader loader = new PropertyFileLoader();
+</span><span class='line'>walker.walk(loader, tree);    // walk parse tree
+</span><span class='line'>System.out.println(loader.props);    // print results</span></code></pre></td></tr></table></div></figure>
+
+<p>然后就是编译和生成代码，运行测试程序去处理输入文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr PropertyFile.g
+</span><span class='line'>compile *.java
+</span><span class='line'>run TestPropertyFile t.properties</span></code></pre></td></tr></table></div></figure>
+
+<p>这里是输出的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>{user="parrt", machine="maniac"}</span></code></pre></td></tr></table></div></figure>
+
+<p>测试程序成功地把文件中的属性赋值重组成内存中的映射数据结构。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -3508,142 +3655,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part13/">ANTLR 4权威参考读书笔记（13）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-05-06T18:24:18+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>6</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:24 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>现在我们准备构建一个工具，用来把<a href="/blog/reading-notes-the-definitive-antlr4-reference-part7/">ANTLR 4权威参考读书笔记（7）</a>中idata.txt里的数据按group分行显示，就像这样：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>2 9 10
-</span><span class='line'>3 1 2 3</span></code></pre></td></tr></table></div></figure>
-
-<p>我们可以借助语法分析树的监听器机制来对词法分析结束后生成的记号流进行改写，我们不需要实现每一个监听器接口方法，只需要在捕获到group的时候把换行符插到它末尾就行。实现改写的代码如下所示：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class RewriteListener extends IDataBaseListener {
-</span><span class='line'>    TokenStreamRewriter rewriter;
-</span><span class='line'>
-</span><span class='line'>    public RewriteListener(TokenStream tokens) {
-</span><span class='line'>        rewriter = new TokenStreamRewriter(tokens);
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    @Override
-</span><span class='line'>    public void enterGroup(IDataParser.GroupContext ctx) {
-</span><span class='line'>        rewriter.insertAfter(ctx.stop, '\n');
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>接着就是写一个小程序来调用我们上面的改写类：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class IData {
-</span><span class='line'>
-</span><span class='line'>    public static void main(String[] args) throws Exception {
-</span><span class='line'>        InputStream is = args.length &gt; 0 ? new FileInputStream(args[0]) : System.in;
-</span><span class='line'>
-</span><span class='line'>        ANTLRInputStream input = new ANTLRInputStream(is);
-</span><span class='line'>        IDataLexer lexer = new IDataLexer(input);
-</span><span class='line'>        CommonTokenStream tokens = new CommonTokenStream(lexer);
-</span><span class='line'>        IDataParser parser = new IDataParser(tokens);
-</span><span class='line'>        ParseTree tree = parser.file();
-</span><span class='line'>
-</span><span class='line'>        RewriteListener listener = new RewriteListener(tokens);
-</span><span class='line'>
-</span><span class='line'>        System.out.println("Before Rewriting");
-</span><span class='line'>        System.out.println(listener.rewriter.getText());
-</span><span class='line'>
-</span><span class='line'>        ParseTreeWalker walker = new ParseTreeWalker();
-</span><span class='line'>        walker.walk(listener, tree);
-</span><span class='line'>
-</span><span class='line'>        System.out.println("After Rewriting");
-</span><span class='line'>        System.out.println(listener.rewriter.getText());
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>这里的关键是TokenStreamRewriter对象知道如何在不修改流的情况下提供一个记号流的修改过的视图。它把所有的操作方法当作指令并把它们排进队列，等到在遍历记号流把它作为文本渲染回去的时候再执行。每次我们调用getText()时rewriter就会执行那些指令。</p>
-
-<p>最后就是构建和测试应用：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr IData.g
-</span><span class='line'>compile *.java
-</span><span class='line'>run IData idata.txt</span></code></pre></td></tr></table></div></figure>
-
-<p>以下是输出结果：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Before Rewriting
-</span><span class='line'>29103123
-</span><span class='line'>After Rewriting
-</span><span class='line'>2910
-</span><span class='line'>3123</span></code></pre></td></tr></table></div></figure>
-
-<p>仅用几行代码，我们就能够没有任何烦恼地对某些内容做轻微的调整。这种策略对于源代码检测或重构这类一般性的问题是非常有效的。TokenStreamRewriter是一个非常强大且有效的操作记号流的工具。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/5">&larr; Older</a>
@@ -3661,6 +3672,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/crawl-novel-with-scrapy-part4/">使用Scrapy爬取小说（4）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/crawl-novel-with-scrapy-part3/">使用Scrapy爬取小说（3）</a>
       </li>
     
@@ -3674,10 +3689,6 @@
     
       <li class="post">
         <a href="/blog/thinking-on-software-version/">软件版本号的思考</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/chasing-the-shiny-and-new-in-software/">追逐时髦的技术</a>
       </li>
     
   </ul>

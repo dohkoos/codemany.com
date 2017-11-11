@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="scope 作用域 为了阐明Cymbol语法是可复用的，本节中我们将在不做修改的基础上再次使用它，用于构建一个完全不同的应用。不仅如此，我们还会在同样的树上使用两个不同的监听器做两次遍历。 验证程序符号的使用情况 为Cymbol这样的编程语言构建解释器、编译器或者转换器， &hellip;">
+  <meta name="description" content="当我们开发一套语法时，会有很多错误要去修复。在完成语法前，生成的语法分析器不会识别所有有效的句子。在这期间，提供有用信息的错误消息帮助我们追踪到语法问题。一旦我们有了一套正确的语法，然后我们就必须处理用户输入的不合语法的句子，或者甚至由其它程序发生故障生成的不合语法的句子。在这两种情况下， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,238 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part29/">ANTLR 4权威参考读书笔记（29）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-10-18T11:22:11+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>11:22 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>当我们开发一套语法时，会有很多错误要去修复。在完成语法前，生成的语法分析器不会识别所有有效的句子。在这期间，提供有用信息的错误消息帮助我们追踪到语法问题。一旦我们有了一套正确的语法，然后我们就必须处理用户输入的不合语法的句子，或者甚至由其它程序发生故障生成的不合语法的句子。在这两种情况下，语法分析器对不合语法的输入的响应方式是一个需要重点考虑的问题。</p>
+
+<p>在这里，我们将学习被ANTLR生成的语法分析器使用的自动错误报告和恢复策略。</p>
+
+<h3 id="错误展示">错误展示</h3>
+
+<p>描述ANTLR的错误恢复策略的最好方式是观察由它生成的语法分析器对错误输入的响应。让我们看一个类Java语言的语法，它包含带有字段和方法成员的类定义。该方法有简单的语句和表达式。嵌入动作在语法分析器找到元素时就打印它们。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Simple;
+</span><span class='line'>
+</span><span class='line'>prog: classDef+ ; // match one or more class definitions
+</span><span class='line'>
+</span><span class='line'>classDef
+</span><span class='line'>    : 'class' ID '{' member+ '}' // a class has one or more members
+</span><span class='line'>      {System.out.println("class "+$ID.text);}
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>member
+</span><span class='line'>    : 'int' ID ';'    // field definition
+</span><span class='line'>      {System.out.println("var "+$ID.text);}
+</span><span class='line'>    | 'int' f=ID '(' ID ')' '{' stat '}'    // method definition
+</span><span class='line'>      {System.out.println("method: "+$f.text);}
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>stat: expr ';'
+</span><span class='line'>      {System.out.println("found expr: "+$stat.text);}
+</span><span class='line'>    | ID '=' expr ';'
+</span><span class='line'>      {System.out.println("found assign: "+$stat.text);}
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>expr: INT
+</span><span class='line'>    | ID '(' INT ')'
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>INT : [0-9]+ ;
+</span><span class='line'>ID  : [a-zA-Z]+ ;
+</span><span class='line'>WS  : [ \t\r\n]+ -&gt; skip ;</span></code></pre></td></tr></table></div></figure>
+
+<p>现在，先让我们使用一些有效的输入运行语法分析器，借以观测正常的输出。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr Simple.g
+</span><span class='line'>compile *.java
+</span><span class='line'>grun Simple prog</span></code></pre></td></tr></table></div></figure>
+
+<p>输入以下数据：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class T { int i; }</span></code></pre></td></tr></table></div></figure>
+
+<p>你就会看到：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>var i
+</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
+
+<p>语法分析器没有显示任何错误，它执行打印语句，报告关于变量i和类定义T的正确识别。</p>
+
+<p>接下来，让我们尝试一个带有方法定义的类，该方法含有一个虚假赋值表达式。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grun Simple prog -gui</span></code></pre></td></tr></table></div></figure>
+
+<p>输入测试数据：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class T {
+</span><span class='line'>  int f(x) { a = 3 4 5; }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>然后你就会看到：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>line 2:19 mismatched input '4' expecting ';'
+</span><span class='line'>method: f
+</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
+
+<p>在4记号处，语法分析器没有找到它期待的“;”，所以它报告一个错误。line 2:19指出有问题的标记是在第2行第19列的字符位置（字符位置从0开始）。因为使用了-gui参数，我们可以看到带有高亮错误节点的语法分析树。</p>
+
+<p><img src="/uploads/simple-parse-tree.png" alt="simple-parse-tree"></p>
+
+<p>在这里，有两个额外的记号，并且语法分析器给出一个不匹配的通用错误消息。如果只有单个的额外记号，语法分析器可能会智能一点，指出它是一个额外的记号。在接下来的运行测试中，有个额外的“;”在类名和类体之间：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grun Simple prog</span></code></pre></td></tr></table></div></figure>
+
+<p>输入如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class T ; { int i; }</span></code></pre></td></tr></table></div></figure>
+
+<p>输出结果：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>line 1:8 extraneous input ';' expecting '{'
+</span><span class='line'>var i
+</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
+
+<p>在“;”处语法分析器报告一个错误，但给出了一个稍微翔实的答案，因为它知道下一个记号就是它实际上在寻找的那个。这个特性被称为单个记号删除（single-token deletion），因为语法分析器可以简单地装作额外的记号不存在并继续执行。</p>
+
+<p>同样的，语法分析器可以在侦测到缺少一个记号时做单个记号插入（single-token insertion）。让我们删掉结束的“}”看看会发生什么。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grun Simple prog</span></code></pre></td></tr></table></div></figure>
+
+<p>然后输入：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class T {
+</span><span class='line'>  int f(x) { a = 3; }</span></code></pre></td></tr></table></div></figure>
+
+<p>结果是：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>found assign: a=3;
+</span><span class='line'>method: f
+</span><span class='line'>line 3:0 missing '}' at '&lt;EOF&gt;'
+</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
+
+<p>语法分析器报告它不能找到必须的结束记号“}”。</p>
+
+<p>当语法分析器处于决策点时，会出现另一个常见的语法错误，并且剩余的输入与规则或子规则的任何选项都不一致。例如，如果我们忘记字段声明中的变量名，规则member中的选项都不匹配。语法分析器报告没有可行的选项。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grun Simple prog</span></code></pre></td></tr></table></div></figure>
+
+<p>输入以下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class T { int ; }</span></code></pre></td></tr></table></div></figure>
+
+<p>然后结果是：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>line 1:14 no viable alternative at input 'int;'
+</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
+
+<p>在“int”和“;”之间没有空格，因为我们在WS()规则中告诉词法分析器skip()。</p>
+
+<p>如果有词法错误，ANTLR也会放出错误消息，指出哪些字符不能匹配为记号。例如，如果我们提交一个完全未知的字符，我们将得到一个记号识别错误。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grun Simple prog</span></code></pre></td></tr></table></div></figure>
+
+<p>输入：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class # { int i; }</span></code></pre></td></tr></table></div></figure>
+
+<p>输出：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>line 1:6 token recognition error at: '#'
+</span><span class='line'>line 1:8 missing ID at '{'
+</span><span class='line'>var i
+</span><span class='line'>class &lt;missing ID&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>因为没有给出有效的类名，单个记号插入机制召唤了“missing ID”名字，以致类名记号是非空值。如果想控制语法分析器如何召唤记号，可以覆盖DefaultErrorStrategy中的getMissingSymbol()。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -2011,153 +2243,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part21/">ANTLR 4权威参考读书笔记（21）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-07-14T18:38:42+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>14</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:38 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>前文的语法仍然存在问题，因为它限制我们只能使用Java生成语法分析器。为使语法可复用和语言无关，我们需要完全避免嵌入动作。接下来就将展示如何用监听器做到这点。</p>
-
-<h3 id="使用语法分析树监听器实现应用">使用语法分析树监听器实现应用</h3>
-
-<p>在构建语言应用时要避免应用和语法纠缠在一起，关键是让语法分析器生成语法分析树，然后遍历该树去触发特定的应用代码。我们可以使用我们最喜欢的技术遍历树，也可以使用ANTLR生成的树遍历机制中的一个。在本节中，我们将使用ANTLR内建的ParseTreeWalker构建一个基于监听器版本的属性文件应用。</p>
-
-<p>让我们从属性文件语法的原始版本开始：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>file : prop+ ;
-</span><span class='line'>prop : ID '=' STRING '\n' ;</span></code></pre></td></tr></table></div></figure>
-
-<p>下面是属性示例文件t.properties的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>user="parrt"
-</span><span class='line'>machine="maniac"</span></code></pre></td></tr></table></div></figure>
-
-<p>通过上述语法，ANTLR生成PropertyFileParser，该语法分析器会自动构建如下图所示的语法分析树：</p>
-
-<p><img src="/uploads/propertyfile-parse-tree.png" alt="propertyfile-parse-tree"></p>
-
-<p>有了语法分析树，我们就可以使用ParseTreeWalker去访问所有的节点，触发进入和退出方法。</p>
-
-<p>现在来看一下ANTLR通过语法PropertyFile生成的监听器接口PropertyFileListener，当ANTLR的ParseTreeWalker发现和完成节点时，它会为每个规则子树分别触发进入和退出方法。因为在语法PropertyFile中只有两条语法规则，所以在接口中有4个方法：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public interface PropertyFileListener extends ParseTreeListener {
-</span><span class='line'>    void enterFile(PropertyFileParser.FileContext ctx);
-</span><span class='line'>    void exitFile(PropertyFileParser.FileContext ctx);
-</span><span class='line'>    void enterProp(PropertyFileParser.PropContext ctx);
-</span><span class='line'>    void exitProp(PropertyFileParser.PropContext ctx);
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>FileContext和PropContext对象是针对每条语法规则的语法分析树节点的实现，它们包含一些有用的方法。</p>
-
-<p>为方便起见，ANTLR也会生成带有默认实现的类PropertyFileBaseListener，这些默认实现模仿在前文语法中@member区域我们手写的空白方法。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class PropertyFileBaseVisitor&lt;T&gt; extends AbstractParseTreeVisitor&lt;T&gt;
-</span><span class='line'>                                        implements PropertyFileVisitor&lt;T&gt; {
-</span><span class='line'>    @Override
-</span><span class='line'>    public T visitFile(PropertyFileParser.FileContext ctx) { }
-</span><span class='line'>    @Override
-</span><span class='line'>    public T visitProp(PropertyFileParser.PropContext ctx) { }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>默认实现让我们只需要覆盖和实现那些我们关心的方法。例如，以下是属性文件加载器的一个重新实现，像前面那样它只有一个方法，但使用监听器机制：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public static class PropertyFileLoader extends PropertyFileBaseListener {
-</span><span class='line'>    Map&lt;String,String&gt; props = new OrderedHashMap&lt;String, String&gt;();
-</span><span class='line'>    public void exitProp(PropertyFileParser.PropContext ctx) {
-</span><span class='line'>        String id = ctx.ID().getText();    // prop : ID '=' STRING '\n' ;
-</span><span class='line'>        String value = ctx.STRING().getText();
-</span><span class='line'>        props.put(id, value);
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>主要的不同是这个版本扩展了基类监听器，而不是语法分析器，监听器方法在语法分析器完成后被触发。</p>
-
-<p>这里面有很多的接口和类，让我们看一下在这些关键元素间的继承关系。</p>
-
-<p><img src="/uploads/propertyfile-listener-hierarchy.png" alt="propertyfile-listener-hierarchy"></p>
-
-<p>处于ANTLR运行库中的接口ParseTreeListener要求每个监听器对事件visitTerminal()、enterEveryRule()和exitEveryRule()作出反应，如果有语法错误的还要加上visitErrorNode()。ANTLR从语法文件PropertyFile生成接口PropertyFileListener，并且为类PropertyFileBaseListener的所有方法生成默认实现。我们仅需要构建PropertyFileLoader，它继承了PropertyFileBaseListener中的所有空方法。</p>
-
-<p>方法exitProp()可以访问与规则prop相关的规则上下文对象PropContext，该上下文对象持有在规则prop中提到的每个元素（ID和STRING）的对应方法。因为这些元素是语法中的记号引用，所以方法返回语法分析树节点TerminalNode。我们既可以通过getText()直接访问记号的文本，也可以通过getSymbol()首先获取Token。</p>
-
-<p>现在让我们创建测试文件TestPropertyFile.java遍历树，倾听来自PropertyFileLoader的声音：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>// create a standard ANTLR parse tree walker
-</span><span class='line'>ParseTreeWalker walker = new ParseTreeWalker();
-</span><span class='line'>// create listener then feed to walker
-</span><span class='line'>PropertyFileLoader loader = new PropertyFileLoader();
-</span><span class='line'>walker.walk(loader, tree);    // walk parse tree
-</span><span class='line'>System.out.println(loader.props);    // print results</span></code></pre></td></tr></table></div></figure>
-
-<p>然后就是编译和生成代码，运行测试程序去处理输入文件：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr PropertyFile.g
-</span><span class='line'>compile *.java
-</span><span class='line'>run TestPropertyFile t.properties</span></code></pre></td></tr></table></div></figure>
-
-<p>这里是输出的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>{user="parrt", machine="maniac"}</span></code></pre></td></tr></table></div></figure>
-
-<p>测试程序成功地把文件中的属性赋值重组成内存中的映射数据结构。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/4">&larr; Older</a>
@@ -2175,6 +2260,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/crawl-novel-with-scrapy-part4/">使用Scrapy爬取小说（4）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/crawl-novel-with-scrapy-part3/">使用Scrapy爬取小说（3）</a>
       </li>
     
@@ -2188,10 +2277,6 @@
     
       <li class="post">
         <a href="/blog/thinking-on-software-version/">软件版本号的思考</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/chasing-the-shiny-and-new-in-software/">追逐时髦的技术</a>
       </li>
     
   </ul>

@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="在使用Scrapy爬取小说（2）中，我们将小说的每个章节保存为独立的文本文件。今天我们准备把小说内容输出到数据库。对于数据存储，我选择MongoDB。为什么是MongoDB而不是其它？原因是以前没用过，想尝试下。 现在我们已经知道，要把抓取来的数据保存到数据库，只需实现Item &hellip;">
+  <meta name="description" content="在使用Scrapy爬取小说（1）中我们使用range(1, 310)来确定章节链接的范围，这很不好。我们编程的时候应该要尽量注意减少代码中的硬编码和魔数，提高代码的可移植性。如果小说章节的链接不是这种连续的数字，或者章节的数量是在逐步增加的，那么这段代码就是无效的，或者会慢慢变得无效。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,59 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/crawl-novel-with-scrapy-part4/">使用Scrapy爬取小说（4）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2017-11-11T14:17:36+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>11</span><span class='date-suffix'>th</span>, <span class='date-year'>2017</span></span> <span class='time'>2:17 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在<a href="/blog/crawl-novel-with-scrapy-part1/">使用Scrapy爬取小说（1）</a>中我们使用range(1, 310)来确定章节链接的范围，这很不好。我们编程的时候应该要尽量注意减少代码中的硬编码和魔数，提高代码的可移植性。如果小说章节的链接不是这种连续的数字，或者章节的数量是在逐步增加的，那么这段代码就是无效的，或者会慢慢变得无效。</p>
+
+<p>如何才能把这段代码写得更具可移植性呢？</p>
+
+<p><img src="/uploads/novel-chapter-urls.png" alt="novel-chapter-urls"></p>
+
+<p>我们不必关心章节链接的格式，我们只要知道它是个链接，一定是以<code>&lt;a href=&quot;url&quot;&gt;text&lt;/a&gt;</code>这种形式呈现（如上图所示）。我们也不必关心章节数量是否变化，只要把所有这种形式的链接抓取下来即可。与此对应的XPath表达式是：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>//center/table[@bordercolorlight]//a/@href</span></code></pre></td></tr></table></div></figure>
+
+<p>因为页面文档中可能有多个表格，所以要在table后面添加@bordercolorlight属性来指定我们要查找的那个。</p>
+
+<p>那么在Scrapy中如何实现这样的能力呢？以下是具体的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def parse(self, response):
+</span><span class='line'>  links = response.xpath('//center/table[@bordercolorlight]//a/@href').extract()
+</span><span class='line'>  for link in links:
+</span><span class='line'>    next = response.urljoin(link)
+</span><span class='line'>    yield scrapy.Request(next, callback=self.parse_chapter)</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -956,92 +1009,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/learn-anything-faster-with-the-feynman-technique/">费曼技巧：最好的学习方法</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2017-06-02T08:30:09+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2017</span></span> <span class='time'>8:30 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="https://www.farnamstreetblog.com/2012/04/learn-anything-faster-with-the-feynman-technique/">https://www.farnamstreetblog.com/2012/04/learn-anything-faster-with-the-feynman-technique/</a></p>
-
-<p>费曼技巧有4个简单的步骤，我将在下面解释它们：</p>
-
-<ul>
-<li>选择一个概念</li>
-<li>把它教给某个小孩</li>
-<li>识别薄弱环节，回到原始材料</li>
-<li>回顾和简化（可选）</li>
-</ul>
-
-<p>如果你不学习就会固步自封。那么，学习新主题并识别现有知识的薄弱环节的最好方式是什么？</p>
-
-<h3 id="两种类型的知识">两种类型的知识</h3>
-
-<p>有<a href="https://www.farnamstreetblog.com/2015/09/two-types-of-knowledge/">两种类型的知识</a>，我们大多数人关注错误的那种。第一类知识注重知道某事物的名称。第二类注重知道某事物。它们不是一回事。著名的诺贝尔物理学奖获得者理查德·费曼（Richard Feynman）明白<a href="https://www.farnamstreetblog.com/2015/01/richard-feynman-knowing-something/">知道某事物和知道某事物的名称之间的差异</a>，这是他成功的最重要的原因之一。事实上，他创造了一个学习公式，确保他比其他人更明白某些东西。</p>
-
-<p>这被称为费曼技巧，它将帮助你更快更明白地学到东西。最重要的是，它极其容易实现。</p>
-
-<blockquote>
-<p>一个人如果说他知道他在想些什么，却表达不出来，通常是他其实并不知道自己在想些什么。——莫提默·艾德勒</p>
-</blockquote>
-
-<h3 id="费曼技巧">费曼技巧</h3>
-
-<p>费曼技巧有4个步骤。</p>
-
-<h4 id="步骤1：把它教给某个小孩">步骤1：把它教给某个小孩</h4>
-
-<p>拿出一张白纸，在顶部写下你想要学习的主题。写出你对这个主题的了解，好像你正在把它教给某个小孩。不是你聪明的成年朋友，而是一个8岁的小孩，他刚好有足够的词汇和注意力来涵盖基本的概念和关系。</p>
-
-<p>很多人倾向于使用复杂的词汇和行话来掩盖他们不明白的东西。问题是我们仅仅愚弄自己，因为我们不知道我们不明白。另外，使用行话会掩盖周围的人对我们的误解。</p>
-
-<p>当你自始至终都用孩子可以理解的简单的语言写出某个想法时（提示：只用最常见的单词），你迫使自己在更深的层次上去理解这个概念，并简化想法之间的关系和连接。如果你努力，你会清楚地知道自己在哪里还有薄弱环节。这种压力很好——它预示着学习的机会。</p>
-
-<h4 id="步骤2：回顾">步骤2：回顾</h4>
-
-<p>在第一步中，你不可避免地会遇到你的知识的薄弱环节，你忘记了某些重要的东西，或者不能解释它，或者只是很难把重要的概念联系起来。</p>
-
-<p>这是宝贵的反馈，因为你已经发现你的知识的边缘。胜任力是知道你能力的极限，你刚刚已经识别出一个！</p>
-
-<p>这是学习开始的地方。现在你知道在哪里会遇到困难，回到原始材料并重新学习，直到你可以用基本的术语去解释它们。</p>
-
-<p>识别你的理解的边界也限制了你可能犯的错误，并增加了在应用知识时成功的机会。</p>
-
-<h4 id="步骤3：整理和简化">步骤3：整理和简化</h4>
-
-<p>现在你有一套手工制作的笔记。检查它们以确保你没有错误地从原始材料中借用任何行话。将它们组织成一个丰满的简单的故事。</p>
-
-<p>把它们大声地朗读出来，如果解释不直白或者听起来很混乱，这表明你在该领域的理解仍需要做些工作。</p>
-
-<h4 id="步骤4（可选）：传播">步骤4（可选）：传播</h4>
-
-<p>如果你真的想要确保自己的理解没有任何偏差，那就把它告诉别人（理想状态是这个人对该主题知之甚少，或者就找个8岁的小孩）。对你的知识的最终考验是你将其传达给另一个人的能力。</p>
-
-<p>这不仅是学习的一个妙诀，它也是一种不同的思维方式的窗口，允许你将想法分解，然后从头开始重建。（Elon Musk称它为<a href="https://www.farnamstreetblog.com/2015/04/elon-musk-framework-thinking/">从第一个原则思考</a>）。这会导致对想法和概念的更深入的理解。重要的是，以这种方式解决问题，你可以在别人不知道他们自己在说什么的情况下理解这个问题。</p>
-
-<p>费曼的方法直观地认为智力是一个成长的过程，这与卡罗尔·德韦克（Carol Dweck）的工作非常吻合，卡罗尔·德韦克漂亮地描述了<a href="https://www.farnamstreetblog.com/2015/03/carol-dweck-mindset/">固定型和成长型思维之间的区别</a>。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/2">&larr; Older</a>
@@ -1057,6 +1024,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/crawl-novel-with-scrapy-part4/">使用Scrapy爬取小说（4）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/crawl-novel-with-scrapy-part3/">使用Scrapy爬取小说（3）</a>
       </li>
     
@@ -1070,10 +1041,6 @@
     
       <li class="post">
         <a href="/blog/thinking-on-software-version/">软件版本号的思考</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/chasing-the-shiny-and-new-in-software/">追逐时髦的技术</a>
       </li>
     
   </ul>
