@@ -5,11 +5,11 @@
 <!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  <title>使用Scrapy爬取小说（3） - 乐者为王</title>
+  <title>Tag: Crawler - 乐者为王</title>
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="在使用Scrapy爬取小说（2）中，我们将小说的每个章节保存为独立的文本文件。今天我们准备把小说内容输出到数据库。对于数据存储，我选择MongoDB。为什么是MongoDB而不是其它？原因是以前没用过，想尝试下。 现在我们已经知道，要把抓取来的数据保存到数据库，只需实现Item &hellip;">
+  <meta name="description" content="Tag: Crawler">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -18,7 +18,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   
-  <link rel="canonical" href="http://codemany.com/blog/crawl-novel-with-scrapy-part3/">
+  <link rel="canonical" href="http://codemany.com/tags/crawler/">
   <link href="/favicon.png" rel="icon">
   <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
   <link href="/atom.xml" rel="alternate" title="乐者为王" type="application/atom+xml">
@@ -72,167 +72,54 @@
   <div id="main">
     <div id="content">
       <div>
-<article class="hentry" role="article">
+<article role="article">
   
   <header>
-    
-      <h1 class="entry-title">使用Scrapy爬取小说（3）</h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2017-11-04T09:55:53+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>4</span><span class='date-suffix'>th</span>, <span class='date-year'>2017</span></span> <span class='time'>9:55 am</span></time>
-        
-      </p>
+    <h1 class="entry-title">Tag: Crawler</h1>
     
   </header>
-
-
-<div class="entry-content"><p>在<a href="/blog/crawl-novel-with-scrapy-part2/">使用Scrapy爬取小说（2）</a>中，我们将小说的每个章节保存为独立的文本文件。今天我们准备把小说内容输出到数据库。对于数据存储，我选择MongoDB。为什么是MongoDB而不是其它？原因是以前没用过，想尝试下。</p>
-
-<p>现在我们已经知道，要把抓取来的数据保存到数据库，只需实现Item Pipeline即可。我们可以仿照前面的实现依葫芦画瓢。</p>
-
-<p>以下是将小说内容保存到MongoDB的代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>import pymongo
-</span><span class='line'>
-</span><span class='line'>class MongoPipeline(object):
-</span><span class='line'>  def open_spider(self, spider):
-</span><span class='line'>    self.client = pymongo.MongoClient('localhost', 27017)
-</span><span class='line'>    self.novel = self.client['novel']
-</span><span class='line'>    self.ssjx = self.novel['ssjx']
-</span><span class='line'>
-</span><span class='line'>  def process_item(self, item, spider):
-</span><span class='line'>    data = {
-</span><span class='line'>      # 标题和内容都是列表类型，必须先转换成字符串
-</span><span class='line'>      'title' : ''.join(item['title']),
-</span><span class='line'>      'content' : ''.join(item['content']),
-</span><span class='line'>    }
-</span><span class='line'>    self.ssjx.insert(data)
-</span><span class='line'>    return item
-</span><span class='line'>
-</span><span class='line'>  def close_spider(self, spider):
-</span><span class='line'>    self.client.close()</span></code></pre></td></tr></table></div></figure>
-
-<p>将组件添加到novel/settings.py的ITEM_PIPELINES配置中以启用它：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ITEM_PIPELINES = {
-</span><span class='line'>  'novel.pipelines.TxtPipeline' : 300,
-</span><span class='line'>  'novel.pipelines.MongoPipeline' : 400,
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>在项目的根目录中使用下面的指令运行Spider：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>scrapy crawl novelspider</span></code></pre></td></tr></table></div></figure>
-
-<p>如果没有问题的话，爬虫会不停地运行，小说的章节内容也会被一个个地保存到数据库。下面的截图是最终的抓取结果：</p>
-
-<p><img src="/uploads/novel-mongo-gui.png" alt="novel-mongo-gui"></p>
-</div>
-
-
-  <footer>
-    <p class="meta">
-      
   
-
-<span class="byline author vcard">Posted by <span class="fn">dohkoos</span></span>
-
-      
+  <div id="blog-archives" class="tag">
 
 
 
-
-<time class='entry-date' datetime='2017-11-04T09:55:53+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>4</span><span class='date-suffix'>th</span>, <span class='date-year'>2017</span></span> <span class='time'>9:55 am</span></time>
-      
-
-
-      
-
-<span class="tags">
   
-    <a class='tag' href='/tags/crawler/'>Crawler</a>, <a class='tag' href='/tags/mongodb/'>MongoDB</a>, <a class='tag' href='/tags/python/'>Python</a>, <a class='tag' href='/tags/scrapy/'>Scrapy</a>
-  
-</span>
+  <h2>2017</h2>
 
+<article>
+  <h1><a href="/blog/crawl-novel-with-scrapy-part4/">使用Scrapy爬取小说（4）</a></h1>
+<time datetime="2017-11-11T14:17:36+08:00" pubdate><span class='month'>Nov</span> <span class='day'>11</span> <span class='year'>2017</span></time>
 
-    </p>
-    
-  <h3>Related Posts</h3>
-  <ul class="posts">
-  
-    <li class="related">
-      <a href="/blog/crawl-novel-with-scrapy-part4/">使用Scrapy爬取小说（4）</a>
-    </li>
-  
-    <li class="related">
-      <a href="/blog/crawl-novel-with-scrapy-part2/">使用Scrapy爬取小说（2）</a>
-    </li>
-  
-    <li class="related">
-      <a href="/blog/crawl-novel-with-scrapy-part1/">使用Scrapy爬取小说（1）</a>
-    </li>
-  
-  </ul>
-
-
-    
-      <div id="jiathis_style_32x32">
-	<a class="jiathis_button_qzone"></a>
-	<a class="jiathis_button_tsina"></a>
-	<a class="jiathis_button_tqq"></a>
-    <a class="jiathis_button_weixin"></a>
-	<a class="jiathis_button_renren"></a>
-	<a href="http://www.jiathis.com/share/" class="jiathis jiathis_txt jtico jtico_jiathis" target="_blank"></a>
-	<a class="jiathis_counter_style"></a>
-</div>
-<script type="text/javascript" src="http://v2.jiathis.com/code/jia.js" charset="utf-8"></script>
-
-    
-    <p class="meta">
-      
-        <a class="basic-alignment left" href="/blog/crawl-novel-with-scrapy-part2/" title="Previous Post: 使用Scrapy爬取小说（2）">&laquo; 使用Scrapy爬取小说（2）</a>
-      
-      
-        <a class="basic-alignment right" href="/blog/crawl-novel-with-scrapy-part4/" title="Next Post: 使用Scrapy爬取小说（4）">使用Scrapy爬取小说（4） &raquo;</a>
-      
-    </p>
-  </footer>
 </article>
 
-  <section>
-    <h1>Comments</h1>
-    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+
+
+<article>
+  <h1><a href="/blog/crawl-novel-with-scrapy-part3/">使用Scrapy爬取小说（3）</a></h1>
+<time datetime="2017-11-04T09:55:53+08:00" pubdate><span class='month'>Nov</span> <span class='day'>04</span> <span class='year'>2017</span></time>
+
+</article>
+
+
+
+<article>
+  <h1><a href="/blog/crawl-novel-with-scrapy-part2/">使用Scrapy爬取小说（2）</a></h1>
+<time datetime="2017-10-28T20:35:23+08:00" pubdate><span class='month'>Oct</span> <span class='day'>28</span> <span class='year'>2017</span></time>
+
+</article>
+
+
+
+<article>
+  <h1><a href="/blog/crawl-novel-with-scrapy-part1/">使用Scrapy爬取小说（1）</a></h1>
+<time datetime="2017-10-21T08:49:54+08:00" pubdate><span class='month'>Oct</span> <span class='day'>21</span> <span class='year'>2017</span></time>
+
+</article>
+
 </div>
-  </section>
+
+  
+</article>
 
 </div>
 
@@ -369,10 +256,7 @@
       var disqus_shortname = 'codemany';
       
         
-        // var disqus_developer = 1;
-        var disqus_identifier = 'http://codemany.com/blog/crawl-novel-with-scrapy-part3/';
-        var disqus_url = 'http://codemany.com/blog/crawl-novel-with-scrapy-part3/';
-        var disqus_script = 'embed.js';
+        var disqus_script = 'count.js';
       
     (function () {
       var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
