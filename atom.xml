@@ -4,7 +4,7 @@
   <title><![CDATA[乐者为王]]></title>
   <link href="http://codemany.com/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-11-17T10:03:11+08:00</updated>
+  <updated>2017-11-18T18:26:08+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,58 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[使用Scrapy爬取小说（5）]]></title>
+    <link href="http://codemany.com/blog/crawl-novel-with-scrapy-part5/"/>
+    <updated>2017-11-18T21:55:30+08:00</updated>
+    <id>http://codemany.com/blog/crawl-novel-with-scrapy-part5</id>
+    <content type="html"><![CDATA[<p>今天的任务是重构TxtPipeline。</p>
+
+<p>先看下TxtPipeline中负责写文件的代码片段：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>f = open(filename, 'w')
+</span><span class='line'>f.write(title)
+</span><span class='line'>f.write(content)
+</span><span class='line'>f.close()</span></code></pre></td></tr></table></div></figure>
+
+<p>我们经常会看到这样的代码，但它存在严重的问题，你能把它找出来吗？</p>
+
+<p>首先，open函数打开文件，并返回文件句柄，该句柄是由操作系统分配的。接着就是调用write方法写文件。最后是调用close方法关闭文件。文件使用完毕后必须关闭，因为文件句柄会占用操作系统的资源，并且操作系统同一时间能打开的文件数量也是有限的。</p>
+
+<p>由于文件读写时都有可能产生IOError，一旦出错，后面的close方法就不会被调用。所以，为确保无论是否出错都能正常地关闭文件和释放文件句柄，我们需要使用如下方法来实现：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>try:
+</span><span class='line'>  f = open(filename, 'w')
+</span><span class='line'>  f.write(title)
+</span><span class='line'>  f.write(content)
+</span><span class='line'>finally:
+</span><span class='line'>  if f:
+</span><span class='line'>    f.close()</span></code></pre></td></tr></table></div></figure>
+
+<p>但每次都这么写实在太繁琐。其实，我们可以使用with语句来帮我们自动管理文件资源：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>with open(filename, 'w') as f:
+</span><span class='line'>  f.write(title)
+</span><span class='line'>  f.write(content)</span></code></pre></td></tr></table></div></figure>
+
+<p>这和前面的try-finally是一样的，但是代码更加简洁，而且不必调用close方法。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[使用Scrapy爬取小说（4）]]></title>
@@ -2137,268 +2189,6 @@
 <p>fail选项使用在双引号中的字符串字面量或者计算结果是字符串的动作。如果你想在谓词失败时执行一个函数，这个动作是很方便的。只需使用一个调用<code>{...}?&lt;fail={failedMaxTest()}&gt;</code>那样的函数的动作。</p>
 
 <p>谨慎使用语义谓词来测试输入有效性。在向量示例中，谓词强制执行语法规则，所以它可以抛出异常并尝试恢复。另一方面，如果我们有一个语法上有效但语义无效的结构，那么使用语义谓词并不是一个好主意。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（30）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part30/"/>
-    <updated>2016-10-26T18:02:32+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part30</id>
-    <content type="html"><![CDATA[<p>有时我们在调试语法时需要ANTLR提供更好的消息提示，为达到这个目的，我们可以改变ANTLR的标准错误报告。</p>
-
-<h3 id="改变和重定向antlr错误消息">改变和重定向ANTLR错误消息</h3>
-
-<p>默认情况下，ANTLR把所有的错误发送给标准错误，但我们可以通过提供ANTLRErrorListener接口的实现来修改目标和内容。该接口有syntaxError()方法可以应用于词法分析器和语法分析器。方法syntaxError()接收各种有关错误的位置以及错误消息的信息。它也接收语法分析器的一个引用，因此我们可以查询关于识别的状态。</p>
-
-<p>例如，这里是一个错误监听器，它打印规则调用栈以及随后的用有问题的记号信息来加强的通常错误消息：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public static class VerboseListener extends BaseErrorListener {
-</span><span class='line'>    @Override
-</span><span class='line'>    public void syntaxError(Recognizer&lt;?, ?&gt; recognizer,
-</span><span class='line'>                            Object offendingSymbol,
-</span><span class='line'>                            int line, int charPositionInLine,
-</span><span class='line'>                            String msg,
-</span><span class='line'>                            RecognitionException e)
-</span><span class='line'>    {
-</span><span class='line'>        List&lt;String&gt; stack = ((Parser)recognizer).getRuleInvocationStack();
-</span><span class='line'>        Collections.reverse(stack);
-</span><span class='line'>        System.err.println("rule stack: "+stack);
-</span><span class='line'>        System.err.println("line "+line+":"+charPositionInLine+" at "+
-</span><span class='line'>        offendingSymbol+": "+msg);
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>使用这个定义，我们的应用可以很容易地在调用开始规则前给语法分析器添加一个错误监听器。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>SimpleParser parser = new SimpleParser(tokens);
-</span><span class='line'>parser.removeErrorListeners();    // remove ConsoleErrorListener
-</span><span class='line'>parser.addErrorListener(new VerboseListener());    // add ours
-</span><span class='line'>parser.prog();    // parse as usual</span></code></pre></td></tr></table></div></figure>
-
-<p>在添加我们自己的错误监听器之前，必须先移除标准的终端错误监听器，否则的话就会得到重复的错误消息。</p>
-
-<p>现在让我们看下包含一个额外类名以及缺少字段名的类定义的错误消息看起来是什么样子：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>compile *.java
-</span><span class='line'>run TestE_Listener</span></code></pre></td></tr></table></div></figure>
-
-<p>以下是包含额外类名以及缺少字段名的类定义：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class T T {
-</span><span class='line'>  int ;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>然后我们就会看到如下错误消息：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>rule stack: [prog, classDef]
-</span><span class='line'>line 1:8 at [@2,8:8='T',&lt;9&gt;,1:8]: extraneous input 'T' expecting '{'
-</span><span class='line'>rule stack: [prog, classDef, member]
-</span><span class='line'>line 2:6 at [@5,18:18=';',&lt;8&gt;,2:6]: no viable alternative at input 'int;'
-</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
-
-<p>栈[prog, classDef]指出语法分析器在规则classDef中，且被prog调用。注意，记号信息包含在输入流中的字符位置，这在高亮输入中的错误时是非常有用的。例如，记号[@2,8:8=&#39;T&#39;,<9>,1:8]指出它是记号流中的第3个记号（索引从0开始），字符范围从8到8，记号类型为9，位于第1行，并且在字符位置8（计数从0开始，且TAB被当作一个字符）。</p>
-
-<p>作为另一个示例，让我们构建一个错误监听器TestE_Listener2.java，它打印带有被下划线强调的有错误的记号的行。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>compile *.java
-</span><span class='line'>run TestE_Listener2</span></code></pre></td></tr></table></div></figure>
-
-<p>输入以下数据：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class T XYZ {
-</span><span class='line'>  int ;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>然后就会看如如下错误信息：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>line 1:8 extraneous input 'XYZ' expecting '{'
-</span><span class='line'>class T XYZ {
-</span><span class='line'>        ^^^
-</span><span class='line'>line 2:6 no viable alternative at input 'int;'
-</span><span class='line'>  int ;
-</span><span class='line'>      ^
-</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
-
-<p>为了让事情变得更容易，我们将忽略TAB——charPositionInLine不是列号，因为TAB的大小不是统一定义的。这里是一个错误监听器实现，强调输入中的错误位置。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public static class UnderlineListener extends BaseErrorListener {
-</span><span class='line'>    public void syntaxError(Recognizer&lt;?, ?&gt; recognizer,
-</span><span class='line'>                            Object offendingSymbol,
-</span><span class='line'>                            int line, int charPositionInLine,
-</span><span class='line'>                            String msg,
-</span><span class='line'>                            RecognitionException e) {
-</span><span class='line'>        System.err.println("line "+line+":"+charPositionInLine+" "+msg);
-</span><span class='line'>        underlineError(recognizer,(Token)offendingSymbol,
-</span><span class='line'>        line, charPositionInLine);
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    protected void underlineError(Recognizer recognizer,
-</span><span class='line'>                                  Token offendingToken, int line,
-</span><span class='line'>                                  int charPositionInLine) {
-</span><span class='line'>        CommonTokenStream tokens =
-</span><span class='line'>            (CommonTokenStream)recognizer.getInputStream();
-</span><span class='line'>        String input = tokens.getTokenSource().getInputStream().toString();
-</span><span class='line'>        String[] lines = input.split("\n");
-</span><span class='line'>        String errorLine = lines[line - 1];
-</span><span class='line'>        System.err.println(errorLine);
-</span><span class='line'>        for (int i=0; i&lt;charPositionInLine; i++) System.err.print(" ");
-</span><span class='line'>        int start = offendingToken.getStartIndex();
-</span><span class='line'>        int stop = offendingToken.getStopIndex();
-</span><span class='line'>        if ( start&gt;=0 && stop&gt;=0 ) {
-</span><span class='line'>            for (int i=start; i&lt;=stop; i++) System.err.print("^");
-</span><span class='line'>        }
-</span><span class='line'>        System.err.println();
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>关于错误监听器还有一件事需要知道。当语法分析器侦测到一个模棱两可的输入序列时，它会通知错误监听器。默认的错误监听器ConsoleErrorListener实际上不会在终端打印任何东西，也就是说，语法分析器不会通知用户。让我们回顾下能用两种方式匹配输入<code>f();</code>的那段歧义语法。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Ambig;
-</span><span class='line'>
-</span><span class='line'>stat: expr ';'    // expression statement
-</span><span class='line'>    | ID '(' ')' ';'    // function call statement
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>expr: ID '(' ')'
-</span><span class='line'>    | INT
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>INT : [0-9]+ ;
-</span><span class='line'>ID  : [a-zA-Z]+ ;
-</span><span class='line'>WS  : [ \t\r\n]+ -&gt; skip ;</span></code></pre></td></tr></table></div></figure>
-
-<p>如果我们测试这段语法，我们不会看到有关模棱两可的输入的警告。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr Ambig.g
-</span><span class='line'>compile *.java
-</span><span class='line'>grun Ambig stat</span></code></pre></td></tr></table></div></figure>
-
-<p>然后输入：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>f();</span></code></pre></td></tr></table></div></figure>
-
-<p>等到语法分析器侦测到二义性时，告诉语法分析器通过addErrorListener()使用DiagnosticErrorListener的实例。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>parser.removeErrorListeners(); // remove ConsoleErrorListener
-</span><span class='line'>parser.addErrorListener(new DiagnosticErrorListener());</span></code></pre></td></tr></table></div></figure>
-
-<p>你还应该通知语法分析器你对所有的二义性警告感兴趣，而不仅仅是那些可以被侦测到的。为了效率，ANTLR的决策机制并不总是追逐完整的二义性信息。以下代码告诉你如何让语法分析器报告所有的二义性：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>parser.getInterpreter()
-</span><span class='line'>.setPredictionMode(PredictionMode.LL_EXACT_AMBIG_DETECTION);</span></code></pre></td></tr></table></div></figure>
-
-<p>如果你通过grun使用TestRig，用选项-diagnostics去让它使用DiagnosticErrorListener代替默认的终端错误监听器（并且开启LL_EXACT_AMBIG_DETECTION）。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grun Ambig stat -diagnostics</span></code></pre></td></tr></table></div></figure>
-
-<p>输入：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>f();</span></code></pre></td></tr></table></div></figure>
-
-<p>你会看到：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>line 1:3 reportAttemptingFullContext d=0, input='f();'
-</span><span class='line'>line 1:3 reportAmbiguity d=0: ambigAlts={1, 2}, input='f();'</span></code></pre></td></tr></table></div></figure>
-
-<p>输出显示语法分析器也会调用reportAttemptingFullContext()。当<code>SLL(*)</code>分析失败并且语法分析器进行更强大的全<code>ALL(*)</code>机制时，ANTLR调用这个方法。</p>
-
-<p>在开发中使用诊断错误监听器是个好主意，因为ANTLR工具不能给你有关歧义语法结构的警告（当生成语法分析器时）。只有在运行时语法分析器才可以侦测到二义性。</p>
 ]]></content>
   </entry>
   

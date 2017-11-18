@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="当我们开发一套语法时，会有很多错误要去修复。在完成语法前，生成的语法分析器不会识别所有有效的句子。在这期间，提供有用信息的错误消息帮助我们追踪到语法问题。一旦我们有了一套正确的语法，然后我们就必须处理用户输入的不合语法的句子，或者甚至由其它程序发生故障生成的不合语法的句子。在这两种情况下， &hellip;">
+  <meta name="description" content="有时我们在调试语法时需要ANTLR提供更好的消息提示，为达到这个目的，我们可以改变ANTLR的标准错误报告。 改变和重定向ANTLR错误消息 默认情况下，ANTLR把所有的错误发送给标准错误，但我们可以通过提供ANTLRErrorListener接口的实现来修改目标和内容。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,288 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part30/">ANTLR 4权威参考读书笔记（30）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-10-26T18:02:32+08:00'><span class='date'><span class='date-month'>Oct</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:02 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>有时我们在调试语法时需要ANTLR提供更好的消息提示，为达到这个目的，我们可以改变ANTLR的标准错误报告。</p>
+
+<h3 id="改变和重定向antlr错误消息">改变和重定向ANTLR错误消息</h3>
+
+<p>默认情况下，ANTLR把所有的错误发送给标准错误，但我们可以通过提供ANTLRErrorListener接口的实现来修改目标和内容。该接口有syntaxError()方法可以应用于词法分析器和语法分析器。方法syntaxError()接收各种有关错误的位置以及错误消息的信息。它也接收语法分析器的一个引用，因此我们可以查询关于识别的状态。</p>
+
+<p>例如，这里是一个错误监听器，它打印规则调用栈以及随后的用有问题的记号信息来加强的通常错误消息：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static class VerboseListener extends BaseErrorListener {
+</span><span class='line'>    @Override
+</span><span class='line'>    public void syntaxError(Recognizer&lt;?, ?&gt; recognizer,
+</span><span class='line'>                            Object offendingSymbol,
+</span><span class='line'>                            int line, int charPositionInLine,
+</span><span class='line'>                            String msg,
+</span><span class='line'>                            RecognitionException e)
+</span><span class='line'>    {
+</span><span class='line'>        List&lt;String&gt; stack = ((Parser)recognizer).getRuleInvocationStack();
+</span><span class='line'>        Collections.reverse(stack);
+</span><span class='line'>        System.err.println("rule stack: "+stack);
+</span><span class='line'>        System.err.println("line "+line+":"+charPositionInLine+" at "+
+</span><span class='line'>        offendingSymbol+": "+msg);
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>使用这个定义，我们的应用可以很容易地在调用开始规则前给语法分析器添加一个错误监听器。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SimpleParser parser = new SimpleParser(tokens);
+</span><span class='line'>parser.removeErrorListeners();    // remove ConsoleErrorListener
+</span><span class='line'>parser.addErrorListener(new VerboseListener());    // add ours
+</span><span class='line'>parser.prog();    // parse as usual</span></code></pre></td></tr></table></div></figure>
+
+<p>在添加我们自己的错误监听器之前，必须先移除标准的终端错误监听器，否则的话就会得到重复的错误消息。</p>
+
+<p>现在让我们看下包含一个额外类名以及缺少字段名的类定义的错误消息看起来是什么样子：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>compile *.java
+</span><span class='line'>run TestE_Listener</span></code></pre></td></tr></table></div></figure>
+
+<p>以下是包含额外类名以及缺少字段名的类定义：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class T T {
+</span><span class='line'>  int ;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>然后我们就会看到如下错误消息：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rule stack: [prog, classDef]
+</span><span class='line'>line 1:8 at [@2,8:8='T',&lt;9&gt;,1:8]: extraneous input 'T' expecting '{'
+</span><span class='line'>rule stack: [prog, classDef, member]
+</span><span class='line'>line 2:6 at [@5,18:18=';',&lt;8&gt;,2:6]: no viable alternative at input 'int;'
+</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
+
+<p>栈[prog, classDef]指出语法分析器在规则classDef中，且被prog调用。注意，记号信息包含在输入流中的字符位置，这在高亮输入中的错误时是非常有用的。例如，记号[@2,8:8=&#39;T&#39;,<9>,1:8]指出它是记号流中的第3个记号（索引从0开始），字符范围从8到8，记号类型为9，位于第1行，并且在字符位置8（计数从0开始，且TAB被当作一个字符）。</p>
+
+<p>作为另一个示例，让我们构建一个错误监听器TestE_Listener2.java，它打印带有被下划线强调的有错误的记号的行。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>compile *.java
+</span><span class='line'>run TestE_Listener2</span></code></pre></td></tr></table></div></figure>
+
+<p>输入以下数据：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class T XYZ {
+</span><span class='line'>  int ;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>然后就会看如如下错误信息：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>line 1:8 extraneous input 'XYZ' expecting '{'
+</span><span class='line'>class T XYZ {
+</span><span class='line'>        ^^^
+</span><span class='line'>line 2:6 no viable alternative at input 'int;'
+</span><span class='line'>  int ;
+</span><span class='line'>      ^
+</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
+
+<p>为了让事情变得更容易，我们将忽略TAB——charPositionInLine不是列号，因为TAB的大小不是统一定义的。这里是一个错误监听器实现，强调输入中的错误位置。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static class UnderlineListener extends BaseErrorListener {
+</span><span class='line'>    public void syntaxError(Recognizer&lt;?, ?&gt; recognizer,
+</span><span class='line'>                            Object offendingSymbol,
+</span><span class='line'>                            int line, int charPositionInLine,
+</span><span class='line'>                            String msg,
+</span><span class='line'>                            RecognitionException e) {
+</span><span class='line'>        System.err.println("line "+line+":"+charPositionInLine+" "+msg);
+</span><span class='line'>        underlineError(recognizer,(Token)offendingSymbol,
+</span><span class='line'>        line, charPositionInLine);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    protected void underlineError(Recognizer recognizer,
+</span><span class='line'>                                  Token offendingToken, int line,
+</span><span class='line'>                                  int charPositionInLine) {
+</span><span class='line'>        CommonTokenStream tokens =
+</span><span class='line'>            (CommonTokenStream)recognizer.getInputStream();
+</span><span class='line'>        String input = tokens.getTokenSource().getInputStream().toString();
+</span><span class='line'>        String[] lines = input.split("\n");
+</span><span class='line'>        String errorLine = lines[line - 1];
+</span><span class='line'>        System.err.println(errorLine);
+</span><span class='line'>        for (int i=0; i&lt;charPositionInLine; i++) System.err.print(" ");
+</span><span class='line'>        int start = offendingToken.getStartIndex();
+</span><span class='line'>        int stop = offendingToken.getStopIndex();
+</span><span class='line'>        if ( start&gt;=0 && stop&gt;=0 ) {
+</span><span class='line'>            for (int i=start; i&lt;=stop; i++) System.err.print("^");
+</span><span class='line'>        }
+</span><span class='line'>        System.err.println();
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>关于错误监听器还有一件事需要知道。当语法分析器侦测到一个模棱两可的输入序列时，它会通知错误监听器。默认的错误监听器ConsoleErrorListener实际上不会在终端打印任何东西，也就是说，语法分析器不会通知用户。让我们回顾下能用两种方式匹配输入<code>f();</code>的那段歧义语法。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Ambig;
+</span><span class='line'>
+</span><span class='line'>stat: expr ';'    // expression statement
+</span><span class='line'>    | ID '(' ')' ';'    // function call statement
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>expr: ID '(' ')'
+</span><span class='line'>    | INT
+</span><span class='line'>    ;
+</span><span class='line'>
+</span><span class='line'>INT : [0-9]+ ;
+</span><span class='line'>ID  : [a-zA-Z]+ ;
+</span><span class='line'>WS  : [ \t\r\n]+ -&gt; skip ;</span></code></pre></td></tr></table></div></figure>
+
+<p>如果我们测试这段语法，我们不会看到有关模棱两可的输入的警告。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr Ambig.g
+</span><span class='line'>compile *.java
+</span><span class='line'>grun Ambig stat</span></code></pre></td></tr></table></div></figure>
+
+<p>然后输入：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>f();</span></code></pre></td></tr></table></div></figure>
+
+<p>等到语法分析器侦测到二义性时，告诉语法分析器通过addErrorListener()使用DiagnosticErrorListener的实例。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>parser.removeErrorListeners(); // remove ConsoleErrorListener
+</span><span class='line'>parser.addErrorListener(new DiagnosticErrorListener());</span></code></pre></td></tr></table></div></figure>
+
+<p>你还应该通知语法分析器你对所有的二义性警告感兴趣，而不仅仅是那些可以被侦测到的。为了效率，ANTLR的决策机制并不总是追逐完整的二义性信息。以下代码告诉你如何让语法分析器报告所有的二义性：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>parser.getInterpreter()
+</span><span class='line'>.setPredictionMode(PredictionMode.LL_EXACT_AMBIG_DETECTION);</span></code></pre></td></tr></table></div></figure>
+
+<p>如果你通过grun使用TestRig，用选项-diagnostics去让它使用DiagnosticErrorListener代替默认的终端错误监听器（并且开启LL_EXACT_AMBIG_DETECTION）。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grun Ambig stat -diagnostics</span></code></pre></td></tr></table></div></figure>
+
+<p>输入：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>f();</span></code></pre></td></tr></table></div></figure>
+
+<p>你会看到：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>line 1:3 reportAttemptingFullContext d=0, input='f();'
+</span><span class='line'>line 1:3 reportAmbiguity d=0: ambigAlts={1, 2}, input='f();'</span></code></pre></td></tr></table></div></figure>
+
+<p>输出显示语法分析器也会调用reportAttemptingFullContext()。当<code>SLL(*)</code>分析失败并且语法分析器进行更强大的全<code>ALL(*)</code>机制时，ANTLR调用这个方法。</p>
+
+<p>在开发中使用诊断错误监听器是个好主意，因为ANTLR工具不能给你有关歧义语法结构的警告（当生成语法分析器时）。只有在运行时语法分析器才可以侦测到二义性。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -2139,110 +2421,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part22/">ANTLR 4权威参考读书笔记（22）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-07-24T21:40:28+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>24</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>9:40 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>基于监听器的方法是极好的，因为所有树遍历和方法触发被自动完成。尽管有时候自动树遍历也是一个缺点，因为我们不能控制遍历本身。例如，我们可能想遍历一段C程序的语法分析树，通过跳过函数体子树忽略函数中的一切。监听器事件方法也不能使用方法返回值去传递数据。当我们需要控制遍历或返回带有事件方法返回值的值时，我们使用访问者模式。现在，让我们构建一个基于访问者版本的属性文件加载器去比较这两种方法。</p>
-
-<h3 id="使用访问者实现应用">使用访问者实现应用</h3>
-
-<p>使用访问者代替监听器，我们只需要让ANTLR生成访问者接口和实现接口，然后创建一段测试代码在语法分析树上调用visit()，根本不需要触及到语法。</p>
-
-<p>在命令行使用-visitor参数时，ANTLR生成接口PropertyFileVisitor和类PropertyFileBaseVisitor，后者有如下的默认实现：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class PropertyFileBaseVisitor&lt;T&gt; extends AbstractParseTreeVisitor&lt;T&gt;
-</span><span class='line'>                                        implements PropertyFileVisitor&lt;T&gt; {
-</span><span class='line'>    @Override
-</span><span class='line'>    public T visitFile(PropertyFileParser.FileContext ctx) { ... }
-</span><span class='line'>    @Override
-</span><span class='line'>    public T visitProp(PropertyFileParser.PropContext ctx) { ... }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>我们可以从监听器的exitProp()中拷贝映射功能，然后把它粘贴到与规则prop相关的访问者方法中。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class TestPropertyFileVisitor {
-</span><span class='line'>    public static class PropertyFileVisitor extends PropertyFileBaseVisitor&lt;Void&gt; {
-</span><span class='line'>        Map&lt;String,String&gt; props = new OrderedHashMap&lt;String, String&gt;();
-</span><span class='line'>        public Void visitProp(PropertyFileParser.PropContext ctx) {
-</span><span class='line'>            String id = ctx.ID().getText();    // prop : ID '=' STRING '\n' ;
-</span><span class='line'>            String value = ctx.STRING().getText();
-</span><span class='line'>            props.put(id, value);
-</span><span class='line'>            return null;    // Java says must return something even when Void
-</span><span class='line'>        }
-</span><span class='line'>    }</span></code></pre></td></tr></table></div></figure>
-
-<p>这里是访问者接口和类之间的继承关系：</p>
-
-<p><img src="/uploads/propertyfile-visitor-hierarchy.png" alt="propertyfile-visitor-hierarchy"></p>
-
-<p>访问者在子节点上通过显式地调用接口ParseTreeVisitor的visit()方法遍历语法分析树。那些方法在AbstractParseTreeVisitor中实现。在这里，为prop调用创建的节点没有子树，因此visitProp()不需要调用visit()。</p>
-
-<p>在监听器和访问者的测试代码（例如TestPropertyFileVisitor）之间最大的不同是访问者的测试代码不需要ParseTreeWalker，它只需要让访问者去访问由语法分析器创建的树。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>PropertyFileVisitor loader = new PropertyFileVisitor();
-</span><span class='line'>loader.visit(tree);
-</span><span class='line'>System.out.println(loader.props);    // print results</span></code></pre></td></tr></table></div></figure>
-
-<p>以下是构建和测试序列：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>antlr -visitor PropertyFile.g  # create visitor as well this time
-</span><span class='line'>compile *.java
-</span><span class='line'>run TestPropertyFileVisitor t.properties</span></code></pre></td></tr></table></div></figure>
-
-<p>这里是输出的内容：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>{user="parrt", machine="maniac"}</span></code></pre></td></tr></table></div></figure>
-
-<p>我们可以使用监听器和访问者构建几乎任何我们想要的。一旦我们处于Java空间，就不再需要学习更多的ANTLR知识。我们只要知道语法、语法分析树、监听器和访问者事件方法之间的关系。除此之外，就是代码。在对识别中的输入短语的回答中，我们可以生成输出、收集信息、以某种方式验证短语，或者执行计算。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/4">&larr; Older</a>
@@ -2260,6 +2438,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/crawl-novel-with-scrapy-part5/">使用Scrapy爬取小说（5）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/crawl-novel-with-scrapy-part4/">使用Scrapy爬取小说（4）</a>
       </li>
     
@@ -2273,10 +2455,6 @@
     
       <li class="post">
         <a href="/blog/crawl-novel-with-scrapy-part1/">使用Scrapy爬取小说（1）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/thinking-on-software-version/">软件版本号的思考</a>
       </li>
     
   </ul>
