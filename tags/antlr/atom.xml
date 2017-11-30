@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: ANTLR | 乐者为王]]></title>
   <link href="http://codemany.com/tags/antlr/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-11-29T23:26:40+08:00</updated>
+  <updated>2017-11-30T19:09:04+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -12,6 +12,17 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（32）]]></title>
+    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part32/"/>
+    <updated>2016-11-18T05:58:56+08:00</updated>
+    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part32</id>
+    <content type="html"><![CDATA[<p>前面我们介绍过ANTLR的自动错误恢复机制，现在让我们看看手动机制，有些时候它能够提供更好的错误恢复。</p>
+
+<h3 id="错误选项">错误选项</h3>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（31）]]></title>
@@ -743,152 +754,6 @@ run CheckSymbols vars.cymbol
 <p>输出结果如下所示：</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">locals:[]
 function&lt;f:tINT&gt;:[&lt;x:tINT&gt;, &lt;y:tFLOAT&gt;]
-...
-</code></pre></div>]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（27）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part27/"/>
-    <updated>2016-09-28T09:32:41+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part27</id>
-    <content type="html"><![CDATA[<p>前面我们主要处理的是数据，今天我们就来做些编程语言方面的事情。</p>
-
-<h3 id="生成调用关系图">生成调用关系图</h3>
-
-<p>软件很难编写和维护，这就是为什么我们试图构建工具去提高我们的生产力和工作效率。例如，在过去的十年里，我们已经看到测试框架、代码覆盖工具和代码分析器的激增，也很高心看到类层次结构的可视化树，以及大部分开发环境支持这个功能。其中有种可视化被称为调用图，它由函数作为节点，并且函数调用作为节点间的有向边。</p>
-
-<p>这本节中，我们将使用Cymbol语法构建一个调用图生成器。考虑以下函数和函数调用集：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">int main() { fact(); a(); }
-float fact(int n) {
-    print(n);
-    if (n == 0) then return 1;
-    return n * fact(n - 1);
-}
-void a() { int x = b(); if false then {c(); d();} }
-void b() { c(); }
-void c() { b(); }
-void d() { }
-void e() { }
-</code></pre></div>
-<p>我们将会把它可视化成如下的调用图：</p>
-
-<p><img src="/uploads/cymbol-call-graph.png" alt="cymbol-call-graph"></p>
-
-<p>可视化的好处是人眼可以很容易地挑出偏差。例如，e()节点是个孤立节点，它意味着没有函数调用它，因此它是一段死代码。一目了然，我们找到一个可以被丢弃的函数。我们还可以通过在图中寻找像fact() -&gt; fact()和b() -&gt; c() -&gt; d()这样的循环非常容易地检测递归。</p>
-
-<p>为了可视化调用图，我们需要读入一段Cymol程序和创建一个DOT文件。例如，以下是我们需要为t.cymbol生成的DOT文件。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">digraph G {
-    ranksep=.25;
-    edge [arrowsize=.5]
-    node [shape=circle, fontname=&quot;ArialNarrow&quot;,
-    fontsize=12, fixedsize=true, height=.45];
-    main; fact; a; b; c; d; e;
-    main -&gt; fact;
-    main -&gt; a;
-    fact -&gt; print;
-    fact -&gt; fact;
-    a -&gt; b;
-    a -&gt; c;
-    a -&gt; d;
-    b -&gt; c;
-    c -&gt; b;
-}
-</code></pre></div>
-<p>上面的输出包括样本设置描述，例如ranksep=.25;和一列节点和边。为抓住孤立节点，我们需要确保为每个函数名生成节点定义，即使它没有出边和入边。否则它将不会出现在图中。注意在节点定义行末尾的e节点。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">main; fact; a; b; c; d; e;
-</code></pre></div>
-<p>我们的策略很简单，当语法分析器找到一个函数声明时，应用会把当前函数名添加到一个列表，并且设置一个字段称为currentFunctionName。当语法分析器看到一个函数调用，应用会记录从currentFunctionName到被调用函数名的一条边。</p>
-
-<p>开始之前，让我们给Cymbol.g中的一些规则选项打上标签，以便获得更精确的监听器方法。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">expr: ID &#39;(&#39; exprList? &#39;)&#39;    # Call
-    | expr &#39;[&#39; expr &#39;]&#39;       # Index
-    | &#39;-&#39; expr                # Negate
-    | &#39;!&#39; expr                # Not
-    | expr &#39;*&#39; expr           # Mult
-    | expr (&#39;+&#39;|&#39;-&#39;) expr     # AddSub
-    | expr &#39;==&#39; expr          # Equal
-    | ID                      # Var
-    | INT                     # Int
-    | &#39;(&#39; expr &#39;)&#39;            # Parens
-    ;
-</code></pre></div>
-<p>然后，作为语言应用的基础，把所有图相关的东西封装进一个类。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">static class Graph {
-    // I&#39;m using org.antlr.v4.runtime.misc: OrderedHashSet, MultiMap
-    Set&lt;String&gt; nodes = new OrderedHashSet&lt;String&gt;();    // list of functions
-    MultiMap&lt;String, String&gt; edges = new MultiMap&lt;String, String&gt;();    // caller-&gt;callee
-    public void edge(String source, String target) {
-        edges.map(source, target);
-    }
-</code></pre></div>
-<p>从节点和边的集合中，我们可以在类Graph的toDOT()中使用一些Java代码转储出适当的DOT代码。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public String toDOT() {
-    StringBuilder buf = new StringBuilder();
-    buf.append(&quot;digraph G {\n&quot;);
-    buf.append(&quot;    ranksep=.25;\n&quot;);
-    buf.append(&quot;    edge [arrowsize=.5]\n&quot;);
-    buf.append(&quot;    node [shape=circle, fontname=\&quot;ArialNarrow\&quot;,\n&quot;);
-    buf.append(&quot;    fontsize=12, fixedsize=true, height=.45];\n&quot;);
-    buf.append(&quot;    &quot;);
-    for (String node : nodes) {    // print all nodes first
-        buf.append(node);
-        buf.append(&quot;; &quot;);
-    }
-    buf.append(&quot;\n&quot;);
-    for (String src : edges.keySet()) {
-        for (String trg : edges.get(src)) {
-            buf.append(&quot;    &quot;);
-            buf.append(src);
-            buf.append(&quot; -&gt; &quot;);
-            buf.append(trg);
-            buf.append(&quot;;\n&quot;);
-        }
-    }
-    buf.append(&quot;}\n&quot;);
-    return buf.toString();
-}
-</code></pre></div>
-<p>现在我们要做的是使用监听器填满这些数据结构，监听器需要两个字段用于记录。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">static class FunctionListener extends CymbolBaseListener {
-    Graph graph = new Graph();
-    String currentFunctionName = null;
-</code></pre></div>
-<p>然后应用只需要监听两个事件。首先，在语法分析器发现函数声明时记录当前的函数名。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public void enterFunctionDecl(CymbolParser.FunctionDeclContext ctx) {
-    currentFunctionName = ctx.ID().getText();
-    graph.nodes.add(currentFunctionName);
-}
-</code></pre></div>
-<p>其次，当语法分析器侦测到函数调用时，应用需要记录从当前函数到被调用函数的一条边。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public void exitCall(CymbolParser.CallContext ctx) {
-    String funcName = ctx.ID().getText();
-    // map current function to the callee
-    graph.edge(currentFunctionName, funcName);
-}
-</code></pre></div>
-<p>注意，函数调用不能隐藏在嵌套代码块或诸如a()这样的声明中。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">void a() { int x = b(); if false then {c(); d();} }
-</code></pre></div>
-<p>无论什么时候，只要树遍历器发现函数调用就触发监听器方法exitCall()。</p>
-
-<p>通过语法分析树和类FunctionListener，我们可以启动带有监听器的一个遍历器去产生输出。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">ParseTreeWalker walker = new ParseTreeWalker();
-FunctionListener collector = new FunctionListener();
-walker.walk(collector, tree);
-System.out.println(collector.graph.toString())
-</code></pre></div>
-<p>在转储DOT字符串前，该代码会打印出函数和边的列表。</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">antlr Cymbol.g
-compile *.java
-run CallGraph t.cymbol
-</code></pre></div>
-<p>以下是部分输出结果：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">edges: {main=[fact, a], fact=[print, fact], a=[b, c, d], b=[c], c=[b]},
-functions: [main, fact, a, b, c, d, e]
-digraph G {
-ranksep=.25;
-edge [arrowsize=.5]
 ...
 </code></pre></div>]]></content>
   </entry>

@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="当使用Tab键切换时，想把光标定位在input[text]的首部。在网上找了一些光标定位的资料发现大多数都是用createTextRange来实现的，而且都出自一个实例。可惜的是在Firefox下createTextRange无效。 &hellip;">
+  <meta name="description" content="我的环境：主机操作系统是Windows Server 2008，虚拟机操作系统是Ubuntu 8.10，虚拟机是VirtualBox 2.0.4。 安装增强功能包（Guest Additions） 安装好Ubuntu 8.10后，运行Ubuntu并登录。然后在VirtualBox的菜单里选择“ &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,88 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/virtualbox-shared-folder-between-ubuntu-guest-and-windows-server-2008-host/">VirtualBox虚拟Ubuntu 8.10时共享文件夹的使用</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2008-12-02T17:24:43+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>2</span><span class='date-suffix'>nd</span>, <span class='date-year'>2008</span></span> <span class='time'>5:24 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>我的环境：主机操作系统是Windows Server 2008，虚拟机操作系统是Ubuntu 8.10，虚拟机是VirtualBox 2.0.4。</p>
+
+<h3 id="安装增强功能包（guest-additions）">安装增强功能包（Guest Additions）</h3>
+
+<p>安装好Ubuntu 8.10后，运行Ubuntu并登录。然后在VirtualBox的菜单里选择“Devices” -&gt; “Install Guest Additions”。如图所示：</p>
+
+<p><img src="/uploads/virtualbox-guest-addtions.png" alt="virtualbox-guest-addtions"></p>
+
+<p>你会发现在Ubuntu桌面上多出一个光盘图标，这张光盘默认被自动加载到了文件夹/media/cdrom0。在命令行下输入：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>cd /media/cdrom0
+</span><span class='line'>sudo ./VboxLinuxAdditions.run</span></code></pre></td></tr></table></div></figure>
+
+<p>开始安装工具包。安装完毕后会提示要重启Ubuntu。</p>
+
+<h3 id="设置共享文件夹">设置共享文件夹</h3>
+
+<p>重启完成后点击“Devices” -&gt; “Shared Folders”菜单，添加一个共享文件夹，选项“Make Permanent”是指该文件夹是否是持久的。共享名可以任取一个自己喜欢的，比如“flamingo”，尽量使用英文名称。</p>
+
+<h3 id="挂载共享文件夹">挂载共享文件夹</h3>
+
+<p>重新进入虚拟Ubuntu，打开命令行窗口输入：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>sudo mkdir /mnt/shared
+</span><span class='line'>sudo mount -t vboxsf flamingo /mnt/shared</span></code></pre></td></tr></table></div></figure>
+
+<p>其中“flamingo”是之前创建的共享文件夹的名字。现在Ubuntu和主机可以分享文件了。</p>
+
+<p>假如你不想每一次都手动挂载，可以在/etc/fstab中添加一项：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>flamingo /mnt/shared vboxsf defaults 0 0</span></code></pre></td></tr></table></div></figure>
+
+<p>这样每次系统启动时就能够自动挂载了。</p>
+
+<p>需要注意的是，共享文件夹的名称千万不要和挂载点的名称相同。比如，上面的挂载点是/mnt/shared，如果共享文件夹的名字也是shared的话，在挂载的时候就会出现如下的错误信息（看 <a href="http://www.virtualbox.org/ticket/2265">http://www.virtualbox.org/ticket/2265</a> ）：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>/sbin/mount.vboxsf: mounting failed with the error: Protocol error</span></code></pre></td></tr></table></div></figure>
+
+<p>原因分析可以看<a href="http://paulsiu.wordpress.com/2007/11/20/tips-on-running-innotek-virtualbox/">Tips on running Sun Virtualbox</a>的Shared Folder on a Linux Guest节。</p>
+
+<p>卸载的话使用下面的命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>sudo umount -f /mnt/shared</span></code></pre></td></tr></table></div></figure>
+
+<p>2017/7/11更新</p>
+
+<p>在设置共享文件夹时，如果勾选了“Auto-mount”，那么Ubuntu会自动在/media里建立以“sf_”为前缀并加上共享名的挂载点。不过因为这个挂载点默认的权限是给vbox创建的用户组“vboxsf”的，所以你会无法查看，可以修改/etc/group，把自己的用户名加到“vboxsf”组解决。并且，在这种情况下你通过手动修改/etc/fstab以实现自动挂载会失败。所以，若想通过修改/etc/fstab实现自动挂载，在设置共享文件夹时就不能勾选“Auto-mount”。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -848,57 +930,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/setpropertiesrule-server-service-engine-host-context-setting-property/">[SetPropertiesRule]{Server/Service/Engine/Host/Context} Setting property</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2008-06-04T15:24:18+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>4</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>3:24 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>使用Tomcat 6.0.16搭配Eclipse创建Dynamic Web Project后，在项目上按右键，选择Run As -&gt; Run on Server方式启动Tomcat服务器。在Console工作台中就会出现如下的红色警告信息，让人不爽。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>2008-6-4 21:49:00 org.apache.tomcat.util.digester.SetPropertiesRule begin
-</span><span class='line'>WARNING: [SetPropertiesRule]{Server/Service/Engine/Host/Context} Setting property 'source' to 'org.eclipse.jst.j2ee.server:cont' did not find a matching property.
-</span><span class='line'>2008-6-4 21:49:00 org.apache.catalina.core.AprLifecycleListener init
-</span><span class='line'>2008-6-4 21:49:00 org.apache.coyote.http11.Http11Protocol init
-</span><span class='line'>INFO: Initializing Coyote HTTP/1.1 on http-8080</span></code></pre></td></tr></table></div></figure>
-
-<p>在网上查找答案，有的说将Tomcat的版本换成6.0.14就可以了；还有的说在建立Dynamic Web Project时把“Dynamic Web Module”选项后面的版本号由2.5改成2.4也行。不过这些回答好像都不能真正地解决问题。只能自己想办法了。</p>
-
-<p>实际上出现SetPropertiesRule警告的原因是因为Tomcat在server.xml的Context节点中不支持source属性：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;Context docBase="xxx" path="/cont" source="org.eclipse.jst.j2ee.server:cont" /&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>解决方法是在Server的配置界面中选中“Publish module contexts to separate XML files”选项。</p>
-
-<p><img src="/uploads/eclipse-server-options.png" alt="eclipse-server-options"></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/24">&larr; Older</a>
@@ -946,7 +977,7 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 142%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 143%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 132%" href="/tags/android/">Android</a>
 <a style="font-size: 103%" href="/tags/c-plus-plus/">C++</a>
