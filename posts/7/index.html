@@ -9,10 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="设计抽奖活动时，我们总是要控制抽奖物品出现的概率，让好的东西很难被抽到；
-设计游戏打怪时，我们要控制打怪时的命中概率，要控制宝物掉出的概率；
-网站的置顶广告，我们也要根据广告主的广告费用控制广告的出现时间；
-设计负载均衡算法时，我们要根据服务器的性能控制服务器被选中的可能。 深入思考这些需求， &hellip;">
+  <meta name="description" content="PBL文件是PowerBuilder库文件，在其中存储了应用程序所使用到的所有系统对象和用户自定义对象的集合，同时PBL文件中还存储了源代码控制信息（Source Code Control，简称SCC）。对其文件格式的研究，可以准确地了解程序结构并能对PBL文件中的对象进行修改， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -76,6 +73,440 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/pbl-file-format-analysis/">PBL文件格式解析</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2015-12-13T17:33:08+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>13</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>5:33 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>PBL文件是PowerBuilder库文件，在其中存储了应用程序所使用到的所有系统对象和用户自定义对象的集合，同时PBL文件中还存储了源代码控制信息（Source Code Control，简称SCC）。对其文件格式的研究，可以准确地了解程序结构并能对PBL文件中的对象进行修改，同时也有利于库文件的修复，程序动态执行等方面的工作。</p>
+
+<h3 id="pbl文件的存储结构">PBL文件的存储结构</h3>
+
+<p>PBL文件存储信息时是以块（Block）为单位为对象分配存储空间的，每个块的大小固定为512字节，块号从0开始计算，块号与块首字节的偏移地址有如下关系：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>块号 = 块首字节的偏移地址 / 512</span></code></pre></td></tr></table></div></figure>
+
+<p>整个PBL文件由Header块、Bitmap块、Node块、Data块组成。其中除Header块外，其它块均以链表结构组织，其中Data块是Node块中Entry表项的具体内容，是从属于Node块的。下图说明了这些块的关系。</p>
+
+<p><img src="/uploads/pbl-datastruct.png" alt="pbl-datastruct"></p>
+
+<p>图中Header块、首个Bitmap块及首个Node块在存储空间上是相邻的，其中Node块比较特别，占6个块共3072字节，其余块只占512字节，其空间大小及起始地址如下表所示：</p>
+
+<table><thead>
+<tr>
+<th style="text-align: right">块号</th>
+<th>地址范围</th>
+<th>描述</th>
+</tr>
+</thead><tbody>
+<tr>
+<td style="text-align: right">0</td>
+<td>0000-01FF</td>
+<td>Header块</td>
+</tr>
+<tr>
+<td style="text-align: right">1</td>
+<td>0200-03FF</td>
+<td>首个Bitmap块</td>
+</tr>
+<tr>
+<td style="text-align: right">2-7</td>
+<td>0400-0FFF</td>
+<td>首个Node块</td>
+</tr>
+</tbody></table>
+
+<h3 id="header块解析">Header块解析</h3>
+
+<p>Header块是整个PBL的描述信息，它包含了PBL的版本标志，库注释，首个SCC数据块的偏移地址等信息。具体内容如下表所示：</p>
+
+<table><thead>
+<tr>
+<th>块内地址范围</th>
+<th>所占字节</th>
+<th>数据类型</th>
+<th>描述</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>0000-0003</td>
+<td>4</td>
+<td>char</td>
+<td>&#39;HDR*&#39;</td>
+</tr>
+<tr>
+<td>0004-0011</td>
+<td>14</td>
+<td>char</td>
+<td>&#39;PowerBuilder&#39; + 0x00 + 0x00</td>
+</tr>
+<tr>
+<td>0012-0015</td>
+<td>4</td>
+<td>char</td>
+<td>PBL格式版本（如0900表示9.0版本）</td>
+</tr>
+<tr>
+<td>0016-0019</td>
+<td>4</td>
+<td>long</td>
+<td>创建/修改日期时间</td>
+</tr>
+<tr>
+<td>001A-001B</td>
+<td>2</td>
+<td>byte</td>
+<td>保留</td>
+</tr>
+<tr>
+<td>001C-011B</td>
+<td>256</td>
+<td>char</td>
+<td>库注释</td>
+</tr>
+<tr>
+<td>011C-011F</td>
+<td>4</td>
+<td>long</td>
+<td>首个SCC数据块的偏移地址</td>
+</tr>
+<tr>
+<td>0120-0123</td>
+<td>4</td>
+<td>long</td>
+<td>SCC数据块实际大小</td>
+</tr>
+<tr>
+<td>0124-01FF</td>
+<td>220</td>
+<td>byte</td>
+<td>保留</td>
+</tr>
+</tbody></table>
+
+<h3 id="bitmap块解析">Bitmap块解析</h3>
+
+<p>Bitmap块中存放的是表示PBL文件存储空间的使用情况。该块数据结构如下表所示：</p>
+
+<table><thead>
+<tr>
+<th>块内地址范围</th>
+<th>所占字节</th>
+<th>数据类型</th>
+<th>描述</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>0000-0003</td>
+<td>4</td>
+<td>char</td>
+<td>&#39;FRE*&#39;</td>
+</tr>
+<tr>
+<td>0004-0007</td>
+<td>4</td>
+<td>long</td>
+<td>下一个Bitmap块的偏移地址或0</td>
+</tr>
+<tr>
+<td>0008-01FF</td>
+<td>504</td>
+<td>bit</td>
+<td>位图（每个位标识一个块）</td>
+</tr>
+</tbody></table>
+
+<p>由上表可知，包含一个Bitmap块的PBL文件最多可使用504 * 8 = 4032个块。当文件空间超过4032个块时，就需要使用第二个Bitmap块，它的偏移地址由当前Bitmap块块内偏移0004-0007处的值表示。如果是最后一个Bitmap块，则对应的字节处为00 00 00 00，即偏移地址为0。这样就形成了Bitmap块的单向链表。</p>
+
+<p><img src="/uploads/bitmap-block-chain.png" alt="bitmap-block-chain"></p>
+
+<p>位图用于标识块的使用/空闲情况。在位图中为1的位，表示与该位序号对应的块已被使用；反之，表示对应块未使用。例如FF FF 40 00还原为位图则为11111111 11111111 01000000 00000000，该位图表示PBL文件共有18个块，其中的第16号块空闲未使用。</p>
+
+<p><strong>注意：在实际分析多个PBL文件后发现，位图中的位并不能真实反映对应块的空闲/使用情况，只是记录PBL文件使用了多少个块。</strong></p>
+
+<h3 id="node块解析">Node块解析</h3>
+
+<p>Node块是目录块，主要用于存放Entry目录表项。下表是Node块的数据结构：</p>
+
+<table><thead>
+<tr>
+<th>块内地址范围</th>
+<th>所占字节</th>
+<th>数据类型</th>
+<th>描述</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>0000-0003</td>
+<td>4</td>
+<td>char</td>
+<td>&#39;NOD*&#39;</td>
+</tr>
+<tr>
+<td>0004-0007</td>
+<td>4</td>
+<td>long</td>
+<td>左Node块的偏移地址或0</td>
+</tr>
+<tr>
+<td>0008-001B</td>
+<td>4</td>
+<td>long</td>
+<td>父Node块的偏移地址或0</td>
+</tr>
+<tr>
+<td>000C-000F</td>
+<td>4</td>
+<td>long</td>
+<td>右Node块的偏移地址或0</td>
+</tr>
+<tr>
+<td>0010-0011</td>
+<td>2</td>
+<td>short</td>
+<td>块内可用空间（初始值3040）</td>
+</tr>
+<tr>
+<td>0012-0013</td>
+<td>2</td>
+<td>short</td>
+<td>按字母顺序最后一个对象名的位置</td>
+</tr>
+<tr>
+<td>0014-0015</td>
+<td>2</td>
+<td>short</td>
+<td>该Node块中的Entry表项数</td>
+</tr>
+<tr>
+<td>0016-0017</td>
+<td>2</td>
+<td>short</td>
+<td>按字母顺序第一个对象名的位置</td>
+</tr>
+<tr>
+<td>0018-001F</td>
+<td>8</td>
+<td>char</td>
+<td>保留</td>
+</tr>
+<tr>
+<td>0020-00BF</td>
+<td>3040</td>
+<td>chunks</td>
+<td>Entry目录表</td>
+</tr>
+</tbody></table>
+
+<p>其中Entry目录表是顺序表。当一个Node块的空间不足以存储所有Entry表项时，可以再使用一个Node块来存储，并且Entry表项不能跨Node块存储，因此Node块中的空间不能完全利用，会有一定的剩余，这个值记录在块内偏移0010-0011处。</p>
+
+<p>Node块的链接方式有些复杂，它使用一种称之为三叉链表（节点包含四个域：数据域、左指针域、右指针域、父指针域）的链式存储结构把所有Node块组织成为一颗二叉树，这可能是PowerBuilder为了提高查找速度而做的一些优化吧。</p>
+
+<p><img src="/uploads/node-block-tree.png" alt="node-block-tree"></p>
+
+<h3 id="entry表项解析">Entry表项解析</h3>
+
+<p>每个Entry表项对应于一个对象的源代码或PCODE的描述信息，因此Entry目录表就是整个库中各个对象的索引表，存储了各对象的索引信息。例如，在编程中创建一个名为“pbltest”的Window对象类型，那么在Entry目录表中要存放该对象的两个索引表项，分别为“pbltest.srw”用于存储源代码，“pbltest.win”用于存储PCODE。在Entry目录表中存储的对象有以下这些：</p>
+
+<table><thead>
+<tr>
+<th>对象类型</th>
+<th>源代码后缀</th>
+<th>PCODE后辍</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>Application</td>
+<td>sra</td>
+<td>apl</td>
+</tr>
+<tr>
+<td>Window</td>
+<td>srw</td>
+<td>win</td>
+</tr>
+<tr>
+<td>DataWindow</td>
+<td>srd</td>
+<td>dwo</td>
+</tr>
+<tr>
+<td>Menu</td>
+<td>srm</td>
+<td>men</td>
+</tr>
+<tr>
+<td>Function</td>
+<td>srf</td>
+<td>fun</td>
+</tr>
+<tr>
+<td>Query</td>
+<td>srq</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Structure</td>
+<td>srs</td>
+<td>str</td>
+</tr>
+<tr>
+<td>User object</td>
+<td>sru</td>
+<td>udo</td>
+</tr>
+<tr>
+<td>Pipeline</td>
+<td>srp</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Project</td>
+<td>srj</td>
+<td>-</td>
+</tr>
+<tr>
+<td>?</td>
+<td>-</td>
+<td>pra</td>
+</tr>
+<tr>
+<td>?</td>
+<td>-</td>
+<td>prp</td>
+</tr>
+</tbody></table>
+
+<p>Entry表项的具体数据结构如下表所示：</p>
+
+<table><thead>
+<tr>
+<th>块内地址范围</th>
+<th>所占字节</th>
+<th>数据类型</th>
+<th>描述</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>0000-0003</td>
+<td>4</td>
+<td>char</td>
+<td>&#39;ENT*&#39;</td>
+</tr>
+<tr>
+<td>0004-0007</td>
+<td>4</td>
+<td>char</td>
+<td>PBL格式版本（如0900表示9.0版本）</td>
+</tr>
+<tr>
+<td>0008-000B</td>
+<td>4</td>
+<td>long</td>
+<td>首个Data块的偏移地址</td>
+</tr>
+<tr>
+<td>000C-000F</td>
+<td>4</td>
+<td>long</td>
+<td>对象的实际大小</td>
+</tr>
+<tr>
+<td>0010-0013</td>
+<td>4</td>
+<td>long</td>
+<td>对象的创建/修改日期时间</td>
+</tr>
+<tr>
+<td>0014-0015</td>
+<td>2</td>
+<td>short</td>
+<td>对象的注释长度</td>
+</tr>
+<tr>
+<td>0016-0017</td>
+<td>2</td>
+<td>short</td>
+<td>对象名的长度</td>
+</tr>
+<tr>
+<td>0018-????</td>
+<td>?</td>
+<td>char</td>
+<td>对象名 + 0x00</td>
+</tr>
+</tbody></table>
+
+<p>这里需要说明的是，每个Entry表项的长度并不是固定的，它随着对象名的长度变化而变化，所以要读取下一个Entry表项，只能通过计算上一个Entry表项的长度即24 + 对象名长度来得
+到，或者通过搜索下一个ENT*得到。</p>
+
+<h3 id="data块解析">Data块解析</h3>
+
+<p>在Entry目录表中的各对象的实际数据内容是存储在Data块中的。Data块的数据结构如下表所示：</p>
+
+<table><thead>
+<tr>
+<th>块内地址范围</th>
+<th>所占字节</th>
+<th>数据类型</th>
+<th>描述</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>0000-0003</td>
+<td>4</td>
+<td>char</td>
+<td>&#39;DAT*&#39;</td>
+</tr>
+<tr>
+<td>0004-0007</td>
+<td>4</td>
+<td>char</td>
+<td>下一个Data块的偏移地址或0</td>
+</tr>
+<tr>
+<td>0008-0009</td>
+<td>2</td>
+<td>short</td>
+<td>本块内存储的数据的实际长度</td>
+</tr>
+<tr>
+<td>0010-01FF</td>
+<td>502</td>
+<td>char</td>
+<td>对象的实际数据</td>
+</tr>
+</tbody></table>
+
+<p>由上表可知，若对象的数据内容在502字节以上时，就需用多个Data块存放，这些Data块形成一个单向链表。链表的最后一个Data块的0004-0007中存储的偏移地址为00 00 00 00，表示链表结束。0010-01FF处存放的是对象的实际数据，只有最后一个Data块的长度有可能小于502，且以0x00字节表示结束。</p>
+
+<p>根据上面对PBL文件格式的解析，使用Ruby开发了一个小工具，用来输出PBL文件中存储的各种信息。源代码被放在GitHub上面，供大家参考。</p>
+
+<p>代码下载：<a href="https://github.com/dohkoos/pblanalyzer">https://github.com/dohkoos/pblanalyzer</a></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1051,333 +1482,6 @@
 <p>当我开始编程时，一切都极其原始，我只需要知道一门语言和一种OS，根本没有框架。甚至在我的两个创业公司里我只需要掌握C，通晓Macintosh和一些偶尔的68K汇编。今时不同以往。然而我们仍然只有一个大脑，并且大脑不服从摩尔定律，它们不能升级。</p>
 
 <p>因此，如果你能（诚实地）同时做Android、iOS和移动Web，并且交付技艺精湛的结果，我向您致敬！但我真的希望你也能赚3倍的钱。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/testing-async-emails-rails-42/">使用Rails 4.2+ 测试异步邮件</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2015-07-09T13:05:08+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>9</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>1:05 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="https://blog.engineyard.com/2015/testing-async-emails-rails-42">https://blog.engineyard.com/2015/testing-async-emails-rails-42</a></p>
-
-<p>如果你正在构建的应用需要发送邮件，我们都赞同绝不能阻塞控制器，因此异步发送必不可少。为了实现这一点，我们需要借助可以在后台处理任务的异步处理库将邮件发送代码从原始请求/响应周期中移出。</p>
-
-<p>我们如何确信我们的代码在进行此更改时会如预期的那样行事？在这篇博文中，我们将研究测试它的一种方法。我们将使用MiniTest（因为Rails内置了这个框架），但是这里介绍的概念可以很容易地转换为RSpec。</p>
-
-<p>好消息是从Rails 4.2开始，<a href="http://guides.rubyonrails.org/4_2_release_notes.html#asynchronous-mails">异步发送邮件</a>比以前更容易。我们将在我们的示例中使用<a href="https://github.com/mperham/sidekiq">Sidekiq</a>作为队列系统，但是由于ActionMailer＃deliver_later构建在Active Job之上，该接口很干净，使得异步处理库的使用不可知。这意味着如果我刚才没有提到它，作为开发者或者用户的你将不会知情。设置队列系统是另一个话题，你可以在<a href="https://blog.engineyard.com/2014/getting-started-with-active-job">Getting Started With Active Job</a>了解更多。</p>
-
-<h3 id="不要依赖具体">不要依赖具体</h3>
-
-<p>在我们的示例中，我们假设Sidekiq和它的依赖关系已经正确配置，因此特定于此场景的唯一一段代码是声明Active Job将使用哪个队列适配器：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># config/application.rb
-</span><span class='line'>
-</span><span class='line'>module OurApp
-</span><span class='line'>  class Application &lt; Rails::Application
-</span><span class='line'>    ...
-</span><span class='line'>    config.active_job.queue_adapter = :sidekiq
-</span><span class='line'>  end
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<p>Active Job在隐藏所有的实质的队列实现细节上做得很好，使得它对于Resque、Delayed Job或其它队列可以用同样的方式工作。所以如果我们要换用<a href="https://github.com/brandonhilkert/sucker_punch">Sucker Punch</a>，唯一要做的更改就是在引用相应的依赖包后，将队列适配器从:sidekiq切换到:sucker_punch。</p>
-
-<h3 id="基于active-job">基于Active Job</h3>
-
-<p>如果你刚开始使用Rails 4.2，或者对<a href="http://guides.rubyonrails.org/4_2_release_notes.html#active-job">Active Job</a>不太了解，<a href="https://blog.engineyard.com/2014/getting-started-with-active-job">Ben Lewis’ intro to Active Job</a>是一个很好的起点。不过，这篇文章还留给我一个细节去<a href="https://twitter.com/mariusbutuc/status/578585047059599361">盼望</a>，即找到一个干净的、地道的方法来测试一切都如预期的那样工作。</p>
-
-<p>根据本文的目标，我们假设你有：</p>
-
-<ul>
-<li>Rails 4.2+</li>
-<li>已经设置好使用队列后端的Active Job（例如Sidekiq、Resque等）</li>
-<li>一个Mailer</li>
-</ul>
-
-<p>任何Mailer都应该使用这里描述的概念，我们将用以下这封“欢迎邮件”来使我们的示例更实际：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>#app/mailers/user_mailer.rb
-</span><span class='line'>
-</span><span class='line'>class UserMailer &lt; ActionMailer::Base
-</span><span class='line'>  default from: 'email@example.com'
-</span><span class='line'>
-</span><span class='line'>  def welcome_email(user:)
-</span><span class='line'>    mail(
-</span><span class='line'>      to: user.email,
-</span><span class='line'>      subject: "Hi #{user.first_name}, and welcome!"
-</span><span class='line'>    )
-</span><span class='line'>  end
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<p>为了保持事情简单并专注于什么是重要的，我们想在用户注册后给他发送一封“欢迎邮件”。</p>
-
-<p>这就像<a href="http://guides.rubyonrails.org/action_mailer_basics.html#calling-the-mailer">Rails指南邮件程序示例</a>中的那样：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># app/controllers/users_controller.rb
-</span><span class='line'>
-</span><span class='line'>class UsersController &lt; ApplicationController
-</span><span class='line'>  ...
-</span><span class='line'>  def create
-</span><span class='line'>    ...
-</span><span class='line'>    # Yes, Ruby 2.0+ keyword arguments are preferred
-</span><span class='line'>    UserMailer.welcome_email(user: @user).deliver_later
-</span><span class='line'>  end
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<h3 id="mailer应该做最后的任务">Mailer应该做最后的任务</h3>
-
-<p>接下来，我们要确保控制器内的任务能完成我们预期的。</p>
-
-<p>在测试指南中，在<a href="http://guides.rubyonrails.org/testing.html#custom-assertions-and-testing-jobs-inside-other-components">Custom Assertions And Testing Jobs Inside Other Components</a>上面的部分教给我们大约半打这样的自定义断言。</p>
-
-<p>或许你的第一本能是立刻使用[assert_enqueued_jobs][assert-enqueued-jobs]来测试每次创建新用户时我们是否将邮件发送任务放入队列。</p>
-
-<p>你可以这样做：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># test/controllers/users_controller_test.rb
-</span><span class='line'>
-</span><span class='line'>require 'test_helper'
-</span><span class='line'>
-</span><span class='line'>class UsersControllerTest &lt; ActionController::TestCase
-</span><span class='line'>  ...
-</span><span class='line'>  test 'email is enqueued to be delivered later' do
-</span><span class='line'>    assert_enqueued_jobs 1 do
-</span><span class='line'>      post :create, {...}
-</span><span class='line'>    end
-</span><span class='line'>  end
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<p>即使你这样做，你也会惊讶于测试的失败，被告知assert_enqueued_jobs没有定义而无法使用。</p>
-
-<p>这是因为我们的测试继承自ActionController::TestCase，它在编写时没有包含ActiveJob::TestHelper。</p>
-
-<p>但是我们可以快速地修复这个问题：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># test/test_helper.rb
-</span><span class='line'>
-</span><span class='line'>class ActionController::TestCase
-</span><span class='line'>  include ActiveJob::TestHelper
-</span><span class='line'>  ...
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<p>假设我们的代码能完成我们预期的，我们的测试现在应该是绿色的。</p>
-
-<p>这是个好消息。我们可以继续重构代码，添加新功能，或者添加新测试。让我们跟随后者，测试我们的邮件是否被发送，以及它是否有预期的内容。</p>
-
-<p>作为delivery_method选项被配置成:test的结果，ActionMailer能给我们提供一个所有发出邮件的数组。我们可以通过ActionMailer::Base.deliveries访问它。当发送的邮件串联时，测试邮件是否被真正发送就非常简单。我们要做的就是在行动完成后，检查交付数量增加1。用MiniTest来写的话，就像下面这样：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>assert_difference 'ActionMailer::Base.deliveries.size', +1 do
-</span><span class='line'>  post :create, {...}
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<p>我们的测试是实时发生的，但正如我们在本文开头赞同的那样，不能阻塞控制器并在后台任务中发送邮件，所以我们现在需要协调一切，以确保我们的系统是确定的。因此，在我们的异步世界中，我们需要首先执行所有入队的任务，然后才能评估其结果。要执行待处理的Active Job任务，我们将使用<a href="http://api.rubyonrails.org/classes/ActiveJob/TestHelper.html#method-i-perform_enqueued_jobs">perform_enqueued_jobs</a>。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>test 'email is delivered with expected content' do
-</span><span class='line'>  perform_enqueued_jobs do
-</span><span class='line'>    post :create, {...}
-</span><span class='line'>    delivered_email = ActionMailer::Base.deliveries.last
-</span><span class='line'>
-</span><span class='line'>    # assert our email has the expected content, e.g.
-</span><span class='line'>    assert_includes delivered_email.to, @user.email
-</span><span class='line'>  end
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<h3 id="缩短反馈循环">缩短反馈循环</h3>
-
-<p>迄今为止，我们都在进行功能性测试以确保我们的控制器如预期的那样行事。但是，当代码中的更改可能会破坏我们发送的邮件时，如何单元测试邮件程序才能缩短反馈循环并获得快速洞察？</p>
-
-<p><a href="http://guides.rubyonrails.org/testing.html#testing-your-mailers">Rails测试指南</a>建议在这里使用fixtures，但我发现它们太过脆弱。特别是在开始的时候，当还在试验邮件的设计或内容时，变化会很快地使它们过时，导致测试变红。相反，我偏向使用assert_match来关注应该是邮件正文部分的关键元素。</p>
-
-<p>为了这个目的和更多（比如抽象处理多部分邮件的逻辑），我们可以构建我们的自定义断言。这使我们能够扩展<a href="http://guides.rubyonrails.org/testing.html#available-assertions">MiniTest标准断言</a>或<a href="http://guides.rubyonrails.org/testing.html#rails-specific-assertions">Rails专用断言</a>。这也是创建我们自己的领域专用语言（DSL）进行测试的一个很好的示例。</p>
-
-<p>让我们在test目录中创建一个shared文件夹来托管我们的SharedMailerTests模块。我们的自定义断言看起来像这样：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># /test/shared/shared_mailer_tests.rb
-</span><span class='line'>
-</span><span class='line'>module SharedMailerTests
-</span><span class='line'>  ...
-</span><span class='line'>  def assert_email_body_matches(matcher:, email:)
-</span><span class='line'>    if email.multipart?
-</span><span class='line'>      %w(text html).each do |part|
-</span><span class='line'>        assert_match matcher, email.send("#{part}_part").body.to_s
-</span><span class='line'>      end
-</span><span class='line'>    else
-</span><span class='line'>      assert_match matcher, email.body.to_s
-</span><span class='line'>    end
-</span><span class='line'>  end
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<p>接下来，我们要让邮件程序测试意识到这个自定义断言，所以我们把它混合在ActionMailer::TestCase中。我们可以以类似于我们在ActionController::TestCase中包含ActiveJob::TestHelper的方式来做到这点：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># test/test_helper.rb
-</span><span class='line'>
-</span><span class='line'>require 'shared/shared_mailer_tests'
-</span><span class='line'>...
-</span><span class='line'>class ActionMailer::TestCase
-</span><span class='line'>  include SharedMailerTests
-</span><span class='line'>  ...
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<p>请注意，我们首先需要在test_helper中依赖我们的shared_mailer_tests。</p>
-
-<p>这些就绪后，我们现在可以确保我们的邮件包含我们预期的关键元素。想象一下，我们想确保我们发送给用户的URL包含一些用于追踪的特定UTM参数。我们现在可以使用我们的自定义断言配合我们的老朋友perform_enqueued_jobs做到这些：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># test/mailers/user_mailer_test.rb
-</span><span class='line'>
-</span><span class='line'>class ToolMailerTest &lt; ActionMailer::TestCase
-</span><span class='line'>  ...
-</span><span class='line'>  test 'emailed URL contains expected UTM params' do
-</span><span class='line'>    UserMailer.welcome_email(user: @user).deliver_later
-</span><span class='line'>
-</span><span class='line'>    perform_enqueued_jobs do
-</span><span class='line'>      refute ActionMailer::Base.deliveries.empty?
-</span><span class='line'>
-</span><span class='line'>      delivered_email = ActionMailer::Base.deliveries.last
-</span><span class='line'>      %W(
-</span><span class='line'>        utm_campaign=#{@campaign}
-</span><span class='line'>        utm_content=#{@content}
-</span><span class='line'>        utm_medium=email
-</span><span class='line'>        utm_source=mandrill
-</span><span class='line'>      ).each do |utm_param|
-</span><span class='line'>        assert_email_body_matches utm_param, delivered_email
-</span><span class='line'>      end
-</span><span class='line'>    end
-</span><span class='line'>  end
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<h3 id="结论">结论</h3>
-
-<p>让ActionMailer基于Active Job之上，使得从同步发送邮件切换到通过队列发送邮件变得非常简单，就如同从deliver_now切换到deliver_later那样。</p>
-
-<p>由于Active Job使得设置任务基础设施（不需要知道太多你正在使用的队列系统）如此容易，你的测试不再需要关心是否以后会切换到Sidekiq或Resque。</p>
-
-<p>让你的测试设置正确以便于可以充分利用Active Job提供的新的自定义断言可能会有点棘手。希望本教程能使你对整个过程更加明白。</p>
-
-<p>附：你有ActionMailer或Active Job的经验吗？有任何建议吗？有什么陷阱？我们很乐意听到你的经验。</p>
 </div>
   
   

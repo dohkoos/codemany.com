@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: OSDev | 乐者为王]]></title>
   <link href="http://codemany.com/tags/osdev/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-12-02T15:20:21+08:00</updated>
+  <updated>2017-12-03T12:21:37+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -501,24 +501,24 @@ void main()
 
 <p>在380页，他说是“在实方式下被预取，在保护方式下被执行”。这个说法不太正确。现在就来说说在进/出保护模式时究竟发生了什么？</p>
 
-<p>在实模式时，通过指令lgdt fword ptr vgdtr把vgdtr处6个字节的内容装入GDTR中（记住，仅仅只是装入）。然后打开A20地址线（打开A20地址线是为了能存取1M以上的内存，和进不进保护模式其实没有必然的联系，也就是说不打开A20也能进入保护模式，只不过这时在保护模式下就不能存取1M以上的内存了）。然后把CR0寄存器的PE位置1，这是告诉CPU开启保护模式。</p>
+<p>在实模式时，通过指令lgdt fword ptr vgdtr把vgdtr处6个字节的内容装入GDTR中（记住，仅仅只是装入）。然后打开A20地址线（打开A20地址线是为了能存取1M以上的内存，和进不进保护模式其实没有必然的联系，也就是说不打开A20也能进入保护模式，只不过这时在保护模式下就不能存取1M以上的内存）。然后把CR0寄存器的PE位置1，这是告诉CPU开启保护模式。</p>
 
-<p>讲到这里，就要先来说说shadow cache了。shadow cache的layout可以看388页。在实模式下的时候有些位是只读的。大家还记的实模式下取址的方法吗？对，段寄存器值 * 16 + offset。是直接由MMU这样做然后再取址的吗？不是，实际上是：当你往段寄存器（比如说CS）送值后，MMU同时会把CS * 16的值放入到CS的shadow cache中。这样以后只要不改变CS的值，那么，在同一段代码段中的寻址将是offset加上shadow cache中的段基址部分。明白了吗？好，我们再回过来讲。</p>
+<p>讲到这里，就要先来说说shadow cache了。shadow cache的布局可以看388页。在实模式下的时候有些位是只读的。大家还记的实模式下取址的算法吗？对，段寄存器值 * 16 + offset。是直接由MMU这样做然后再取址的吗？不是，实际上是：当你往段寄存器（比如说CS）送值后，MMU同时会把CS * 16的值放入到CS的shadow cache中。这样以后只要不改变CS的值，那么，在同一段代码段中的寻址将是offset加上shadow cache中的段基址部分。明白了吗？好，我们再回过来讲。</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">mov eax, cr0
 or eax, 1
 mov cr0, eax
 </code></pre></div>
 <p>这段代码究竟做了什么呢？其实它做的是开放段寄存器shadow cache的每个位（也就是每个位的值都能修改了，而在实模式下有些位是只读的）。还有就是告诉CPU开启保护模式。记住，这时候在shadow cache中的内容还没有变，还是原来实模式下的地址值。</p>
 
-<p>现在再来谈谈保护模式下的寻址。在386以后的机器，保护模式下的寻址其实和在实模式下的寻址是一样的，也是offset加上shadow cache中的段基址部分。这样就可以理解为什么把CR0的PE位置1后还能执行后面的指令了。因为把CR0的PE位置1虽然使系统进入了保护模式。但因为在shadow cache中的内容还是实模式下的内容，所以才能在保护模式下执行实地址处的指令。然后呢！看看jump指令做了什么？</p>
+<p>现在再来谈谈保护模式下的寻址。在386以后的机器，保护模式下的寻址其实和在实模式下的寻址是一样的，也是offset加上shadow cache中的段基址部分。这样就可以理解为什么把CR0的PE位置1后还能执行后面的指令了。因为把CR0的PE位置1虽然使系统进入了保护模式。但因为在shadow cache中的内容还是实模式下的内容，所以才能在保护模式下执行实地址处的指令。然后呢？</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">jump selector, offset
 </code></pre></div>
-<p>这个指令做了什么？它的意思是要跳到选择子为selector的段的偏移为offset处，执行那里的指令。这时CPU究竟做了什么呢？因为是段间跳转（就是带selector的跳转啦）。又因为现在是在保护模式下，所以MMU根据selector从GDT（知道LDGT的作用了吧）来找到段的真实段基址，然后再把它放入到相应段的shadow cache中。接着MMU再把offset和（shadow cache中的段基址部分）相加。这样就得到了下一个指令的地址。同样的道理，从保护模式出来时用</p>
+<p>这个指令做了什么？它的意思是跳到选择子为selector的段的偏移为offset处，执行那里的指令。这时CPU究竟做了什么呢？因为是段间跳转（就是带selector的跳转啦）。又因为现在是在保护模式下，所以MMU根据selector从GDT（知道LDGT的作用了吧）来找到段的真实段基址，然后再把它放入到相应段的shadow cache中。接着MMU再把offset和shadow cache中的段基址部分相加。这样就得到了下一个指令的地址。同样的道理，从保护模式出来时用</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text">mov eax，cr0
 and eax，0xffffffff
 mov cr0，eax
 </code></pre></div>
-<p>使各段的shadow cache中一部分位固定，并且宣告进入实模式，即以后的寻址将采用实模式方式。然后通过执行jump cs, offset来把CS * 16的值装入shadow cache中。</p>
+<p>使各段的shadow cache中部分位固定，并且宣告进入实模式，即以后的寻址将采用实模式方式。然后通过执行jump cs, offset来把CS * 16的值装入shadow cache中。</p>
 ]]></content>
   </entry>
   

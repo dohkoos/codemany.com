@@ -9,7 +9,10 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="连接（join）可以在SELECT语句的FROM子句或WHERE子句中建立，在FROM子句中指出连接时有助于将连接操作与WHERE子句中的搜索条件区分开来。连接可以对同一个表操作，也可以对多个表操作，对同一个表操作的连接称为自连接（self join）。 连接类型（join type）分为三种： &hellip;">
+  <meta name="description" content="破解前的系统情况： 硬件版本号 V3.0
+软件版本号 F460_IMS_V2.30.10P1T6_JS1111
+BOOT版本号 V1.1.0P1T1
+版本日期 2012-02-29 16:29:07 中兴ZXA10-F460光猫（E8-C）在第一次安装的时候， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +76,159 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-crack-zte-zxa10-f460-v30-for-superuser-password/">如何破解中兴ZXA10-F460 v3.0获取超级管理员密码</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2012-07-20T14:12:59+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>20</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>2:12 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>破解前的系统情况：</p>
+
+<ul>
+<li>硬件版本号 V3.0</li>
+<li>软件版本号 F460_IMS_V2.30.10P1T6_JS1111</li>
+<li>BOOT版本号 V1.1.0P1T1</li>
+<li>版本日期 2012-02-29 16:29:07</li>
+</ul>
+
+<p>中兴ZXA10-F460光猫（E8-C）在第一次安装的时候，超级管理员帐号是telecomadmin，密码为nE7jA%5m，这个是默认的，由安装人员设置好相关设置后，会自动下载配置，这时候这个超级管理员密码会被修改为telecomadminXXXXXXXX（8个X是8位数字，每个用户是不同的）这种格式。因为很多设置需要在超级管理员下才能设置，所以破解这个超级管理员密码是非常必要的。</p>
+
+<p>其中V1.0和V2.0版本网上有破解方法，大家可以自己搜索。</p>
+
+<p>在命令行下输入telnet 192.168.1.1，帐号和密码都是root。连接成功后，会出现“F460 login:”这样的提示。</p>
+
+<p>注意：目前网上流传的查看/tmp目录下db_backup_cfg.xml文件内容的破解方法已经无效了。另外在/userconfig/cfg目录下有两个加密的配置文件db_backup_cfg.xml和db_user_cfg.xml，同目录下还有个db_default_cfg.xml是不加密的（该文件是出厂设置的配置文件），但是大家不要用这个文件去替换db_user_cfg.xml，否则会出现不可预知的后果。</p>
+
+<p>实际上只要修改一下/home/httpd/login.gch这个文件，就能看到密码了。patch文件内容如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>--- /home/httpd/login.gch 2012-07-03 14:05:16.000000000 +0800
+</span><span class='line'>+++ login.gch 2012-07-03 14:03:37.000000000 +0800
+</span><span class='line'>@@ -152,6 +152,17 @@
+</span><span class='line'>set_language("langcn.conf");
+</span><span class='line'>langclass = "login_title_centeren";
+</span><span class='line'>}
+</span><span class='line'>+var CK_HANDLE = create_paralist();
+</span><span class='line'>+var login_name = "telecomadmin";
+</span><span class='line'>+set_para(CK_HANDLE, "Username", login_name);
+</span><span class='line'>+qeury_list_bycond("OBJ_USERINFO_ID", "IGD", CK_HANDLE);
+</span><span class='line'>+destroy_paralist(CK_HANDLE);
+</span><span class='line'>+CK_HANDLE = create_paralist();
+</span><span class='line'>+var CK_IDENTITY = query_identity(0);
+</span><span class='line'>+get_inst(CK_HANDLE, "OBJ_USERINFO_ID", CK_IDENTITY);
+</span><span class='line'>+var now_pwd = get_para(CK_HANDLE, "Password");
+</span><span class='line'>+now_pwd = delMoreSlash(now_pwd);
+</span><span class='line'>+destroy_paralist(CK_HANDLE);
+</span><span class='line'>%&gt;
+</span><span class='line'>&lt;head&gt;
+</span><span class='line'>&lt;META HTTP-EQUIV="pragma" CONTENT="no-cache&gt;
+</span><span class='line'>@@ -239,4 +250,5 @@
+</span><span class='line'>&lt;/script&gt;
+</span><span class='line'>&lt;/head&gt;
+</span><span class='line'>&lt;body onload="onFocus();"&gt;
+</span><span class='line'>+&lt;div&gt;&lt;%=now_pwd;%&gt;&lt;/div&gt;
+</span><span class='line'>&lt;div id="container" class="content"&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>效果是浏览器登录192.168.1.1的时候，超级管理员密码会显示在首页界面的左上角。</p>
+
+<p>到这儿有人想了，怎么把上面的patch更新到/home/httpd/login.gch中呢？总结了三种方法：</p>
+
+<p>第一种方法是telent到F460上后，执行下面的命令即可：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>sed -i '155 s/^/var CK_HANDLE = create_paralist();\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '156 s/^/var login_name = "telecomadmin";\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '157 s/^/set_para(CK_HANDLE, "Username", login_name);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '158 s/^/qeury_list_bycond("OBJ_USERINFO_ID", "IGD", CK_HANDLE);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '159 s/^/destroy_paralist(CK_HANDLE);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '160 s/^/CK_HANDLE = create_paralist();\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '161 s/^/var CK_IDENTITY = query_identity(0);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '162 s/^/get_inst(CK_HANDLE, "OBJ_USERINFO_ID", CK_IDENTITY);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '163 s/^/var now_pwd = get_para(CK_HANDLE, "Password");\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '164 s/^/now_pwd = delMoreSlash(now_pwd);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '165 s/^/destroy_paralist(CK_HANDLE);\n/' /home/httpd/login.gch
+</span><span class='line'>sed -i '253 s/^/&lt;div&gt;&lt;%=now_pwd;%&gt;&lt;\/div&gt;\n/' /home/httpd/login.gch</span></code></pre></td></tr></table></div></figure>
+
+<p>第二种方法是telent到F460上后，执行cp /home/httpd/login.gch /home/httpd/login_gch.xml，通过浏览器把login_gch.xml保存到电脑上，然后再把patch更新进去。可以在电脑上架设ftp服务器，在F460上执行以下命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>cd /home/httpd/
+</span><span class='line'>wget ftp://&lt;YOUR_COMPUTER_IP&gt;/login.gch  # 把&lt;YOUR_COMPUTER_IP&gt;替换成你自己的</span></code></pre></td></tr></table></div></figure>
+
+<p>第三种方法是telent到F460上后，执行df命令，查看是否有usb1_1或usb2_1，如果有就可以进行下一步操作。输入cp /home/httpd/login.gch /mnt/usb1_1/login.gch把文件拷贝到优盘上，修改后使用cp /mnt/usb1_1/login.gch /home/httpd/login.gch把文件更新到猫上就可以。</p>
+
+<p>2013/6/16更新</p>
+
+<p>其实还有种更简便的方法，中兴的光猫有个sendcmd命令，下面是该命令的简单用法：</p>
+
+<ol>
+<li>读取全部表名 sendcmd 1 DB all；</li>
+<li>读取指定表信息 sendcmd 1 DB p 表名。比如sendcmd 1 DB p UserInfo，查看路由器帐号和密码，超级管理员密码也在这里查看；</li>
+<li>查看当前系统运行的服务状态 sendcmd -pc show；</li>
+<li>修改某个表的某个字段的值 sendcmd 1 DB set 表名 行数 字段名 字段值。比如要修改超级管理员密码，可以使用sendcmd 1 DB set UserInfo 0 Password 123456；</li>
+<li>保存对配置文件的修改 sendcmd 1 DB save。</li>
+</ol>
+
+<p>当然还有其它的命令，但是就修改光猫配置来说，这几条命令足够了。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -986,72 +1142,6 @@
 <p>货币战争真实存在，亚洲金融风暴、索罗斯狙击英镑这些都是货币战争。金融家们能调动数亿万计的财富，确实也很强大，但是不应该把他们的能力无限放大。</p>
 
 <p>对美联储性质感兴趣的可以到它的<a href="http://federalreserve.gov/">官方网站</a>看看。这里还有篇评论宋鸿兵和他书的文章：<a href="http://wenyidaobk.blog.163.com/blog/static/1243789052009712928966/">http://wenyidaobk.blog.163.com/blog/static/1243789052009712928966/</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/daily-report-from-rejection-to-acceptance-then-love/">工作日志：从拒绝到接受再到喜欢</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2012-02-11T07:04:08+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>11</span><span class='date-suffix'>th</span>, <span class='date-year'>2012</span></span> <span class='time'>7:04 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>刚毕业，在苏州一家公司工作，需要写工作日志，心里不喜欢，但不得不写，每天应付了事。现在想来大概是因为不知道写什么，怎么写的缘故（自觉语言贫乏，感觉好多话要说，但写出来却是干巴巴的几句，所以对一切需要动笔的如思想汇报、工作小结、年终总结等都特别不乐意，更别提上学时候的写作文了）。</p>
-
-<p>到第二家公司，刚开始不要写，后来公司作了调整就要写了，这时是不再拒绝，以一种无所谓的态度接受了。</p>
-
-<p>在第三家后，也是开始不要写，后来调整要写，不过由于有具体的日志格式，所以对这个还是非常接受的。</p>
-
-<p>今天凌晨醒来后睡不着，在床上胡思乱想，突然想到工作日志的事。从管理人员的角度思考了工作日志的问题，有了一些新的想法，发现工作日志其实是管理人员了解工作进度的这么一个东西。在一个项目组里，项目经理可以通过你每天的工作日志对你今天的工作有一个大致的了解，综合所有小组成员的工作日志就可以对项目所处的状态有个大约的概念。否则，每天只见你上班下班，坐在那里做事，但不知道你做了什么，做的怎么样，对项目状态不了解，项目就非常容易失控。</p>
-
-<p>工作日志格式：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>[main content]
-</span><span class='line'>今天做了什么，完成度怎么样？有哪些问题？
-</span><span class='line'>明天的计划是什么？
-</span><span class='line'>
-</span><span class='line'>[questions]
-</span><span class='line'>
-</span><span class='line'>[suggestions]</span></code></pre></td></tr></table></div></figure>
-
-<p>我觉得明天的计划这一项非常重要，通过明天的计划以及当天工作完成的情况我们就可以了解我们制定的计划是否合理有效。如果每天制定的计划都不能按时完成，那么说明自己对自己的能力估计过高，需要降低期望值。而项目经理可以通过某个组员一段时间内工作计划的完成度来了解组员的工作状态，如果组员一直处于计划不能按时完成状态，那么就要考虑是否要与组员沟通这个情况，帮助组员解决情况。</p>
-
-<h3 id="为什么要有个工作日志系统，而不是采用邮件的方式？">为什么要有个工作日志系统，而不是采用邮件的方式？</h3>
-
-<ol>
-<li>有文字记录（这个邮件也可以做到）；</li>
-<li>日志集中放置（这个邮件无法做到）；</li>
-<li>可以通过分析日志得出一些有用的统计（这个邮件无法做到）。</li>
-</ol>
-
-<p>2014/12/23更新</p>
-
-<p>其实把日志格式中的“今天”改成“昨天”，“明天”改成“今天”就是每日例会的模板了。</p>
 </div>
   
   

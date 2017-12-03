@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="lookahead 前导符 现在我们已经对ANTLR语法分析器生成的消息种类以及如何调整和重定向它们有很好的了解，让我们来探讨错误恢复。 自动错误恢复策略 错误恢复是允许语法分析器找到语法错误后还能继续的东西。ANTLR的错误恢复机制是：如果可能的话， &hellip;">
+  <meta name="description" content="前面我们介绍过ANTLR的自动错误恢复机制，现在让我们看看手动机制，有些时候它能够提供更好的错误恢复。 错误选项 某些语法错误非常常见，所以值得特别处理。例如，程序员经常在带有嵌套参数的函数调用结尾处忘记写大括号。特别是处理这些情况，我们所要做的就是添加选项来匹配错误但常见的语法。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,87 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part32/">ANTLR 4权威参考读书笔记（32）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-11-18T05:58:56+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>5:58 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>前面我们介绍过ANTLR的自动错误恢复机制，现在让我们看看手动机制，有些时候它能够提供更好的错误恢复。</p>
+
+<h3 id="错误选项">错误选项</h3>
+
+<p>某些语法错误非常常见，所以值得特别处理。例如，程序员经常在带有嵌套参数的函数调用结尾处忘记写大括号。特别是处理这些情况，我们所要做的就是添加选项来匹配错误但常见的语法。下面的语法识别单个参数或者可能在参数中使用嵌套括号的函数调用。规则fcall有两个所谓的错误选项。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>stat: fcall ';' ;
+</span><span class='line'>fcall
+</span><span class='line'>    : ID '(' expr ')'
+</span><span class='line'>    | ID '(' expr ')' ')' { notifyErrorListeners("Too many parentheses"); }
+</span><span class='line'>    | ID '(' expr         { notifyErrorListeners("Missing closing ')'"); }
+</span><span class='line'>    ;
+</span><span class='line'>expr: '(' expr ')'
+</span><span class='line'>    | INT
+</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+
+<p>虽然这些错误选项可能使ANTLR生成的语法分析器在选项之间选择时更困难，但它们不以任何方式混淆语法分析器。就像任何其它选项，如果它们与当前的输入一致，语法分析器就会匹配它们。现在，让我们从一个有效的函数调用开始，尝试一些匹配错误选项的输入序列。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>$ antlr Call.g
+</span><span class='line'>$ compile Call
+</span><span class='line'>$ grun Call stat
+</span><span class='line'>f(34);
+</span><span class='line'>EOF
+</span><span class='line'>$ grun Call stat
+</span><span class='line'>f((34);
+</span><span class='line'>EOF
+</span><span class='line'>line 1:6 Missing closing ')'
+</span><span class='line'>$ grun Call stat
+</span><span class='line'>f((34)));
+</span><span class='line'>EOF
+</span><span class='line'>line 1:8 Too many parentheses</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -2544,146 +2625,6 @@
 <p>注解者通常可以作为默认解决方案采用，因为它允许你任意地提供信息给事件方法操作语法分析树中上上下下的节点。你也可以传递多个值，它们可以是任意类型。在许多情况下注解胜于使用带有短暂值的栈。在各种方法的数据传递准备间很少有断开的机会。比起在编程语言中说返回值，使用setValue(ctx, value)注解树不太直观，但是更通用。超过其它两种的这种方法的唯一缺点是在树遍历期间部分结果是保留的，因此它有较大的内存占用。</p>
 
 <p>从另一方面来说，在某些应用中能够注解树正是我们需要的。应用需要在树上通过多遍，第一遍是很方便在树上计算和储存数据的。当语法分析树遍历器重新遍历树的时候第二遍然后就很容易访问数据。总的来说，树注解非常灵活，有一个可接受的内存负担。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part23/">ANTLR 4权威参考读书笔记（23）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-08-16T18:09:05+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:09 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>默认情况下，ANTLR为每个规则生成一个单一的事件类型，而不管语法分析器匹配了哪个选项。这很不方便，因为监听器和访问者方法必须确定哪个选项被语法分析器匹配。在本节中，我们将看到如何得到更细粒度的事件。</p>
-
-<h3 id="为规则选项贴标签以得到精确的事件方法">为规则选项贴标签以得到精确的事件方法</h3>
-
-<p>为阐明事件粒度问题，让我们为以下的表达式语法构建一个带有监听器的简单计算器：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Expr;
-</span><span class='line'>s : e ;
-</span><span class='line'>e : e op=MULT e    // MULT is '*'
-</span><span class='line'>  | e op=ADD e     // ADD is '+'
-</span><span class='line'>  | INT
-</span><span class='line'>  ;</span></code></pre></td></tr></table></div></figure>
-
-<p>按照上面的语法，规则e会产生一个相当无用的监听器，因为规则e的所有选项导致树遍历器触发相同的enterE()和exitE()方法。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public interface ExprListener extends ParseTreeListener {
-</span><span class='line'>    void enterE(ExprParser.EContext ctx);
-</span><span class='line'>    void exitE(ExprParser.EContext ctx);</span></code></pre></td></tr></table></div></figure>
-
-<p>监听器方法必须使用op记号标签和ctx的方法进行测试以查看语法分析器为每个e子树匹配了哪个选项。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitE(ExprParser.EContext ctx) {
-</span><span class='line'>    if (ctx.getChildCount() == 3) {    // operations have 3 children
-</span><span class='line'>        int left = values.get(ctx.e(0));
-</span><span class='line'>        int right = values.get(ctx.e(1));
-</span><span class='line'>        if (ctx.op.getType() == ExprParser.MULT) {
-</span><span class='line'>            values.put(ctx, left * right);
-</span><span class='line'>        } else {
-</span><span class='line'>            values.put(ctx, left + right);
-</span><span class='line'>        }
-</span><span class='line'>    } else {
-</span><span class='line'>        values.put(ctx, values.get(ctx.getChild(0)));    // an INT
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>在exitE()中引用的MULT字段是在ExprParser中由ANTLR自动生成的：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class ExprParser extends Parser {
-</span><span class='line'>    public static final int MULT=1, ADD=2, INT=3, WS=4;</span></code></pre></td></tr></table></div></figure>
-
-<p>如果我们查看在类ExprParser中的类EContext，我们可以看到ANTLR把来自3个选项的所有元素都塞进了相同的上下文对象。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public static class EContext extends ParserRuleContext {
-</span><span class='line'>    public Token op;                     // derived from label op
-</span><span class='line'>    public List&lt;EContext&gt; e() { ... }    // get all e subtrees
-</span><span class='line'>    public EContext e(int i) { ... }     // get ith e subtree
-</span><span class='line'>    public TerminalNode INT() { ... }    // get INT node if alt 3 of e</span></code></pre></td></tr></table></div></figure>
-
-<p>为得到更精确的监听器事件，ANTLR让我们使用#运算符给任何规则最外层的选项打标签。让我们从Expr派生语法LExpr，并给e的选项打上标签，以下是修改后的e规则：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>e : e MULT e  # Mult
-</span><span class='line'>  | e ADD e   # Add
-</span><span class='line'>  | INT       # Int
-</span><span class='line'>  ;</span></code></pre></td></tr></table></div></figure>
-
-<p>现在，ANTLR为e的每个选项生成了单独的监听器方法，因此，我们不再需要op记号标签。对于选项标签X，ANTLR生成方法enterX()和exitX()。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public interface LExprListener extends ParseTreeListener {
-</span><span class='line'>    void enterMult(LExprParser.MultContext ctx);
-</span><span class='line'>    void exitMult(LExprParser.MultContext ctx);
-</span><span class='line'>    void enterAdd(LExprParser.AddContext ctx);
-</span><span class='line'>    void exitAdd(LExprParser.AddContext ctx);
-</span><span class='line'>    void enterInt(LExprParser.IntContext ctx);
-</span><span class='line'>    void exitInt(LExprParser.IntContext ctx);
-</span><span class='line'>    ...
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>注意，ANTLR也为选项生成特定的以标签命名的上下文对象（EContext的子类）。专门的上下文对象的getter方法只限于应用在那些相关的选项。例如，IntContext只有一个INT()方法，我们可以在enterInt()中调用ctx.INT()，但在enterAdd()中就不能。</p>
-
-<p>监听器和访问者是极好的。我们只需要通过充实事件方法就可以得到可复用和可重定目标的语法以及封装的语言应用。ANTLR甚至会为我们自动生成骨架代码。</p>
 </div>
   
   
