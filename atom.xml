@@ -4,7 +4,7 @@
   <title><![CDATA[乐者为王]]></title>
   <link href="http://codemany.com/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-12-05T13:35:27+08:00</updated>
+  <updated>2017-12-06T11:20:03+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -1818,7 +1818,7 @@
 
 <h3 id="更改antlr的错误处理策略">更改ANTLR的错误处理策略</h3>
 
-<p>默认的错误处理机制工作得很好，但在有些非典型的情况下我们可能要更改它。首先，我们可能由于运行时开销而想要禁用一些内联错误处理。其次，我们可能希望语法分析器在出现第一个语法错误时就退出。例如，当为类似bash这样的shell解析命令行时，没必要试图从错误中恢复。无论如何我们不能冒险执行该命令，所以语法分析器可以在一遇到麻烦时就推出。</p>
+<p>默认的错误处理机制工作得很好，但在有些非典型的情况下我们可能要更改它。首先，我们可能由于运行时开销而想要禁用一些内联错误处理。其次，我们可能希望在出现第一个语法错误时就退出语法分析器。例如，当为类似bash这样的shell解析命令行时，没必要试图从错误中恢复。无论如何我们不能冒险执行该命令，所以语法分析器可以在一遇到麻烦时就推出。</p>
 
 <p>要了解错误处理策略，请查看接口ANTLRErrorStrategy及其具体的实现类DefaultErrorStrategy。这个类持有与默认错误处理行为相关联的一切。ANTLR语法分析器指示该对象报告错误并恢复。例如，下面是在每个ANTLR生成的规则函数里面的捕获块：</p>
 
@@ -1847,6 +1847,61 @@
 </span><span class='line'>    _errHandler.sync(this);
 </span><span class='line'>    _la = _input.LA(1);
 </span><span class='line'>} while ( _la==6 );</span></code></pre></td></tr></table></div></figure>
+
+<p>对于可以安全地假设输入语法是正确的应用程序，比如网络协议，我们最好避免检测并从错误中恢复的开销。我们可以通过继承DefaultErrorStrategy并用空方法覆写sync()来做到这点。Java编译器可能会内联并消除_errHandler.sync(this)调用。我们将在下个例子中阐述如何通知语法分析器使用不同的错误策略。</p>
+
+<p>另一种非典型的情况是在出现第一个语法错误时就退出语法分析器。为使它工作，我们必须覆写3个关键的恢复方法，如下面的代码所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>import org.antlr.v4.runtime.*;
+</span><span class='line'>
+</span><span class='line'>public class BailErrorStrategy extends DefaultErrorStrategy {
+</span><span class='line'>    /** Instead of recovering from exception e, rethrow it wrapped
+</span><span class='line'>     *  in a generic RuntimeException so it is not caught by the
+</span><span class='line'>     *  rule function catches. Exception e is the "cause" of the
+</span><span class='line'>     *  RuntimeException.
+</span><span class='line'>     */
+</span><span class='line'>    @Override
+</span><span class='line'>    public void recover(Parser recognizer, RecognitionException e) {
+</span><span class='line'>        throw new RuntimeException(e);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    /** Make sure we don't attempt to recover inline; if the parser
+</span><span class='line'>     *  successfully recovers, it won't throw an exception.
+</span><span class='line'>     */
+</span><span class='line'>    @Override
+</span><span class='line'>    public Token recoverInline(Parser recognizer) throws RecognitionException {
+</span><span class='line'>        throw new RuntimeException(new InputMismatchException(recognizer));
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    /** Make sure we don't attempt to recover from problems in subrules. */
+</span><span class='line'>    @Override
+</span><span class='line'>    public void sync(Parser recognizer) { }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 ]]></content>
   </entry>
   
