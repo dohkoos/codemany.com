@@ -9,7 +9,8 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="主机是Windows Server 2008，虚拟机Windows XP，VirtualBox的版本为4.3.6。 因为某种原因，需要修改XP系统的时间设置。但在设置后不到10秒钟就又和主机的时间自动同步了。 实时同步时间功能是由Guest Additions提供的，把它卸载就可以修改时间， &hellip;">
+  <meta name="description" content="浪费几个小时，杀死无数脑细胞，最终发现是单词打错了。不过错有错招，这个问题也让我重新温习了一遍关于form数据编码的知识。 在做上传表单时，一直报告如下错误： 1
+undefined method 'original_filename' for "example.csv":String 在 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +74,89 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/multipart-misspelling-cause-bug/">打错multipart引发的血案</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2014-11-13T09:27:17+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>13</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>9:27 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>浪费几个小时，杀死无数脑细胞，最终发现是单词打错了。不过错有错招，这个问题也让我重新温习了一遍关于form数据编码的知识。</p>
+
+<p>在做上传表单时，一直报告如下错误：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>undefined method 'original_filename' for "example.csv":String</span></code></pre></td></tr></table></div></figure>
+
+<p>在 <a href="http://guides.rubyonrails.org/form_helpers.html#what-gets-uploaded">http://guides.rubyonrails.org/form_helpers.html#what-gets-uploaded</a> 有这样一段文字：</p>
+
+<blockquote>
+<p>The object in the params hash is an instance of a subclass of IO. Depending on the size of the uploaded file it may in fact be a StringIO or an instance of File backed by a temporary file. In both cases the object will have an original_filename attribute containing the name the file had on the user&#39;s computer and a content_type attribute containing the MIME type of the uploaded file.</p>
+</blockquote>
+
+<p>说明example.csv应该是IO类型的，这里怎么显示是String呢？</p>
+
+<p>表单代码为</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= form_tag import_stocks_path, mutlipart: true do %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>或</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= form_tag import_stocks_path, method: :post, mutlipart: true do %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>生成后的HTML代码都是：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;form action="/stocks/import" method="post" mutlipart="true"&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>正确的HTML代码应该是：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;form action="/stocks/import" method="post" enctype="multipart/form-data"&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>使用HttpFox工具抓取表单提交信息如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>POST /stocks/import HTTP/1.1
+</span><span class='line'>Host localhost:3000
+</span><span class='line'>Referer http://localhost:3000/stocks/import
+</span><span class='line'>Connection keep-alive
+</span><span class='line'>Content-Type application/x-www-form-urlencoded
+</span><span class='line'>Content-Length 112</span></code></pre></td></tr></table></div></figure>
+
+<p>什么是application/x-www-form-urlencoded？含有file类型字段的表单编码不应该是multipart/form-data吗。</p>
+
+<p>form的enctype属性通常有两种：application/x-www-form-urlencoded和multipart/form-data，默认为前者。当method=get时，浏览器用application/x-www-form-urlencoded编码方式把form数据转换成一个字串（name1=value1&amp;name2=value2...），然后把这个字串附加到url后面，用?分割。当method=post的时候，浏览器把form数据封装到post-body中。如果没有type=file的控件，就用默认的application/x-www-form-urlencoded编码。但是如果有type=file的话，就要用到multipart/form-data了。浏览器会把整个表单以控件为单位分割，并为每个部分加上Content-Disposition（form-data或者file），Content-Type（默认为text/plain），name等信息，并加上分割边界（boundary）。</p>
+
+<p>这时才发现原来是把multipart打错成mutlipart了，真是惨痛的教训啊！</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -760,229 +844,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/using-raspberry-pi-to-monitor-home-humiture/">使用Raspberry Pi监控室内温湿度</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2014-06-24T14:19:44+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>24</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>2:19 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>机房没有温湿度监控系统，只有温湿度计，还不是数字的，只能得到个大概的读数，不是非常精确。怎么办？自己动手DIY个在线的温湿度监控系统吧！</p>
-
-<p>物品清单：</p>
-
-<ul>
-<li>金士顿16G的SDHC卡1张</li>
-<li>SDHC读卡器1个（可选）</li>
-<li>网线1条</li>
-<li>手机充电器（5V/1A）1个</li>
-<li>MicroUSB数据线1条</li>
-<li>电脑1台</li>
-<li>1P-1P双头母杜邦线3条</li>
-<li>10K电位器一个</li>
-<li>DHT11或DHT22温湿度传感器一个（可以购买已经焊好电阻的传感器模块）</li>
-</ul>
-
-<h3 id="让树莓派（raspberry-pi）工作起来">让树莓派（Raspberry Pi）工作起来</h3>
-
-<p>从 <a href="http://www.raspberrypi.org/downloads">http://www.raspberrypi.org/downloads</a> 下载基于debian的wheezy镜像Raspbian。如果使用Windows系统，官方建议使用<a href="http://sourceforge.net/projects/win32diskimager/">Win32DiskImager</a>来复制image文件到SD卡（如果是Linux系统可以用工具dd）。写入系统后，把卡插到板子上，接上网线、电源，然后就启动了。等个20多秒，板上3个小灯都亮了，表明系统已经启动成功。</p>
-
-<p>登录路由器后台找到raspberrypi设备分配到的IP。然后使用SSH或VNC（前者是命令行界面，后者是图形界面）连接刚才从路由器找到的IP地址。登录的默认账号是pi，密码是raspberry。登录RPi之后输入ping qq.com测试上网是否正常。</p>
-
-<h3 id="使用固定的ip访问rpi">使用固定的IP访问RPi</h3>
-
-<p>默认情况下RPi使用的是自动分配的IP地址，每次登录都需要在路由器中查找对应IP，实在太麻烦，可以把它设置成静态的。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sudo vi /etc/network/interfaces</span></code></pre></td></tr></table></div></figure>
-
-<p>打开配置文件，看到如下内容</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>auto lo
-</span><span class='line'>
-</span><span class='line'>iface lo inet loopback
-</span><span class='line'>iface eth0 inet dhcp
-</span><span class='line'>
-</span><span class='line'>allow-hotplug wlan0
-</span><span class='line'>iface wlan0 inet manual
-</span><span class='line'>wpa-roam /etc/wpa_supplicant/wpa_supplicant.conf
-</span><span class='line'>iface default inet dhcp</span></code></pre></td></tr></table></div></figure>
-
-<p>将之修改成</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>auto lo
-</span><span class='line'>
-</span><span class='line'>iface lo inet loopback
-</span><span class='line'>
-</span><span class='line'>iface eth0 inet static
-</span><span class='line'>  address 192.168.0.100
-</span><span class='line'>  netmask 255.255.255.0
-</span><span class='line'>  gateway 192.168.0.1
-</span><span class='line'>  dns-nameservers 8.8.8.8
-</span><span class='line'>
-</span><span class='line'>allow-hotplug wlan0
-</span><span class='line'>iface wlan0 inet manual
-</span><span class='line'>  wpa-roam /etc/wpa_supplicant/wpa_supplicant.conf
-</span><span class='line'>
-</span><span class='line'>iface default inet dhcp</span></code></pre></td></tr></table></div></figure>
-
-<p>然后存盘退出。以后就可以通过192.168.0.100来登录RPi了。</p>
-
-<h3 id="把温湿度传感器接到rpi上">把温湿度传感器接到RPi上</h3>
-
-<p><img src="/uploads/rpi-dht22.png" alt="rpi-dht22"></p>
-
-<p>DHT11/DHT22共有4根引脚：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>1 -&gt; 3.3v 接左边第1个GPIO针脚
-</span><span class='line'>2 -&gt; GPIO 数据接口，可随意连接1个GPIO针脚（第7个针脚对应的是GPIO Pin #4）
-</span><span class='line'>3 -&gt; NC 不接
-</span><span class='line'>4 -&gt; GND 接地（第14个针脚）</span></code></pre></td></tr></table></div></figure>
-
-<p>注意：在1脚和2脚间还需要并联10K的电阻，以保持读数稳定。</p>
-
-<p>安装好的样子：</p>
-
-<p><img src="/uploads/rpi-actual.png" alt="rpi-actual"></p>
-
-<h3 id="用c代码读取当前的温度和湿度值">用C代码读取当前的温度和湿度值</h3>
-
-<p>用的是树莓派2红色B型，它采用Broadcom BCM2835 (CPU, GPU, DSP, and SDRAM)芯片。所以读取GPIO口需要到 <a href="http://www.open.com.au/mikem/bcm2835/index.html">http://www.open.com.au/mikem/bcm2835/index.html</a> 获取最新的BCM2835 C语言库，然后下载，编译和安装。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>wget http://www.open.com.au/mikem/bcm2835/bcm2835-1.36.tar.gz
-</span><span class='line'>tar -zxvf bcm2835-1.36.tar.gz
-</span><span class='line'>cd bcm2835-1.36
-</span><span class='line'>./configure
-</span><span class='line'>make
-</span><span class='line'>sudo make install</span></code></pre></td></tr></table></div></figure>
-
-<p>从GitHub库中获取DHT11/DHT22温湿度程序，编译测试。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>cd /home/pi
-</span><span class='line'>git clone https://github.com/dohkoos/Raspberry-Pi-Code.git
-</span><span class='line'>cd Raspberry-Pi-Code/DHT22
-</span><span class='line'>make
-</span><span class='line'>sudo ./dht 22 4 # 数据接口接在第7针脚，所以这里是4</span></code></pre></td></tr></table></div></figure>
-
-<h3 id="记录曲线图到云端">记录曲线图到云端</h3>
-
-<p>这里使用<a href="http://www.yeelink.net/">Yeelink</a>的服务，Yeelink是国内比较知名的免费物联网数据平台。根据它的API规则，提交的数据必须为JSON格式：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>{"timestamp": "2012-03-15 16:13:14", "value": 294.34}</span></code></pre></td></tr></table></div></figure>
-
-<p>将温湿度值提交到Yeelink的Ruby代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># Capture temperature & humidity value from the console
-</span><span class='line'>output = `sudo ./dht 22 4`
-</span><span class='line'>mt = /Temp =\s+([0-9.]+)/.match(output)
-</span><span class='line'>temperature = mt[1]
-</span><span class='line'>
-</span><span class='line'>mt = /Hum =\s+([0-9.]+)/.match(output)
-</span><span class='line'>humidity = mt[1]
-</span><span class='line'>
-</span><span class='line'># Combined temperature & humidity value into json format
-</span><span class='line'>json_temperature = %Q[{\\"timestamp\\": \\"#{Time.now}\\", \\"value\\": #{temperature}}]
-</span><span class='line'>json_humidity = %Q[{\\"timestamp\\": \\"#{Time.now}\\", \\"value\\": #{humidity}}]
-</span><span class='line'>
-</span><span class='line'># Post json data to Yeelink
-</span><span class='line'>`curl -X POST -d "#{json_temperature}" -H "Content-Type: application/json" -H "U-ApiKey:XXXXXXXXXXXXXXXX" http://api.yeelink.net/v1.0/device/&lt;device_id&gt;/sensor/&lt;sensor_id&gt;/datapoints`
-</span><span class='line'>`curl -X POST -d "#{json_humidity}" -H "Content-Type: application/json" -H "U-ApiKey:XXXXXXXXXXXXXXXX" http://api.yeelink.net/v1.0/device/&lt;device_id&gt;/sensor/&lt;sensor_id&gt;/datapoints`</span></code></pre></td></tr></table></div></figure>
-
-<p>将U-ApiKey:XXXXXXXXXXXXXXXX替换为自已账户的API Key，后面的URL也需要替换为自己申请的传感器URL。</p>
-
-<h3 id="添加到计划任务">添加到计划任务</h3>
-
-<p>使用crontab命令将以下内容添加到计划任务中：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># m h dom mon dow command
-</span><span class='line'>*/10 * * * * cd /home/pi/Raspberry-Pi-Code/DHT22/ && ruby yeelink.rb</span></code></pre></td></tr></table></div></figure>
-
-<p>重启计划任务，然后每隔10分钟就会上传一次数据到云端。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sudo /etc/init.d/cron restart</span></code></pre></td></tr></table></div></figure>
-
-<p>下面是我的曲线图：</p>
-
-<p><img src="/uploads/rpi-yeelink.png" alt="rpi-yeelink"></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/10">&larr; Older</a>
@@ -1000,6 +861,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/crawl-novel-with-scrapy-part6/">使用Scrapy爬取小说（6）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/crawl-novel-with-scrapy-part5/">使用Scrapy爬取小说（5）</a>
       </li>
     
@@ -1013,10 +878,6 @@
     
       <li class="post">
         <a href="/blog/crawl-novel-with-scrapy-part2/">使用Scrapy爬取小说（2）</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/crawl-novel-with-scrapy-part1/">使用Scrapy爬取小说（1）</a>
       </li>
     
   </ul>
@@ -1051,7 +912,7 @@
 <a style="font-size: 115%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
 <a style="font-size: 117%" href="/tags/ruby/">Ruby</a>
-<a style="font-size: 95%" href="/tags/spring/">Spring</a>
+<a style="font-size: 95%" href="/tags/scrapy/">Scrapy</a>
 <a style="font-size: 99%" href="/tags/struts/">Struts</a>
 <a style="font-size: 146%" href="/tags/translation/">Translation</a>
 <a style="font-size: 95%" href="/tags/ubuntu/">Ubuntu</a>
