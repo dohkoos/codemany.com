@@ -4,7 +4,7 @@
   <title><![CDATA[Tag: SiteMesh | 乐者为王]]></title>
   <link href="http://codemany.com/tags/sitemesh/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2017-12-10T19:34:36+08:00</updated>
+  <updated>2017-12-25T15:35:03+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -124,68 +124,6 @@
 </code></pre></div>
 <p>代码下载：<a href="https://github.com/dohkoos/JBookShelf">https://github.com/dohkoos/JBookShelf</a></p>
 ]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[如何解决含有中文的页面末尾内容会被SiteMesh截掉的问题]]></title>
-    <link href="http://codemany.com/blog/how-to-solve-sitemesh-truncate-the-page-containing-chinese-character/"/>
-    <updated>2005-07-22T14:33:59+08:00</updated>
-    <id>http://codemany.com/blog/how-to-solve-sitemesh-truncate-the-page-containing-chinese-character</id>
-    <content type="html"><![CDATA[<p>首先，我们要了解一下ServletResponse.setContentLength(int len)的含义。setContentLength是设置返回内容体长度的方法，len是内容体的长度。由于网络上传输内容是以字节（byte）为单位的，所以len就是指内容体有多少个字节。假设现在有长度为100个字节的数据，在输出数据到客户端前我们用setContentLength(90)设置内容体的长度为90个字节。那么在客户端接收到的数据长度就是90个字节而不是100。下面我们来做个试验：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public class PageTruncateFilter implements Filter {
-
-    public void init(FilterConfig config) throws ServletException {
-    }
-
-    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
-                        throws IOException, ServletException {
-        HttpServletRequest request = (HttpServletRequest)req;
-        HttpServletResponse response = (HttpServletResponse)res;
-
-        String content = &quot;&lt;html&gt;&lt;head&gt;&lt;title&gt;Truncated Page&lt;/title&gt;&lt;/head&gt;&quot;;
-               content += &quot;&lt;body&gt;这个页面的内容will be truncated.&lt;/body&gt;&lt;/html&gt;&quot;;
-        response.setCharacterEncoding(&quot;gbk&quot;);
-        response.setContentLength(content.length());
-        PrintWriter out = response.getWriter();
-        out.println(content);
-        out.close();
-    }
-
-    public void destroy() {
-    }
-}
-</code></pre></div>
-<p>由于content字符串含有两个中文字符，每一个中文字符又是由两个字节组成，所以content.length()的值比content的字节数要少2。在客户端显示的内容也会因此少2个字节，即缺少“l&gt;”这两个字符。</p>
-
-<p>现在我们来浏览SiteMesh的源代码找出问题的原因。首先从PageFilter.java的doFilter方法开始。由于页面没有在decorators.xml中注册修饰，所以writeOriginal方法会被调用。下面是writeOriginal方法的源代码：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">/** Write the original page data to the response. */
-private void writeOriginal(HttpServletRequest request, HttpServletResponse response,
-                          Page page) throws IOException {
-    response.setContentLength(page.getContentLength());
-
-    if (request.getAttribute(USING_STREAM).equals(Boolean.TRUE)) {
-        PrintWriter writer = new PrintWriter(response.getOutputStream());
-        page.writePage(writer);
-        // flush writer to underlying outputStream
-        writer.flush();
-        response.getOutputStream().flush();
-    } else {
-        page.writePage(response.getWriter());
-        response.getWriter().flush();
-    }
-}
-</code></pre></div>
-<p>首行代码就是设置内容体长度的，让我们追到page.getContentLength()里面去看看（Page接口的getContentLength方法是由AbstractPage.java实现的）：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public int getContentLength() {
-    return pageData.length;
-}
-</code></pre></div>
-<p>它返回pageData数组的长度。但是pageData数组是char类型的，假如pageData中有中文内容时，设置的内容体长度就会小于pageData的字节数。这时就会出现输出到客户端的数据截掉的问题。所以只要修改getContentLength方法返回的值就可以了，下面是修改后的getContentLength方法：</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">public int getContentLength() {
-    String content = new String(pageData);
-    return content.getBytes().length;
-}
-</code></pre></div>]]></content>
   </entry>
   
 </feed>

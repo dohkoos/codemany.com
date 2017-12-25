@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="英文原文：https://www.innoq.com/en/blog/the-perils-of-shared-code/ 通往地狱的道路往往是由良好的意愿铺就。在各种软件项目中，我看到人们走在这样的道路上，他们在微服务之间借助库共享代码。在几乎每个组织支持微服务架构的项目中， &hellip;">
+  <meta name="description" content="lookahead 前导符 现在我们已经对ANTLR语法分析器生成的消息种类以及如何调整和重定向它们有很好的了解，让我们来探讨错误恢复。 自动错误恢复策略 错误恢复是允许语法分析器找到语法错误后还能继续的东西。ANTLR的错误恢复机制是：如果可能的话， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,191 +73,6 @@
     <div id="content">
       <div class="blog-index">
   
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/the-perils-of-shared-code/">共享代码的风险</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-11-25T18:51:10+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>25</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:51 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="https://www.innoq.com/en/blog/the-perils-of-shared-code/">https://www.innoq.com/en/blog/the-perils-of-shared-code/</a></p>
-
-<p>通往地狱的道路往往是由良好的意愿铺就。在各种软件项目中，我看到人们走在这样的道路上，他们在微服务之间借助库共享代码。在几乎每个组织支持微服务架构的项目中，各个团队和开发者都期望以某些核心库为基础构建他们的微服务。显然，即使可能带来的问题已经被知道很长时间了，很多人仍然不知道它们。在这篇博文中，我想研究为什么使用这样的库可能起初听起来有吸引力，为什么可能会出现问题，以及如何能够减轻这些问题。</p>
-
-<h3 id="共享代码的目的">共享代码的目的</h3>
-
-<p>通过库来共享代码有两个主要目的：共享领域逻辑和共享基础设施层中的抽象。</p>
-
-<ol>
-<li><p><em>共享的领域模型：</em>领域模型的特定部分在两个或多个有界上下文之间是共同的，因此，作为三番五次实现它的替换，你消除了重复的需要和引入该领域逻辑的不一致实现的可能性。通常，人们想要像那样共享的领域模型的部分是核心领域或一个或多个通用子领域。在领域驱动设计的行话中，这也被称为共享内核。通常，你可以在这里找到像会话和身份验证逻辑这样的概念，但不限于此。一套相关的方法是规范数据模型。</p></li>
-<li><p><em>基础设施层抽象：</em>你想避免一次又一次地实现基础设施层的有用抽象，因此你把它们放进一个库里。通常，这些库在数据库访问、消息传递和序列化等方面提供一套统一的方法。</p></li>
-</ol>
-
-<p>两者的动机是相同的——避免重复，也就是说，遵循DRY原则（Don’t repeat yourself!）。一旦实现这些逻辑有几个好处：</p>
-
-<blockquote>
-<p>你不需要花费宝贵的时间致力于那些已经被解决的问题。</p>
-
-<p>有一套统一的方式做消息传递、数据库访问等。这意味着，当开发者需要去阅读和修改其他开发者最初创建的微服务中的代码时，他们很容易找到他们的方式。</p>
-
-<p>关于彼此行为略有不同的业务逻辑或基础设施关注点，你不想有不同的实现。取而代之的是，有一套做正确事情的规范实现。</p>
-</blockquote>
-
-<h3 id="共享代码的问题">共享代码的问题</h3>
-
-<p>在理论上听起来很棒的东西不会没有自己的问题，而且这些问题可能比你试图用你的库解决的问题更令人痛苦。Stefan Tilkov已经详细解释了<a href="https://www.innoq.com/en/blog/thoughts-on-a-canonical-data-model/">为什么你应该避免规范的数据模型</a>。除此之外，让我指出一些其它的问题。</p>
-
-<h4 id="分布式单体">分布式单体</h4>
-
-<p>通常，似乎存在一个隐含的假设，将东西放入库意味着你永远不必担心使用错误或过时的实现构成的服务，因为他们只需要更新其对库的依赖关系到最新版本。</p>
-
-<p>每当你依靠通过将所有的微服务更新到同样的新版本库，来对所有微服务的某些行为作出一致的改变时，你就会在它们之间引入强耦合。你失去了微服务的一个主要优点，即它们彼此独立地演进和部署的能力。</p>
-
-<p>我见过这样的案例，所有的服务必须同时部署，以便服务仍能正常工作。如果你达到这种状态，不可否认，你实际上构建了一个分布式的单体。</p>
-
-<p>一个流行的示例是使用代码生成，例如，基于服务API的Swagger描述，以便为你的服务提供一个客户端库。比你想象的更多，开发者可能会滥用此种方式进行重大变更，因为依赖服务“只”需要使用新版本的客户端库。这不是你如何<a href="http://olivergierke.de/2016/10/evolving-distributed-systems/">演进一个分布式系统</a>。</p>
-
-<h4 id="依赖地狱">依赖地狱</h4>
-
-<p>库，尤其是那些旨在为基础设施关注点提供通用解决方案的库，往往有个额外的问题：它们会附上它们依赖的一整套额外的库。你的库的传递依赖树越大，它导致俗称为依赖地狱的噩梦的可能性就越高。因为你的微服务可能需要自己的额外的依赖，它们同样具有传递依赖性，直到它们中的某些库间接地拉进一些库的冲突版本，这只是个时间问题，只在不同版本之间选择是不可能的，因为它们是二进制不兼容的。</p>
-
-<p>当然，你的解决方案也许只是提供微服务可能需要的所有库作为你的核心库的依赖。那仍然意味着你的微服务不能独立地演进，例如通过升级到它们依赖的唯一的特定库的更高版本——它们都与核心库的发布周期步调一致。除此之外，为什么你要强制每个服务接受一整堆的依赖，当它们实际上可能只需要依赖中的一些时？</p>
-
-<h4 id="自顶而下的库设计">自顶而下的库设计</h4>
-
-<p>通常情况下，我见过的库被一个或多个架构师强加于开发者，采用自顶而下的方法进行库设计。</p>
-
-<p>通常，在这种情况下发生的是，由库暴露的API太受限制和不灵活，或者使用了错误的抽象级别，因为它们是由不够熟悉广泛的不同的真实世界用例的人设计的。这样的库经常导致不得不使用它的开发者遭受挫折，以及导致人们试图绕过库的限制。</p>
-
-<h4 id="单语言解决一切">单语言解决一切</h4>
-
-<p>强制使用库的最明显的缺陷之一是，这使得它更难以切换到不同的编程语言（或者平台，比如JVM或.NET），再次失去了微服务架构的一个优势，即选择最适合给定问题的技术的能力。如果你后来意识到，你终究需要这种语言或者平台的多样性，你必须创造各种奇怪的支持。例如，Netflix提出的<a href="https://github.com/Netflix/Prana">Prana</a>，一个同时运行非JVM服务的附加件，为他们提供到Netflix技术栈的一套HTTP API。</p>
-
-<h3 id="我们能不能做得更好？">我们能不能做得更好？</h3>
-
-<p>由于所有的问题都是通过库共享代码引入的，最极端的解决方案是根本没有这样的库。如果你这样做，你将不得不做一些复制和粘贴或者为新的微服务提供一个模板项目，以便从前面所述的步调一致中释放你的服务。基础设施代码以及领域模型的共享内核中都可以这么做。事实上，Eric Evans在他的关于领域驱动设计的经典蓝皮书中提到，“通常各个团队只是在各自的内核备份上改动，每隔一定时间才会与其他团队集成”[1]。共享内核不一定要是库。</p>
-
-<p>如果你不喜欢复制和粘贴的想法，那也很好。毕竟，如上所述，通过库共享代码有一定的优势。在这种情况下，这里有一些重要的事情需要考虑：</p>
-
-<h4 id="最少依赖的小型库">最少依赖的小型库</h4>
-
-<p>尝试将大的共享库分成一组非常小的、高度集中的库，每个库解决一个特定的问题。试着让这些库成为零依赖库，只依靠语言的标准库。是的，仅仅针对语言的标准库来编程并不总是令人愉快的，但是对于你公司的所有团队的巨大好处（甚至超出你的公司，如果你的馆是开源的）显然大于这个微小的不便。</p>
-
-<p>当然，零依赖并不总是可能的，特别是对于基础设施关注点。对于这些，通过你的每个小型库最小化所需的依赖。另外，有时可以独立于库的核心，提供与别的库的绑定或集成作为单独的工件。</p>
-
-<h4 id="留下选择余地">留下选择余地</h4>
-
-<p>不要指望服务将在特定时间点更新到共享库的最新版本的事实。换句话说，不要强制团队进行库更新，而是让他们可以按照自己的节奏自由更新。这可能需要你以向后和向前兼容的方式修改库，但它会解耦你的服务，不仅给你微服务架构的运营成本，而且还有一些优势。</p>
-
-<p>如果可能，不仅要避免强制库更新，还要使库本身的使用可选。</p>
-
-<h4 id="自底而上的库设计">自底而上的库设计</h4>
-
-<p>最后，如果你想拥有共享库，我见过的获得成功的项目是使用自底而上的方法。让你的团队实现他们的微服务，而不是让象牙塔架构师设计在现实世界中几乎不可用的库，而当在多个服务的生产中已经证明它们自己的一些常见模式出现时，将它们提取到库中。</p>
-
-<p>[1] Evans, Eric: Domain-Driven Design: Tackling Complexity in the Heart of Software, p. 355</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part32/">ANTLR 4权威参考读书笔记（32）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-11-18T05:58:56+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>5:58 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>前面我们介绍过ANTLR的自动错误恢复机制，现在让我们看看手动机制，有些时候它能够提供更好的错误恢复。</p>
-
-<h3 id="错误选项">错误选项</h3>
-
-<p>某些语法错误非常常见，所以值得特别处理。例如，程序员经常在带有嵌套参数的函数调用结尾处忘记写大括号。特别是处理这些情况，我们所要做的就是添加选项来匹配错误但常见的语法。下面的语法识别单个参数或者可能在参数中使用嵌套括号的函数调用。规则fcall有两个所谓的错误选项。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>stat: fcall ';' ;
-</span><span class='line'>fcall
-</span><span class='line'>    : ID '(' expr ')'
-</span><span class='line'>    | ID '(' expr ')' ')' { notifyErrorListeners("Too many parentheses"); }
-</span><span class='line'>    | ID '(' expr         { notifyErrorListeners("Missing closing ')'"); }
-</span><span class='line'>    ;
-</span><span class='line'>expr: '(' expr ')'
-</span><span class='line'>    | INT
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<p>虽然这些错误选项可能使ANTLR生成的语法分析器在选项之间选择时更困难，但它们不以任何方式混淆语法分析器。就像任何其它选项，如果它们与当前的输入一致，语法分析器就会匹配它们。现在，让我们从一个有效的函数调用开始，尝试一些匹配错误选项的输入序列。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>$ antlr Call.g
-</span><span class='line'>$ compile Call
-</span><span class='line'>$ grun Call stat
-</span><span class='line'>f(34);
-</span><span class='line'>EOF
-</span><span class='line'>$ grun Call stat
-</span><span class='line'>f((34);
-</span><span class='line'>EOF
-</span><span class='line'>line 1:6 Missing closing ')'
-</span><span class='line'>$ grun Call stat
-</span><span class='line'>f((34)));
-</span><span class='line'>EOF
-</span><span class='line'>line 1:8 Too many parentheses</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
   
   
     <article>
@@ -2429,6 +2244,453 @@
 
     </article>
   
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part24/">ANTLR 4权威参考读书笔记（24）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-08-26T18:46:37+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:46 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在本节中，我们准备讲讲有时候事件方法需要传递部分结果或其它信息的问题。</p>
+
+<h3 id="在事件方法间共享信息">在事件方法间共享信息</h3>
+
+<p>无论收集信息还是计算值，传递参数和返回值都是比使用字段和全局变量更方便良好的编程实践。问题是ANTLR自动生成的监听器方法的签名不需要特定应用的返回值或参数，ANTLR也自动生成访问者方法而不需要特定应用的参数。</p>
+
+<p>接下来，我们将探讨让事件方法无需修改事件方法签名就能传递数据的机制。我们将构建同样的简单计算器的3个不同实现，基于前面章节的LExpr表达式语法。第一个实现使用访问者方法返回值，第二个定义了一个在事件方法间共享的字段，第三个则注解语法分析树节点以便储存感兴趣的值。</p>
+
+<h4 id="使用访问者遍历语法分析树">使用访问者遍历语法分析树</h4>
+
+<p>构建基于访问者的计算器，最简单的方法是让和规则expr相关的事件方法返回子表达式的值。例如，visitAdd()将返回两个子表达式相加的值，visitInt()将返回整型的值。传统的访问者不指定visit方法的返回值。当我们为特定应用需求实现一个类时添加返回类型是容易的，扩展LExprBaseVisitor<T>并提供Integer作为<T>类型参数。访问者代码看起来如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static class EvalVisitor extends LExprBaseVisitor&lt;Integer&gt; {
+</span><span class='line'>    public Integer visitMult(LExprParser.MultContext ctx) {
+</span><span class='line'>        return visit(ctx.e(0)) * visit(ctx.e(1));
+</span><span class='line'>    }
+</span><span class='line'>    public Integer visitAdd(LExprParser.AddContext ctx) {
+</span><span class='line'>        return visit(ctx.e(0)) + visit(ctx.e(1));
+</span><span class='line'>    }
+</span><span class='line'>    public Integer visitInt(LExprParser.IntContext ctx) {
+</span><span class='line'>        return Integer.valueOf(ctx.INT().getText());
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>EvalVisitor从ANTLR生成的AbstractParseTreeVisitor类继承通用的visit()方法，我们的访问者使用它去准确地触发子树访问。</p>
+
+<p>注意，EvalVisitor没有针对规则s的访问者方法。在LExprBaseVisitor中的visitS()的默认实现调用预定义的方法ParseTreeVisitor.visitChildren(). visitChildren()返回从最后的子节点访问返回的值。在这里，visitS()返回访问它唯一的子节点（节点e）时返回的表达式的值。我们可以使用这种默认的行为。</p>
+
+<p>在测试文件TestLEvalVisitor.java中，我们有常用代码去启动LExprParser和打印语法分析树，然后我们需要编码去启动EvalVisitor和打印出当访问树时计算出的表达式的值。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>EvalVisitor evalVisitor = new EvalVisitor();
+</span><span class='line'>int result = evalVisitor.visit(tree);
+</span><span class='line'>System.out.println("visitor result = " + result);</span></code></pre></td></tr></table></div></figure>
+
+<p>要构建计算器，需要告诉ANTLR使用-visitor参数去生成访问者。（如果我们不再需要生成监听器，可以使用-no-listener参数）以下是完整的构建和测试序列：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr -visitor LExpr.g
+</span><span class='line'>compile *.java
+</span><span class='line'>run TestLEvalVisitor</span></code></pre></td></tr></table></div></figure>
+
+<p>接着输入以下内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>1+2*3
+</span><span class='line'>EOF</span></code></pre></td></tr></table></div></figure>
+
+<p>你就会看到如下结果：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>(s (e (e 1) + (e (e 2) * (e 3))))
+</span><span class='line'>visitor result = 7</span></code></pre></td></tr></table></div></figure>
+
+<p>如果我们需要特定应用的返回值，访问者工作的相当好，因为我们使用了内建的Java返回值机制。如果我们不希望显式地调用访问者方法去访问子节点，我们可以切换到监听器机制，不幸的是，这意味着我们要放弃使用Java方法返回值的整洁。</p>
+
+<h4 id="使用栈模拟返回值">使用栈模拟返回值</h4>
+
+<p>ANTLR生成的监听器事件方法没有返回值。为了给在语法分析树更高节点上执行的监听器方法返回值，我们可以把部分的值存储在监听器的一个字段中。我们会想到用栈来存储值，方法就是把计算一个子表达式的结果推送到栈中，在语法分析树上用于子表达式的方法则把运算元从栈中弹出。以下是完整的Evaluator计算器监听器（代码在TestLEvaluator.java文件中）：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static class Evaluator extends LExprBaseListener {
+</span><span class='line'>    Stack&lt;Integer&gt; stack = new Stack&lt;Integer&gt;();
+</span><span class='line'>    public void exitMult(LExprParser.MultContext ctx) {
+</span><span class='line'>        int right = stack.pop();
+</span><span class='line'>        int left = stack.pop();
+</span><span class='line'>        stack.push(left * right);
+</span><span class='line'>    }
+</span><span class='line'>    public void exitAdd(LExprParser.AddContext ctx) {
+</span><span class='line'>        int right = stack.pop();
+</span><span class='line'>        int left = stack.pop();
+</span><span class='line'>        stack.push(left + right);
+</span><span class='line'>    }
+</span><span class='line'>    public void exitInt(LExprParser.IntContext ctx) {
+</span><span class='line'>        stack.push(Integer.valueOf(ctx.INT().getText()));
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>要测试上面的这段代码，我们可以创建和使用在代码TestLEvaluator中的ParseTreeWalker，以下是完整的构建和测试序列：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr LExpr.g
+</span><span class='line'>compile *.java
+</span><span class='line'>run TestLEvaluator</span></code></pre></td></tr></table></div></figure>
+
+<p>接着输入以下内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>1+2*3
+</span><span class='line'>EOF</span></code></pre></td></tr></table></div></figure>
+
+<p>你就会看到如下结果：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>(s (e (e 1) + (e (e 2) * (e 3))))
+</span><span class='line'>stack result = 7</span></code></pre></td></tr></table></div></figure>
+
+<p>使用栈字段有点别扭但工作得很好。我们必须确保事件方法以正确的顺序压入和弹出跨越监听器事件的值。带有返回值的访问者没有栈的这种笨拙但却需要手工访问树的节点。第三种实现是通过把部分值隐藏在树节点中来捕获它们。</p>
+
+<h4 id="注解语法分析树">注解语法分析树</h4>
+
+<p>作为使用临时存储在事件方法间共享数据的替代，我们可以把这些值存储在语法分析树本身中。使用树注解方法时我们可以带有监听器或访问者，但在这里我们使用监听器来阐明如何使用它。让我们首先看一下用部分结果注解的1+2*3的LExpr语法分析树。</p>
+
+<p><img src="/uploads/lexpr-parse-tree.png" alt="lexpr-parse-tree"></p>
+
+<p>每个子表达式对应一个子树根（和对应一个e规则调用）。从e节点发出的水平线指向的数字是我们想要返回的部分结果。</p>
+
+<p>让我们看看节点注解策略将如何工作在来自LExpr语法的规则e上。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>e : e MULT e    # Mult
+</span><span class='line'>  | e ADD e     # Add
+</span><span class='line'>  | INT         # Int
+</span><span class='line'>  ;</span></code></pre></td></tr></table></div></figure>
+
+<p>e选项的监听器方法每个都会存储一个结果在相对应的e语法分析树节点中。任何随后的在语法分析树更高节点上的add或multiply事件将通过查看存储在它们对应的子节点中的值来抓取子表达式的值。</p>
+
+<p>现在，让我们假设每个语法分析树节点（每个规则上下文对象）都有一个字段value，那么exitAdd()看起来将是这样；</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitAdd(LExprParser.AddContext ctx) {
+</span><span class='line'>    // e(0).value is the subexpression value of the first e in the alternative
+</span><span class='line'>    ctx.value = ctx.e(0).value + ctx.e(1).value;    // e '+' e # Add
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>这看起来相当合理，但不幸的是，在Java中我们不能扩展类ExprContext去动态地添加字段。为了让语法分析树注解生效，我们需要一种方法去注解各式各样的节点而不需要手工修改由ANTLR生成的关联节点类。</p>
+
+<p>注解语法分析树节点最简单的方式是使用与节点任意值相关联的一个Map。因此，ANTLR提供了一个简单的帮助类ParseTreeProperty。让我们在文件TestLEvaluatorWithProps.java中构建称作EvaluatorWithProps的另一个计算器版本，它使用ParseTreeProperty关联了LExpr语法分析树节点和部分结果。以下是在监听器开始处的适当的定义：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static class EvaluatorWithProps extends LExprBaseListener {
+</span><span class='line'>    /** maps nodes to integers with Map&lt;ParseTree,Integer&gt; */
+</span><span class='line'>    ParseTreeProperty&lt;Integer&gt; values = new ParseTreeProperty&lt;Integer&gt;();</span></code></pre></td></tr></table></div></figure>
+
+<p>注意：如果你想使用自己的Map类型字段代替ParseTreeProperty，确保它继承自IdentityHashMap，而不是通常的HashMap。我们需要去注解特殊的节点，进行同一性测试而不是equals()。两个e节点可能是equals()，但在内存中不是同一个物理节点。</p>
+
+<p>为注解一个节点，我们使用values.put(node, value)。为得到和一个节点有关联的值，我们使用values.get(node)。这很好，但是让我们创建一些有直白名字的帮助方法以便让代码更容易阅读。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void setValue(ParseTree node, int value) { values.put(node, value); }
+</span><span class='line'>public int getValue(ParseTree node) { return values.get(node); }</span></code></pre></td></tr></table></div></figure>
+
+<p>让我们从最简单的表达式选项Int开始监听器方法。我们想使用它匹配的INT记号的整型值去注解它的语法分析树e节点。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitInt(LExprParser.IntContext ctx) {
+</span><span class='line'>    String intText = ctx.INT().getText();    // INT    # Int
+</span><span class='line'>    setValue(ctx, Integer.valueOf(intText));
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>对于加法树，我们得到两个子表达式子节点的值（运算元）和带有和的注释的子树跟。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitAdd(LExprParser.AddContext ctx) {
+</span><span class='line'>    int left = getValue(ctx.e(0));    // e '+' e    # Add
+</span><span class='line'>    int right = getValue(ctx.e(1));
+</span><span class='line'>    setValue(ctx, left + right);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>方法exitMult()是相同的，只是运算的时候用multiply代替了add。</p>
+
+<p>我们的测试代码从分析规则s开始。因此我们必须确保语法分析树根有e子树的值。为把值从e节点冒泡到根s节点，我们实现了exitS()。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>/** Need to pass e's value out of rule s : e ; */
+</span><span class='line'>public void exitS(LExprParser.SContext ctx) {
+</span><span class='line'>    setValue(ctx, getValue(ctx.e()));    // like: int s() { return e(); }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>以下是如何启动监听器以及打印出来自语法分析树根节点的表达式的值：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ParseTreeWalker walker = new ParseTreeWalker();
+</span><span class='line'>EvaluatorWithProps evalProp = new EvaluatorWithProps();
+</span><span class='line'>walker.walk(evalProp, tree);
+</span><span class='line'>System.out.println("properties result = " + evalProp.getValue(tree));</span></code></pre></td></tr></table></div></figure>
+
+<p>以下是构建和测试序列：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr LExpr.g
+</span><span class='line'>compile *.java
+</span><span class='line'>run TestLEvaluatorWithProps</span></code></pre></td></tr></table></div></figure>
+
+<p>接着输入以下内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>1+2*3
+</span><span class='line'>EOF</span></code></pre></td></tr></table></div></figure>
+
+<p>你就会看到如下结果：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>(s (e (e 1) + (e (e 2) * (e 3))))
+</span><span class='line'>stack result = 7</span></code></pre></td></tr></table></div></figure>
+
+<p>现在我们已经看到了相同计算器的3个实现，并且我们也已经准备好把我们的知识用于构建真实案例。因为每个方法都有它的优势和劣势，下面就让我们来比较下不同的技术。</p>
+
+<h3 id="比较信息共享方法">比较信息共享方法</h3>
+
+<p>为得到可复用和可重定目标的语法，我们需要让它们完全清除用户定义的动作。这意味着要把所有特定应用的代码放到语法外的某些监听器和访问者中。监听器和访问者操作语法分析树，ANTLR自动生成合适的树遍历接口和默认实现。因为事件方法签名是固定的和不特定于应用的，所以事件方法可以共享信息的方式有3种：</p>
+
+<ul>
+<li>本地Java调用栈：访问者返回用户定义类型的一个值。如果访问者需要传递参数，它也必须使用下面两种技术的一种。</li>
+<li>基于栈：一个栈字段模仿参数和返回值，像Java调用栈那样。</li>
+<li>注解者：一个Map字段使用有用的值注解节点。</li>
+</ul>
+
+<p>所有这3种方法是和语法本身完全解耦的，并且很好地封装在专门的对象中。除此之外，它们也都有各自的优点和缺点。我们可以根据问题的需要和个人的喜好决定采取哪种方法。你甚至可以在同一个应用中使用多种方法。</p>
+
+<p>访问者方法很好懂，因为它们直接调用其它访问者方法去获取部分结果，并且能像其它任何方法那样返回值。这也是它们的缺点，访问者方法必须显式地访问它们的子节点。而监听器就不需要。因为访问者有个通用的接口，所以它不能定义参数。访问者必须使用其它解决方案的一种去传递参数给它在子节点上调用的访问者方法。访问者的空间效率很好，因为它在任何时间仅需保留少数的部分结果。在树遍历后没有部分结果保留。当访问者方法可以返回值时，每个值必须是同种类型，不想其它的解决方案。</p>
+
+<p>基于栈的解决方案可以模仿参数和返回带有一个栈的值，但在手动管理栈时有个断开的机会。这可能会发生，因为监听器方法不能直接调用彼此。作为程序员，我们必须确定推入栈中的在将来事件方法调用能适当地弹出。栈可以传递多个值和多个返回值。基于栈的解决方案也是空间有效的，因为它不会把任何东西固定到树上。在树遍历后所有的部分结果存储消失。</p>
+
+<p>注解者通常可以作为默认解决方案采用，因为它允许你任意地提供信息给事件方法操作语法分析树中上上下下的节点。你也可以传递多个值，它们可以是任意类型。在许多情况下注解胜于使用带有短暂值的栈。在各种方法的数据传递准备间很少有断开的机会。比起在编程语言中说返回值，使用setValue(ctx, value)注解树不太直观，但是更通用。超过其它两种的这种方法的唯一缺点是在树遍历期间部分结果是保留的，因此它有较大的内存占用。</p>
+
+<p>从另一方面来说，在某些应用中能够注解树正是我们需要的。应用需要在树上通过多遍，第一遍是很方便在树上计算和储存数据的。当语法分析树遍历器重新遍历树的时候第二遍然后就很容易访问数据。总的来说，树注解非常灵活，有一个可接受的内存负担。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part23/">ANTLR 4权威参考读书笔记（23）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-08-16T18:09:05+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>6:09 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>默认情况下，ANTLR为每个规则生成一个单一的事件类型，而不管语法分析器匹配了哪个选项。这很不方便，因为监听器和访问者方法必须确定哪个选项被语法分析器匹配。在本节中，我们将看到如何得到更细粒度的事件。</p>
+
+<h3 id="为规则选项贴标签以得到精确的事件方法">为规则选项贴标签以得到精确的事件方法</h3>
+
+<p>为阐明事件粒度问题，让我们为以下的表达式语法构建一个带有监听器的简单计算器：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar Expr;
+</span><span class='line'>s : e ;
+</span><span class='line'>e : e op=MULT e    // MULT is '*'
+</span><span class='line'>  | e op=ADD e     // ADD is '+'
+</span><span class='line'>  | INT
+</span><span class='line'>  ;</span></code></pre></td></tr></table></div></figure>
+
+<p>按照上面的语法，规则e会产生一个相当无用的监听器，因为规则e的所有选项导致树遍历器触发相同的enterE()和exitE()方法。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public interface ExprListener extends ParseTreeListener {
+</span><span class='line'>    void enterE(ExprParser.EContext ctx);
+</span><span class='line'>    void exitE(ExprParser.EContext ctx);</span></code></pre></td></tr></table></div></figure>
+
+<p>监听器方法必须使用op记号标签和ctx的方法进行测试以查看语法分析器为每个e子树匹配了哪个选项。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void exitE(ExprParser.EContext ctx) {
+</span><span class='line'>    if (ctx.getChildCount() == 3) {    // operations have 3 children
+</span><span class='line'>        int left = values.get(ctx.e(0));
+</span><span class='line'>        int right = values.get(ctx.e(1));
+</span><span class='line'>        if (ctx.op.getType() == ExprParser.MULT) {
+</span><span class='line'>            values.put(ctx, left * right);
+</span><span class='line'>        } else {
+</span><span class='line'>            values.put(ctx, left + right);
+</span><span class='line'>        }
+</span><span class='line'>    } else {
+</span><span class='line'>        values.put(ctx, values.get(ctx.getChild(0)));    // an INT
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>在exitE()中引用的MULT字段是在ExprParser中由ANTLR自动生成的：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class ExprParser extends Parser {
+</span><span class='line'>    public static final int MULT=1, ADD=2, INT=3, WS=4;</span></code></pre></td></tr></table></div></figure>
+
+<p>如果我们查看在类ExprParser中的类EContext，我们可以看到ANTLR把来自3个选项的所有元素都塞进了相同的上下文对象。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static class EContext extends ParserRuleContext {
+</span><span class='line'>    public Token op;                     // derived from label op
+</span><span class='line'>    public List&lt;EContext&gt; e() { ... }    // get all e subtrees
+</span><span class='line'>    public EContext e(int i) { ... }     // get ith e subtree
+</span><span class='line'>    public TerminalNode INT() { ... }    // get INT node if alt 3 of e</span></code></pre></td></tr></table></div></figure>
+
+<p>为得到更精确的监听器事件，ANTLR让我们使用#运算符给任何规则最外层的选项打标签。让我们从Expr派生语法LExpr，并给e的选项打上标签，以下是修改后的e规则：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>e : e MULT e  # Mult
+</span><span class='line'>  | e ADD e   # Add
+</span><span class='line'>  | INT       # Int
+</span><span class='line'>  ;</span></code></pre></td></tr></table></div></figure>
+
+<p>现在，ANTLR为e的每个选项生成了单独的监听器方法，因此，我们不再需要op记号标签。对于选项标签X，ANTLR生成方法enterX()和exitX()。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public interface LExprListener extends ParseTreeListener {
+</span><span class='line'>    void enterMult(LExprParser.MultContext ctx);
+</span><span class='line'>    void exitMult(LExprParser.MultContext ctx);
+</span><span class='line'>    void enterAdd(LExprParser.AddContext ctx);
+</span><span class='line'>    void exitAdd(LExprParser.AddContext ctx);
+</span><span class='line'>    void enterInt(LExprParser.IntContext ctx);
+</span><span class='line'>    void exitInt(LExprParser.IntContext ctx);
+</span><span class='line'>    ...
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>注意，ANTLR也为选项生成特定的以标签命名的上下文对象（EContext的子类）。专门的上下文对象的getter方法只限于应用在那些相关的选项。例如，IntContext只有一个INT()方法，我们可以在enterInt()中调用ctx.INT()，但在enterAdd()中就不能。</p>
+
+<p>监听器和访问者是极好的。我们只需要通过充实事件方法就可以得到可复用和可重定目标的语法以及封装的语言应用。ANTLR甚至会为我们自动生成骨架代码。</p>
+</div>
+  
+  
+
+
+    </article>
+  
   <div class="pagination">
     
       <a class="prev" href="/posts/4">&larr; Older</a>
@@ -2446,6 +2708,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/how-to-verify-mailbox-exist/">如何验证邮箱是否存在？</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/crawl-novel-with-scrapy-part6/">使用Scrapy爬取小说（6）</a>
       </li>
     
@@ -2461,10 +2727,6 @@
         <a href="/blog/crawl-novel-with-scrapy-part3/">使用Scrapy爬取小说（3）</a>
       </li>
     
-      <li class="post">
-        <a href="/blog/crawl-novel-with-scrapy-part2/">使用Scrapy爬取小说（2）</a>
-      </li>
-    
   </ul>
 </section>
 <section>
@@ -2476,31 +2738,31 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 143%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 140%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 132%" href="/tags/android/">Android</a>
-<a style="font-size: 103%" href="/tags/c-plus-plus/">C++</a>
+<a style="font-size: 133%" href="/tags/android/">Android</a>
+<a style="font-size: 96%" href="/tags/c-plus-plus/">C++</a>
 <a style="font-size: 106%" href="/tags/css/">CSS</a>
-<a style="font-size: 108%" href="/tags/crack/">Crack</a>
-<a style="font-size: 106%" href="/tags/database/">Database</a>
-<a style="font-size: 95%" href="/tags/eclipse/">Eclipse</a>
-<a style="font-size: 113%" href="/tags/git/">Git</a>
-<a style="font-size: 95%" href="/tags/html/">HTML</a>
+<a style="font-size: 91%" href="/tags/crack/">Crack</a>
+<a style="font-size: 96%" href="/tags/crawler/">Crawler</a>
+<a style="font-size: 96%" href="/tags/database/">Database</a>
+<a style="font-size: 114%" href="/tags/git/">Git</a>
+<a style="font-size: 96%" href="/tags/html/">HTML</a>
 <a style="font-size: 103%" href="/tags/jbookshelf/">JBookShelf</a>
-<a style="font-size: 146%" href="/tags/java/">Java</a>
-<a style="font-size: 99%" href="/tags/javascript/">JavaScript</a>
-<a style="font-size: 95%" href="/tags/listview/">ListView</a>
-<a style="font-size: 103%" href="/tags/mysql/">MySQL</a>
+<a style="font-size: 137%" href="/tags/java/">Java</a>
+<a style="font-size: 100%" href="/tags/javascript/">JavaScript</a>
+<a style="font-size: 96%" href="/tags/listview/">ListView</a>
+<a style="font-size: 96%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 103%" href="/tags/paperclip/">Paperclip</a>
-<a style="font-size: 117%" href="/tags/powerbuilder/">PowerBuilder</a>
-<a style="font-size: 99%" href="/tags/powerscript/">PowerScript</a>
-<a style="font-size: 115%" href="/tags/qianbao/">Qianbao</a>
+<a style="font-size: 96%" href="/tags/python/">Python</a>
+<a style="font-size: 116%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
 <a style="font-size: 117%" href="/tags/ruby/">Ruby</a>
-<a style="font-size: 95%" href="/tags/scrapy/">Scrapy</a>
-<a style="font-size: 99%" href="/tags/struts/">Struts</a>
-<a style="font-size: 146%" href="/tags/translation/">Translation</a>
-<a style="font-size: 95%" href="/tags/ubuntu/">Ubuntu</a>
+<a style="font-size: 96%" href="/tags/scrapy/">Scrapy</a>
+<a style="font-size: 91%" href="/tags/spring/">Spring</a>
+<a style="font-size: 100%" href="/tags/struts/">Struts</a>
+<a style="font-size: 145%" href="/tags/translation/">Translation</a>
+<a style="font-size: 96%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 106%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 106%" href="/tags/wxwidgets/">wxWidgets</a>
 

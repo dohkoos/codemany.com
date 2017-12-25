@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="在使用Scrapy爬取小说（1）中，我们首先抓取小说目录页面的所有章节链接，然后再使用这些链接分别抓取各个章节的正文内容。这样需要分析两个不同页面的结构。其实，还有个更简单点的方法，只要分析内容页面的结构即可。 在小说的内容页面中通常都会有“上一页”和“下一页”这样的链接。 &hellip;">
+  <meta name="description" content="事情的起因是想要注销某个免费的163邮箱，但是查找资料后发现： 163免费邮箱不支持直接注销。 如果连续180天没登录过网易任何产品的帐号，系统将自动清空所有信息和资料，并删除帐号。 那么问题来了，超过上述期限没有登录的话，如何才能验证该邮箱是否真的被销号？直接登录肯定不行， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,6 +73,215 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-verify-mailbox-exist/">如何验证邮箱是否存在？</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2017-12-23T11:45:10+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>23</span><span class='date-suffix'>rd</span>, <span class='date-year'>2017</span></span> <span class='time'>11:45 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>事情的起因是想要注销某个免费的163邮箱，但是查找资料后发现：</p>
+
+<blockquote>
+<p>163免费邮箱不支持直接注销。</p>
+
+<p>如果连续180天没登录过网易任何产品的帐号，系统将自动清空所有信息和资料，并删除帐号。</p>
+</blockquote>
+
+<p>那么问题来了，超过上述期限没有登录的话，如何才能验证该邮箱是否真的被销号？直接登录肯定不行，如果那时邮箱正处于冻结状态，你登录不就相当于重新激活吗！或者向该邮箱发送测试邮件，如果投递成功就说明邮箱还没被注销，但这种方法太过麻烦，尤其对于注销多个邮箱的情况。要想优雅地解决这个问题，我们需要从了解电子邮件传输协议开始。</p>
+
+<h3 id="电子邮件传输协议">电子邮件传输协议</h3>
+
+<p>电子邮件传输协议主要包括SMTP协议、ESMTP协议、POP协议、IMAP协议等，具体的标准可以参考<a href="https://www.rfc-editor.org/">RFC Editor</a>网站下的相关RFC文档。POP3是Post Office Protocol 3的缩写，IMAP是Internet Message Access Protocol的缩写，两者的作用都是收取邮件，关键的区别在于邮件是放在服务器上（IMAP）还是放在本地电脑上（POP3）。SMTP是Simple Mail Transfer Protocol的缩写，ESMTP即Extension-SMTP，是为对付滥用SMTP服务器发邮件而引入的，它和SMTP的主要区别在于增加了发信认证机制。</p>
+
+<p>下图是一个典型的电子邮件收发路径：</p>
+
+<p><img src="/uploads/email-architecture.png" alt="email-architecture"></p>
+
+<p>在你写完邮件点击“发送”时，你的邮件客户端会将消息发送给SMTP服务器（就如同我们将信交给本地的邮局），然后SMTP服务器根据收信人的地址向DNS服务器查询邮箱地址后缀的MX记录，找到目的邮件服务器（就好像邮局根据收信人的地址选择邮递路线，经过飞机或火车等交通工具到达收信人所在地邮局），然后收信人就可以使用自己的帐号登录POP3服务器收取邮件（就像收信人从邮箱取信）。</p>
+
+<p>由此推断，通过SMTP服务器或者MX服务器能够验证邮箱是否存在。下面我们就来进行测试。</p>
+
+<h3 id="实践">实践</h3>
+
+<p>我们先从SMTP服务器开始。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>C:\&gt;telnet smtp.163.com 25
+</span><span class='line'>220 163.com Anti-spam GT for Coremail System (163com[20141201])
+</span><span class='line'>
+</span><span class='line'>hello    # SMTP协议没有这个指令
+</span><span class='line'>502 Error: command not implemented
+</span><span class='line'>
+</span><span class='line'>helo hi  # 因为每次按键都会被传送到服务器，所以输入错误时不能使用退格键删除，只能换行重新输入
+</span><span class='line'>500 Error: bad syntax
+</span><span class='line'>
+</span><span class='line'>helo hi
+</span><span class='line'>250 OK
+</span><span class='line'>
+</span><span class='line'>vrfy noname@163.com  # 现在的邮件服务器都使用ESTMP协议，VRFY、EXPN这些指令都已经被禁用或不被支持
+</span><span class='line'>502 Error: command not implemented
+</span><span class='line'>
+</span><span class='line'>mail from: &lt;noname@example.com&gt;  # 必须是同域的邮箱才能发邮件
+</span><span class='line'>553 Local user only,163 smtp7,C8CowAA3eUZ7jEBaXE8hDg--.38995S2 1514179735
+</span><span class='line'>mail from: &lt;noname@163.com&gt;
+</span><span class='line'>553 authentication is required,163 smtp7,C8CowAA3eUZ7jEBaXE8hDg--.38995S3 1514179751
+</span><span class='line'>
+</span><span class='line'>quit
+</span><span class='line'>221 Bye</span></code></pre></td></tr></table></div></figure>
+
+<p>因为邮件服务器使用ESMTP协议的缘故，必须使用同域的其它邮箱登录SMTP服务器后才能验证邮箱是否存在，这显然不是什么好的验证方法。</p>
+
+<p>再来试试MX服务器，希望不要如此麻烦，否则的话就完蛋了～</p>
+
+<p>首先找到163免费邮箱的MX服务器：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>C:\&gt;nslookup -q=mx 163.com
+</span><span class='line'>Non-authoritative answer:
+</span><span class='line'>163.com MX preference = 10, mail exchanger = 163mx03.mxmail.netease.com
+</span><span class='line'>163.com MX preference = 10, mail exchanger = 163mx01.mxmail.netease.com
+</span><span class='line'>163.com MX preference = 10, mail exchanger = 163mx02.mxmail.netease.com
+</span><span class='line'>163.com MX preference = 50, mail exchanger = 163mx00.mxmail.netease.com
+</span><span class='line'>
+</span><span class='line'>163.com nameserver = ns6.nease.net
+</span><span class='line'>163.com nameserver = ns3.nease.net
+</span><span class='line'>163.com nameserver = ns4.nease.net
+</span><span class='line'>163.com nameserver = ns1.nease.net
+</span><span class='line'>163.com nameserver = ns8.166.com
+</span><span class='line'>163.com nameserver = ns2.166.com
+</span><span class='line'>163.com nameserver = ns5.nease.net
+</span><span class='line'>163mx01.mxmail.netease.com      internet address = 220.181.14.138
+</span><span class='line'>163mx01.mxmail.netease.com      internet address = 220.181.14.139
+</span><span class='line'>163mx01.mxmail.netease.com      internet address = 220.181.14.140
+</span><span class='line'>163mx01.mxmail.netease.com      internet address = 220.181.14.141
+</span><span class='line'>163mx01.mxmail.netease.com      internet address = 220.181.14.142
+</span><span class='line'>163mx01.mxmail.netease.com      internet address = 220.181.14.143
+</span><span class='line'>163mx01.mxmail.netease.com      internet address = 220.181.14.135
+</span><span class='line'>163mx01.mxmail.netease.com      internet address = 220.181.14.136
+</span><span class='line'>163mx01.mxmail.netease.com      internet address = 220.181.14.137</span></code></pre></td></tr></table></div></figure>
+
+<p>找到MX服务器后，我们就可以像对待SMTP服务器那样对待它：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>C:\&gt;telnet 163mx03.mxmail.netease.com 25
+</span><span class='line'>220 163.com Anti-spam GT for Coremail System (163com[20141201])
+</span><span class='line'>
+</span><span class='line'>helo hi
+</span><span class='line'>250 OK
+</span><span class='line'>
+</span><span class='line'>vrfy noname@163.com              # VRFY指令也处于禁用
+</span><span class='line'>502 Error: command not implemented
+</span><span class='line'>
+</span><span class='line'>mail from: &lt;noname@example.com&gt;  # 注意：不同域的邮箱也能发邮件啦
+</span><span class='line'>250 Mail OK
+</span><span class='line'>
+</span><span class='line'>rcpt to: &lt;fewfwe&gt;
+</span><span class='line'>550 Invalid User: fewfwe
+</span><span class='line'>
+</span><span class='line'>rcpt to: &lt;fewfwe@163.com&gt;        # 邮箱不存在
+</span><span class='line'>550 User not found: fewfwe@163.com
+</span><span class='line'>
+</span><span class='line'>rcpt to: &lt;fake@163.com&gt;          # 邮箱存在
+</span><span class='line'>250 Mail OK
+</span><span class='line'>
+</span><span class='line'>quit
+</span><span class='line'>221 Bye</span></code></pre></td></tr></table></div></figure>
+
+<h3 id="总结">总结</h3>
+
+<ul>
+<li>验证邮箱是否存在的最好方法是在MX服务器上使用RCPT TO指令。</li>
+<li>连续180天没登录过的163免费邮箱不会被注销。</li>
+</ul>
+
+<p>写到这里才想起我手里还有以前收集的大批邮箱，即使按照上面的步骤逐个验证也不现实，需要找个时间码个程序来自动化批量处理它们。这次就暂时先这样子吧。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1082,75 +1291,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/10x-engineers-take-long-naps/">10x工程师经常的打盹</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2017-07-23T18:05:43+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>23</span><span class='date-suffix'>rd</span>, <span class='date-year'>2017</span></span> <span class='time'>6:05 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="https://hackernoon.com/10x-engineers-take-long-naps-ed2ca00a953">https://hackernoon.com/10x-engineers-take-long-naps-ed2ca00a953</a></p>
-
-<p>最近，我在为一个疯狂的悖论而烦恼：<strong>我感觉从来没有像今天这样工作效率高过，然而我也注意到在给定的每周内我工作的时间并没有减少。</strong>这让我想起另一个令人困惑的悖论，我在成功的软件公司看到，它们重视那些不足以令人信服的10x工程师传说，但同时也重视那些花费很多个人时间并确保避免倦怠的员工。</p>
-
-<p>我对这些最近我给予它们很多激烈思考的悖论感到困惑，但我倾向于认为我已经得出结论，该结论可以很好地解释这两个似乎对立的观点。</p>
-
-<p>之所以用“似乎”这个词，是因为我认为它们其实并不算是真正的对立面。简而言之，我的看法是，虽然我们使用相同的词汇谈论工程师的效率，但我们谈论的是两种截然不同的效率：</p>
-
-<ul>
-<li>一方面，<strong>效率是指在最短的时间内交付最多的产出。</strong>这个可以通过检查软件编写的数量（提交次数、代码行数等）或与软件相关的工作（文档页面、可交付的成果等）进行衡量。更长更多的工作时间意味着更多的产出。</li>
-<li>另一方面，<strong>效率是指用最短的时间和精力产出最多的业务价值。</strong>这个可以通过利益相关者（客户、同事等）能从工程师的工作中的获得多少实际的货币化/有用的价值进行衡量。就像我一直在说的，<strong>软件工程师的职责不是解决技术问题，而是用技术方案解决业务问题。</strong></li>
-</ul>
-
-<p>混乱可能源于在大多数工作中，投入和产出的关系在一定程度上是呈线性的。最简单的例子：如果你的工作是工厂产品的日常生产，你工作的时间越长，生产的产品就越多。更多的工作时间=更多的价值。但事实是，在我们的工作中，这些可以变得非常无关，我甚至可以冒昧地说，有时候它们甚至是相互成反比的。</p>
-
-<p><strong>它们可以是不相关的</strong>，因为你可以被某个疯狂的问题困扰整周的时间，捶胸顿足，感觉就像你没有带来任何价值，直到你把事情弄清楚，并且在10分钟内真正地解决这些事情（因此终于将业务向前推进）。或者，仅仅因为不同的心态，你可以花1个小时自动化某个过程，这将使其它问题过时，同时给另一个团队每周节省几个小时。或者你可以突然想到在结帐渠道中引入某个变更，它会使你的公司的转化率提高1%，因此可以提高数百万的收入。</p>
-
-<p><strong>它们有时候也可以是成反比的</strong>（更多的工作时间=创造更少的价值），因为如果以“创造业务价值”为KPI，你的生产效率将取决于很多难以掌控的未知因素。如果你遇到这样的情况，花费整天的努力去尝试解决某些问题，然后经过充分的休息后在第二天早上回来，并在5分钟内诊断出问题，你可能会同意充分的休息是主要因素。</p>
-
-<h3 id="“10x工程师”和“快速行动”">“10x工程师”和“快速行动”</h3>
-
-<p>所以让我们回到“10x工程师”这个话题。在软件层次上，有更快速的工程师能完成其他工程师10x的代码这个概念在我看来是非常不切实际的。但是，如果你正在考虑的KPI是创造实际的业务价值，这听起来就不那么牵强。我可以告诉你的是，目前正在从事技术问题的一些工程师几乎不能给他们的公司增加任何业务价值，他们解决技术问题只是因为它们是有趣和富有挑战性的，工程师们太缺乏经验或者不够价值驱动，以至于不能认识到他们为什么跑偏；他们的领导技术太弱，以至于不能理解这项工作可能应该被重新调整优先级。相比之下，如果以业务价值为KPI，业界所有其他的工程师都是数学上无限的工程师！</p>
-
-<p>此外，通过以业务价值为KPI，“<strong>快速行动和推陈出新</strong>”就可以被理解为“在最短的时间内优化你的业务价值能力并达到目标，不要太过满足于已经创造的价值，它们可以优化的更好”。如果“优化你的业务价值能力”意味着你需要减少每天的工作量，并获得充分的休息，以便能够产出更多的价值，那么即使要达到目标也不意味着会给你带来更多的压力，或者是大量的工作时间。</p>
-
-<h3 id="行业现状">行业现状</h3>
-
-<p>诚然，并不是所有的公司都同意我的理解。一个极端是，一些公司（Uber、Apple等）希望顶尖的工程师能够每天都全力以赴，并最大化他们的日常产出，以达到所需的业务价值。另一个极端是，其它一些公司（Facebook、Salesforce等）坚决要求工程师需要知道什么时候应该放慢速度，在必要的时候减少工作时间，以更聪明和更周全的方式工作，因为这些公司认为它们的工程师将因此做出更好的选择，可以用更少的时间和精力建立更多的价值。</p>
-
-<p>当然，由于辩论双方都有公司是成功的，所以我不认为某些公司比其它公司更正确。我的观点是：</p>
-
-<ul>
-<li>由于软件工作的本质及其在最优条件下的潜在价值乘数效应，后者公司提出的方法对于员工来说既不是悖论，也不是不道德的。</li>
-<li>作为业界的工程师，你可以在这两种文化（以及两者的折中）之间进行选择，与其它行业相比，我们真的算是幸运的。</li>
-</ul>
-
-<h3 id="结论">结论</h3>
-
-<p>回到标题：<strong>10x开发者真的都经常的打盹吗？</strong>不，不，他们不是都这样做。不过我看到很多“业务价值10x”的开发者经常这样，因为他们很清楚地知道自己的极限，他们知道何时应该切换到非工作相关的事情来触发当他们恢复工作时倍增业务价值生产效率的时刻。对于其中的某些人来说，它是经常的打盹，但对于你来说，你可能会发现它是别的东西（在正确的时间散步、快速的视频游戏以放空你的大脑、和你的小孩一起玩等）。</p>
-
-<p><strong>那么接下来该怎么做？</strong>如果你不确定如何在现实生活中应用这些想法，这里是主要的提示：注意观察你用少量代码解决大部分业务需求时都发生了什么的模式；实验你的日常例程，看看什么工作可以产生“乘数效应”；注意学习你自己的极限，随着时间的推移，优化你的健康、心态和生产效率；同样具有挑战性的是，让你自己遵循你所发现的极限。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/2">&larr; Older</a>
@@ -1164,6 +1304,10 @@
     <section>
   <h1>Recent Posts</h1>
   <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/how-to-verify-mailbox-exist/">如何验证邮箱是否存在？</a>
+      </li>
     
       <li class="post">
         <a href="/blog/crawl-novel-with-scrapy-part6/">使用Scrapy爬取小说（6）</a>
@@ -1181,10 +1325,6 @@
         <a href="/blog/crawl-novel-with-scrapy-part3/">使用Scrapy爬取小说（3）</a>
       </li>
     
-      <li class="post">
-        <a href="/blog/crawl-novel-with-scrapy-part2/">使用Scrapy爬取小说（2）</a>
-      </li>
-    
   </ul>
 </section>
 <section>
@@ -1196,31 +1336,31 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 143%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 140%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 132%" href="/tags/android/">Android</a>
-<a style="font-size: 103%" href="/tags/c-plus-plus/">C++</a>
+<a style="font-size: 133%" href="/tags/android/">Android</a>
+<a style="font-size: 96%" href="/tags/c-plus-plus/">C++</a>
 <a style="font-size: 106%" href="/tags/css/">CSS</a>
-<a style="font-size: 108%" href="/tags/crack/">Crack</a>
-<a style="font-size: 106%" href="/tags/database/">Database</a>
-<a style="font-size: 95%" href="/tags/eclipse/">Eclipse</a>
-<a style="font-size: 113%" href="/tags/git/">Git</a>
-<a style="font-size: 95%" href="/tags/html/">HTML</a>
+<a style="font-size: 91%" href="/tags/crack/">Crack</a>
+<a style="font-size: 96%" href="/tags/crawler/">Crawler</a>
+<a style="font-size: 96%" href="/tags/database/">Database</a>
+<a style="font-size: 114%" href="/tags/git/">Git</a>
+<a style="font-size: 96%" href="/tags/html/">HTML</a>
 <a style="font-size: 103%" href="/tags/jbookshelf/">JBookShelf</a>
-<a style="font-size: 146%" href="/tags/java/">Java</a>
-<a style="font-size: 99%" href="/tags/javascript/">JavaScript</a>
-<a style="font-size: 95%" href="/tags/listview/">ListView</a>
-<a style="font-size: 103%" href="/tags/mysql/">MySQL</a>
+<a style="font-size: 137%" href="/tags/java/">Java</a>
+<a style="font-size: 100%" href="/tags/javascript/">JavaScript</a>
+<a style="font-size: 96%" href="/tags/listview/">ListView</a>
+<a style="font-size: 96%" href="/tags/mysql/">MySQL</a>
 <a style="font-size: 103%" href="/tags/paperclip/">Paperclip</a>
-<a style="font-size: 117%" href="/tags/powerbuilder/">PowerBuilder</a>
-<a style="font-size: 99%" href="/tags/powerscript/">PowerScript</a>
-<a style="font-size: 115%" href="/tags/qianbao/">Qianbao</a>
+<a style="font-size: 96%" href="/tags/python/">Python</a>
+<a style="font-size: 116%" href="/tags/qianbao/">Qianbao</a>
 <a style="font-size: 150%" href="/tags/rails/">Rails</a>
 <a style="font-size: 117%" href="/tags/ruby/">Ruby</a>
-<a style="font-size: 95%" href="/tags/scrapy/">Scrapy</a>
-<a style="font-size: 99%" href="/tags/struts/">Struts</a>
-<a style="font-size: 146%" href="/tags/translation/">Translation</a>
-<a style="font-size: 95%" href="/tags/ubuntu/">Ubuntu</a>
+<a style="font-size: 96%" href="/tags/scrapy/">Scrapy</a>
+<a style="font-size: 91%" href="/tags/spring/">Spring</a>
+<a style="font-size: 100%" href="/tags/struts/">Struts</a>
+<a style="font-size: 145%" href="/tags/translation/">Translation</a>
+<a style="font-size: 96%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 106%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 106%" href="/tags/wxwidgets/">wxWidgets</a>
 

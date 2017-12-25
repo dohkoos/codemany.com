@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Tag: POP | 乐者为王]]></title>
+  <link href="http://codemany.com/tags/pop/atom.xml" rel="self"/>
+  <link href="http://codemany.com/"/>
+  <updated>2017-12-25T15:35:03+08:00</updated>
+  <id>http://codemany.com/</id>
+  <author>
+    <name><![CDATA[dohkoos]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[如何验证邮箱是否存在？]]></title>
+    <link href="http://codemany.com/blog/how-to-verify-mailbox-exist/"/>
+    <updated>2017-12-23T11:45:10+08:00</updated>
+    <id>http://codemany.com/blog/how-to-verify-mailbox-exist</id>
+    <content type="html"><![CDATA[<p>事情的起因是想要注销某个免费的163邮箱，但是查找资料后发现：</p>
+
+<blockquote>
+<p>163免费邮箱不支持直接注销。</p>
+
+<p>如果连续180天没登录过网易任何产品的帐号，系统将自动清空所有信息和资料，并删除帐号。</p>
+</blockquote>
+
+<p>那么问题来了，超过上述期限没有登录的话，如何才能验证该邮箱是否真的被销号？直接登录肯定不行，如果那时邮箱正处于冻结状态，你登录不就相当于重新激活吗！或者向该邮箱发送测试邮件，如果投递成功就说明邮箱还没被注销，但这种方法太过麻烦，尤其对于注销多个邮箱的情况。要想优雅地解决这个问题，我们需要从了解电子邮件传输协议开始。</p>
+
+<h3 id="电子邮件传输协议">电子邮件传输协议</h3>
+
+<p>电子邮件传输协议主要包括SMTP协议、ESMTP协议、POP协议、IMAP协议等，具体的标准可以参考<a href="https://www.rfc-editor.org/">RFC Editor</a>网站下的相关RFC文档。POP3是Post Office Protocol 3的缩写，IMAP是Internet Message Access Protocol的缩写，两者的作用都是收取邮件，关键的区别在于邮件是放在服务器上（IMAP）还是放在本地电脑上（POP3）。SMTP是Simple Mail Transfer Protocol的缩写，ESMTP即Extension-SMTP，是为对付滥用SMTP服务器发邮件而引入的，它和SMTP的主要区别在于增加了发信认证机制。</p>
+
+<p>下图是一个典型的电子邮件收发路径：</p>
+
+<p><img src="/uploads/email-architecture.png" alt="email-architecture"></p>
+
+<p>在你写完邮件点击“发送”时，你的邮件客户端会将消息发送给SMTP服务器（就如同我们将信交给本地的邮局），然后SMTP服务器根据收信人的地址向DNS服务器查询邮箱地址后缀的MX记录，找到目的邮件服务器（就好像邮局根据收信人的地址选择邮递路线，经过飞机或火车等交通工具到达收信人所在地邮局），然后收信人就可以使用自己的帐号登录POP3服务器收取邮件（就像收信人从邮箱取信）。</p>
+
+<p>由此推断，通过SMTP服务器或者MX服务器能够验证邮箱是否存在。下面我们就来进行测试。</p>
+
+<h3 id="实践">实践</h3>
+
+<p>我们先从SMTP服务器开始。</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">C:\&gt;telnet smtp.163.com 25
+220 163.com Anti-spam GT for Coremail System (163com[20141201])
+
+hello    # SMTP协议没有这个指令
+502 Error: command not implemented
+
+helo hi  # 因为每次按键都会被传送到服务器，所以输入错误时不能使用退格键删除，只能换行重新输入
+500 Error: bad syntax
+
+helo hi
+250 OK
+
+vrfy noname@163.com  # 现在的邮件服务器都使用ESTMP协议，VRFY、EXPN这些指令都已经被禁用或不被支持
+502 Error: command not implemented
+
+mail from: &lt;noname@example.com&gt;  # 必须是同域的邮箱才能发邮件
+553 Local user only,163 smtp7,C8CowAA3eUZ7jEBaXE8hDg--.38995S2 1514179735
+mail from: &lt;noname@163.com&gt;
+553 authentication is required,163 smtp7,C8CowAA3eUZ7jEBaXE8hDg--.38995S3 1514179751
+
+quit
+221 Bye
+</code></pre></div>
+<p>因为邮件服务器使用ESMTP协议的缘故，必须使用同域的其它邮箱登录SMTP服务器后才能验证邮箱是否存在，这显然不是什么好的验证方法。</p>
+
+<p>再来试试MX服务器，希望不要如此麻烦，否则的话就完蛋了～</p>
+
+<p>首先找到163免费邮箱的MX服务器：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">C:\&gt;nslookup -q=mx 163.com
+Non-authoritative answer:
+163.com MX preference = 10, mail exchanger = 163mx03.mxmail.netease.com
+163.com MX preference = 10, mail exchanger = 163mx01.mxmail.netease.com
+163.com MX preference = 10, mail exchanger = 163mx02.mxmail.netease.com
+163.com MX preference = 50, mail exchanger = 163mx00.mxmail.netease.com
+
+163.com nameserver = ns6.nease.net
+163.com nameserver = ns3.nease.net
+163.com nameserver = ns4.nease.net
+163.com nameserver = ns1.nease.net
+163.com nameserver = ns8.166.com
+163.com nameserver = ns2.166.com
+163.com nameserver = ns5.nease.net
+163mx01.mxmail.netease.com      internet address = 220.181.14.138
+163mx01.mxmail.netease.com      internet address = 220.181.14.139
+163mx01.mxmail.netease.com      internet address = 220.181.14.140
+163mx01.mxmail.netease.com      internet address = 220.181.14.141
+163mx01.mxmail.netease.com      internet address = 220.181.14.142
+163mx01.mxmail.netease.com      internet address = 220.181.14.143
+163mx01.mxmail.netease.com      internet address = 220.181.14.135
+163mx01.mxmail.netease.com      internet address = 220.181.14.136
+163mx01.mxmail.netease.com      internet address = 220.181.14.137
+</code></pre></div>
+<p>找到MX服务器后，我们就可以像对待SMTP服务器那样对待它：</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">C:\&gt;telnet 163mx03.mxmail.netease.com 25
+220 163.com Anti-spam GT for Coremail System (163com[20141201])
+
+helo hi
+250 OK
+
+vrfy noname@163.com              # VRFY指令也处于禁用
+502 Error: command not implemented
+
+mail from: &lt;noname@example.com&gt;  # 注意：不同域的邮箱也能发邮件啦
+250 Mail OK
+
+rcpt to: &lt;fewfwe&gt;
+550 Invalid User: fewfwe
+
+rcpt to: &lt;fewfwe@163.com&gt;        # 邮箱不存在
+550 User not found: fewfwe@163.com
+
+rcpt to: &lt;fake@163.com&gt;          # 邮箱存在
+250 Mail OK
+
+quit
+221 Bye
+</code></pre></div>
+<h3 id="总结">总结</h3>
+
+<ul>
+<li>验证邮箱是否存在的最好方法是在MX服务器上使用RCPT TO指令。</li>
+<li>连续180天没登录过的163免费邮箱不会被注销。</li>
+</ul>
+
+<p>写到这里才想起我手里还有以前收集的大批邮箱，即使按照上面的步骤逐个验证也不现实，需要找个时间码个程序来自动化批量处理它们。这次就暂时先这样子吧。</p>
+]]></content>
+  </entry>
+  
+</feed>
