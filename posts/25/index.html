@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="wxWidgets提供了一个用来检测是否只有一个实例在运行的wxSingleInstanceChecker类。为了检测程序只运行一个实例，你可以在程序运行之初使用该类创建一个m_check对象，这个对象将存在于程序的整个生命周期。 &hellip;">
+  <meta name="description" content="英文原文：http://chrisharrison.net/projects/progressbars/ProgBarHarrison.pdf 摘要 进度条在现代用户界面中是普遍存在的。通常，线性函数的使用使得条的进度和已经完成多少工作成正比。然而，许多因素会导致进度条以非线性的速率前进。此外， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,365 +73,6 @@
     <div id="content">
       <div class="blog-index">
   
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/run-only-one-instance-and-active-an-instance-of-the-former/">程序只运行一个实例，并将前一个实例提到前台</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2007-12-01T09:59:19+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>1</span><span class='date-suffix'>st</span>, <span class='date-year'>2007</span></span> <span class='time'>9:59 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>wxWidgets提供了一个用来检测是否只有一个实例在运行的wxSingleInstanceChecker类。为了检测程序只运行一个实例，你可以在程序运行之初使用该类创建一个m_check对象，这个对象将存在于程序的整个生命周期。然后就可以在OnInit函数中调用其IsAnotherRunning函数检测是否已经有别的实例在运行。代码如下所示：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>bool MainApp::OnInit()
-</span><span class='line'>{
-</span><span class='line'>    wxString name = wxString::Format(wxT("MainApp-%s"), wxGetUserId().GetData());
-</span><span class='line'>    m_checker = new wxSingleInstanceChecker(name);
-</span><span class='line'>    if (m_checker-&gt;IsAnotherRunning())
-</span><span class='line'>    {
-</span><span class='line'>        wxLogError(wxT("Another program instance is already running, aborting."));
-</span><span class='line'>        delete m_checker;
-</span><span class='line'>        return false;
-</span><span class='line'>    }
-</span><span class='line'>    // more initializations
-</span><span class='line'>    return true;
-</span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>int MainApp::OnExit()
-</span><span class='line'>{
-</span><span class='line'>    delete m_checker;
-</span><span class='line'>    return 0;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>注意：上面使用了wxGetUserId()来构建实例名，这表示允许不同的用户能同时运行程序的一个实例。如果不这样，那么程序就只能被一个用户运行一次。</p>
-
-<p>但是，如果你想把旧的实例提到前台，或者想使旧的实例打开传递给新的实例的作为命令行参数的文件，该怎么办呢？一般来说，这需要在这两个实例间进行通讯。我们可以使用wxWidgets提供的进程间通讯类来实现。</p>
-
-<p>在下面的实例中，我们将实现程序多个实例间的通讯，以便允许第二个实例请求第一个实例将自己带到前台以提醒用户它已经在运行。下面的代码实现了一个连接类，这个类将被两个实例使用。一个服务器类被旧的实例使用，以便监听新的实例的连接请求。一个客户端类被新的实例使用，以便和旧的实例进行通讯。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class AppServer : public wxServer
-</span><span class='line'>{
-</span><span class='line'>public:
-</span><span class='line'>    virtual wxConnectionBase* OnAcceptConnection(const wxString& topic);
-</span><span class='line'>};</span></code></pre></td></tr></table></div></figure>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class AppClient : public wxClient
-</span><span class='line'>{
-</span><span class='line'>public:
-</span><span class='line'>    virtual wxConnectionBase* OnMakeConnection();
-</span><span class='line'>};</span></code></pre></td></tr></table></div></figure>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>class AppConnection : public wxConnection
-</span><span class='line'>{
-</span><span class='line'>public:
-</span><span class='line'>    virtual bool OnExecute(const wxString& WXUNUSED(topic), wxChar* WXUNUSED(data),
-</span><span class='line'>                          int WXUNUSED(size), wxIPCFormat WXUNUSED(format));
-</span><span class='line'>};</span></code></pre></td></tr></table></div></figure>
-
-<p>当有新的实例（作为Client）进行连接请求时，旧的实例（作为Server）中的OnAcceptConnection函数首先检查旧的实例中没有任何模式对话框。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>wxConnectionBase* AppServer::OnAcceptConnection(const wxString& topic)
-</span><span class='line'>{
-</span><span class='line'>    if (topic.Lower() == wxT("only-one"))
-</span><span class='line'>    {
-</span><span class='line'>        wxWindowList::Node* node = wxTopLevelWindows.GetFirst();
-</span><span class='line'>        while (node)
-</span><span class='line'>        {
-</span><span class='line'>            wxDialog* dialog = wxDynamicCast(node-&gt;GetData(), wxDialog);
-</span><span class='line'>            if (dialog && dialog-&gt;IsModal())
-</span><span class='line'>            {
-</span><span class='line'>                return false;
-</span><span class='line'>            }
-</span><span class='line'>            node = node-&gt;GetNext();
-</span><span class='line'>        }
-</span><span class='line'>        return new AppConnection();
-</span><span class='line'>    }
-</span><span class='line'>    else
-</span><span class='line'>    {
-</span><span class='line'>        return NULL;
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>OnExecute函数是一个回调函数，在新的实例对其连接对象（由AppConnection创建的对象）调用Execute函数时被调用。OnExecute函数可以有一个空的参数，这表示它只要将自己提到前台就可以了。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>bool AppConnection::OnExecute(const wxString& WXUNUSED(topic), wxChar* WXUNUSED(data),
-</span><span class='line'>                              int WXUNUSED(size), wxIPCFormat WXUNUSED(format))
-</span><span class='line'>{
-</span><span class='line'>    wxFrame* frame = wxDynamicCast(wxGetApp().GetTopWindow(), wxFrame);
-</span><span class='line'>    if (frame)
-</span><span class='line'>    {
-</span><span class='line'>        frame-&gt;Restore();    // 必须要有这句，不然当主窗口最小化时，就不能被提到前台
-</span><span class='line'>        frame-&gt;Raise();
-</span><span class='line'>    }
-</span><span class='line'>    return true;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>接下来我们还需要修改OnInit()函数。当没有别的实例在运行时，这个实例需要将自己设置为Server，等待别的实例的连接请求，如果已经有实例在运行，那么就创建一个和那个实例的连接，请求那个实例将程序的主窗口提到前台。下面的修改后的代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>bool MainApp::OnInit()
-</span><span class='line'>{
-</span><span class='line'>    wxString name = wxString::Format(wxT("MainApp-%s"), wxGetUserId().GetData());
-</span><span class='line'>    m_checker = new wxSingleInstanceChecker(name);
-</span><span class='line'>    if (!m_checker-&gt;IsAnotherRunning())
-</span><span class='line'>    {
-</span><span class='line'>        m_server = new AppServer();
-</span><span class='line'>        if (!m_server-&gt;Create(wxT("wxMainApp")))
-</span><span class='line'>        {
-</span><span class='line'>            wxLogDebug(wxT("Failed to create an IPC service."));
-</span><span class='line'>            return false;
-</span><span class='line'>        }
-</span><span class='line'>    }
-</span><span class='line'>    else
-</span><span class='line'>    {
-</span><span class='line'>        AppClient* client = new AppClient();
-</span><span class='line'>        wxString hostName = wxT("localhost");
-</span><span class='line'>        wxConnectionBase* conn = client-&gt;MakeConnection(hostName, wxT("wxMainApp"), wxT("only-one"));
-</span><span class='line'>        if (conn)
-</span><span class='line'>        {
-</span><span class='line'>            conn-&gt;Execute(wxEmptyString);
-</span><span class='line'>            conn-&gt;Disconnect();
-</span><span class='line'>            delete conn;
-</span><span class='line'>        }
-</span><span class='line'>        else
-</span><span class='line'>        {
-</span><span class='line'>            wxString msg = wxT("Sorry, the existing instance may be too busy to respond.\nPlease close any open dialogs and retry.");
-</span><span class='line'>            wxMessageBox(msg, wxT("wxMainApp"), wxICON_INFORMATION | wxOK);
-</span><span class='line'>        }
-</span><span class='line'>        delete client;    // 如果没有这句，在运行Debug版本时就会显示如下图的警告
-</span><span class='line'>        return false;
-</span><span class='line'>    }
-</span><span class='line'>    // more initializations
-</span><span class='line'>    return true;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p><img src="/uploads/wxdde-alert.png" alt="wxdde-alert"></p>
-
-<p>释放实例资源</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>int MainApp::OnExit()
-</span><span class='line'>{
-</span><span class='line'>    delete m_checker;
-</span><span class='line'>    delete m_server;
-</span><span class='line'>    return 0;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>遇到的问题：</p>
-
-<p>1、调用wxGetApp时编译错误</p>
-
-<p>在调用wxGetApp()时可能会有编译错误，提示说“identifier not found”。这可以通过在App类后加上一行DECLARE_APP(XXXApp)来解决。</p>
-
-<p>2、引入ipc.h和wx.h时的顺序问题</p>
-
-<p>运行第二个实例的时候，发现它总是会挂起在MakeConnection处，查看进程可以看到有两个实例在运行。在网上找了n久，只在wxWidgets Forum上发现有提到这个问题（<a href="http://wxforum.shadonet.com/viewtopic.php?t=4367&highlight=makeconnection">Windows service using wxWidgets ipc</a>），可是也没有提到如何解决。只能靠自己啦，经过对程序的一步步排除，终于发现是因为引入头文件时将ipc.h放在wx.h之前的原因，掉换引入头文件的顺序后问题被解决。</p>
-
-<p><a href="/uploads/wxSingleton.zip" title="wxSingleton.zip">代码下载</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/sms-split-algorithm/">短信分拆算法</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2007-11-22T21:34:47+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2007</span></span> <span class='time'>9:34 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>今天，突然心血来潮，写了一段分拆短信的代码。代码如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class SMSHelper {
-</span><span class='line'>    private static final int SMS_MAX_LENGTH = 70;
-</span><span class='line'>
-</span><span class='line'>    public static List split(String msg) {
-</span><span class='line'>        if (msg.length() &lt;= SMS_MAX_LENGTH) {
-</span><span class='line'>            throw new IllegalArgumentException("被分拆的短信长度必须大于70个字符");
-</span><span class='line'>        }
-</span><span class='line'>
-</span><span class='line'>        List&lt;String&gt; list = new ArrayList&lt;String&gt;();
-</span><span class='line'>        int i = 0, start = 0;
-</span><span class='line'>        while (true) {
-</span><span class='line'>            i++;
-</span><span class='line'>            String prompt = "(第" + i + "条)";
-</span><span class='line'>            int remain = SMS_MAX_LENGTH - prompt.length();
-</span><span class='line'>            if (start + remain &gt; msg.length()) {
-</span><span class='line'>                list.add(prompt + msg.substring(start));
-</span><span class='line'>                break;
-</span><span class='line'>            }
-</span><span class='line'>            list.add(prompt + msg.substring(start, start + remain));
-</span><span class='line'>            start += remain;
-</span><span class='line'>        }
-</span><span class='line'>        return list;
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
   
   
     <article>
@@ -524,7 +165,7 @@
 
 <p>不同的进度条行为在用户感知进度持续时间上似乎有显著影响。通过最小化负面行为和结合正面行为，可以有效地使进度条及其相关过程看起来更快。此外，如果一个多阶段操作的元素可以被重新排列，它可能会用更令人满意和似乎更快的序列重新排序阶段。</p>
 
-<h3 id="未来工作">未来工作</h3>
+<h3 id="未来的工作">未来的工作</h3>
 
 <p>在此次实验中，所有进度条在5.5秒内完成。然而许多使用进度条的操作有相当长的运行时。如果我们的发现扩展到其它持续时间，调查研究应该会很有趣。此外，其它进度行为和行为组合的研究可能揭示新的感知影响。同时，一个自适应实验可以被进行，在此实验中，单独的进度条时间将被动态调整到所有函数在持续时间上被认为相等的一个状态。这将允许相关感知的变体被定量评估。</p>
 </div>
@@ -1454,6 +1095,97 @@
 
     </article>
   
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/union-lotto-simulation-ernie/">双色球（Union Lotto）模拟摇奖器</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-05-30T18:26:49+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>30</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>6:26 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>双色球基本规则：</p>
+
+<ol>
+<li>彩票投注区分为红色球号码区和蓝色球号码区；</li>
+<li>每注投注号码由6个红色球号码和1个蓝色球号码组成。红色球号码从1-33中选择；蓝色球号码从1-16中选择；</li>
+<li>摇奖时先摇出6个红色球号码，再摇出1个蓝色球号码，摇出的红色球号码按从小到大的顺序和蓝色球号码一起公布。</li>
+</ol>
+
+<p>双色球模拟摇奖器代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># union_lotto.rb
+</span><span class='line'>red_balls = Array.new(33) {|i| i + 1}
+</span><span class='line'>blue_balls = Array.new(16) {|i| i + 1}
+</span><span class='line'>1.upto(6) do
+</span><span class='line'>  print red_balls.delete_at(rand(red_balls.length)), ' '
+</span><span class='line'>end
+</span><span class='line'>puts '- ' + blue_balls.delete_at(rand(blue_balls.length)).to_s</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/cannot-delete-or-update-a-parent-row-a-foreign-key-constraint-fails/">Cannot delete or update a parent row: a foreign key constraint fails</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-05-17T20:08:03+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>17</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>8:08 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在SQLyog中Import Data或Empty Table时，出现：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Error No. 1451
+</span><span class='line'>Cannot delete or update a parent row: a foreign key constraint fails</span></code></pre></td></tr></table></div></figure>
+
+<p>查看官方文档<a href="http://dev.mysql.com/doc/refman/5.0/en/innodb-foreign-key-constraints.html">Setting FOREIGN_KEY_CHECKS to 0 can also be useful for ignoring foreign key constraints during LOAD DATA and ALTER TABLE operations.</a>知道这可能是MySQL在InnoDB中设置了foreign key关联，造成无法更新或删除数据。可以通过设置FOREIGN_KEY_CHECKS变量来避免这种情况。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SET FOREIGN_KEY_CHECKS = 0;</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
   <div class="pagination">
     
       <a class="prev" href="/posts/26">&larr; Older</a>
@@ -1471,6 +1203,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/rnn-effectiveness/">循环神经网络不可思议的效用</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/how-to-verify-mailbox-exist/">如何验证邮箱是否存在？</a>
       </li>
     
@@ -1486,10 +1222,6 @@
         <a href="/blog/crawl-novel-with-scrapy-part4/">使用Scrapy爬取小说（4）</a>
       </li>
     
-      <li class="post">
-        <a href="/blog/crawl-novel-with-scrapy-part3/">使用Scrapy爬取小说（3）</a>
-      </li>
-    
   </ul>
 </section>
 <section>
@@ -1503,7 +1235,7 @@
   <ul class="tag-cloud">
     <a style="font-size: 140%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 133%" href="/tags/android/">Android</a>
+<a style="font-size: 131%" href="/tags/android/">Android</a>
 <a style="font-size: 96%" href="/tags/c-plus-plus/">C++</a>
 <a style="font-size: 106%" href="/tags/css/">CSS</a>
 <a style="font-size: 91%" href="/tags/crack/">Crack</a>
@@ -1524,7 +1256,7 @@
 <a style="font-size: 96%" href="/tags/scrapy/">Scrapy</a>
 <a style="font-size: 91%" href="/tags/spring/">Spring</a>
 <a style="font-size: 100%" href="/tags/struts/">Struts</a>
-<a style="font-size: 145%" href="/tags/translation/">Translation</a>
+<a style="font-size: 146%" href="/tags/translation/">Translation</a>
 <a style="font-size: 96%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 106%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 106%" href="/tags/wxwidgets/">wxWidgets</a>
@@ -1585,7 +1317,7 @@
     </div>
   </div>
   <footer role="contentinfo"><p>
-  Copyright &copy; 2017 - dohkoos -
+  Copyright &copy; 2018 - dohkoos -
   <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
 </p>
 

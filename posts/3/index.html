@@ -9,7 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="lookahead 前导符 现在我们已经对ANTLR语法分析器生成的消息种类以及如何调整和重定向它们有很好的了解，让我们来探讨错误恢复。 自动错误恢复策略 错误恢复是允许语法分析器找到语法错误后还能继续的东西。ANTLR的错误恢复机制是：如果可能的话， &hellip;">
+  <meta name="description" content="有时我们在调试语法时需要ANTLR提供更好的消息提示，为达到这个目的，我们可以改变ANTLR的标准错误报告。 改变和重定向ANTLR错误消息 默认情况下，ANTLR把所有的错误发送给标准错误，但我们可以通过提供ANTLRErrorListener接口的实现来修改目标和内容。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,393 +73,6 @@
     <div id="content">
       <div class="blog-index">
   
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part31/">ANTLR 4权威参考读书笔记（31）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-11-12T14:21:50+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>2:21 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><ul>
-<li>lookahead 前导符</li>
-</ul>
-
-<p>现在我们已经对ANTLR语法分析器生成的消息种类以及如何调整和重定向它们有很好的了解，让我们来探讨错误恢复。</p>
-
-<h3 id="自动错误恢复策略">自动错误恢复策略</h3>
-
-<p>错误恢复是允许语法分析器找到语法错误后还能继续的东西。ANTLR的错误恢复机制是：如果可能的话，语法分析器在不匹配的记号错误上执行单次记号插入和单次记号删除。如果不能，语法分析器会吞掉记号直到它找到可以合理遵循当前规则的记号然后返回它，继续下去，就好像什么事都没发生。在本节中，我们将探讨ANTLR如何在各种情况下从错误中恢复。让我们从ANTLR使用的基本恢复策略开始。</p>
-
-<h4 id="通过扫描后续记号恢复">通过扫描后续记号恢复</h4>
-
-<p>当真正面对残缺的输入时，当前规则不能继续，因此语法分析器通过吞掉记号来恢复，直到它认为它已经重新同步然后返回到调用规则。我们可以称之为“同步和返回策略”。有些人称它是“恐慌模式”，但它工作的非常好。语法分析器知道它不能用当前规则匹配当前输入。它只能抛出记号直到前导符与语法分析器退出规则后应该匹配的内容一致。例如，如果在赋值语句中有个语法错误，在语法分析器看到分号或其它语句终结符之前抛出记号是非常有意义的。激烈但有效。正如我们将看到的，ANTLR试图在规则中恢复，然后在撤回到这个基本策略。</p>
-
-<p>每个ANTLR生成的规则方法都被包裹在try-catch中，通过报告错误并在返回之前尝试恢复来响应语法错误。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>try {
-</span><span class='line'>    ...
-</span><span class='line'>} catch (RecognitionException re) {
-</span><span class='line'>    _errHandler.reportError(this, re);
-</span><span class='line'>    _errHandler.recover(this, re);
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>在这里，recover()会消费记号直到它在重新同步集合中找到记号。重新同步集合是所有调用栈上的规则的规则引用跟随集合的并集。规则引用的跟随集合是可以立即匹配引用而无需离开当前规则的跟随引用的记号集合。例如，选项<code>assign &#39;;&#39;</code>，规则引用assign的跟随集合是{&#39;;&#39;}。如果选项仅仅是assign，它的跟随集合就为空。</p>
-
-<p>让我们通过示例来看看重新同步集合中包含什么。考虑以下语法，并设想在每个规则调用中，语法分析器跟踪每个规则调用的跟随集合。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>// Filename: F.g
-</span><span class='line'>
-</span><span class='line'>grammar F;
-</span><span class='line'>
-</span><span class='line'>group
-</span><span class='line'>    : '[' expr ']'      // Tokens following ref to expr: {']'}
-</span><span class='line'>    | '(' expr ')'      // Tokens following ref to expr: {')'}
-</span><span class='line'>    ;
-</span><span class='line'>expr: atom '^' INT ;    // Tokens following ref to atom: {'^'}
-</span><span class='line'>atom: ID
-</span><span class='line'>    | INT
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>INT : [0-9]+ ;
-</span><span class='line'>ID  : [a-zA-Z]+ ;
-</span><span class='line'>WS  : [ \t\r\n]+ -&gt; skip ;</span></code></pre></td></tr></table></div></figure>
-
-<p>对于输入<code>[1^2]</code>，考虑下图中左边的语法分析树：</p>
-
-<p><img src="/uploads/syntax-parse-tree.png" alt="syntax-parse-tree"></p>
-
-<p>当在规则atom中匹配记号1时，调用栈是[group, expr, atom]（group调用expr，expr调用atom）。通过查看调用栈，我们可以准确地知道记号集合可以跟随语法分析器调用的任何规则，以便把我们带到当前位置。在当前规则中跟随集合只考虑记号，以至在运行时，我们可以只组合与当前调用栈有关系的集合。换句话说，我们不能同时从group的所有选项到达规则expr。</p>
-
-<p>结合从语法F中的注释里提取的跟随集合，我们得到一个重新同步集合<code>{&#39;^&#39;, &#39;]&#39;}</code>。为什么这是我们想要的，让我们观察当语法分析器遇到错误的输入<code>[]</code>时会发生什么。我们得到上图中显示在右边的语法分析树。在规则atom中，语法分析器发现当前记号<code>]</code>不符合atom的任何选项。要想重新同步，语法分析器需要消费记号直到它在重新同步集合找到记号。在这种情况下，当前记号<code>]</code>作为重新同步集合的成员开始，所以语法分析器不会消费任何记号以便在atom中重新同步。</p>
-
-<p>在规则atom中完成恢复过程之后，语法分析器回到规则expr但是立刻发现它没有<code>^</code>记号。重复同样的过程，语法分析器消费记号直到它在重新同步集合找到记号。expr的重新同步集合是在group的第一个选项中的expr引用的跟随集合：<code>{ &#39;]&#39; }</code>。再次，语法分析器不消费任何东西并退出expr，回到规则group的第一个选项。现在，跟随着expr的引用，语法分析器明确知道它在寻找什么。它成功地匹配规则group中的<code>&#39;]&#39;</code>。语法分析器现在已经正确地同步。</p>
-
-<p>在恢复期间，ANTLR语法分析器避免发出级联错误消息。也就是说，语法分析器为每个语法错误发出单独的错误消息，直到它们从该错误成功地恢复。通过使用一个简单的布尔变量，设置语法错误，语法分析器避免发出更多的错误，直到语法分析器成功匹配记号和重置变量。</p>
-
-<p>在许多情况下，ANTLR可以比单纯消费更智能地恢复，直到重新同步集合并从当前规则返回。尝试“修复”输入并在相同的规则内继续是值得的。在接下来的几个部分，我们将看看语法分析器如何从不匹配的记号以及子规则里的错误中恢复。</p>
-
-<h4 id="从不匹配记号中恢复">从不匹配记号中恢复</h4>
-
-<p>在语法分析过程中最常见的操作之一是“匹配记号”。对于语法中的每个记号引用T，语法分析器调用match(T)。如果当前的记号不是T，match()通知错误监听器并尝试重新同步。要重新同步，它有3个选择。它可以删除一个记号，它可以想象出一个，或者可以放弃并抛出异常以便从事基本的同步和返回机制。</p>
-
-<p>如果这样做有意义的话，删除当前记号是最容易去重新同步的方法。让我们再次讨论来自在语法Simple中的简单类定义语言的规则classDef。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>classDef
-</span><span class='line'>    : 'class' ID '{' member+ '}'    // a class has one or more members
-</span><span class='line'>      { System.out.println("class " + $ID.text); }
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<p>给定输入<code>class 9 T {int i; }</code>，语法分析器将删除9并继续在规则中进行来匹配类体。下图说明了语法分析器消费class后的输入状态：</p>
-
-<p><img src="/uploads/input-state-1.png" alt="input-state-1"></p>
-
-<p>LA(1)和LA(2)记号前导符号的第一个记号（当前记号）和第二个记号。match(ID)期望LA(1)是一个ID，但它不是。实际上，下一个记号LA(2)才是一个ID。为了恢复分析，我们只需要删除当前记号，消费我们期望的ID并退出match()。</p>
-
-<p>如果语法分析器无法通过删除记号重新同步，则会尝试插入一个记号作为代替。假设我们忘记了ID，以致classDef看到输入<code>class { int i; }</code>。匹配class后，输入状态如下所示：</p>
-
-<p><img src="/uploads/input-state-2.png" alt="input-state-2"></p>
-
-<p>语法分析器调用match(ID)后发现是{。在这种情况下，语法分析器知道{是下一步需要的记号，因为它在classDef中跟随ID引用。要重新同步，match()可以假装看到标识符并返回，从而允许下一个match(&#39;{&#39;)调用成功。</p>
-
-<p>如果我们忽略嵌入动作（如引用类名标识符的print语句），那么这很有用。print语句通过$ID.text引用缺失的记号，如果记号为空，将导致异常。而不是简单地假装记号存在，由错误处理程序想象出一个。这个想象出的记号有语法分析器期望的记号类型以及从当前输入记号LA(1)中获得的行和字符的位置信息。这个想象出的记号也用于阻止在监听器和访问者中引用缺失记号的异常。</p>
-
-<p>看看发生了什么的最简单的方法是查看语法分析树，它显示语法分析器如何识别所有记号。在出现错误的情况下，
-语法分析树用红色突出显示在重新同步期间语法分析器删除或想象出的记号。对于输入<code>class { int i; }</code>和语法Simple，我们得到以下的语法分析树：</p>
-
-<p><img src="/uploads/error-parse-tree.png" alt="error-parse-tree"></p>
-
-<p>语法分析器也会执行嵌入print动作而不抛出异常，因为错误恢复会为$ID想象出一个有效的Token对象。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>$ grun Simple prog -gui
-</span><span class='line'>class { int i; }
-</span><span class='line'>EOF
-</span><span class='line'>line 1:6 missing ID at '{'
-</span><span class='line'>var i
-</span><span class='line'>class &lt;missing ID&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>当然，带有文本<code>&lt;missing ID&gt;</code>的标识符对于任何我们试图完成的目标都不是很有用，但至少错误恢复不会导致一堆空指针异常。现在我们知道ANTLR如何对简单的记号引用进行规则内恢复，下面让我们来探讨如何从以前和子规则识别期间的错误中恢复。</p>
-
-<h4 id="从子规则的错误中恢复">从子规则的错误中恢复</h4>
-
-<p>为避免刚碰到错误就从子规则循环中抽身，对周围规则强制同步和返回恢复，ANTLR v4会在开始和循环继续测试处自动插入同步检查。机制看起来是这样：</p>
-
-<p><em>子规则开始</em> 在任何子规则的开头，语法分析器尝试单个记号删除。但是，与记号匹配不同，语法分析器不会尝试单个记号插入。ANTLR很难想象出一个记号，因为它将不得不猜测几个选项中的哪个最终会成功。</p>
-
-<p><em>循环子规则继续测试</em> 如果子规则是循环结构，<code>(...)*</code>或者<code>(...)+</code>，语法分析器在错误出现时积极尝试恢复以停留在循环中。在成功匹配循环的某个选项后，语法分析器消费直到它找到符合以下这些集合之一的记号：</p>
-
-<ol>
-<li>循环的另个迭代</li>
-<li>循环后面的</li>
-<li>当前的重新同步集合</li>
-</ol>
-
-<p>让我们先来看下子规则前的单个符号删除。考虑规则classDef中的<code>member+</code>循环结构。如果我们不小心输入一个额外的<code>{</code>，<code>member+</code>子规则在跳进member前将会删除这个额外的记号，就像下面语法分析树显示的那样：</p>
-
-<p><img src="/uploads/member-parse-tree.png" alt="member-parse-tree"></p>
-
-<p>以下的会话可以证实恢复是妥当的，因为它能正确地识别变量i：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>$ grun Simple prog
-</span><span class='line'>class T { { int i; }
-</span><span class='line'>EOF
-</span><span class='line'>line 1:9 extraneous input '{' expecting 'int'
-</span><span class='line'>var i
-</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
-
-<p>现在让我们尝试一些真正混乱的输入，看看<code>member+</code>循环能否恢复并继续寻找member。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>$ grun Simple prog
-</span><span class='line'>class T { {
-</span><span class='line'>  int x;
-</span><span class='line'>  y;;;
-</span><span class='line'>  int z;
-</span><span class='line'>}
-</span><span class='line'>EOF
-</span><span class='line'>line 1:9 extraneous input '{' expecting 'int'
-</span><span class='line'>var x
-</span><span class='line'>line 3:2 extraneous input 'y' expecting {'int', '}'}
-</span><span class='line'>var z
-</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
-
-<p>语法分析器重新同步并停留在循环中是因为它确定了变量z。语法分析器消费<code>y;;;</code>直到看到另一个成员的开始（就如前面所说的集合3），然后循环回到member。如果输入不包含<code>int z</code>，语法分析器会一直消费下去直到看到<code>}</code>（前面的集合2）并退出循环。语法分析树突出显示已被删除的记号并说明语法分析器仍然把<code>int z;</code>解释为有效的成员。</p>
-
-<p><img src="/uploads/parse-tree-10.png" alt="parse-tree-10"></p>
-
-<p>如果提供的规则member有语法错误并且没有<code>}</code>，在语法分析器找到<code>}</code>之前我们不希望它进行扫描。语法分析器重新同步可以为查找<code>}</code>抛出整个下面的类定义。相反，语法分析器如果看到集合3中的记号会停止消费，就如同下面的会话那样：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>$ grun Simple prog
-</span><span class='line'>class T {
-</span><span class='line'>  int x;
-</span><span class='line'>  ;
-</span><span class='line'>class U { int y; }
-</span><span class='line'>EOF
-</span><span class='line'>var x
-</span><span class='line'>line 3:2 extraneous input ';' expecting {'int', '}'}
-</span><span class='line'>class T
-</span><span class='line'>var y
-</span><span class='line'>class U</span></code></pre></td></tr></table></div></figure>
-
-<p>如我们所见，语法分析器在看到关键字class时会停止从语法分析树重新同步。</p>
-
-<p><img src="/uploads/parse-tree-11.png" alt="parse-tree-11"></p>
-
-<p>除了记号和子规则的识别之外，语法分析器也可能无法匹配语义谓词。</p>
-
-<h4 id="捕捉失败的语义谓词">捕捉失败的语义谓词</h4>
-
-<p>语义谓词就像断言，它指定在运行时必须为真的条件以便让语法分析器通过它们。如果谓词评估为假，则语法分析器将抛出FailedPredicateException异常，被当前规则的catch所捕获。语法分析器报告错误，并进行通用的同步和返回恢复。</p>
-
-<p>让我们来看一个使用语义谓词限制矢量中的整数数量的例子，规则ints匹配max整数。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>vec4: '[' ints[4] ']' ;
-</span><span class='line'>ints[int max]
-</span><span class='line'>locals [int i=1]
-</span><span class='line'>    : INT ( ',' { $i++; } { $i&lt;=$max }? INT )*
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<p>如果像下面的会话那样，给定一个太多整数的矢量，我们会看到错误消息并得到抛出额外逗号和整数的错误恢复：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>$ antlr Vec.g
-</span><span class='line'>$ compile Vec
-</span><span class='line'>$ grun Vec vec4
-</span><span class='line'>[1,2,3,4,5,6]
-</span><span class='line'>EOF
-</span><span class='line'>line 1:9 rule ints failed predicate: { $i&lt;=$max }?</span></code></pre></td></tr></table></div></figure>
-
-<p>语法分析树显示语法分析器在第5个整数处检测到错误。</p>
-
-<p><img src="/uploads/parse-tree-12.png" alt="parse-tree-12"></p>
-
-<p>错误消息<code>{ $i &lt;= $max }</code>可能对作为文法设计者的我们有帮助，但对我们的用户肯定没有帮助。我们可以通过使用语义谓词上的失败选项把消息变得更加可读。例如，下面是带有计算可读字符串动作的ints规则：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ints[int max]
-</span><span class='line'>locals [int i=1]
-</span><span class='line'>    : INT ( ',' { $i++; } { $i&lt;=$max }?&lt;fail={"exceeded max "+$max}&gt; INT )*
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<p>对于相同的输入，现在我们得到一个更好的消息。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>$ antlr VecMsg.g
-</span><span class='line'>$ compile VecMsg
-</span><span class='line'>$ grun VecMsg vec4
-</span><span class='line'>[1,2,3,4,5,6]
-</span><span class='line'>EOF
-</span><span class='line'>line 1:9 rule ints exceeded max 4</span></code></pre></td></tr></table></div></figure>
-
-<p>fail选项使用在双引号中的字符串字面量或者计算结果是字符串的动作。如果你想在谓词失败时执行一个函数，这个动作是很方便的。只需使用一个调用<code>{...}?&lt;fail={failedMaxTest()}&gt;</code>那样的函数的动作。</p>
-
-<p>谨慎使用语义谓词来测试输入有效性。在向量示例中，谓词强制执行语法规则，所以它可以抛出异常并尝试恢复。另一方面，如果我们有一个语法上有效但语义无效的结构，那么使用语义谓词并不是一个好主意。</p>
-
-<p>想象一下，在某种语言中，我们可以给变量赋除0外的任何值。这意味着赋值语句<code>x = 0;</code>在语法上是有效的，但在语义上是无效的。当然，我们必须向用户发出一个错误，但是我们不应该触发错误恢复。<code>x = 0;</code>在语法上是完全合法的。从某种意义上说，语法分析器会从错误中自动执行“恢复”。这是个简单的语法问题：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>assign
-</span><span class='line'>    : ID '=' v=INT {$v.int&gt;0}? ';'
-</span><span class='line'>      { System.out.println("assign "+$ID.text+" to "); }
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<p>如果规则assign中的谓词抛出异常，则同步和返回行为会在谓词之后抛出<code>;</code>。这可能会进行的很顺利，但我们冒着不完美重新同步的风险。更好的解决办法是手动发出一个出错，并让语法分析器继续匹配正确的语法。所以，我们应该用一个有条件的简单动作而不是谓词。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>{if ($v.int==0) notifyListeners("values must be &gt; 0");}</span></code></pre></td></tr></table></div></figure>
-
-<p>现在我们已经看过所有可能引发错误恢复的情况。现在需要指出这个机制存在潜在的缺陷。鉴于语法分析器有时在单次恢复尝试期间不消费任何记号，整体恢复可能会陷入无限循环。如果我们能够不消费记号而恢复并回到语法分析器中的相同位置，我们可以再次恢复而不消费记号。在下一节中，我们将会显示ANTLR如何避免这个陷阱。</p>
-
-<h4 id="错误恢复的失效保护">错误恢复的失效保护</h4>
-
-<p>ANTLR语法分析器具有内置的失效保护，以保证错误恢复终止。如果我们到达相同的语法分析器位置并具有相同的输入位置，语法分析器在尝试恢复之前会强制消费一个记号。现在让我们来看一个失效保护的例子。如果我们在字段定义中添加一个额外的int记号，语法分析器检测到错误并尝试恢复。就像我们将在下个测试中看到的那样，语法分析器将调用recover()并在正确重新同步前尝试重新分析多次。</p>
-
-<p><img src="/uploads/parser-resynchronization.png" alt="parser-resynchronization"></p>
-
-<p>右边的语法分析树显示从classDef到member有3次调用。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>$ grun Simple prog
-</span><span class='line'>class T {
-</span><span class='line'>  int int x;
-</span><span class='line'>}
-</span><span class='line'>EOF
-</span><span class='line'>line 2:6 no viable alternative at input 'intint'
-</span><span class='line'>var x
-</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
-
-<p>第一个引用不匹配任何东西，但第二个引用匹配没有直接联系的int记号。匹配member的第三次尝试匹配正确的<code>int x;</code>序列。</p>
-
-<p>我们来看一下事件的确切顺序。当语法分析器检测到第一个错误时它在规则member中。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>member
-</span><span class='line'>    : 'int' ID ';'                          // field definition
-</span><span class='line'>      { System.out.println("var "+$ID.text); }
-</span><span class='line'>    | 'int' f=ID '(' ID ')' '{' stat '}'    // method definition
-</span><span class='line'>      { System.out.println("method: "+$f.text); }
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<p>输入<code>int int</code>不适合member的任何选项，所以语法分析器参与同步并返回错误恢复策略。它发出第一个错误信息然后消费记号，直到它在调用栈<code>[prog, classDef, member]</code>的重新同步集合中看到记号为止。</p>
-
-<p>由于语法中的<code>classDef+</code>和<code>member+</code>循环，计算重新同步集合有点复杂。在调用member之后，语法分析器可以循环回去并找到另一个成员，或退出循环并找到关闭类定义的<code>&#39;}&#39;</code>。在调用classDef之后，语法分析器可以循环回去查看另一个类的开始或简单地退出prog。因此对于调用栈<code>[prog, classDef, member]</code>，重新同步集合是<code>{&#39;int&#39;, &#39;}&#39;, &#39;class&#39;}</code>。</p>
-
-<p>在这点上，语法分析器恢复不消费记号，因为当前输入记号int在重新同步集合中。它只是返回到调用者：classDef中的<code>member+</code>循环。然后循环尝试匹配另一个成员。不幸的是，因为它没有消费任何记号，当语法分析器返回到member时它检测到另一个错误（虽然它凭借errorRecovery标志消除了虚假错误消息）。</p>
-
-<p>在第2次错误的恢复过程中，语法分析器触发失效保护，因为它已经到达相同的语法分析器位置和输入位置。失效保护在尝试重新同步之前强制记号消费。由于int是在重新同步集合中，它不会消费第2个记号。幸运的是，这正是我们想要的，因为语法分析器现在是正确地同步的。接下来的3个记号表示一个有效的成员定义：<code>int x;</code>。语法分析器再次从member返回到classDef中的循环。第3次，我们回到member，但现在语法分析将会成功。</p>
-</div>
-  
-  
-
-
-    </article>
   
   
     <article>
@@ -2691,6 +2304,123 @@
 
     </article>
   
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/how-to-create-effective-icons/">如何创建有效的图标</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-08-06T12:43:17+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>6</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>12:43 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>英文原文：<a href="http://www.awwwards.com/how-to-create-effective-icons.html">http://www.awwwards.com/how-to-create-effective-icons.html</a></p>
+
+<p>我可能就是你所说的图标爱好者。我喜欢图标，而且我更加喜欢制作它们！作为一个艺术家，我的背景在很大程度上是绘画——我喜欢绘画，并且我已经画了一辈子（甚至远远早于我知道什么是图形设计）。我想，这是我理解创建图标的一个关键。绘画教你看——然后把你所看到的转化成纸上的线条和图形——而这正是如何创建有效的图标。</p>
+
+<h3 id="几何图形">几何图形</h3>
+
+<p>因此，对初学者而言，基本上任何东西都可以用这四种图形组合而成：</p>
+
+<p><img src="/uploads/effective-icons-1.png" alt="effective-icons-1"></p>
+
+<p>当我想把某事物转换成一个图标时，我观察它然后尽可能地将其拆分为最简单的图形。例如，水滴可以用一个三角形和一个圆形组成。</p>
+
+<p><img src="/uploads/effective-icons-2.png" alt="effective-icons-2"></p>
+
+<p>心形图标可以由两个圆形和一个三角形构成。</p>
+
+<p><img src="/uploads/effective-icons-3.png" alt="effective-icons-3"></p>
+
+<p>我每次都是在Adobe Illustrator中创建这些图形。使用矢量图形可以让我控制线条的粗细，以及图形和其锚点的相互作用。Illustrator也可以让我自由地把线条转换成图形，反之亦然。这一切也许看起来十分基础，但它是我用于创建最复杂图标的同样的方法。下面是我最近在做的一个略微更加复杂些的《权利法案》图标的示例，在这里我应用了同样的原则。</p>
+
+<p><img src="/uploads/effective-icons-4.png" alt="effective-icons-4"></p>
+
+<h3 id="界面图标">界面图标</h3>
+
+<p>我最近有机会为一款超赞的iPhone应用Parker Planner制作一组图标。我很喜欢做这个项目，这个项目其中最重要的一个方面是创建一组易懂的、私有的、实用的和美观的用户界面图标，可以帮助用户浏览操作这款略微复杂的计划应用。</p>
+
+<p><img src="/uploads/effective-icons-5.png" alt="effective-icons-5"></p>
+
+<p>让我们选取这些图标的其中之一分解看看我如何创建它。例如，垃圾桶图标是由三个圆角矩形和三条线构成。</p>
+
+<p>1、选择圆角矩形工具。</p>
+
+<p><img src="/uploads/effective-icons-6.png" alt="effective-icons-6"></p>
+
+<p>2、拖动出一个图形。</p>
+
+<p><img src="/uploads/effective-icons-7.png" alt="effective-icons-7"></p>
+
+<p>3、调整笔划宽度直到你满意。</p>
+
+<p><img src="/uploads/effective-icons-8.png" alt="effective-icons-8"></p>
+
+<p>我通常选择在整组图标中使用一到两种笔划宽度。</p>
+
+<p><img src="/uploads/effective-icons-9.png" alt="effective-icons-9"></p>
+
+<p>这使它们看起来更一致和感觉更有整体性。</p>
+
+<p>4、用另一个圆角矩形创建盖子。</p>
+
+<p><img src="/uploads/effective-icons-10.png" alt="effective-icons-10"></p>
+
+<p>5、再一个圆角矩形创建盖子的把手。</p>
+
+<p><img src="/uploads/effective-icons-11.png" alt="effective-icons-11"></p>
+
+<p>6、擦除圆角矩形的下半部分。</p>
+
+<p><img src="/uploads/effective-icons-12.png" alt="effective-icons-12"></p>
+
+<p>7、现在，通过添加三条竖线到桶身上给桶添加条纹。</p>
+
+<p><img src="/uploads/effective-icons-13.png" alt="effective-icons-13"></p>
+
+<p>8、然后你就获得了它！一个垃圾桶图标……如果你喜欢，你可以用颜色或线条宽度做进一步调整。</p>
+
+<p><img src="/uploads/effective-icons-14.png" alt="effective-icons-14"></p>
+
+<p>我在创建图标时经常使用的一些其它真正有用的工具是Pathfinder，我使用它来剪切、连接和挖空图形。</p>
+
+<p><img src="/uploads/effective-icons-15.png" alt="effective-icons-15"></p>
+
+<p>Stroke/Fill工具，它帮助你将图形在填满和笔划间切换。</p>
+
+<p><img src="/uploads/effective-icons-16.png" alt="effective-icons-16"></p>
+
+<p>以及我非常喜欢的工具Stroke Panel，它帮助你将拐角和线的末端从直角转换到圆角。</p>
+
+<p><img src="/uploads/effective-icons-17.png" alt="effective-icons-17"></p>
+
+<p>当我完成一组图标，我通常将它们全体紧挨着排成一排，看看是否有哪个看起来很奇怪或不到位。然后我会做任何必要的修改。</p>
+
+<p><img src="/uploads/effective-icons-18.png" alt="effective-icons-18"></p>
+
+<p>最后，我总是在应用中测试它们以确保它们感觉正确和功能良好。</p>
+
+<p><img src="/uploads/effective-icons-19.png" alt="effective-icons-19"></p>
+
+<p>最终，我想说创建优秀图标的方法不仅仅是学习Illustrator技巧，尽管它们也是必需的。最好的做法是练习把你周围看到的事物分解成简单图形。你在这点上越是变得更好，你越是能够成为更高超的图标设计师！加油！</p>
+</div>
+  
+  
+
+
+    </article>
+  
   <div class="pagination">
     
       <a class="prev" href="/posts/4">&larr; Older</a>
@@ -2708,6 +2438,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/rnn-effectiveness/">循环神经网络不可思议的效用</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/how-to-verify-mailbox-exist/">如何验证邮箱是否存在？</a>
       </li>
     
@@ -2723,10 +2457,6 @@
         <a href="/blog/crawl-novel-with-scrapy-part4/">使用Scrapy爬取小说（4）</a>
       </li>
     
-      <li class="post">
-        <a href="/blog/crawl-novel-with-scrapy-part3/">使用Scrapy爬取小说（3）</a>
-      </li>
-    
   </ul>
 </section>
 <section>
@@ -2740,7 +2470,7 @@
   <ul class="tag-cloud">
     <a style="font-size: 140%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 133%" href="/tags/android/">Android</a>
+<a style="font-size: 131%" href="/tags/android/">Android</a>
 <a style="font-size: 96%" href="/tags/c-plus-plus/">C++</a>
 <a style="font-size: 106%" href="/tags/css/">CSS</a>
 <a style="font-size: 91%" href="/tags/crack/">Crack</a>
@@ -2761,7 +2491,7 @@
 <a style="font-size: 96%" href="/tags/scrapy/">Scrapy</a>
 <a style="font-size: 91%" href="/tags/spring/">Spring</a>
 <a style="font-size: 100%" href="/tags/struts/">Struts</a>
-<a style="font-size: 145%" href="/tags/translation/">Translation</a>
+<a style="font-size: 146%" href="/tags/translation/">Translation</a>
 <a style="font-size: 96%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 106%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 106%" href="/tags/wxwidgets/">wxWidgets</a>
@@ -2822,7 +2552,7 @@
     </div>
   </div>
   <footer role="contentinfo"><p>
-  Copyright &copy; 2017 - dohkoos -
+  Copyright &copy; 2018 - dohkoos -
   <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
 </p>
 

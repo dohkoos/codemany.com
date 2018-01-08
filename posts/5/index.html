@@ -9,7 +9,14 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="对于大多数语法而言，注释和空格都是语法分析器可以忽略的东西。如果我们不想让注释和空格在语法中到处都是，那么就需要让词法分析器把它们扔掉。不幸的是，这意味着任何后续的处理步骤都不能再访问注释和空格。保留但忽略注释和空格的秘密是把这些发送给语法分析器的记号放到一个“隐藏通道”中。 &hellip;">
+  <meta name="description" content="在一条街上，有5座房子，喷了5种颜色。
+每座房子里住着不同国籍的人。
+每个人喝不同的饮料，抽不同品牌的香烟，养不同的宠物。 问题是：谁养鱼？ 提示： 英国人住红色房子。
+瑞典人养狗。
+丹麦人喝茶。
+绿色房子在白色房子左面。
+绿色房子主人喝咖啡。
+抽Pall Mall香烟的人养鸟。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,50 +80,6 @@
     <div id="content">
       <div class="blog-index">
   
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part14/">ANTLR 4权威参考读书笔记（14）</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2016-05-16T20:26:22+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>8:26 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>对于大多数语法而言，注释和空格都是语法分析器可以忽略的东西。如果我们不想让注释和空格在语法中到处都是，那么就需要让词法分析器把它们扔掉。不幸的是，这意味着任何后续的处理步骤都不能再访问注释和空格。保留但忽略注释和空格的秘密是把这些发送给语法分析器的记号放到一个“隐藏通道”中。因为语法分析器只能调谐到单个通道，所以我们可以把任何我们想要的东西传递到其它通道中。这里是如何实现的语法：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>COMMENT
-</span><span class='line'>    : '/*' .*? '*/' -&gt; channel(HIDDEN)    // match anything between /* and */
-</span><span class='line'>    ;
-</span><span class='line'>
-</span><span class='line'>WS  : [ \r\t\n]+    -&gt; channel(HIDDEN)
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<p>就像我们前面讨论过的<code>-&gt; skip</code>那样，<code>-&gt; channel(HIDDEN)</code>也是一个词法分析器指令。在这里，它设置那些记号的通道号码以便它们可以被语法分析器忽略。记号流仍然维护着原始的记号序列，但在传递记号给语法分析器时会略过隐藏通道中的记号。</p>
-</div>
-  
-  
-
-
-    </article>
   
   
     <article>
@@ -1353,6 +1316,93 @@ another runner in the night<br>
 
     </article>
   
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/reading-notes-the-definitive-antlr4-reference-part7/">ANTLR 4权威参考读书笔记（7）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2016-03-11T16:42:08+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>11</span><span class='date-suffix'>th</span>, <span class='date-year'>2016</span></span> <span class='time'>4:42 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在<a href="/blog/reading-notes-the-definitive-antlr4-reference-part6/">ANTLR 4权威参考读书笔记（6）</a>中的这些动作仅仅是提取和打印被语法分析器匹配的值，它们并没有改变语法分析器本身。</p>
+
+<p>实际上，动作还可以影响语法分析器如何识别输入短语。这类特殊的动作被称为语义谓词。下面我们会用一个简单的例子来展示语义谓词的强大能力：动态地打开和关闭语法的某个部分。</p>
+
+<h3 id="使用语义谓词改变语法分析">使用语义谓词改变语法分析</h3>
+
+<p>有一个读入整数序列的语法，它的玄机是由输入的部分指定有多少个整数组合在一起，所以我们必须等到运行时才能知道有多少个整数被匹配。这里是示例输入文件idata.txt的内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>2 9 10 3 1 2 3</span></code></pre></td></tr></table></div></figure>
+
+<p>第一个数字表示匹配后续两个数字9和10；紧跟着10的数字3表示匹配接下来的三个数字。我们的目的是设计一个语法IData.g，把9和10组合在一起，把1、2和3组合在一起。在语法上执行下面的命令后显示的语法分析树能够清楚地标识出整数的分组，就像下图显示的那样：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>antlr -no-listener IData.g
+</span><span class='line'>compile *.java
+</span><span class='line'>grun IData file -gui idata.txt</span></code></pre></td></tr></table></div></figure>
+
+<p><img src="/uploads/idata-parse-tree.png" alt="idata-parse-tree"></p>
+
+<p>要达成这个目标，以下语法中的关键是一个被称为语义谓词的布尔值操作：{$i &lt;= $n}?。当谓词计算结果为true时，语法分析器匹配整数直到超过规则参数n要求的数量；当计算结果为false时，谓词让相关的选项从生成的语法分析器中“消失”。
+在这个案例中，值为false的谓词让(...)*循环从规则里终止并返回。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>grammar IData;
+</span><span class='line'>
+</span><span class='line'>file : group+ ;
+</span><span class='line'>
+</span><span class='line'>group: INT sequence[$INT.int] ;
+</span><span class='line'>
+</span><span class='line'>sequence[int n]
+</span><span class='line'>locals [int i=1]
+</span><span class='line'>     : ( {$i &lt;= $n}? INT {$i++;} )*    // match n integers
+</span><span class='line'>     ;
+</span><span class='line'>
+</span><span class='line'>INT  : [0-9]+ ;  // match integers
+</span><span class='line'>WS   : [ \t\n\r]+ -&gt; skip ;    // toss out all whitespace</span></code></pre></td></tr></table></div></figure>
+
+<p>被语法分析器使用的规则sequence的内部语法表示看起来就像下图这样：</p>
+
+<p><img src="/uploads/idata-rule-sequence.png" alt="idata-rule-sequence"></p>
+
+<p>虚线表明谓词可以剪断那条路径，只给语法分析器留下一个选择：退出的路径。</p>
+
+<p>虽然大部分时间我们不需要这样的微管理，但它至少让我们知道我们有这样的武器可以处理病理分析问题。</p>
+</div>
+  
+  
+
+
+    </article>
+  
   <div class="pagination">
     
       <a class="prev" href="/posts/6">&larr; Older</a>
@@ -1370,6 +1420,10 @@ another runner in the night<br>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/rnn-effectiveness/">循环神经网络不可思议的效用</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/how-to-verify-mailbox-exist/">如何验证邮箱是否存在？</a>
       </li>
     
@@ -1385,10 +1439,6 @@ another runner in the night<br>
         <a href="/blog/crawl-novel-with-scrapy-part4/">使用Scrapy爬取小说（4）</a>
       </li>
     
-      <li class="post">
-        <a href="/blog/crawl-novel-with-scrapy-part3/">使用Scrapy爬取小说（3）</a>
-      </li>
-    
   </ul>
 </section>
 <section>
@@ -1402,7 +1452,7 @@ another runner in the night<br>
   <ul class="tag-cloud">
     <a style="font-size: 140%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 133%" href="/tags/android/">Android</a>
+<a style="font-size: 131%" href="/tags/android/">Android</a>
 <a style="font-size: 96%" href="/tags/c-plus-plus/">C++</a>
 <a style="font-size: 106%" href="/tags/css/">CSS</a>
 <a style="font-size: 91%" href="/tags/crack/">Crack</a>
@@ -1423,7 +1473,7 @@ another runner in the night<br>
 <a style="font-size: 96%" href="/tags/scrapy/">Scrapy</a>
 <a style="font-size: 91%" href="/tags/spring/">Spring</a>
 <a style="font-size: 100%" href="/tags/struts/">Struts</a>
-<a style="font-size: 145%" href="/tags/translation/">Translation</a>
+<a style="font-size: 146%" href="/tags/translation/">Translation</a>
 <a style="font-size: 96%" href="/tags/ubuntu/">Ubuntu</a>
 <a style="font-size: 106%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 106%" href="/tags/wxwidgets/">wxWidgets</a>
@@ -1484,7 +1534,7 @@ another runner in the night<br>
     </div>
   </div>
   <footer role="contentinfo"><p>
-  Copyright &copy; 2017 - dohkoos -
+  Copyright &copy; 2018 - dohkoos -
   <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
 </p>
 
