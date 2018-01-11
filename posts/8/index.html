@@ -9,7 +9,8 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="英文原文：https://www.sitepoint.com/image-processing-rails/ 图片是任何应用程序的重要部分。从社交网络到简单的缺陷跟踪器，图片都扮演着重要的角色。不过，管理图片不是件容易的事情，需要提前做大量的规划。 在本文中，我将演示如何用Rails实现这些。 &hellip;">
+  <meta name="description" content="CURD的URL格式： 1
+http://localhost:9200/&lt;index&gt;/&lt;type&gt;/[&lt;id&gt;] id是可选的，不提供的话Elasticsearch会自动生成。index和type将信息进行分层，便于管理。可以将index理解为数据库， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -73,413 +74,6 @@
     <div id="content">
       <div class="blog-index">
   
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/image-processing-rails/">使用Rails进行图片处理</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2015-05-12T12:31:25+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>12</span><span class='date-suffix'>th</span>, <span class='date-year'>2015</span></span> <span class='time'>12:31 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="https://www.sitepoint.com/image-processing-rails/">https://www.sitepoint.com/image-processing-rails/</a></p>
-
-<p>图片是任何应用程序的重要部分。从社交网络到简单的缺陷跟踪器，图片都扮演着重要的角色。不过，管理图片不是件容易的事情，需要提前做大量的规划。</p>
-
-<p>在本文中，我将演示如何用Rails实现这些。我将向你展示如何处理你的图片，并在后台创建多个版本。我们还将看到如何通过压缩这些图片来提高页面的性能，而不损失质量。</p>
-
-<h3 id="起步">起步</h3>
-
-<p>本教程中的示例在Rails 4.2上运行，使用MongoDB数据库，以及使用HAML渲染视图。不过，这里使用的代码片段应该能与任何版本的Rails兼容，尽管有轻微的配置差异。</p>
-
-<h4 id="配置环境">配置环境</h4>
-
-<p>ImageMagick是POSIX系统图片处理库。如果你的系统没有安装ImageMagick，它可以用操作系统的软件包管理器安装。</p>
-
-<p>在Ubuntu上：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>sudo apt-get -y install imagemagick
-</span><span class='line'>sudo apt-get -y install libmagic-dev
-</span><span class='line'>sudo apt-get -y install libmagickwand-dev</span></code></pre></td></tr></table></div></figure>
-
-<p>在Mac OS X上，推荐使用Homebrew：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>brew install imagemagick</span></code></pre></td></tr></table></div></figure>
-
-<p>现在，我们需要Ruby适配器来连接本地的ImageMagick库。我个人更偏爱MiniMagick，因为它是轻量级的，含有典型应用程序需要的几乎所有东西：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># Gemfile
-</span><span class='line'>
-</span><span class='line'>gem 'mini_magick'</span></code></pre></td></tr></table></div></figure>
-
-<h3 id="热身运动">热身运动</h3>
-
-<p>在正式构建任何东西之前，让我们先试试MiniMagick的某些功能。打开Rails控制台（rails c）并运行以下命令：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># Open an image from a website
-</span><span class='line'>
-</span><span class='line'>image = MiniMagick::Image.open("https://s3.amazonaws.com/StartupStockPhotos/20140808_StartupStockPhotos/85.jpg")
-</span><span class='line'>
-</span><span class='line'># Get the Image's width
-</span><span class='line'>image.width  # 4928
-</span><span class='line'>
-</span><span class='line'># Get the image's height
-</span><span class='line'>image.height  #3264</span></code></pre></td></tr></table></div></figure>
-
-<p>我的天哪，这图好大。让我们看看能否调整它的大小以适应我们的iPad：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>image.resize "2048x1536"
-</span><span class='line'>
-</span><span class='line'># Now get the image's new width and height
-</span><span class='line'>
-</span><span class='line'>p "Width is =&gt; #{image.width} and height is =&gt; #{image.height}"</span></code></pre></td></tr></table></div></figure>
-
-<p>调整速度很快，只是修改的文件存储在哪里？</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>image.path  # temp path</span></code></pre></td></tr></table></div></figure>
-
-<p>处理过的图片存储在临时路径中，并且随时可能被清理。要将其持久化到磁盘，只需要调用write方法即可：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>image.write "public/uploads/test.jpg"</span></code></pre></td></tr></table></div></figure>
-
-<h4 id="转换图片">转换图片</h4>
-
-<p>你将要执行的最常用操作之一是将图片转换为不同的格式。MiniMagick使这非常简单：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>image.format "png"
-</span><span class='line'>image.write "public/uploads/test.png"</span></code></pre></td></tr></table></div></figure>
-
-<p>你也可以在单个块中组合多个操作：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>image.combine_options do |i|
-</span><span class='line'>  i.resize "2048x1536"
-</span><span class='line'>  i.flip
-</span><span class='line'>  i.rotate "-45"
-</span><span class='line'>  i.blur "0x15"
-</span><span class='line'>end
-</span><span class='line'>image.write "public/uploads/blur.png"
-</span><span class='line'>
-</span><span class='line'>![Some weird result](blur.png)</span></code></pre></td></tr></table></div></figure>
-
-<p>好吧，在这里我做的有点过火。我要给自己辩解一下，我只是试图给你展示可以用MiniMagick做的所有酷的东西。</p>
-
-<p>现在，让我们来看看如何将其与Rails应用程序相结合。</p>
-
-<h3 id="上传文件">上传文件</h3>
-
-<p>Carrierwave是个奇妙的gem，它简化了Ruby中的文件上传。它还可以很好地与MiniMagick互动，使我们的生活更简单。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># Gemfile
-</span><span class='line'>
-</span><span class='line'>gem 'carrierwave'
-</span><span class='line'>gem 'carrierwave-mongoid', :require =&gt; 'carrierwave/mongoid'</span></code></pre></td></tr></table></div></figure>
-
-<p>注意：如果你使用的是ActiveRecord或DataMapper，配置将略有不同，而<a href="https://github.com/carrierwaveuploader/carrierwave">Carrierwave官方文档</a>会告诉你正确的方法。</p>
-
-<p>批量获取所有这些gem：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>bundle install</span></code></pre></td></tr></table></div></figure>
-
-<p>创建首个上传器：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>#app/uploaders/image_uploader.rb
-</span><span class='line'>
-</span><span class='line'>class ImageUploader &lt; CarrierWave::Uploader::Base
-</span><span class='line'>  # Include RMagick or MiniMagick support:
-</span><span class='line'>  include CarrierWave::MiniMagick
-</span><span class='line'>
-</span><span class='line'>  # Choose what kind of storage to use for this Uploader:
-</span><span class='line'>  storage :file
-</span><span class='line'>  # Override the directory where uploaded files will be stored.
-</span><span class='line'>  # This is a sensible default for uploaders that are meant to be mounted:
-</span><span class='line'>  def store_dir
-</span><span class='line'>    "uploads/images"
-</span><span class='line'>  end
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<p>这里的代码是不言自明的。<code>storage：file</code>指示服务器将图片存储在本地服务器上，<code>store_dir</code>指定存储位置。</p>
-
-<p>由于这些文件是通过互联网发送的，因此最佳的做法是始终过滤进来的文件：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># app/uploaders/image_uploader.rb
-</span><span class='line'>...
-</span><span class='line'># Add a white list of extensions which are allowed to be uploaded.
-</span><span class='line'># For images you might use something like this:
-</span><span class='line'>def extension_white_list
-</span><span class='line'>  %w(jpg jpeg png gif)
-</span><span class='line'>end
-</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
-
-<p>此代码片段过滤掉未在此处指定的文件类型。这绝对不是万无一失的，但它可以作为抵御任何阻碍攻击的第一级过滤器。</p>
-
-<p>将此上传器添加到我们的图片模型中：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># app/models/image.rb
-</span><span class='line'>
-</span><span class='line'>class Image
-</span><span class='line'>  include Mongoid::Document
-</span><span class='line'>  include Mongoid::Timestamps
-</span><span class='line'>  include Mongoid::Paranoia
-</span><span class='line'>  include Mongoid::Attributes::Dynamic
-</span><span class='line'>  include Rails.application.routes.url_helpers
-</span><span class='line'>
-</span><span class='line'>  mount_uploader :media, ImageUploader, mount_on: :media_filename
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<p>编辑image_uploader.rb去处理上传的图片：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># app/uploaders/image_uploader.rb
-</span><span class='line'>
-</span><span class='line'>...
-</span><span class='line'>process :resize_to_fill =&gt; [200, 200]
-</span><span class='line'>process :convert =&gt; 'png'
-</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
-
-<p>尝试在Rails控制台创建一个新图片：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>media = File.open("/Users/test/Desktop/image/jpg")
-</span><span class='line'>img = Image.new(:media =&gt; media)
-</span><span class='line'>img.save</span></code></pre></td></tr></table></div></figure>
-
-<p>上传的图片保存在<code>store_dir</code>目录。而且上传的图片将立即被处理并覆写为200x200的图片。我们不会为任何未来的编辑而保有原始文件的副本。为避免这种情况，需要创建文件的多个版本。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># app/uploaders/image_uploader.rb
-</span><span class='line'>
-</span><span class='line'>...
-</span><span class='line'>version :thumb do
-</span><span class='line'>  process :resize_to_fit =&gt; [100, 100]
-</span><span class='line'>  process :convert =&gt; 'jpg'
-</span><span class='line'>end
-</span><span class='line'>
-</span><span class='line'>version :cover   do
-</span><span class='line'>  process :resize_to_fit =&gt; [240, 180]
-</span><span class='line'>  process :convert =&gt; 'jpg'
-</span><span class='line'>end
-</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
-
-<p>除原始图片之外，还将创建2个新版本。检查Carrierwave创建的版本：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>img.media.versions[:thumb]  # returns the thumb image instance
-</span><span class='line'>img.media.versions[:cover]  # returns the cover image instance</span></code></pre></td></tr></table></div></figure>
-
-<p>你注意到这些图片是瞬间生成的吗？这意味着图片转换发生在同一个线程中，并且执行被阻塞直到转换完成。在生产应用程序中，在同一个线程中创建图片的多个版本是不应该的。相反，我们应该有条件地处理这个问题。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># app/uploaders/image_uploader/rb
-</span><span class='line'>
-</span><span class='line'>...
-</span><span class='line'>version :cover, :if =&gt; :is_live? do
-</span><span class='line'>  process :resize_to_fit =&gt; [240, 180]
-</span><span class='line'>  process :convert =&gt; 'jpg'
-</span><span class='line'>end
-</span><span class='line'>
-</span><span class='line'>def is_live?(img = nil)
-</span><span class='line'>  @is_live
-</span><span class='line'>end
-</span><span class='line'>
-</span><span class='line'>def is_live=(value)
-</span><span class='line'>  @is_live = value
-</span><span class='line'>end
-</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
-
-<p>现在，当我们尝试创建一个新图片时，封面版本将不会生成。我们可以在需要时通过简单的运行以下代码来手动触发：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>img.media.is_live = true
-</span><span class='line'>img.save
-</span><span class='line'>img.media.recreate_versions! :cover</span></code></pre></td></tr></table></div></figure>
-
-<p>该代码也在前台运行，是个阻塞操作，但至少是推迟到最后可能的一刻。我们可以再进一步，通过Resque在后台运行这些代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># lib/resque/image_queue.rb
-</span><span class='line'>class ImageQueue
-</span><span class='line'>  @queue = :image_queue
-</span><span class='line'>  def self.perform(image_id)
-</span><span class='line'>    image = Image.find image_id
-</span><span class='line'>    img.media.is_live= true
-</span><span class='line'>    img.save
-</span><span class='line'>    img.media.recreate_versions! :cover
-</span><span class='line'>  end
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-<p>然后，把它们放入队列：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Resque.enqueue(ImageQueue, img.id.to_s)</span></code></pre></td></tr></table></div></figure>
-
-<h3 id="提高性能">提高性能</h3>
-
-<p>重量级的图片往往会减慢网站的速度。减少页面大小的一种方法是压缩这些图片。Carrierwave Image Optimizer可以帮助我们轻松地压缩图片，而没有任何麻烦。</p>
-
-<p>将其添加到你的Gemfile中：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>gem 'carrierwave-imageoptimizer'</span></code></pre></td></tr></table></div></figure>
-
-<p>然后编辑image_uploader.rb文件：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'># app/uploaders/image_uploader.rb
-</span><span class='line'>
-</span><span class='line'>...
-</span><span class='line'>include CarrierWave::ImageOptimizer
-</span><span class='line'>process :optimize
-</span><span class='line'>process :quality =&gt; 100
-</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
-
-<p>这段代码压缩所有的图片，没有任何视觉损失。这种方式的做法是所有图片的元信息被剥离。平均而言，这减少了约20-30%的大小。</p>
-
-<h3 id="总结">总结</h3>
-
-<p>图片处理是非常垂直的技术，我们几乎只触及表面。我们可以用它构建这么多酷的东西。我希望我已经用这篇文章引起你的兴趣。请在评论中分享你的想法。</p>
-</div>
-  
-  
-
-
-    </article>
   
   
     <article>
@@ -1297,6 +891,164 @@ TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类
 
     </article>
   
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/tricks-and-tips-for-octopress/">Octopress 2.0使用技巧</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2014-09-15T13:16:30+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>15</span><span class='date-suffix'>th</span>, <span class='date-year'>2014</span></span> <span class='time'>1:16 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Octopress 2.0带的RDiscount支持表格等Markdown扩展语法了。具体语法看 <a href="https://michelf.ca/projects/php-markdown/extra/#table">https://michelf.ca/projects/php-markdown/extra/#table</a> 。不过默认表格是不具有边框的，在显示数据时会很难看。<a href="http://programus.github.io/blog/2012/03/07/add-table-data-css-for-octopress/">http://programus.github.io/blog/2012/03/07/add-table-data-css-for-octopress/</a> 修复了这个问题，只是它的修改有些复杂，其实只要把data-table.css的内容粘贴到sass/custom/_styles.scss里就出效果了。</p>
+
+<p>还有就是Octopress中的列表项应该是右移的，实际左移了。可以在sass/custom/_styles.scss添加以下代码解决：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>article {
+</span><span class='line'>  ol, ul {
+</span><span class='line'>    padding-left: 3em;
+</span><span class='line'>  }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>更简单的办法是把sass/custom/_layout.scss中被注释的这行代码打开：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>//$indented-lists: true;</span></code></pre></td></tr></table></div></figure>
+
+<p>列表、表格前要有空行，例如</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>List
+</span><span class='line'>* item
+</span><span class='line'>* item
+</span><span class='line'>* item
+</span><span class='line'>
+</span><span class='line'>Table
+</span><span class='line'>column | column
+</span><span class='line'>------ | ------
+</span><span class='line'>value  | value
+</span><span class='line'>value  | value</span></code></pre></td></tr></table></div></figure>
+
+<p>不会正常显示，必须在List和Table后空一行才行。就像下面这样：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>List
+</span><span class='line'>
+</span><span class='line'>* item
+</span><span class='line'>* item
+</span><span class='line'>* item
+</span><span class='line'>
+</span><span class='line'>Table
+</span><span class='line'>
+</span><span class='line'>column | column
+</span><span class='line'>------ | ------
+</span><span class='line'>value  | value
+</span><span class='line'>value  | value</span></code></pre></td></tr></table></div></figure>
+
+<p>如果你已经发表了许多的文章，Octopress站点的生成速度将会非常之慢，解决方式是使用：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rake isolate['title']</span></code></pre></td></tr></table></div></figure>
+
+<p>隔离你所工作的文章（使用此命令前请确保该文章已经存在）。</p>
+
+<p>现在使用以下命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rake generate
+</span><span class='line'>rake preview</span></code></pre></td></tr></table></div></figure>
+
+<p>将会仅工作在被隔离的文章上。</p>
+
+<p>解除文章的隔离可以使用以下命令：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rake integrate</span></code></pre></td></tr></table></div></figure>
+
+<p>如果想在rake new_post/page后使用指定编辑器自动打开生成的文件，可以编辑Rakefile，在Misc Configs段中添加以下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>editor="open"
+</span><span class='line'># open，使用系统默认编辑器
+</span><span class='line'># open -a Mou，使用Mou打开
+</span><span class='line'># open -a Byword，使用Byword打开
+</span><span class='line'># subl，使用Sublime Text2打开</span></code></pre></td></tr></table></div></figure>
+
+<p>然后在task :new_post和task :new_page的末尾添加如下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if #{editor}
+</span><span class='line'>  system "sleep 1; #{editor} #{filename}"
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>在rake preview后自动打开浏览器，也可以编辑Rakefile，在task :preview任务中添加：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>system "sleep 2; open http://localhost:#{server_port}/"</span></code></pre></td></tr></table></div></figure>
+
+<p>如果日后Octopress有新版本发布，可以使用以下指令升级：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>git remote add octopress git://github.com/imathis/octopress.git
+</span><span class='line'>git pull octopress master  # Get the latest Octopress
+</span><span class='line'>bundle install             # Keep gems updated
+</span><span class='line'>rake update_source         # update the template's source
+</span><span class='line'>rake update_style          # update the template's style</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
   <div class="pagination">
     
       <a class="prev" href="/posts/9">&larr; Older</a>
@@ -1344,7 +1096,7 @@ TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 140%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 139%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 131%" href="/tags/android/">Android</a>
 <a style="font-size: 96%" href="/tags/c-plus-plus/">C++</a>
@@ -1369,7 +1121,7 @@ TabActivity在API 13中被标记为过期了，所以就去寻找它的替换类
 <a style="font-size: 100%" href="/tags/struts/">Struts</a>
 <a style="font-size: 146%" href="/tags/translation/">Translation</a>
 <a style="font-size: 96%" href="/tags/ubuntu/">Ubuntu</a>
-<a style="font-size: 106%" href="/tags/windows-server-2008/">Windows Server 2008</a>
+<a style="font-size: 103%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 106%" href="/tags/wxwidgets/">wxWidgets</a>
 
   </ul>
