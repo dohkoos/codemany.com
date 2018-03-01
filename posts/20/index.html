@@ -9,8 +9,8 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="调整后的entries页面就是不一样，感觉清爽多了。现在让我们添加几条测试数据吧！进入new页面，感觉似乎少了点什么。对了，怎么没有消费发生的具体时间呢？还是先把这个给加上吧。 执行下面的命令，创建一个迁移任务，添加date类型的effective_date字段到entries中： 1
-2 &hellip;">
+  <meta name="description" content="经过这几天的不断完善，记账应用越来越让人心情愉快了。不过要是能给应用加上忘记密码的功能就更好了。 创建迁移任务，在users数据表中加入一个字段用来储存修改密码时的重置码： 1
+script/generate migration add_password_reset_code_to_users &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -74,6 +74,344 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/using-rails-23-to-create-a-simple-accounting-app-part7/">用Rails 2.3打造简单记账应用（7）</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2009-12-14T21:48:25+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>14</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>9:48 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>经过这几天的不断完善，记账应用越来越让人心情愉快了。不过要是能给应用加上忘记密码的功能就更好了。</p>
+
+<p>创建迁移任务，在users数据表中加入一个字段用来储存修改密码时的重置码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>script/generate migration add_password_reset_code_to_users</span></code></pre></td></tr></table></div></figure>
+
+<p>执行上面的命令后就可以在db/migrate目录下看到如下格式的迁移文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>20091214171949_add_password_reset_code_to_users.rb</span></code></pre></td></tr></table></div></figure>
+
+<p>打开它，将它的内容改为：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class AddPasswordResetCodeToUsers &lt; ActiveRecord::Migration
+</span><span class='line'>  def self.up
+</span><span class='line'>    add_column :users, :password_reset_code, :string, :limit =&gt; 40
+</span><span class='line'>  end
+</span><span class='line'>
+</span><span class='line'>  def self.down
+</span><span class='line'>    remove_column :users, :password_reset_code
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>执行迁移任务更新数据表users：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rake db:migrate</span></code></pre></td></tr></table></div></figure>
+
+<p>然后打开config/routes.rb文件，在里面增加两个映射：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>map.forgot_password '/forgot_password', :controller =&gt; 'users', :action =&gt; 'forgot_password'
+</span><span class='line'>map.reset_password '/reset_password/:reset_code', :controller =&gt; 'users', :action =&gt; 'reset_password'</span></code></pre></td></tr></table></div></figure>
+
+<p>另外还要创建两个视图文件：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># app/views/users/forgot_password.html.erb
+</span><span class='line'>&lt;h1&gt;Password Reset Request&lt;/h3&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;p&gt;
+</span><span class='line'>  Enter your email address that we have on our file and click send.&lt;br /&gt;
+</span><span class='line'>  We will send you a password reset link email to your email address.
+</span><span class='line'>&lt;/p&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;% form_for :user, :url =&gt; { :action =&gt; 'forgot_password' } do |f| %&gt;
+</span><span class='line'>  &lt;%= f.error_messages %&gt;
+</span><span class='line'>
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>    &lt;%= f.label :email %&gt;&lt;br /&gt;
+</span><span class='line'>    &lt;%= f.text_field :email %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>    &lt;%= f.submit 'Send' %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>&lt;% end %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># app/views/users/reset_password.html.erb
+</span><span class='line'>&lt;h1&gt;Reset Password&lt;/h1&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;% form_for :user, :url =&gt; { :action =&gt; 'reset_password' } do |f| %&gt;
+</span><span class='line'>  &lt;%= f.error_messages %&gt;
+</span><span class='line'>
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>    &lt;%= f.label :password %&gt;&lt;br /&gt;
+</span><span class='line'>    &lt;%= f.password_field :password %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>    &lt;%= f.label :password_confirmation 'Confirm password' %&gt;&lt;br /&gt;
+</span><span class='line'>    &lt;%= f.password_field :password_confirmation %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>  &lt;p&gt;
+</span><span class='line'>    &lt;%= f.submit 'Reset password' %&gt;
+</span><span class='line'>  &lt;/p&gt;
+</span><span class='line'>&lt;% end %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>然后就是在app/views/sessions/new.html.erb的最下面加上：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;%= link_to 'Forgot password?', forgot_password_path %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>在app/controllers/users_controller.rb中添加以下方法：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def forgot_password
+</span><span class='line'>  return unless request.post?
+</span><span class='line'>  if @user = User.find_by_email(params[:user][:email])
+</span><span class='line'>    @user.forgot_password
+</span><span class='line'>    @user.save
+</span><span class='line'>    flash[:notice] = "A password reset link has been sent to your email address"
+</span><span class='line'>    redirect_back_or_default('/')
+</span><span class='line'>  else
+</span><span class='line'>    flash[:alert] = "Could not find a user with that email address"
+</span><span class='line'>  end
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>def reset_password
+</span><span class='line'>  @user = User.find_by_password_reset_code(params[:reset_code])
+</span><span class='line'>  return if @user unless params[:user]
+</span><span class='line'>
+</span><span class='line'>  new_password = params[:user][:password]
+</span><span class='line'>  new_password_confirmation = params[:user][:password_confirmation]
+</span><span class='line'>
+</span><span class='line'>  if (new_password && new_password_confirmation &&
+</span><span class='line'>      !new_password.blank? && !new_password_confirmation.blank?)
+</span><span class='line'>    @user.reset_password(new_password, new_password_confirmation)
+</span><span class='line'>    if @user.save
+</span><span class='line'>      flash[:notice] = "Password reset success."
+</span><span class='line'>      redirect_back_or_default('/')
+</span><span class='line'>    else
+</span><span class='line'>      flash[:error] = "Password reset failed."
+</span><span class='line'>    end
+</span><span class='line'>  else
+</span><span class='line'>    flash[:error] = "Password mismatch"
+</span><span class='line'>  end
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>再创建两个邮件模板：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># app/views/user_mailer/forgot_password.html.erb
+</span><span class='line'>Dear &lt;%=h @user.login %&gt;,
+</span><span class='line'>
+</span><span class='line'>  We have had a request to reset your password, please visit&lt;br /&gt;
+</span><span class='line'>  &lt;%=h @url %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># app/views/user_mailer/reset_password.html.erb
+</span><span class='line'>Your have reset the password for your account successfully.
+</span><span class='line'>
+</span><span class='line'>  Username: &lt;%=h @user.login %&gt;
+</span><span class='line'>  Password: &lt;%=h @user.password %&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>下一步是打开app/models/user.rb，在它底部protected关键字的后面添加下面的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def make_password_reset_code
+</span><span class='line'>  self.password_reset_code = Digest::SHA1.hexdigest(Time.now.to_s.split(//).sort_by {rand}.join)
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>然后在protected关键字的上面添加如下代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def forgot_password
+</span><span class='line'>  @forgotten_password = true
+</span><span class='line'>  self.make_password_reset_code
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>def reset_password(new_password, new_password_confirmation)
+</span><span class='line'>  # First update the password_reset_code before setting the
+</span><span class='line'>  # reset_password flag to avoid duplicate email notifications.
+</span><span class='line'>  self.password_reset_code = nil
+</span><span class='line'>  self.password = new_password
+</span><span class='line'>  self.password_confirmation = new_password_confirmation
+</span><span class='line'>  @reset_password = true
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>def recently_forgot_password?
+</span><span class='line'>  @forgotten_password
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>def recently_reset_password?
+</span><span class='line'>  @reset_password
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>接着来配置mailer发送通知邮件，打开app/models/user_mailer.rb加上：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def forgot_password(user)
+</span><span class='line'>  setup_email(user)
+</span><span class='line'>  @subject    += 'You have requested to change your password'
+</span><span class='line'>  @body[:url]  = "http://#{HOST}/reset_password/#{user.password_reset_code}"
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>def reset_password(user)
+</span><span class='line'>  setup_email(user)
+</span><span class='line'>  @subject    += 'Your password has been reset.'
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>最后打开app/models/user_observer.rb修改after_save方法为：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>def after_save(user)
+</span><span class='line'>  UserMailer.deliver_activation(user) if user.recently_activated?
+</span><span class='line'>  UserMailer.deliver_forgot_password(user) if user.recently_forgot_password?
+</span><span class='line'>  UserMailer.deliver_reset_password(user) if user.recently_reset_password?
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+<p>代码下载：<a href="https://github.com/dohkoos/qianbao">https://github.com/dohkoos/qianbao</a></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1082,143 +1420,6 @@
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/using-whois-protocol-to-query-domain-information/">利用WHOIS协议查询域名信息</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2009-09-16T06:15:04+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2009</span></span> <span class='time'>6:15 am</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>域名信息的查询原理非常简单，主要是基于RFC 954（RFC 812已被废弃）提供的WHOIS协议。WHOIS服务器是一个基于“查询/响应”的TCP事务服务器，用户程序通过访问WHOIS服务器，从WHOIS数据库中查询得到我们所需要的内容。其主要过程有以下三步：</p>
-
-<ol>
-<li>在TCP服务端口43连接WHOIS服务主机；</li>
-<li>发送一个命令，以回车换行符结尾；</li>
-<li>接受相应命令的返回信息，一旦输出结束，服务器将关闭连接。</li>
-</ol>
-
-<p>命令的格式非常简单。可以直接输入域名（例如example.com）查询相关域名信息；也可以使用help得到详细的帮助信息。以下是查询的代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-<span class='line-number'>29</span>
-<span class='line-number'>30</span>
-<span class='line-number'>31</span>
-<span class='line-number'>32</span>
-<span class='line-number'>33</span>
-<span class='line-number'>34</span>
-<span class='line-number'>35</span>
-<span class='line-number'>36</span>
-<span class='line-number'>37</span>
-<span class='line-number'>38</span>
-<span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>wxString Whois::Lookup(wxString& host, wxString& szAddress)
-</span><span class='line'>{
-</span><span class='line'>    char szQuery[512];
-</span><span class='line'>    char szBuffer[512];
-</span><span class='line'>    wxString szResult;
-</span><span class='line'>
-</span><span class='line'>    strcpy(szQuery, szAddress);
-</span><span class='line'>    strcat(szQuery, "\r\n");
-</span><span class='line'>
-</span><span class='line'>    wxIPV4address addr;
-</span><span class='line'>    addr.Hostname(host);
-</span><span class='line'>    addr.Service(43);
-</span><span class='line'>
-</span><span class='line'>    wxSocketClient socket;
-</span><span class='line'>    socket.Connect(addr, false);
-</span><span class='line'>    socket.WaitOnConnect(30);
-</span><span class='line'>
-</span><span class='line'>    if (socket.IsConnected())
-</span><span class='line'>    {
-</span><span class='line'>        socket.Write(szQuery, strlen(szQuery));
-</span><span class='line'>        szResult = "";
-</span><span class='line'>        while (true)
-</span><span class='line'>        {
-</span><span class='line'>            // Clear buffer before each iteration
-</span><span class='line'>            memset(szBuffer, 0, 512);
-</span><span class='line'>
-</span><span class='line'>            // Try to receive some data
-</span><span class='line'>            socket.Read(szBuffer, 500);
-</span><span class='line'>            if (socket.LastCount() &lt;= 0)
-</span><span class='line'>            {
-</span><span class='line'>                break;
-</span><span class='line'>            }
-</span><span class='line'>            szResult += szBuffer;
-</span><span class='line'>        }
-</span><span class='line'>    }
-</span><span class='line'>    else
-</span><span class='line'>    {
-</span><span class='line'>        szResult = wxT("Failed! Unable to connect\n");
-</span><span class='line'>    }
-</span><span class='line'>    socket.Close();
-</span><span class='line'>
-</span><span class='line'>    return wxString::FromUTF8(szResult);
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>常用的WHOIS服务器：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>.cn=whois.cnnic.net.cn
-</span><span class='line'>.com=whois.internic.com
-</span><span class='line'>.net=whois.internic.com
-</span><span class='line'>.name=www.whois.name
-</span><span class='line'>.cc=whois.nic.cc</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/posts/21">&larr; Older</a>
@@ -1236,6 +1437,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/build-timelog-from-scratch-part1/">从零开始构建TimeLog（1）</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/rnn-effectiveness/">循环神经网络不可思议的效用</a>
       </li>
     
@@ -1251,10 +1456,6 @@
         <a href="/blog/crawl-novel-with-scrapy-part5/">使用Scrapy爬取小说（5）</a>
       </li>
     
-      <li class="post">
-        <a href="/blog/crawl-novel-with-scrapy-part4/">使用Scrapy爬取小说（4）</a>
-      </li>
-    
   </ul>
 </section>
 <section>
@@ -1268,7 +1469,7 @@
   <ul class="tag-cloud">
     <a style="font-size: 139%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
-<a style="font-size: 131%" href="/tags/android/">Android</a>
+<a style="font-size: 132%" href="/tags/android/">Android</a>
 <a style="font-size: 96%" href="/tags/c-plus-plus/">C++</a>
 <a style="font-size: 106%" href="/tags/css/">CSS</a>
 <a style="font-size: 91%" href="/tags/crack/">Crack</a>
