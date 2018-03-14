@@ -904,6 +904,71 @@ bundle install 在需要设置断点的地方添加binding. &hellip;">
 <p>我们还使用is_mobile模板变量作为这个监听器的开关，因为它在桌面版本上不需要。</p>
 
 <h4 id="减少网络请求，节省带宽">减少网络请求，节省带宽</h4>
+
+<p>众所周知，减少HTTP请求数量可以大大提高性能。移动设备进一步限制了浏览器可以进行的并发连接数量，因此移动网站从减少这些无关请求中受益匪浅。此外，削减每个字节至关重要，因为带宽限制通常在手机上。你可能会花费用户的钱！</p>
+
+<p>以下是我们为减少网络请求和减少html5rocks带宽所采取的一些方法：</p>
+
+<ul>
+<li>删除iframe——iframe很慢！我们的大量延迟来自教程页面上的第三方共享小部件（Buzz、Google Friend Connect、Twitter、Facebook）。这些API通过<code>&lt;script&gt;</code>标签引入，并创建降低页面速度的iframe。这些小部件在移动版上已被移除。</li>
+<li>display:none——在某些情况下，如果标记不符合移动配置，我们会隐藏它。一个很好的例子是<a href="https://www.html5rocks.com/">主页</a>顶部的四个圆角框：</li>
+</ul>
+
+<p><img src="/uploads/box-icons.png" alt="box-icons"></p>
+
+<p><em>主页上的框按钮。</em></p>
+
+<p>他们会在移动网站中消失。但请务必记住，浏览器仍然会为每个图标发出请求，尽管它们的容器被display:none隐藏。因此，仅仅隐藏这些按钮是不够的。这不仅会浪费带宽，而且用户甚至不会知道它在浪费带宽！解决方案是在我们的Django模板中创建一个“is_mobile”布尔值，有条件地忽略HTML的各个部分。当用户在智能设备上查看该网站时，这些按钮将被忽略。</p>
+
+<ul>
+<li>应用程序缓存——这不仅可以为我们提供离线支持，还可以创建更快的启动。</li>
+<li>CSS/JS压缩——我们使用YUI压缩器取代<a href="http://code.google.com/closure/compiler/">Closure编译器</a>，主要是因为它同时处理CSS和JS。</li>
+<li>尽可能使用CSS图像精灵。</li>
+<li>使用pngcrush进行图像压缩。</li>
+<li>对小图像使用了dataURI。Base64编码为图像增加大约30%多的大小，但节省了网络请求。</li>
+<li>使用单个脚本标记自动加载Google自定义搜索，而不是使用google.load()动态加载它。后者会产生额外的请求。</li>
+</ul>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;script src="//www.google.com/jsapi?autoload={"modules":[{"name":"search","version":"1"}]}"&gt;&lt;/script&gt;</span></code></pre></td></tr></table></div></figure>
+
+<ul>
+<li><a href="http://www.modernizr.com/">Modernizr</a>被包含在每个页面内，即使它们从未被使用过。Modernizr非常棒，但它对每次加载都进行一系列的测试。其中一些测试会对DOM进行昂贵的修改并降低页面加载速度。现在，我们只在实际需要的页面中包含这些库，这减少了2个请求:)</li>
+</ul>
+
+<p>额外的性能调整：</p>
+
+<ul>
+<li>将所有的JavaScript代码移到页面的底部（在可能的情况下）。</li>
+<li>删除内联的<code>&lt;style&gt;</code>标签。</li>
+<li>缓存DOM查找和最小化DOM操作——每次触及DOM时，浏览器都会执行<a href="http://dev.opera.com/articles/view/efficient-javascript/?page=3">重排</a>。移动设备上的重排成本更高。</li>
+<li>将浪费性的客户端代码移到服务端。具体来说，设置当前页面的导航样式：</li>
+</ul>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>var lis = document.querySelectorAll('header nav li');
+</span><span class='line'>var i = lis.length;
+</span><span class='line'>while (i--) {
+</span><span class='line'>  var a = lis[i].querySelector('a');
+</span><span class='line'>  var section = a.getAttribute("data-section");
+</span><span class='line'>  if (new RegExp(section).test(document.location.href)) {
+</span><span class='line'>    a.className = 'current';
+</span><span class='line'>  }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<ul>
+<li>具有固定宽度的元素被替换为易变的width:100%或者width:auto。</li>
+</ul>
+
+<h4 id="应用程序缓存">应用程序缓存</h4>
 </div>
   
   
