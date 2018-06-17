@@ -9,9 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="通过有with check option选项的视图操作基表，有以下结论： 首先视图只操作它可以查询出来的数据，对于它查询不出的数据，即使基表有，也不可以通过视图来操作；
-对于update，有with check option，要保证update后，数据能被视图查询出来；
-对于delete， &hellip;">
+  <meta name="description" content="下午在机房值班，14:00的时候有人报告说交易客户端不能登录了，确定问题后两同事急忙重启AR和AS以及交易网关，可是还是不能登录。紧急重启数据库后问题才解决。 出了问题不可怕，关键是找到问题根源所在，解决问题，使同样的错误不再重复地发生。 打电话联系恒生的工程师，向他们提供系统的日志文件， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -75,119 +73,6 @@
     <div id="content">
       <div class="blog-index">
   
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/with-check-option-in-view/">创建视图时的with check option选项</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2010-06-28T20:33:27+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>28</span><span class='date-suffix'>th</span>, <span class='date-year'>2010</span></span> <span class='time'>8:33 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>通过有with check option选项的视图操作基表，有以下结论：</p>
-
-<ol>
-<li>首先视图只操作它可以查询出来的数据，对于它查询不出的数据，即使基表有，也不可以通过视图来操作；</li>
-<li>对于update，有with check option，要保证update后，数据能被视图查询出来；</li>
-<li>对于delete，有无with check option都一样；</li>
-<li>对于insert，有with check option，要保证insert后，数据要被视图查询出来。</li>
-</ol>
-
-<p>对于没有where子句的视图，使用with check option是多余的。</p>
-
-<p>下面用一个例子来说明第4条：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>CREATE TABLE students (
-</span><span class='line'>    id int NOT NULL AUTO_INCREMENT,
-</span><span class='line'>    name varchar(50) NOT NULL,
-</span><span class='line'>    age int,
-</span><span class='line'>    sex char(1),
-</span><span class='line'>    PRIMARY KEY (id)
-</span><span class='line'>);
-</span><span class='line'>
-</span><span class='line'>CREATE VIEW male_students_view AS
-</span><span class='line'>    SELECT name, age FROM students
-</span><span class='line'>    WHERE sex = 'M'
-</span><span class='line'>    WITH CHECK OPTION;</span></code></pre></td></tr></table></div></figure>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>-- 报CHECK OPTION failed错误，原因如4，插入数据后要还能被视图查询出来。
-</span><span class='line'>INSERT INTO male_students_view VALUES('WU', 18);</span></code></pre></td></tr></table></div></figure>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>-- 报Column count doesn't match value count错误，因为视图中根本没有sex列。
-</span><span class='line'>INSERT INTO male_students_view VALUES('WU', 18, 'M');</span></code></pre></td></tr></table></div></figure>
-
-<p>将students.sex列改成默认值为M：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ALTER TABLE students MODIFY sex char(1) NOT NULL DEFAULT 'M'</span></code></pre></td></tr></table></div></figure>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>-- 执行成功，1 row affected。
-</span><span class='line'>INSERT INTO male_students_view VALUES('WU', 18);</span></code></pre></td></tr></table></div></figure>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>-- 还是同样的问题，Column count doesn't match value count。
-</span><span class='line'>INSERT INTO male_students_view VALUES('WU', 18, 'M');</span></code></pre></td></tr></table></div></figure>
-
-<p>或者不修改students.sex的属性，将视图改成：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>CREATE VIEW male_students_view AS
-</span><span class='line'>    SELECT name, age, sex FROM students
-</span><span class='line'>    WHERE sex = 'M'
-</span><span class='line'>    WITH CHECK OPTION;</span></code></pre></td></tr></table></div></figure>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>-- 会报CHECK OPTION failed错误。
-</span><span class='line'>INSERT INTO male_students_view VALUES('WU', 18);</span></code></pre></td></tr></table></div></figure>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>-- 执行成功，1 row affected。
-</span><span class='line'>INSERT INTO male_students_view VALUES('WU', 18, 'M');</span></code></pre></td></tr></table></div></figure>
-
-<p>以上例子都在MySQL上实际执行过。</p>
-</div>
-  
-  
-
-
-    </article>
   
   
     <article>
@@ -760,6 +645,145 @@
 
     </article>
   
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/display-local-contact-number-on-android/">显示Android的本地联系电话</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2010-01-23T14:26:55+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>23</span><span class='date-suffix'>rd</span>, <span class='date-year'>2010</span></span> <span class='time'>2:26 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>首先要在AndroidManifest.xml中设置允许读取联系人的权限：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;uses-permission android:name="android.permission.READ_CONTACTS" /&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>联系人列表布局文件contact_list.xml：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+</span><span class='line'>      android:orientation="vertical"
+</span><span class='line'>      android:layout_width="fill_parent"
+</span><span class='line'>      android:layout_height="fill_parent"&gt;
+</span><span class='line'>    &lt;ListView android:id="@+id/contactList"
+</span><span class='line'>        android:layout_width="fill_parent"
+</span><span class='line'>        android:layout_height="wrap_content" /&gt;
+</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>联系人列表项布局文件contact_entry.xml：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+</span><span class='line'>&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+</span><span class='line'>      android:layout_width="fill_parent"
+</span><span class='line'>      android:layout_height="fill_parent"&gt;
+</span><span class='line'>    &lt;TextView android:id="@+id/contactName"
+</span><span class='line'>        android:layout_width="wrap_content"
+</span><span class='line'>        android:layout_height="wrap_content" /&gt;
+</span><span class='line'>    &lt;TextView android:id="@+id/contactNumber"
+</span><span class='line'>        android:layout_width="wrap_content"
+</span><span class='line'>        android:layout_height="wrap_content" /&gt;
+</span><span class='line'>&lt;/LinearLayout&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>MainActivity.java文件内容：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>import android.app.Activity;
+</span><span class='line'>import android.database.Cursor;
+</span><span class='line'>import android.os.Bundle;
+</span><span class='line'>import android.provider.Contacts.People;
+</span><span class='line'>import android.widget.ListView;
+</span><span class='line'>import android.widget.SimpleCursorAdapter;
+</span><span class='line'>
+</span><span class='line'>public class MainActivity extends Activity {
+</span><span class='line'>
+</span><span class='line'>    @Override
+</span><span class='line'>    public void onCreate(Bundle savedInstanceState) {
+</span><span class='line'>        super.onCreate(savedInstanceState);
+</span><span class='line'>        setContentView(R.layout.contact_list);
+</span><span class='line'>
+</span><span class='line'>        ListView contactList = (ListView)findViewById(R.id.contactList);
+</span><span class='line'>
+</span><span class='line'>        Cursor contactsCursor = managedQuery(People.CONTENT_URI,
+</span><span class='line'>                null, null, null, null);
+</span><span class='line'>        startManagingCursor(contactsCursor);
+</span><span class='line'>
+</span><span class='line'>        String[] columnsToMap = new String[] {People.NAME, People.NUMBER};
+</span><span class='line'>        int[] mapTo = new int[] {R.id.contactName, R.id.contactNumber};
+</span><span class='line'>
+</span><span class='line'>        SimpleCursorAdapter mAdapter = new SimpleCursorAdapter(this,
+</span><span class='line'>                R.layout.contact_entry, contactsCursor,
+</span><span class='line'>                columnsToMap, mapTo);
+</span><span class='line'>        contactList.setAdapter(mAdapter);
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
   <div class="pagination">
     
       <a class="prev" href="/posts/19">&larr; Older</a>
@@ -807,7 +831,7 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 139%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 138%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 131%" href="/tags/android/">Android</a>
 <a style="font-size: 96%" href="/tags/c-plus-plus/">C++</a>

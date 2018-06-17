@@ -9,10 +9,7 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="网上关于集成P6Spy到Spring的帖子说：在Spring的配置文件中添加： 1
-2
-3
-&lt;bean id="dataSource" class="com.p6spy.engine.spy.P6DataSource" destroy-method="close"&gt; &lt; &hellip;">
+  <meta name="description" content="在介绍本讲内容之前，先提出一个问题？普通的黑白针式打印机能打出灰度图来吗？如果说能，从针式打印机的打印原理来分析，似乎是不可能的。因为针打是靠撞针击打色带在纸上形成黑点的，不可能打出灰色的点来；如果说不能，可是我们的确见过用针式打印机打印出来的灰色图象。到底是怎么回事呢？ &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -76,97 +73,6 @@
     <div id="content">
       <div class="blog-index">
   
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/problem-does-not-generate-log-file-when-integrate-p6spy-into-spring/">集成P6Spy到Spring后没有产生日志文件的问题</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2007-01-22T17:41:32+08:00'><span class='date'><span class='date-month'>Jan</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2007</span></span> <span class='time'>5:41 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>网上关于集成P6Spy到Spring的帖子说：在Spring的配置文件中添加：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;bean id="dataSource" class="com.p6spy.engine.spy.P6DataSource" destroy-method="close"&gt;
-</span><span class='line'>    &lt;constructor-arg ref="dataSourceTarget" /&gt;
-</span><span class='line'>&lt;/bean&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>然后将原来dataSource定义的id值改为dataSourceTarget：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;bean id="dataSourceTarget" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close"&gt;
-</span><span class='line'>    &lt;property name="driverClassName" value="${driver}" /&gt;
-</span><span class='line'>    &lt;property name="url" value="${url}" /&gt;
-</span><span class='line'>    &lt;property name="username" value="${username}" /&gt;
-</span><span class='line'>    &lt;property name="password" value="${password}" /&gt;
-</span><span class='line'>&lt;/bean&gt;</span></code></pre></td></tr></table></div></figure>
-
-<p>但是照着这样做了以后却发现没有生成日志文件。</p>
-
-<p>下载P6Spy的源代码进行阅读后找到了问题所在。打开P6Util.java文件，在classPathFile()方法中有这样一条语句：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>fp = classLoadPropertyFile(Thread.currentThread().getContextClassLoader().getResource(file))</span></code></pre></td></tr></table></div></figure>
-
-<p>getResource(file)用来读取spy.properties配置文件，file的值就是spy.properties的文件路径。我的syp.properties放在了C:\Tomcat 5.5\webapps\netlink\WEB-INF\classes目录下，所以它返回的值是C:/Tomcat%205.5/webapps/netlink/WEB-INF/classes/spy.properties，Tomcat 5.5中的空格被编码成了%20。然后在classLoadPropertyFile()方法中就直接使用该值来创建File对象。可想而知，肯定创建失败。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public static File classLoadPropertyFile(java.net.URL purl) {
-</span><span class='line'>    try {
-</span><span class='line'>        if (purl != null) {
-</span><span class='line'>            // modified by jayakumar for JDK 1.2 support
-</span><span class='line'>            //return new File(purl.getPath());
-</span><span class='line'>            return new File(getPath(purl));
-</span><span class='line'>            // end of modification
-</span><span class='line'>        }
-</span><span class='line'>    } catch (Exception e) {
-</span><span class='line'>        // we ignore this, since JDK 1.2 does not suppport this method
-</span><span class='line'>    }
-</span><span class='line'>    return null;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>在classPathFile()方法中通过判断fp.exists()来决定是否返回日志文件的路径，既然上面创建File对象失败了，那fp.exists()肯定不可能为true了，日志文件也就不可能被创建了。</p>
-
-<p>解决问题的方法超简单，把Tomcat 5.5中的空格去掉就行了。</p>
-</div>
-  
-  
-
-
-    </article>
   
   
     <article>
@@ -1374,6 +1280,126 @@
 
     </article>
   
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/ant-series-problem-using-jdepend-generate-package-dependency-metrics/">Ant系列之用JDepend生成包依赖性度量的问题</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2005-12-29T18:04:59+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>29</span><span class='date-suffix'>th</span>, <span class='date-year'>2005</span></span> <span class='time'>6:04 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>首先获取JDepend的最新jar文件jdepend-2.9.jar，把它添加到ANT_HOME/lib目录里。</p>
+
+<p>在build.xml中添加：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;target name="jdepend" description="Generate dependency metrics for each package"&gt;
+</span><span class='line'>    &lt;jdepend format="xml" outputfile="${jdepend.dir}/jdepend-report.xml"&gt;
+</span><span class='line'>        &lt;classpath&gt;
+</span><span class='line'>            &lt;pathelement path="classes" /&gt;
+</span><span class='line'>        &lt;/classpath&gt;
+</span><span class='line'>    &lt;/jdepend&gt;
+</span><span class='line'>&lt;/target&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>运行任务后出现如下的错误：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>BUILD FAILED
+</span><span class='line'>build.xml:59: Missing classespath required argument
+</span><span class='line'>    at org.apache.tools.ant.taskdefs.optional.jdepend.JDependTask.execute(JDependTask.java:397)
+</span><span class='line'>    at org.apache.tools.ant.UnknownElement.execute(UnknownElement.java:275)
+</span><span class='line'>    at org.apache.tools.ant.Task.perform(Task.java:364)
+</span><span class='line'>    at org.apache.tools.ant.Target.execute(Target.java:341)
+</span><span class='line'>    at org.apache.tools.ant.Target.performTasks(Target.java:369)
+</span><span class='line'>    at org.apache.tools.ant.Project.executeSortedTargets(Project.java:1216)
+</span><span class='line'>    at org.apache.tools.ant.Project.executeTarget(Project.java:1185)
+</span><span class='line'>    at org.apache.tools.ant.helper.DefaultExecutor.executeTargets(DefaultExecutor.java:40)
+</span><span class='line'>    at org.eclipse.ant.internal.ui.antsupport.EclipseDefaultExecutor.executeTargets(EclipseDefaultExecutor.java:32)
+</span><span class='line'>    at org.apache.tools.ant.Project.executeTargets(Project.java:1068)
+</span><span class='line'>    at org.eclipse.ant.internal.ui.antsupport.InternalAntRunner.run(InternalAntRunner.java:423)
+</span><span class='line'>    at org.eclipse.ant.internal.ui.antsupport.InternalAntRunner.main(InternalAntRunner.java:137)</span></code></pre></td></tr></table></div></figure>
+
+<p>查看JDependTask.java文件的397行：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if (getSourcespath() == null && getClassespath() == null) {
+</span><span class='line'>    throw new BuildException("Missing classespath required argument");
+</span><span class='line'>} else if (getClassespath() == null) {
+</span><span class='line'>    String msg = "sourcespath is deprecated in JDepend &gt;= 2.5 - please convert to classespath";
+</span><span class='line'>    log(msg);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>发现是getClassespath() == null了，跳到221行：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public Path getClassespath() {
+</span><span class='line'>    return classesPath;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>不是写了classpath吗？怎么classesPath的值会等于null呢？结果发现在247行有：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void setClasspath(Path classpath) {
+</span><span class='line'>    if (compileClasspath == null) {
+</span><span class='line'>        compileClasspath = classpath;
+</span><span class='line'>    } else {
+</span><span class='line'>        compileClasspath.append(classpath);
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>原来是在build.xml中把classespath错写成classpath了，那样当然有问题啦。改过来，再运行就可以了。</p>
+</div>
+  
+  
+
+
+    </article>
+  
   <div class="pagination">
     
       <a class="prev" href="/posts/27">&larr; Older</a>
@@ -1421,7 +1447,7 @@
 <section>
   <h1>Tags</h1>
   <ul class="tag-cloud">
-    <a style="font-size: 139%" href="/tags/antlr/">ANTLR</a>
+    <a style="font-size: 138%" href="/tags/antlr/">ANTLR</a>
 <a style="font-size: 106%" href="/tags/algorithm/">Algorithm</a>
 <a style="font-size: 131%" href="/tags/android/">Android</a>
 <a style="font-size: 96%" href="/tags/c-plus-plus/">C++</a>
