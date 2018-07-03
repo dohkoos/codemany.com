@@ -9,11 +9,12 @@
   <meta name="author" content="dohkoos">
 
   
-  <meta name="description" content="昨天晚上开始在我的本本上安装Ubuntu 8.04。本本是80G的硬盘，自带有一个XP Home操作系统。现在我想把Ubuntu装在C盘下，也就是不要XP了，并且不想再保留ThinkPad出厂时用来做HPA的隐藏分区，因此可以给Ubuntu使用的主分区就有了四个。分区方案如下： 1
+  <meta name="description" content="无标题栏窗口的实现很简单。先将窗口从wxMiniFrame继承，然后在窗口的构造函数中设置一下窗口的样式。 1
 2
 3
 4
-5 &hellip;">
+5
+MainFrame::MainFrame(const wxPoint& pos, const wxSize& size) : wxMiniFrame(NULL, &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -83,7 +84,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/install-ubuntu-804-on-thinkpad-x60-with-usb/">使用USB在ThinkPad X60上安装Ubuntu 8.04</a></h1>
+      <h1 class="entry-title"><a href="/blog/how-to-implement-draggable-window-without-title-bar/">如何实现一个可拖动的无标题栏窗口</a></h1>
     
     
       <p class="meta">
@@ -92,39 +93,741 @@
 
 
 
-<time class='entry-date' datetime='2008-06-16T17:22:03+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>5:22 pm</span></time>
+<time class='entry-date' datetime='2007-12-03T15:46:55+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>3</span><span class='date-suffix'>rd</span>, <span class='date-year'>2007</span></span> <span class='time'>3:46 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>昨天晚上开始在我的本本上安装Ubuntu 8.04。本本是80G的硬盘，自带有一个XP Home操作系统。现在我想把Ubuntu装在C盘下，也就是不要XP了，并且不想再保留ThinkPad出厂时用来做HPA的隐藏分区，因此可以给Ubuntu使用的主分区就有了四个。分区方案如下：</p>
+  <div class="entry-content"><p>无标题栏窗口的实现很简单。先将窗口从wxMiniFrame继承，然后在窗口的构造函数中设置一下窗口的样式。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>Device     Type  MountPoint  Size
-</span><span class='line'>/dev/sda1  ext3  /boot       197M
-</span><span class='line'>/dev/sda2  swap  /swap       1028M
-</span><span class='line'>/dev/sda3  ext3  /home       48800M
-</span><span class='line'>/dev/sda4  ext3  /           29997M</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>MainFrame::MainFrame(const wxPoint& pos, const wxSize& size)
+</span><span class='line'>    : wxMiniFrame(NULL, wxID_ANY, wxEmptyString, pos, size)
+</span><span class='line'>{
+</span><span class='line'>    SetWindowStyleFlag(wxFRAME_NO_TASKBAR | wxNO_BORDER);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>Linux至少需要两个分区，一个是根分区，一个是交换分区，这样还剩下两个主分区可以使用。因为/home相当于Windows系统中的My Documents，所以准备给它单独分个区。剩下的一个主分区就给/boot挂载点。分配单独的分区给/boot是有必要的，因为/boot包含了操作系统的内核和在启动系统过程中所要用到的文件，这样就算工作分区出了问题，只要这个分区没有问题，系统照样可以启动。</p>
+<p>但是，窗口的移动通常都是通过鼠标点住标题栏拖动窗口来实现的，那么现在没有了标题栏，该如何移动窗口呢？我们知道，当鼠标拖动窗口时，它在窗口中的位置是始终不变的。所以如果能够在鼠标移动过程中，通过改变窗口在桌面上的坐标，并且始终保持鼠标相对于窗口的坐标不变，即可实现鼠标的拖动效果。</p>
 
-<p>安装步骤：</p>
+<p>在具体的设计中，先在鼠标的MouseDown事件中记录下鼠标相对于窗口的偏移，在鼠标的MouseMove事件中根据鼠标在桌面上的位置实时设置窗口的位置，即可达到鼠标拖动窗口的操作。利用此方法实现鼠标拖动，与常规的标题栏鼠标拖动在效果上有一点区别。通过标题栏拖动时，鼠标移动过程中不重画窗口，只有松开鼠标后才在固定位置重画窗口，因此其速度较快。而采用本方法的拖动过程中，每移动一步都需要重画窗口，因此对速度稍有影响，在慢一些的机器上可能会出现轻微的拖尾现象。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>void MainFrame::OnMouseMove(wxMouseEvent& event)
+</span><span class='line'>{
+</span><span class='line'>    if (event.Dragging() && event.LeftIsDown())
+</span><span class='line'>    {
+</span><span class='line'>        wxPoint pt = ClientToScreen(event.GetPosition());
+</span><span class='line'>        int x = pt.x - m_delta.x;
+</span><span class='line'>        int y = pt.y - m_delta.y;
+</span><span class='line'>        Move(x, y);
+</span><span class='line'>    }
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>void MainFrame::OnMouseLeftDown(wxMouseEvent& event)
+</span><span class='line'>{
+</span><span class='line'>    CaptureMouse();
+</span><span class='line'>    wxPoint pt = ClientToScreen(event.GetPosition());
+</span><span class='line'>    wxPoint origin = GetPosition();
+</span><span class='line'>    int dx = pt.x - origin.x;
+</span><span class='line'>    int dy = pt.y - origin.y;
+</span><span class='line'>    m_delta = wxPoint(dx, dy);
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>void MainFrame::OnMouseLeftUp(wxMouseEvent& WXUNUSED(event))
+</span><span class='line'>{
+</span><span class='line'>    if (HasCapture())
+</span><span class='line'>    {
+</span><span class='line'>        ReleaseMouse();
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p><a href="/uploads/wxDragAndDrop.zip" title="wxDragAndDrop.zip">代码下载</a></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/run-only-one-instance-and-active-an-instance-of-the-former/">程序只运行一个实例，并将前一个实例提到前台</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-12-01T09:59:19+08:00'><span class='date'><span class='date-month'>Dec</span> <span class='date-day'>1</span><span class='date-suffix'>st</span>, <span class='date-year'>2007</span></span> <span class='time'>9:59 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>wxWidgets提供了一个用来检测是否只有一个实例在运行的wxSingleInstanceChecker类。为了检测程序只运行一个实例，你可以在程序运行之初使用该类创建一个m_check对象，这个对象将存在于程序的整个生命周期。然后就可以在OnInit函数中调用其IsAnotherRunning函数检测是否已经有别的实例在运行。代码如下所示：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>bool MainApp::OnInit()
+</span><span class='line'>{
+</span><span class='line'>    wxString name = wxString::Format(wxT("MainApp-%s"), wxGetUserId().GetData());
+</span><span class='line'>    m_checker = new wxSingleInstanceChecker(name);
+</span><span class='line'>    if (m_checker-&gt;IsAnotherRunning())
+</span><span class='line'>    {
+</span><span class='line'>        wxLogError(wxT("Another program instance is already running, aborting."));
+</span><span class='line'>        delete m_checker;
+</span><span class='line'>        return false;
+</span><span class='line'>    }
+</span><span class='line'>    // more initializations
+</span><span class='line'>    return true;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>int MainApp::OnExit()
+</span><span class='line'>{
+</span><span class='line'>    delete m_checker;
+</span><span class='line'>    return 0;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>注意：上面使用了wxGetUserId()来构建实例名，这表示允许不同的用户能同时运行程序的一个实例。如果不这样，那么程序就只能被一个用户运行一次。</p>
+
+<p>但是，如果你想把旧的实例提到前台，或者想使旧的实例打开传递给新的实例的作为命令行参数的文件，该怎么办呢？一般来说，这需要在这两个实例间进行通讯。我们可以使用wxWidgets提供的进程间通讯类来实现。</p>
+
+<p>在下面的实例中，我们将实现程序多个实例间的通讯，以便允许第二个实例请求第一个实例将自己带到前台以提醒用户它已经在运行。下面的代码实现了一个连接类，这个类将被两个实例使用。一个服务器类被旧的实例使用，以便监听新的实例的连接请求。一个客户端类被新的实例使用，以便和旧的实例进行通讯。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class AppServer : public wxServer
+</span><span class='line'>{
+</span><span class='line'>public:
+</span><span class='line'>    virtual wxConnectionBase* OnAcceptConnection(const wxString& topic);
+</span><span class='line'>};</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class AppClient : public wxClient
+</span><span class='line'>{
+</span><span class='line'>public:
+</span><span class='line'>    virtual wxConnectionBase* OnMakeConnection();
+</span><span class='line'>};</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>class AppConnection : public wxConnection
+</span><span class='line'>{
+</span><span class='line'>public:
+</span><span class='line'>    virtual bool OnExecute(const wxString& WXUNUSED(topic), wxChar* WXUNUSED(data),
+</span><span class='line'>                          int WXUNUSED(size), wxIPCFormat WXUNUSED(format));
+</span><span class='line'>};</span></code></pre></td></tr></table></div></figure>
+
+<p>当有新的实例（作为Client）进行连接请求时，旧的实例（作为Server）中的OnAcceptConnection函数首先检查旧的实例中没有任何模式对话框。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>wxConnectionBase* AppServer::OnAcceptConnection(const wxString& topic)
+</span><span class='line'>{
+</span><span class='line'>    if (topic.Lower() == wxT("only-one"))
+</span><span class='line'>    {
+</span><span class='line'>        wxWindowList::Node* node = wxTopLevelWindows.GetFirst();
+</span><span class='line'>        while (node)
+</span><span class='line'>        {
+</span><span class='line'>            wxDialog* dialog = wxDynamicCast(node-&gt;GetData(), wxDialog);
+</span><span class='line'>            if (dialog && dialog-&gt;IsModal())
+</span><span class='line'>            {
+</span><span class='line'>                return false;
+</span><span class='line'>            }
+</span><span class='line'>            node = node-&gt;GetNext();
+</span><span class='line'>        }
+</span><span class='line'>        return new AppConnection();
+</span><span class='line'>    }
+</span><span class='line'>    else
+</span><span class='line'>    {
+</span><span class='line'>        return NULL;
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>OnExecute函数是一个回调函数，在新的实例对其连接对象（由AppConnection创建的对象）调用Execute函数时被调用。OnExecute函数可以有一个空的参数，这表示它只要将自己提到前台就可以了。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>bool AppConnection::OnExecute(const wxString& WXUNUSED(topic), wxChar* WXUNUSED(data),
+</span><span class='line'>                              int WXUNUSED(size), wxIPCFormat WXUNUSED(format))
+</span><span class='line'>{
+</span><span class='line'>    wxFrame* frame = wxDynamicCast(wxGetApp().GetTopWindow(), wxFrame);
+</span><span class='line'>    if (frame)
+</span><span class='line'>    {
+</span><span class='line'>        frame-&gt;Restore();    // 必须要有这句，不然当主窗口最小化时，就不能被提到前台
+</span><span class='line'>        frame-&gt;Raise();
+</span><span class='line'>    }
+</span><span class='line'>    return true;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>接下来我们还需要修改OnInit()函数。当没有别的实例在运行时，这个实例需要将自己设置为Server，等待别的实例的连接请求，如果已经有实例在运行，那么就创建一个和那个实例的连接，请求那个实例将程序的主窗口提到前台。下面的修改后的代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>bool MainApp::OnInit()
+</span><span class='line'>{
+</span><span class='line'>    wxString name = wxString::Format(wxT("MainApp-%s"), wxGetUserId().GetData());
+</span><span class='line'>    m_checker = new wxSingleInstanceChecker(name);
+</span><span class='line'>    if (!m_checker-&gt;IsAnotherRunning())
+</span><span class='line'>    {
+</span><span class='line'>        m_server = new AppServer();
+</span><span class='line'>        if (!m_server-&gt;Create(wxT("wxMainApp")))
+</span><span class='line'>        {
+</span><span class='line'>            wxLogDebug(wxT("Failed to create an IPC service."));
+</span><span class='line'>            return false;
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>    else
+</span><span class='line'>    {
+</span><span class='line'>        AppClient* client = new AppClient();
+</span><span class='line'>        wxString hostName = wxT("localhost");
+</span><span class='line'>        wxConnectionBase* conn = client-&gt;MakeConnection(hostName, wxT("wxMainApp"), wxT("only-one"));
+</span><span class='line'>        if (conn)
+</span><span class='line'>        {
+</span><span class='line'>            conn-&gt;Execute(wxEmptyString);
+</span><span class='line'>            conn-&gt;Disconnect();
+</span><span class='line'>            delete conn;
+</span><span class='line'>        }
+</span><span class='line'>        else
+</span><span class='line'>        {
+</span><span class='line'>            wxString msg = wxT("Sorry, the existing instance may be too busy to respond.\nPlease close any open dialogs and retry.");
+</span><span class='line'>            wxMessageBox(msg, wxT("wxMainApp"), wxICON_INFORMATION | wxOK);
+</span><span class='line'>        }
+</span><span class='line'>        delete client;    // 如果没有这句，在运行Debug版本时就会显示如下图的警告
+</span><span class='line'>        return false;
+</span><span class='line'>    }
+</span><span class='line'>    // more initializations
+</span><span class='line'>    return true;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p><img src="/uploads/wxdde-alert.png" alt="wxdde-alert"></p>
+
+<p>释放实例资源</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>int MainApp::OnExit()
+</span><span class='line'>{
+</span><span class='line'>    delete m_checker;
+</span><span class='line'>    delete m_server;
+</span><span class='line'>    return 0;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>遇到的问题：</p>
+
+<p>1、调用wxGetApp时编译错误</p>
+
+<p>在调用wxGetApp()时可能会有编译错误，提示说“identifier not found”。这可以通过在App类后加上一行DECLARE_APP(XXXApp)来解决。</p>
+
+<p>2、引入ipc.h和wx.h时的顺序问题</p>
+
+<p>运行第二个实例的时候，发现它总是会挂起在MakeConnection处，查看进程可以看到有两个实例在运行。在网上找了n久，只在wxWidgets Forum上发现有提到这个问题（<a href="http://wxforum.shadonet.com/viewtopic.php?t=4367&highlight=makeconnection">Windows service using wxWidgets ipc</a>），可是也没有提到如何解决。只能靠自己啦，经过对程序的一步步排除，终于发现是因为引入头文件时将ipc.h放在wx.h之前的原因，掉换引入头文件的顺序后问题被解决。</p>
+
+<p><a href="/uploads/wxSingleton.zip" title="wxSingleton.zip">代码下载</a></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/sms-split-algorithm/">短信分拆算法</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-11-22T21:34:47+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>22</span><span class='date-suffix'>nd</span>, <span class='date-year'>2007</span></span> <span class='time'>9:34 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>今天，突然心血来潮，写了一段分拆短信的代码。代码如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class SMSHelper {
+</span><span class='line'>    private static final int SMS_MAX_LENGTH = 70;
+</span><span class='line'>
+</span><span class='line'>    public static List split(String msg) {
+</span><span class='line'>        if (msg.length() &lt;= SMS_MAX_LENGTH) {
+</span><span class='line'>            throw new IllegalArgumentException("被分拆的短信长度必须大于70个字符");
+</span><span class='line'>        }
+</span><span class='line'>
+</span><span class='line'>        List&lt;String&gt; list = new ArrayList&lt;String&gt;();
+</span><span class='line'>        int i = 0, start = 0;
+</span><span class='line'>        while (true) {
+</span><span class='line'>            i++;
+</span><span class='line'>            String prompt = "(第" + i + "条)";
+</span><span class='line'>            int remain = SMS_MAX_LENGTH - prompt.length();
+</span><span class='line'>            if (start + remain &gt; msg.length()) {
+</span><span class='line'>                list.add(prompt + msg.substring(start));
+</span><span class='line'>                break;
+</span><span class='line'>            }
+</span><span class='line'>            list.add(prompt + msg.substring(start, start + remain));
+</span><span class='line'>            start += remain;
+</span><span class='line'>        }
+</span><span class='line'>        return list;
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/rethinking-the-progress-bar/">进度条的再思考</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-11-08T20:26:41+08:00'><span class='date'><span class='date-month'>Nov</span> <span class='date-day'>8</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>8:26 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>英文原文：<a href="http://chrisharrison.net/projects/progressbars/ProgBarHarrison.pdf">http://chrisharrison.net/projects/progressbars/ProgBarHarrison.pdf</a></p>
+
+<h3 id="摘要">摘要</h3>
+
+<p>进度条在现代用户界面中是普遍存在的。通常，线性函数的使用使得条的进度和已经完成多少工作成正比。然而，许多因素会导致进度条以非线性的速率前进。此外，人类以一种非线性的方式感知时间。这篇论文探讨各种进度条行为在用户感知过程持续时间上的影响。结果被用来提出一些设计考量——可以使进度条看起来更快，最终改善用户的计算体验。</p>
+
+<h3 id="简介">简介</h3>
+
+<p>大多数软件包使用进度条显示一个持续过程的状态。用户依靠进度条来验证操作进展顺利，以及估算它的完成时间。通常，线性函数的应用使得进度条的前进和已经完成工作的数量成正比。然而，为复杂的或多阶段的过程估算进度可能是困难的。不同的磁盘，内存，处理器，带宽和其它因素使这个问题进一步复杂化。因而，进度条经常表现出非线性的行为，例如加速、减速和停顿。</p>
+
+<p>再者，人类不以线性的方式感知时间的流逝。再加上进度条的不规则行为，导致人类感知过程持续时间的不同。了解哪些行为在感知上缩短或延长过程持续时间可以被用来改变进度条让它看起来更快，尽管实际的持续时间保持不变。这篇论文描述一个实验，它试图识别在用户感知进度条行为中的模式。然后结果被分析去划分在感知上加速或减速过程执行的行为。我们得出一些设计建议，它们可以被应用于使用进度条的应用，有助于一种总体上反应更灵敏、令人愉悦的和以人为中心的计算体验。</p>
+
+<h3 id="相关工作">相关工作</h3>
+
+<p>Myers调查研究了图形用户界面中进度指示器对用户体验的影响。他得出用户在长期的任务过程中对进度指示器有着强烈的偏好，并且，总的来说，发现它们是有用的。Conn在《Time Affordances: The Time Factor in Diagnostic Usability Heuristics》一文中探讨了时间可见性的概念，文中还列举了一系列理想的进度条的属性。范例给用户提供了一个准确易懂的方法以帮助测量交互系统中的进度。Conn也定义了其它概念——时间容忍窗口，它是用户在判定任务没有取得足够进展前愿意等待的时间长度。Conn接着描述了可以被应用于设置用户期望进行更长等待的预测算法，本质上用一个非线性方法报告进度来增强用户体验。</p>
+
+<p>Fredrickson等人提出持续时间对情感体验多么令人满意的评估影响不大（持续时间忽视）。相反，在体验期间和在体验结束时（峰端效应）感知受到显著特征（好的和坏的）的影响最严重。出现这种情况是因为人类不能以一种一致的和线性的方式记住体验，而是有选择地和带着各种偏见地回忆事件。持续时间忽视（duration neglect）和峰端效应（peak-and-end effects）可以在各种各样的领域中看到，包括医学、经济学、广告和人机交互。</p>
+
+<h3 id="实验">实验</h3>
+
+<p>我们识别并开发了8个非线性函数，它们体现不同的进度行为。包含一个线性函数作为比较的基线。Table 1和Figure 1描述了每个进度函数的行为。为测试这些函数的人类感知，开发了一个实验应用，它同时给用户提供像Figure 2这样的两个进度条。这些进度条逐次运行：当第一个进度条完成时第二个进度条自动开始。每个进度条充当控件的持续时间保持在一个恒定的5.5秒。界面提供三个响应按钮，允许用户选择是否第一个或第二个进度条显示更快些或者它们在持续时间上是相等的。另一个按钮允许用户在继续随后的一对进度条之前重放每次测试。一旦提供了答案，下一次测试就会被启动。响应和重放按钮可以在任何时候被按下。</p>
+
+<p><img src="/uploads/progress-bar-table-1.png" alt="progress-bar-table-1"></p>
+
+<p>基于Java的应用运行在一台12”显示器1024x768分辨率的Apple笔记本上。进度条是使用Java Graphics2D原语定制的，600x50像素大小（大约1.2cm x 14.3cm）。一套着色和命名方案被应用于更好地可视化地通知用户：运行的进度条显示成蓝色并且题为“running”，而完成的进度条染成绿色并且题为“finished”。用户通过带有一个集成的、单独的鼠标按钮的触摸板和界面交互。</p>
+
+<p>比较9个进度函数的所有不同顺序对需要81次测试。最初的试点测试显示，在大约50套进度条后用户发现任务是相当乏味的并开始失去兴趣。为了保持主题的关注和确保响应完整的高水平，我们决定给每个用户呈现9个进度函数的所有组合（36次测试）以及与自己配对的函数组合（9次测试）总计45次测试。这保持总的任务时间在15分钟以下。呈现的顺序在两个方面被抵消。首先，对每对用户来说45次测试的序列是随机选择的。其次，在每对用户中，每次测试的呈现顺序是相反的（也就是说，如果配对中第一个用户看见Linear/Power，第二个用户将看见Power/Linear）。</p>
+
+<p><img src="/uploads/progress-bar-figure-1.png" alt="progress-bar-figure-1"></p>
+
+<p>我们从两个大的计算机研究实验室招募了平均年龄约为37岁的22名参与者（14名男性，8名女性）。实验在参与者的办公室里进行。简易比较界面的一个简短口头解释被给出。参与者被告知进度条可能以不同速率前进，他们应该选择他们认为更快的进度条或者如果速度相同就选择等于。</p>
+
+<p><img src="/uploads/progress-bar-figure-2.png" alt="progress-bar-figure-2"></p>
+
+<h3 id="分析和结果">分析和结果</h3>
+
+<p>参与者往往偏好（也就是说，认为更快）第一次看到的那个函数。在990对比较中，第一个函数被优先选择376次（38%），第二个262次（26%），没有任何偏好352次（36%）。这一发现被随后讨论的卡方检验结果所支持。</p>
+
+<p>参与者在9个函数中有着强烈的偏好。对函数的任何配对比较，我们指派一个+1的偏好分数如果第一个函数被优先选择，如果第二个函数被优先选择则是-1，如果参与者没有偏好就是0。Table 2显示了36个函数对中每一个的平均偏好分数。例如，在22个Slow Wavy和Fast Wavy的比较中（每个出现11次），10名参与者优先选择Fast Wavy，5名优先选择Slow Wavy，7名认为函数是相等的。因此，平均偏好分数是(10 – 5) / 22 = 0.23。表的行和列根据增长的总体偏好排序。粗体表示统计显著性从0开始在0.05水平上使用每个函数是同等可能被优先选择的零假设的一个双边符号测试。</p>
+
+<p><img src="/uploads/progress-bar-table-2.png" alt="progress-bar-table-2"></p>
+
+<p>使用Table 2中的平均偏好分数，我们为9个进度函数生成一个粗略的偏好排序，如Figure 3所示。</p>
+
+<p><img src="/uploads/progress-bar-figure-3.png" alt="progress-bar-figure-3"></p>
+
+<p>为有效地组合跨单元信息，在控制呈现顺序时，我们使一个logistic回归模型与偏好已给出的638个案例相拟合。偏好Function i胜于Function j假定函数Function i被第一次看到的概率被建模为</p>
+
+<p><img src="/uploads/progress-bar-formula.png" alt="progress-bar-formula"></p>
+
+<p>Hosmer-Lemeshow卡方检验（8.87和自由度7）未能显示模型拟合的不足。参数&alpha;据估计是带有标准误差0.09的0.42，反映了参与者更偏好他们看见的第一个函数的倾向性。估计的&alpha;度量在函数中的相对偏好。因为概率仅仅依赖&alpha;间的差异，我们把为Linear估计的&alpha;固定在0（Figure 4）。&alpha;间差异的标准误差介于0.28和0.37。</p>
+
+<p><img src="/uploads/progress-bar-figure-4.png" alt="progress-bar-figure-4"></p>
+
+<p>9个函数干净利落地聚成三组（Figure 4）：3个被认为比Linear更慢，4个被认为接近Linear，2个被认为比Linear更快。所有三组间的不同是显著的但在组内不一定显著。每个函数的&alpha;和其它任何群集中的每个函数在0.05水平上差异显著。被认为比Linear更快的2个函数Power和Fast Power都是指数函数，在接近过程的结尾以更快的进度发生。Slow Wavy、Fast Wavy和Late Pause，仅有的在接近过程结束有停顿的函数，都被认为比Linear更慢。</p>
+
+<p>三个常规发现解释了估算模式，它符合前面提到的峰端效应。首先，参与者认为带有停顿的进度条需要更长的时间去完成（峰值效应）。其次，加速的进度被强烈地青睐。当位于过程即将结束时两种效应的后者有一个夸张的感知影响（末端效应）。有趣的是，两个因素似乎结合在Early Pause情况下，使它基本上等同于偏好的Linear函数。</p>
+
+<h3 id="论述">论述</h3>
+
+<p>尽管我们的结果可以被用来增强整个系统的进度条，但有许多情况修改进度行为似乎不合适。一般而言，带有已知静态完成条件和稳定进度的过程不是好的候选者——标准进度条能有效地、精确地可视化这些。另外，这些过程类型往往很少被停顿或其它负面进度行为影响（足以使它们经常伴随着精确的时间估算）。这种过程类型的例子包括拷贝一个文件到磁盘，扫描一张照片，或者播放一个音频文件。</p>
+
+<p>然而，带有动态完成条件和粗略估计持续时间的进度条（比如，碎片整理硬盘驱动器）可以在两个重要方面被加强。首先，因为用户似乎对停顿特别是一个操作即将结束时有种强烈的厌恶，进度条可以被设计成用于弥补这种行为。一个智能的进度条可以缓存进度当操作首先开始缓解以后的负面进度行为（比如，停顿或者迟缓）时。其次，进度可以在开始时被低估和在即将结束时被加速，提供一个迅速结束的感觉在我们的实验中是被用户高度青睐的。</p>
+
+<p>感知增强也可以被集成到多阶段过程的设计中，例如软件的安装。我们的结果表明用户最愿意在一个操作的开始容忍负面的进度行为（比如，停顿和不一致的进度）。因此，过程阶段可以安排那些更慢的或多变的操作最先完成。例如，如果安装程序的一部分需要从远程服务器获取更新，而网络连接可能是不稳定或不可靠的，最好在安装顺序的早期运行这个阶段。更新自己总是可以被稍后应用，因为它们运行在本地，有更多的可预测行为。</p>
+
+<h3 id="总结">总结</h3>
+
+<p>不同的进度条行为在用户感知进度持续时间上似乎有显著影响。通过最小化负面行为和结合正面行为，可以有效地使进度条及其相关过程看起来更快。此外，如果一个多阶段操作的元素可以被重新排列，它可能会用更令人满意和似乎更快的序列重新排序阶段。</p>
+
+<h3 id="未来的工作">未来的工作</h3>
+
+<p>在此次实验中，所有进度条在5.5秒内完成。然而许多使用进度条的操作有相当长的运行时。如果我们的发现扩展到其它持续时间，调查研究应该会很有趣。此外，其它进度行为和行为组合的研究可能揭示新的感知影响。同时，一个自适应实验可以被进行，在此实验中，单独的进度条时间将被动态调整到所有函数在持续时间上被认为相等的一个状态。这将允许相关感知的变体被定量评估。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/hello-wxwidgets/">Hello wxWidgets!</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-09-25T11:31:56+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>25</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>11:31 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>MainApp.h代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>#ifndef __MAINAPP_H__
+</span><span class='line'>#define __MAINAPP_H__
+</span><span class='line'>
+</span><span class='line'>#include &lt;wx/wx.h&gt;
+</span><span class='line'>
+</span><span class='line'>class MainApp : public wxApp
+</span><span class='line'>{
+</span><span class='line'>public:
+</span><span class='line'>    virtual bool OnInit();
+</span><span class='line'>};
+</span><span class='line'>
+</span><span class='line'>#endif</span></code></pre></td></tr></table></div></figure>
+
+<p>MainApp.cpp代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>#include "MainApp.h"
+</span><span class='line'>#include "MainFrame.h"
+</span><span class='line'>
+</span><span class='line'>IMPLEMENT_APP(MainApp)
+</span><span class='line'>
+</span><span class='line'>bool MainApp::OnInit()
+</span><span class='line'>{
+</span><span class='line'>    MainFrame* frame = new MainFrame("Hello wxWidgets!");
+</span><span class='line'>    SetTopWindow(frame);
+</span><span class='line'>    frame-&gt;Show();
+</span><span class='line'>    return true;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>MainFrame.h代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>#ifndef __MAINFRAME_H__
+</span><span class='line'>#define __MAINFRAME_H__
+</span><span class='line'>
+</span><span class='line'>#include &lt;wx/frame.h&gt;
+</span><span class='line'>
+</span><span class='line'>class MainFrame : public wxFrame
+</span><span class='line'>{
+</span><span class='line'>public:
+</span><span class='line'>    MainFrame(const wxString& title);
+</span><span class='line'>};
+</span><span class='line'>
+</span><span class='line'>#endif</span></code></pre></td></tr></table></div></figure>
+
+<p>MainFrame.cpp代码：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>#include "MainFrame.h"
+</span><span class='line'>
+</span><span class='line'>MainFrame::MainFrame(const wxString& title) : wxFrame(NULL, wxID_ANY, title)
+</span><span class='line'>{
+</span><span class='line'>    // TODO: add member initialization code here
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/idcardtool-tool-for-chinese-identity-card/">身份证工具IDCardTool</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-09-16T11:42:20+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>16</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>11:42 am</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>周末赶了两天，终于把这个工具完成了。界面几乎完全仿制了“身份证生成与查询BBSt（共享版）”。</p>
+
+<p><img src="/uploads/ict-main.png" alt="ict-main"></p>
+
+<h3 id="中国居民身份证的常识">中国居民身份证的常识</h3>
+
+<p>我国现行使用公民身份证号码有两种尊循两个国家标准，〖GB 11643-1989〗和〖GB 11643-1999〗。</p>
+
+<p>〖GB 11643-1989〗中规定的是15位身份证号码：排列顺序从左至右依次为：六位数字地址码，六位数字出生日期码，三位数字顺序码，其中出生日期码不包含世纪数。</p>
+
+<p><img src="/uploads/ict-15.png" alt="ict-15"></p>
+
+<p>〖GB 11643-1999〗中规定的是18位身份证号码：排列顺序从左至右依次为：六位数字地址码，八位数字出生日期码，三位数字顺序码，一位数字校验码。</p>
+
+<p><img src="/uploads/ict-18.png" alt="ict-18"></p>
 
 <ol>
-<li>准备一个至少1G优盘；</li>
-<li>下载<a href="http://www.pendrivelinux.com/downloads/Ub8convert2.exe">Ub8convert2.exe</a>。运行这个文件，将会获得一个Ubuntu8目录；</li>
-<li>下载ubuntu-8.04-desktop-i386.iso，将它放到Ubuntu8目录下；</li>
-<li>运行Ubuntu8目录下的fixu8.bat脚本（注意：fixu.bat采用的是utf-8编码，需要重新编辑该文件中的盘符）；</li>
-<li>现在就可以使用U盘来安装Ubuntu了。</li>
+<li>地址码：表示编码对象常住户口所在县（市、旗、区）的<a href="http://www.stats.gov.cn/tjsj/tjbz/xzqhdm/">行政区划代码</a>。</li>
+<li>出生日期码：表示编码对象出生的年、月、日，年、月、日之间不用分隔符。</li>
+<li>顺序码：表示同一地址码所标识的区域范围内，对同年、同月、同日出生的人员编定的顺序号。顺序码的奇数分给男性，偶数分给女性。</li>
+<li>校验码：根据前面十七位数字码，按照国际标准ISO 7064:1983.MOD 11-2规定的校验算法计算出来的检验码。</li>
 </ol>
 
-<p>注意：如果内存小于512M，那么最好分配两倍内存容量的swap分区。否则只要2的n次方就可以了。</p>
+<p>关于身份证号码最后一位校验码的算法如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&sum;(a[i] * W[i]) mod 11 (i = 2, 3, ..., 18)</span></code></pre></td></tr></table></div></figure>
+
+<ul>
+<li>*：表示乘号；</li>
+<li>i：表示身份证号码每一位字符的位置序号，从右至左，最左侧为18，最右侧为1；</li>
+<li>a[i]：表示身份证号码第i位上的号码数字值；</li>
+<li>W[i]：表示第i位上的加权因子，其数值依据公式W[i] = 2<sup>i-1</sup> mod 11计算得出。</li>
+</ul>
+
+<p>设：R = &sum;(a[i] * W[i]) mod 11 (i = 2, 3, ..., 18)，C = 身份证号码的校验码，则R和C之间的对应关系如下表：</p>
+
+<p><img src="/uploads/ict-check.png" alt="ict-check"></p>
+
+<p>由此看出Ⅹ相当于10（罗马数字中的10就是用Ⅹ表示），所以在新标准的身份证号码中可能含有非数字的字母Ⅹ。</p>
+
+<p>代码下载：<a href="https://github.com/dohkoos/IDCardTool">https://github.com/dohkoos/IDCardTool</a></p>
 </div>
   
   
@@ -137,7 +840,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/setpropertiesrule-server-service-engine-host-context-setting-property/">[SetPropertiesRule]{Server/Service/Engine/Host/Context} Setting property</a></h1>
+      <h1 class="entry-title"><a href="/blog/built-wxwidgets-286-development-environment-under-visual-studio-2005/">Visual Studio 2005下wxWidgets-2.8.6开发环境的搭建</a></h1>
     
     
       <p class="meta">
@@ -146,36 +849,100 @@
 
 
 
-<time class='entry-date' datetime='2008-06-04T15:24:18+08:00'><span class='date'><span class='date-month'>Jun</span> <span class='date-day'>4</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>3:24 pm</span></time>
+<time class='entry-date' datetime='2007-09-11T15:27:51+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>11</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>3:27 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>使用Tomcat 6.0.16搭配Eclipse创建Dynamic Web Project后，在项目上按右键，选择Run As -&gt; Run on Server方式启动Tomcat服务器。在Console工作台中就会出现如下的红色警告信息，让人不爽。</p>
+  <div class="entry-content"><p>wxWidgets是一个开源的跨平台C++类库，它包含一个可以支持现今几乎所有操作系统的图形用户界面（GUI）库和其它一些很有用的工具，提供了类似MFC的功能。wxWidgets的主体是由C++构建的，但你并不是必需通过C++才能使用wxWidgets。wxWidgets拥有许多其它语言的绑定，使你在用其它语言编写程序的时候也可以使用wxWidgets。</p>
+
+<h3 id="wxwidgets的下载、安装和编译">wxWidgets的下载、安装和编译</h3>
+
+<ol>
+<li>去 <a href="http://www.wxwidgets.org/downloads/">http://www.wxwidgets.org/downloads/</a> 下载一个wxMSW版本的wxWidgets；</li>
+<li>运行安装文件。在安装好后设置环境变量WXWIN，指向wxWidgets的安装目录。因为安装过程仅仅是把文件拷贝到指定的目录，所以还需要对wxWidgets进行编译；</li>
+<li>进入$(WXWIN)/build/msw目录，用VS2005打开wx.dsw，提示是否进行项目转换，点确定。如果想要链接静态运行库，在编译前应该对每个项目进行设置，如下图：</li>
+</ol>
+
+<p><img src="/uploads/wxwidgets-compile.png" alt="wxwidgets-compile"></p>
+
+<p>编译好后的wxWidgets会在$(WXWIN)/lib/vc_lib目录下生成一系列的lib文件，这些lib文件的名字遵循下面的命名规则：不依赖于GUI组件的库会以wxbase开头，紧跟着的是版本号，然后的字母表明这个库是否是编译为Unicode(&#39;u&#39;)或是否是编译为Debug(&#39;d&#39;)，名字中的最后部分是wxWidgets组件的名字。</p>
+
+<p>注意：wxWidgets编译完后在$(WXWIN)/build/msw目录下会生成许多预编译头文件，占了很大的空间，如果确定以后不再编译wxWidgets库的话，可以考虑删掉。</p>
+
+<h3 id="设置开发环境">设置开发环境</h3>
+
+<p>打开Tools -&gt; Options -&gt; Projects and Solutions -&gt; VC++ Directories</p>
+
+<ol>
+<li>在Include files中加入$(WXWIN)/include和$(WXWIN)/include/msvc</li>
+<li>在Library files中加入$(WXWIN)/lib/vc_lib</li>
+</ol>
+
+<h3 id="创建wxwidgets项目">创建wxWidgets项目</h3>
+
+<p>新建一个General -&gt; Empty Project或Win32 -&gt; Win32 Project项目，然后设置项目的一些属性，可以选择下面的其中一个来设置。譬如你如果打算使用Unicode，那么选择Unicode Debug或Unicode Release，如果你仅仅想调试程序而非发布，则只需要选择Debug设置。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>2008-6-4 21:49:00 org.apache.tomcat.util.digester.SetPropertiesRule begin
-</span><span class='line'>WARNING: [SetPropertiesRule]{Server/Service/Engine/Host/Context} Setting property 'source' to 'org.eclipse.jst.j2ee.server:cont' did not find a matching property.
-</span><span class='line'>2008-6-4 21:49:00 org.apache.catalina.core.AprLifecycleListener init
-</span><span class='line'>2008-6-4 21:49:00 org.apache.coyote.http11.Http11Protocol init
-</span><span class='line'>INFO: Initializing Coyote HTTP/1.1 on http-8080</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Debug：
+</span><span class='line'>Project Properties -&gt; General -&gt; Character Set: No Set
+</span><span class='line'>Project Properties -&gt; C/C++ -&gt; Code Generation -&gt; Runtime Library: Multi-threaded Debug (/MTd)
+</span><span class='line'>Project Properties -&gt; Linker -&gt; Input -&gt; Additional Dependencies: wxbase28d.lib wxmsw28d_core.lib winmm.lib comctl32.lib rpcrt4.lib wsock32.lib oleacc.lib
+</span><span class='line'>
+</span><span class='line'>Release：
+</span><span class='line'>Project Properties -&gt; General -&gt; Character Set: No Set
+</span><span class='line'>Project Properties -&gt; C/C++ -&gt; Code Generation -&gt; Runtime Library: Multi-threaded (/MT)
+</span><span class='line'>Project Properties -&gt; Linker -&gt; Input -&gt; Additional Dependencies: wxbase28.lib wxmsw28_core.lib winmm.lib comctl32.lib rpcrt4.lib wsock32.lib oleacc.lib
+</span><span class='line'>
+</span><span class='line'>Unicode Debug：
+</span><span class='line'>Project Properties -&gt; General -&gt; Character Set: Use Unicode Character Set
+</span><span class='line'>Project Properties -&gt; C/C++ -&gt; Code Generation -&gt; Runtime Library: Multi-threaded Debug (/MTd)
+</span><span class='line'>Project Properties -&gt; Linker -&gt; Input -&gt; Additional Dependencies: wxbase28ud.lib wxmsw28ud_core.lib winmm.lib comctl32.lib rpcrt4.lib wsock32.lib oleacc.lib
+</span><span class='line'>
+</span><span class='line'>Unicode Release：
+</span><span class='line'>Project Properties -&gt; General -&gt; Character Set: Use Unicode Character Set
+</span><span class='line'>Project Properties -&gt; C/C++ -&gt; Code Generation -&gt; Runtime Library: Multi-threaded (/MT)
+</span><span class='line'>Project Properties -&gt; Linker -&gt; Input -&gt; Additional Dependencies: wxbase28u.lib wxmsw28u_core.lib winmm.lib comctl32.lib rpcrt4.lib wsock32.lib oleacc.lib</span></code></pre></td></tr></table></div></figure>
 
-<p>在网上查找答案，有的说将Tomcat的版本换成6.0.14就可以了；还有的说在建立Dynamic Web Project时把“Dynamic Web Module”选项后面的版本号由2.5改成2.4也行。不过这些回答好像都不能真正地解决问题。只能自己想办法了。</p>
+<h3 id="问题">问题</h3>
 
-<p>实际上出现SetPropertiesRule警告的原因是因为Tomcat在server.xml的Context节点中不支持source属性：</p>
+<p>1、编译时出现</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;Context docBase="xxx" path="/cont" source="org.eclipse.jst.j2ee.server:cont" /&gt;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Cannot open include file: '../mswu/wx/setup.h': No such file or directory</span></code></pre></td></tr></table></div></figure>
 
-<p>解决方法是在Server的配置界面中选中“Publish module contexts to separate XML files”选项。</p>
+<p>是因为项目属性的Character Set设置不正确，必须与使用的wxWidgets库的Character Set一致。</p>
 
-<p><img src="/uploads/eclipse-server-options.png" alt="eclipse-server-options"></p>
+<p>2、编译时如果出现</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>MSVCRT.lib(MSVCRT.dll) : error LNK2005: _free already defined in LIBC.lib(free.obj)</span></code></pre></td></tr></table></div></figure>
+
+<p>这是因为没有连接正确的wxWidgets库，譬如Unicode Debug版本的项目就需要连接Unicode+Debug版本的wxWidgets库（库名后缀为&#39;ud&#39;的lib文件），或者是wxWidgets库和程序使用的Runtime Library不同。</p>
+
+<p>3、运行时出现No Debugging Information对话框。</p>
+
+<p>将Project Properties -&gt; Linker -&gt; Debugging -&gt; Generate Debug Info的值改成Yes (/DEBUG)。</p>
 </div>
   
   
@@ -188,7 +955,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/reading-notes-the-difference-of-date-calculation-between-java-and-javascript/">《Java和JavaScript关于日期计算上的差异》阅读笔记</a></h1>
+      <h1 class="entry-title"><a href="/blog/install-and-use-ruby-dbi/">Ruby DBI的安装和使用</a></h1>
     
     
       <p class="meta">
@@ -197,57 +964,442 @@
 
 
 
-<time class='entry-date' datetime='2008-05-23T13:30:00+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>23</span><span class='date-suffix'>rd</span>, <span class='date-year'>2008</span></span> <span class='time'>1:30 pm</span></time>
+<time class='entry-date' datetime='2007-09-04T22:35:15+08:00'><span class='date'><span class='date-month'>Sep</span> <span class='date-day'>4</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>10:35 pm</span></time>
         
       </p>
     
   </header>
 
 
-  <div class="entry-content"><p>下面是<a href="http://wangchangjun.javaeye.com/blog/170049">《Java和JavaScript关于日期计算上的差异》</a>作者给出的结论：</p>
+  <div class="entry-content"><p>Ruby DBI是一个为Ruby程序访问数据库提供的与数据库无关的统一数据库编程接口。结构层次上可以分为两层：</p>
+
+<ol>
+<li>Database Interface 数据库接口层，与数据库无关，提供与数据库无关的标准接口</li>
+<li>Database Driver 数据库驱动，与数据库相关</li>
+</ol>
+
+<p>Ruby DBI模块可以从 <a href="http://ruby-dbi.sourceforge.net/">http://ruby-dbi.sourceforge.net/</a> 取得，下载后解压缩，配置，然后安装：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ruby setup.rb config --with=dbi,dbd_mysql
+</span><span class='line'>ruby setup.rb setup
+</span><span class='line'>ruby setup.rb install</span></code></pre></td></tr></table></div></figure>
+
+<p>注意：--with参数必须根据你所安装的数据库类型来选择。可以配置多个，但不能选择没有安装在你机器上的数据库类型。记得刚开始的时候我使用ruby setup.rb config来配置（我机器上只安装了MySQL和SQL Server），结果在ruby setup.rb setup时一直出现像下面这样的错误信息：</p>
+
+<p><img src="/uploads/ruby-dbi.png" alt="ruby-dbi"></p>
+
+<p>下面是一个完整的例子</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># dbitest.rb
+</span><span class='line'>require 'dbi'
+</span><span class='line'>
+</span><span class='line'># Connect to a database
+</span><span class='line'>dbh = DBI.connect('dbi:Mysql:rubydbi:localhost', 'root', '123456')
+</span><span class='line'>
+</span><span class='line'>dbh.do('DROP TABLE IF EXISTS people')
+</span><span class='line'>dbh.do('CREATE TABLE people (id int, name varchar(30))')
+</span><span class='line'>
+</span><span class='line'># Insert some rows, use placeholders
+</span><span class='line'>sql = 'INSERT INTO people VALUES (?, ?)'
+</span><span class='line'>dbh.prepare(sql) do |sth|
+</span><span class='line'>    sth.execute('100', 'Michael')
+</span><span class='line'>    sth.execute('200', 'John')
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'># Select all rows
+</span><span class='line'>sth = dbh.prepare('SELECT * FROM people')
+</span><span class='line'>sth.execute
+</span><span class='line'>
+</span><span class='line'># Print out each row
+</span><span class='line'>while row = sth.fetch do
+</span><span class='line'>    p row
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'># Close the statement handle when done
+</span><span class='line'>sth.finish
+</span><span class='line'>
+</span><span class='line'>dbh.do('DROP TABLE people')
+</span><span class='line'>
+</span><span class='line'># Finally, disconnect
+</span><span class='line'>dbh.disconnect</span></code></pre></td></tr></table></div></figure>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/getting-started-jpa-with-spring2/">JPA + Spring 2入门</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-08-10T18:33:42+08:00'><span class='date'><span class='date-month'>Aug</span> <span class='date-day'>10</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>6:33 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>JPA（Java Persistence API）是EJB 3.0 新引入的一个把Java数据对象映射成关系数据库对象的数据持久化编程模型，它弥补了JDBC、ORM、EJB 2等在Java对象持久化方面的不足之处，并且非常易于使用。JPA可以被当作一个单独的 POJO（Plain Old Java Object）持续化使用，或者被集成到任意Java EE兼容的容器或其它的轻量级框架（例如Spring）等一起使用。</p>
+
+<h3 id="配置jpa">配置JPA</h3>
+
+<p>Spring提供了两种方法创建JPA的EntityManagerFactory对象。</p>
+
+<p>方法1：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;beans&gt;
+</span><span class='line'>    &lt;bean id="entityManagerFactory" class="org.springframework.orm.jpa.LocalEntityManagerFactoryBean"&gt;
+</span><span class='line'>        &lt;property name="persistenceUnitName" value="persistenceUnit" /&gt;
+</span><span class='line'>    &lt;/bean&gt;
+</span><span class='line'>&lt;/beans&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>FactoryBean创建的EntityManagerFactory适用于仅通过JPA进行数据访问的环境。由于使用了PersistenceProvider自动侦测机制，所以只能从默认路径classpath:META-INF/persistence.xml中读取配置信息。</p>
+
+<p>方法2：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;beans&gt;
+</span><span class='line'>    &lt;bean id="entityManagerFactory" class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean"&gt;
+</span><span class='line'>        &lt;property name="dataSource" ref="someDataSource" /&gt;
+</span><span class='line'>        &lt;property name="loadTimeWeaver"&gt;
+</span><span class='line'>            &lt;bean class="org.springframework.instrument.classloading.SimpleLoadTimeWeaver" /&gt;
+</span><span class='line'>        &lt;/property&gt;
+</span><span class='line'>    &lt;/bean&gt;
+</span><span class='line'>&lt;/beans&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>FactoryBean提供了对JPA EntityManagerFactory的完整控制，非常适合那种有简单定制需要的环境。你可以处理多个persistence.xml配置文件；覆盖persistence.xml文件的默认路径；可以传递Spring托管的JDBC DataSource给JPA PersistenceProvider，用来替代persistence.xml中的JDBC配置（这个Spring托管的DataSource通常被作为nonJtaDataSource传送给PersistenceProvider，并且覆盖persistence.xml中相同的nonJtaDataSource）。</p>
+
+<h3 id="数据访问">数据访问</h3>
+
+<p>基于JPA的DAO可以通过三种方式进行数据访问JpaDaoSupport，JpaTemplate和plain JPA。其中JpaTemplate是plain JPA的封装，而JpaDaoSupport又是JpaTemplate的封装。无疑，使用不对Spring产生任何依赖的Plain JPA的API进行编程是最好选择。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class ProductDaoImpl implements ProductDao {
+</span><span class='line'>    private EntityManager entityManager = null;
+</span><span class='line'>
+</span><span class='line'>    @PersistenceContext
+</span><span class='line'>    public void setEntityManager(EntityManager entityManager) {
+</span><span class='line'>        this.entityManager = entityManager;
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    public Collection loadProductsByCategory(String category) {
+</span><span class='line'>         Query query = em.createQuery("from Product as p where p.category = :category");
+</span><span class='line'>         query.setParameter("category", category);
+</span><span class='line'>         return query.getResultList();
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>需要注意的是，必须激活PersistenceAnnotationBeanPostProcessor功能才能让Spring识别@PersistenceContext注解。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;beans&gt;
+</span><span class='line'>    &lt;!-- JPA annotations bean post processor --&gt;
+</span><span class='line'>    &lt;bean class="org.springframework.orm.jpa.support.PersistenceAnnotationBeanPostProcessor" /&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;bean id="productDao" class="com.codemany.netlink.dao.impl.ProductDaoImpl" /&gt;
+</span><span class='line'>&lt;/beans&gt;</span></code></pre></td></tr></table></div></figure>
+
+<h3 id="异常转化">异常转化</h3>
+
+<p>Spring提供了一个允许通过使用@Repository注解进行透明的异常转化的解决方案。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>@Repository
+</span><span class='line'>public class ProductDaoImpl implements ProductDao {</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;beans&gt;
+</span><span class='line'>    &lt;!-- Exception translation bean post processor --&gt;
+</span><span class='line'>    &lt;bean class="org.springframework.dao.annotation.PersistenceExceptionTranslationPostProcessor" /&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>后置处理器将自动的寻找所有的异常转化器（PersistenceExceptionTranslator这个接口的实现类）并通知所有打上@Repository注解的bean，从而能够使得被找到的异常转化器能够在抛出异常时做相应的异常转化工作。</p>
+
+<p>总的来说，DAO能够基于普通的Java持久层API和注解来实现，但同样也能享受到由Spring管理事务、IoC和透明的异常转化（转化成为Spring的异常体系）等好处。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/rediscovering-the-button-element/">重新认识button元素</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+<time class='entry-date' datetime='2007-07-26T23:49:49+08:00'><span class='date'><span class='date-month'>Jul</span> <span class='date-day'>26</span><span class='date-suffix'>th</span>, <span class='date-year'>2007</span></span> <span class='time'>11:49 pm</span></time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>英文原文：<a href="http://www.particletree.com/features/rediscovering-the-button-element/">http://www.particletree.com/features/rediscovering-the-button-element/</a></p>
+
+<h3 id="简介">简介</h3>
+
+<p>对每个应用程序设计者来说，为你的用户创建一套一致的界面是个不懈的斗争。在Web上构建一致性尤为艰难，因为跨越浏览器和操作系统的视觉渲染差异是完全不同的，并且在什么能做和不能做上几乎是随心所欲的。在你<a href="http://www.456bereastreet.com/archive/200409/styling_form_controls/">处理</a> <a href="http://www.456bereastreet.com/archive/200410/styling_even_more_form_controls/">表单元素</a>时这个问题变得更为明显。在标准外观的战争里，它们中最大的输家是臭名昭著的提交按钮。</p>
+
+<p>现状是，带有type=&quot;submit&quot;的输入要么是太丑陋（Firefox），有点缺陷（Internet Explorer），要么完全缺乏弹性（Safari）。大多数的解决方案是使用图片输入和自己创建这个该死的东西。这是不幸的，因为那样做以后每当我们急需一个新按钮时工作就被归结为启用Photoshop的繁琐任务。我们需要的是更好的东西——一些对于设计者来说更加灵活和有意义的东西。我们很幸运，因为解决方案已经存在，它所需要的是一点点爱。我的朋友们，让我向你介绍我的小朋友：<code>&lt;button&gt;</code>元素。</p>
+
+<h3 id="输入-vs-按钮">输入 vs 按钮</h3>
+
+<p>这里是标准的提交按钮标记：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;input type="submit" value="Submit" /&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>它在浏览器三兄弟里看起来像这样：</p>
+
+<p><img src="/uploads/input-submit.gif" alt="input-submit"></p>
+
+<p>嗯。这里是创建一个用于提交的按钮元素时使用的标记：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;button type="submit"&gt;Submit&lt;/button&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>并且它看起来像这样：</p>
+
+<p><img src="/uploads/button-tag.gif" alt="button-tag"></p>
+
+<p>这些按钮与上面对等物的工作和行为方式完全相同。除提交表单外，你可以让它们禁用，添加一个accesskey甚至指定一个tabindex。除了Safari里的按钮看起来有视觉差异（它没有把不自然的aqua界面放到按钮上，这对我们是有利的），关于<code>&lt;button&gt;</code>标签最酷的事情是你可以在它们里面放置有用的HTML元素，像图片：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;button type="submit"&gt;&lt;img src="" alt="" /&gt; Submit&lt;/button&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>它们看起来像这样：</p>
+
+<p><img src="/uploads/button-images.gif" alt="button-images"></p>
+
+<p>非常好。（好吧，它们有点丑，但是我说过它们需要一点点爱。）实际上，根据W3C所说，这些特殊的视觉差异正是<code>&lt;button&gt;</code>元素被创建的原因。</p>
 
 <blockquote>
-<p>当进行日期计算的时候，当前日期的月份必须是大月，并且是在这个月的最后一天也就是31号，比如2008-3-31号，当给这个日期加上一个月，得到的日期是个小月就会出现这样的情况。比如在2008-3-31这天加上一月，那因该是4月份，4月就是小月，那Java就是4月30号，JavaScript 就是5月1号，相差一天。当加上2月后，就是5月，5月是大月，那么计算的结果都是5月31号。</p>
+<p>Buttons created with the BUTTON element function just like buttons created with the INPUT element, but they offer richer rendering possibilities: the BUTTON element may have content. For example, a BUTTON element that contains an image functions like and may resemble an INPUT element whose type is set to “image”, but the BUTTON element type allows content.</p>
+
+<p><a href="http://www.w3.org/TR/html4/interact/forms.html#h-17.5">The Button Element - W3C</a></p>
 </blockquote>
 
-<p>不过这样的结论还是不能让人明白Java和JavaScript计算日期时相差的一天是怎么来的。</p>
+<p>所以这里我们正在寻找一种设计解决方案，好在拥有海量资料的互联网上有一段标记可以帮助我们解决这个问题。这很方便，然而不幸的是大多数设计者和开发者甚至不知道该元素存在。现在，在我直接用按钮元素替换所有在<a href="http://wufoo.com/">Wufoo</a>中的图片输入之前，我决定标记和CSS必须满足几个需求：</p>
 
-<p>以下是我对Java和JavaScript日期计算差异的一些理解：</p>
+<p><strong>需求</strong></p>
 
-<p>2008-2-29加上12个月，那么就是2009-2-29，但2009年是非闰年，它的2月份只有28天，这样就多出来的一天。如何处理这多出来的一天呢？Java和JavaScript做出了不同的理解。Java认为，既然2009年的2月只有28天，那么那多出来的一天就是多余的，应该丢弃，所以Java的计算结果是2009-2-28；而JavaScript则认为这多出来的一天不能丢弃，应该也加上去。那么2009-2-28号加上一天就是2009-3-31号。</p>
+<blockquote>
+<ol>
+<li>它们必须看起来像按钮。</li>
+<li>它们必须在浏览器里看起来相同。</li>
+<li>我用于按钮的样式需要同样能被使用在链接上（因为在Wufoo中的交互总是由一个表单提交或者从链接来的一个Ajax调用引发，这些东西很可能并排排列，我需要它们具有相同的视觉重量感）。</li>
+<li>在许多不同情况下使用时标记需要保持弹性和易于修改。</li>
+<li>我应该能够有效地使用图标和颜色来传递关于这种交互将要发生的信息。</li>
+</ol>
+</blockquote>
 
-<p>同样的，2008-3-31加上一个月在Java中的结果是2008-4-30号，而在JavaScript中则是2008-5-1号。那如果加上的是两个月呢？2008-3-31加上两个月是2008-5-31号，是有效的日期，所以Java和JavaScript的计算结果都是2008-5-31号。</p>
+<p>带着这些适当的挑战，我潜进CSS，在解决一些跨浏览器的挑战之后，得出了以下内容（你也可以在Wufoo上看到所有的这些内容）：</p>
 
-<p>结论是，当进行日期计算时，如果结果日期的date值超出了该月的最大天数值，那么在Java中就会将该date值设为该月的最大天数值；而JavaScript则不但会将该date值设为该月的最大天数值，还会再加上超出的天数值。例如：2009-1-31号加上一个月，Java的结果就是2009-2-28号，JavaScript的结果则是2009-3-3号，2009-2-28加多出来的3 = 31 - 28天。</p>
-</div>
-  
-  
+<p><strong>结果</strong></p>
 
+<p><img src="/uploads/buttons.gif" alt="buttons"></p>
 
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/complete-wxwidgets-wizard-for-visual-studio-2005-and-2008-install-program/">完成了wxWidgets Wizard for Visual Studio 2005/2008的安装程序</a></h1>
-    
-    
-      <p class="meta">
-        
+<p>没有什么疯狂的。简单，但是有效。现在，我喜欢这种处理按钮的方式是我可以使用<a href="http://famfamfam.com/">FAMFAMFAM</a>的1000个图标库去说明大量可笑的想法和动作而不必每一次我需要一些新东西时都要从Photoshop生成。如果我们快速查看下标记，你会注意到在那里的最后两个按钮实际上是链接：</p>
 
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div class="buttons"&gt;
+</span><span class='line'>    &lt;button type="submit" class="positive"&gt;
+</span><span class='line'>        &lt;img src="/images/icons/tick.png" alt=""/&gt; Save
+</span><span class='line'>    &lt;/button&gt;
+</span><span class='line'>    &lt;a href="/password/reset/"&gt;
+</span><span class='line'>        &lt;img src="/images/icons/key.png" alt=""/&gt; Change Password
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>    &lt;a href="#" class="negative"&gt;
+</span><span class='line'>        &lt;img src="/images/icons/cross.png" alt=""/&gt; Cancel
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>&lt;/div&gt;</span></code></pre></td></tr></table></div></figure>
 
+<p>这很有用的原因是因为在Web应用中许多动作是由REST驱动的，所以只要通过链接把用户请求发送到某个特定的URL就会发起它们需要做的事情。使用可以在这两种类型的元素（链接和按钮）上工作的样式，为我们提供了灵活性，以保持我们的交互方式看起来是一致的和适当的，不管它是通过Ajax完成还是一个标准的提交。</p>
 
+<p>仅仅是一些简短的题外话。你可能想知道我为什么把那些图标图片中的alt属性留成空白。它可能会令一些人感到惊讶，虽然每个图片的alt属性是必需的，实际上描述它们不是必需的。空的alt属性完全有效，并且帮助屏幕阅读器知道哪些信息事实上要被忽略，在你试图寻找下一个适当的可操作条目时节省你用户宝贵的时间。因为图标实际上是多余的，我宁愿不要浪费用户的时间听到我用于可视化的图片发生了什么事。它们只会听到“Submit”而不是“Checkmark Submit”，这实际上会让事情有点困惑。</p>
 
-<time class='entry-date' datetime='2008-05-21T15:28:16+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>21</span><span class='date-suffix'>st</span>, <span class='date-year'>2008</span></span> <span class='time'>3:28 pm</span></time>
-        
-      </p>
-    
-  </header>
+<h3 id="css">CSS</h3>
 
+<p>在大多数情况下，样式化这些按钮的CSS是相当直白的。让人抓破脑袋的跨浏览器的不一致性导致下列代码中填充的数量不一致，但没什么不可能，你们很幸运，这个问题已经解决了。</p>
 
-  <div class="entry-content"><p>两个晚上的时间，一边查资料一边学习，同时编写和测试安装脚本，最终完成了wxWidgets Wizard for Visual Studio 2005/2008的安装程序。现在不用配置就可以使用wxWidgets Wizard的代码框架生成功能了。安装制作程序采用的是Inno Setup，完整的安装脚本如下：</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>/* BUTTONS */
+</span><span class='line'>.buttons a, .buttons button {
+</span><span class='line'>    display: block;
+</span><span class='line'>    float: left;
+</span><span class='line'>    margin: 0 7px 0 0;
+</span><span class='line'>    background-color: #f5f5f5;
+</span><span class='line'>    border: 1px solid #dedede;
+</span><span class='line'>    border-top: 1px solid #eee;
+</span><span class='line'>    border-left: 1px solid #eee;
+</span><span class='line'>    font-family: "Lucida Grande", Tahoma, Arial, Verdana, sans-serif;
+</span><span class='line'>    font-size: 100%;
+</span><span class='line'>    line-height: 130%;
+</span><span class='line'>    text-decoration: none;
+</span><span class='line'>    font-weight: bold;
+</span><span class='line'>    color: #565656;
+</span><span class='line'>    cursor: pointer;
+</span><span class='line'>    padding: 5px 10px 6px 7px;    /* Links */
+</span><span class='line'>}
+</span><span class='line'>.buttons button {
+</span><span class='line'>    width: auto;
+</span><span class='line'>    overflow: visible;
+</span><span class='line'>    padding: 4px 10px 3px 7px;    /* IE6 */
+</span><span class='line'>}
+</span><span class='line'>.buttons button[type] {
+</span><span class='line'>    padding: 5px 10px 5px 7px;    /* Firefox */
+</span><span class='line'>    line-height: 17px;    /* Safari */
+</span><span class='line'>}
+</span><span class='line'>*:first-child+html button[type] {
+</span><span class='line'>    padding: 4px 10px 3px 7px;    /* IE7 */
+</span><span class='line'>}
+</span><span class='line'>.buttons button img, .buttons a img {
+</span><span class='line'>    margin: 0 3px -3px 0 !important;
+</span><span class='line'>    padding: 0;
+</span><span class='line'>    border: none;
+</span><span class='line'>    width: 16px;
+</span><span class='line'>    height: 16px;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>当致力于不一致性的时候有件事出现了，就是Internet Explorer中关于显示长按钮有个渲染缺陷的事实。你可以在<a href="http://jehiah.cz/archive/button-width-in-ie-revised">Jehiah.cz</a>阅读相关内容，但它是什么导致了以上代码中一些宽度和溢出的声明。</p>
+
+<h3 id="添加一些颜色">添加一些颜色</h3>
+
+<p>在Wufoo中，我们使悬停颜色蓝色成为中性动作，对于正面和负面内涵适当地使用绿色和红色。以下的代码是我们为处理按钮而创建的样式，这些按钮意味着显示像添加和保存这样的正面交互以及像取消和删除这样的负面交互。对我们来说这是一次不错的尝试，显然你可以根据自己的喜好选择颜色。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -288,562 +1440,49 @@
 <span class='line-number'>37</span>
 <span class='line-number'>38</span>
 <span class='line-number'>39</span>
-<span class='line-number'>40</span>
-<span class='line-number'>41</span>
-<span class='line-number'>42</span>
-<span class='line-number'>43</span>
-<span class='line-number'>44</span>
-<span class='line-number'>45</span>
-<span class='line-number'>46</span>
-<span class='line-number'>47</span>
-<span class='line-number'>48</span>
-<span class='line-number'>49</span>
-<span class='line-number'>50</span>
-<span class='line-number'>51</span>
-<span class='line-number'>52</span>
-<span class='line-number'>53</span>
-<span class='line-number'>54</span>
-<span class='line-number'>55</span>
-<span class='line-number'>56</span>
-<span class='line-number'>57</span>
-<span class='line-number'>58</span>
-<span class='line-number'>59</span>
-<span class='line-number'>60</span>
-<span class='line-number'>61</span>
-<span class='line-number'>62</span>
-<span class='line-number'>63</span>
-<span class='line-number'>64</span>
-<span class='line-number'>65</span>
-<span class='line-number'>66</span>
-<span class='line-number'>67</span>
-<span class='line-number'>68</span>
-<span class='line-number'>69</span>
-<span class='line-number'>70</span>
-<span class='line-number'>71</span>
-<span class='line-number'>72</span>
-<span class='line-number'>73</span>
-<span class='line-number'>74</span>
-<span class='line-number'>75</span>
-<span class='line-number'>76</span>
-<span class='line-number'>77</span>
-<span class='line-number'>78</span>
-<span class='line-number'>79</span>
-<span class='line-number'>80</span>
-<span class='line-number'>81</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>#define SrcImgsDir '..\VCWizards\images'
-</span><span class='line'>#define SrcHtmlDir '..\VCWizards\html\1033'
-</span><span class='line'>#define SrcScptDir '..\VCWizards\scripts\1033'
-</span><span class='line'>#define SrcTempDir '..\VCWizards\templates\1033'
-</span><span class='line'>#define TgtImgsDir 'VCWizards\AppWiz\wxWidgets\Application\images'
-</span><span class='line'>#define TgtHtmlDir 'VCWizards\AppWiz\wxWidgets\Application\html\1033'
-</span><span class='line'>#define TgtScptDir 'VCWizards\AppWiz\wxWidgets\Application\scripts\1033'
-</span><span class='line'>#define TgtTempDir 'VCWizards\AppWiz\wxWidgets\Application\templates\1033'
-</span><span class='line'>
-</span><span class='line'>[Setup]
-</span><span class='line'>AppName=wxWidgets Application Wizard
-</span><span class='line'>AppVerName=wxWidgets Wizard 1.0.0
-</span><span class='line'>AppPublisher=dohkoos
-</span><span class='line'>DefaultDirName={pf32}\Microsoft Visual Studio 9.0\VC
-</span><span class='line'>DirExistsWarning=no
-</span><span class='line'>;Uninstallable=no
-</span><span class='line'>UninstallFilesDir={app}\VCWizards\AppWiz\wxWidgets
-</span><span class='line'>UninstallDisplayIcon={app}\VCProjects\wxAppWiz.ico
-</span><span class='line'>Compression=lzma
-</span><span class='line'>SolidCompression=yes
-</span><span class='line'>
-</span><span class='line'>[Files]
-</span><span class='line'>Source: ..\VCProjects\wxAppWiz.ico; DestDir: {app}\VCProjects
-</span><span class='line'>Source: ..\VCProjects\wxAppWiz.vsz; DestDir: {app}\VCProjects
-</span><span class='line'>Source: ..\VCProjects\wxWidgets\wxWidgets.vsdir; DestDir: {app}\VCProjects\wxWidgets
-</span><span class='line'>Source: {#SrcImgsDir}\*.gif; DestDir: {app}\{#TgtImgsDir}
-</span><span class='line'>Source: {#SrcHtmlDir}\*.htm; DestDir: {app}\{#TgtHtmlDir}
-</span><span class='line'>Source: {#SrcHtmlDir}\*.css; DestDir: {app}\{#TgtHtmlDir}
-</span><span class='line'>Source: {#SrcScptDir}\*.js; DestDir: {app}\{#TgtScptDir}
-</span><span class='line'>Source: {#SrcTempDir}\*.h; DestDir: {app}\{#TgtTempDir}
-</span><span class='line'>Source: {#SrcTempDir}\*.cpp; DestDir: {app}\{#TgtTempDir}
-</span><span class='line'>Source: {#SrcTempDir}\readme.txt; DestDir: {app}\{#TgtTempDir}
-</span><span class='line'>Source: {#SrcTempDir}\root.manifest; DestDir: {app}\{#TgtTempDir}
-</span><span class='line'>Source: {#SrcTempDir}\Templates.inf; DestDir: {app}\{#TgtTempDir}
-</span><span class='line'>
-</span><span class='line'>[Code]
-</span><span class='line'>procedure CurStepChanged(CurStep: TSetupStep);
-</span><span class='line'>var
-</span><span class='line'>    i: Integer;
-</span><span class='line'>    Signature: String;
-</span><span class='line'>    ConfigLine: String;
-</span><span class='line'>    ConfigFile: String;
-</span><span class='line'>    ConfigFileLines: TArrayOfString;
-</span><span class='line'>begin
-</span><span class='line'>    if CurStep = ssPostInstall then begin
-</span><span class='line'>        Signature := 'wxWidgets';
-</span><span class='line'>        ConfigLine := 'wxWidgets|{1B027A40-8F43-11D0-8D11-00A0C91BC942}|#1043|70' + #13#10;
-</span><span class='line'>        ConfigFile := ExpandConstant('{app}\VCProjects\vc.vsdir');
-</span><span class='line'>        LoadStringsFromFile(ConfigFile, ConfigFileLines);
-</span><span class='line'>        for i := 0 to GetArrayLength(ConfigFileLines) - 1 do begin
-</span><span class='line'>            if (Pos(Signature, ConfigFileLines[i]) &gt; 0) then abort;
-</span><span class='line'>        end;
-</span><span class='line'>        SaveStringToFile(ConfigFile, ConfigLine, True);
-</span><span class='line'>    end;
-</span><span class='line'>end;
-</span><span class='line'>
-</span><span class='line'>procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
-</span><span class='line'>var
-</span><span class='line'>    i: Integer;
-</span><span class='line'>    j: Integer;
-</span><span class='line'>    Signature: String;
-</span><span class='line'>    ConfigFile: String;
-</span><span class='line'>    ConfigFileLines, NewConfigFileLines: TArrayOfString;
-</span><span class='line'>begin
-</span><span class='line'>    if CurUninstallStep = usUninstall then begin
-</span><span class='line'>        Signature := 'wxWidgets';
-</span><span class='line'>        ConfigFile := ExpandConstant('{app}\VCProjects\vc.vsdir');
-</span><span class='line'>        LoadStringsFromFile(ConfigFile, ConfigFileLines);
-</span><span class='line'>        SetArrayLength(NewConfigFileLines, GetArrayLength(ConfigFileLines) - 1);
-</span><span class='line'>        j := 0;
-</span><span class='line'>        for i := 0 to GetArrayLength(ConfigFileLines) - 1 do begin
-</span><span class='line'>            if (Pos(Signature, ConfigFileLines[i]) &gt; 0) then begin
-</span><span class='line'>                continue;
-</span><span class='line'>            end else begin
-</span><span class='line'>                NewConfigFileLines[j] := ConfigFileLines[i];
-</span><span class='line'>                j := j + 1;
-</span><span class='line'>            end;
-</span><span class='line'>        end;
-</span><span class='line'>        SaveStringsToFile(ConfigFile, NewConfigFileLines, False);
-</span><span class='line'>    end;
-</span><span class='line'>end;</span></code></pre></td></tr></table></div></figure>
-
-<p>代码下载：<a href="https://github.com/dohkoos/wxwizard">https://github.com/dohkoos/wxwizard</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/10-tips-for-how-to-name-your-project/">如何命名你的项目的10个技巧</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2008-05-14T14:45:32+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>14</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>2:45 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>英文原文：<a href="http://www.wynia.org/wordpress/2006/06/22/10-tips-for-how-to-name-your-project/">http://www.wynia.org/wordpress/2006/06/22/10-tips-for-how-to-name-your-project/</a></p>
-
-<p>这是我在几年前写的系列文章中的一篇，但是我想再分享一下。给那些开始产品和服务的人们，他们需要一些说明，以便于理解、发音或正确拼写产品和服务的名字，我想该文章的价值就如同我第一次写它的时候一样。</p>
-
-<p>如何（以及避免那样）命名你的项目</p>
-
-<ol>
-<li>如果你考虑的名字是直接取自科幻或奇幻作品，不必费心了。这些名字在软件中作为命名源的比例非常大。不仅是你想出有独创性名字的机会相当小，而且大部分作品中的角色和地方的名字都被商标化了，你要冒着被起诉的危险。</li>
-<li>如果你考虑的名字来自于希腊、罗马或北欧神话，再试一次。我们已经有了足够多的被称为“Mercury”变体的邮件相关软件。</li>
-<li>在Google上搜索被提议的名字。你得到的结果越少越好。如果没有结果，那么就是它。</li>
-<li>不要试图通过轻微拼错单词得到唯一名字。把新窗口文件系统程序叫做Phat32只会以用户沮丧的看着“fat32”在搜索引擎中的结果而告终。</li>
-<li>如果你的产品名称不能在电视上用50秒或60秒说完，你或许走在了错误的道路上。如果你希望任何人在工作环境使用你的产品，这尤其适用。没有人会去推荐一个产品给他们的工友，如果他们会遭到性骚扰起诉只是为了说出产品的名称。</li>
-<li>如果你的产品名称根本不能被发音，你就完全得不到口碑的好处。同样，如果没人知道如何去发音它，他们就非常有可能不会试着大声的说着它去询问关于它的问题，等等。你怎么说MySQL? PostgreSQL? GNU? 在地球上的几乎所有口语都是基于某类辅音/元音音节。在辅音和元音之间交替是一个相当好的方式保证别人能够发音它。</li>
-<li>越短越好。</li>
-<li>查看.com域名是否有效。如果不是，那就证明有人比你先想到了这个名称，并且正在使用它或接近使用它。即使你不打算使用域名也要做这一步。</li>
-<li>不要让你产品中固有的局限性成为名称的一部分。把你的产品名称叫做LinProduct或WinProduct预先的就永远阻止你发布任一类的跨平台版本。</li>
-<li>不要使用你自己的名字来命名开源产品。如果项目在你不再参与开发后仍然活着，项目要么是重命名，要么就是你的名字可能会被使用在你意想不到的地方。</li>
-</ol>
-
-<p>2017/5/3更新</p>
-
-<p>从长远来看，造个新词是取名的最好方式。虽然在创造新词后把它投放市场，它的认知度很有可能会低迷一段时间。但如果你能成功创造一个新词，并且可以用日常用语来介绍和解释，那么你就拥有了它。它变成了一个不会和任何其它名字混淆，并且不会被竞争者侵占的重要区分资产。在最好的情况下，你最终会定义一个全新的类别——Levis、Nike、eBay、QQ。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/extend-windows-server-2008-evaluation-period/">延长Windows Server 2008的评估期限</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2008-05-11T21:56:51+08:00'><span class='date'><span class='date-month'>May</span> <span class='date-day'>11</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>9:56 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>今天，对正在使用的Windows Server 2008做了一次延长评估期限的操作。</p>
-
-<blockquote>
-<ol>
-<li>Click <strong>Start</strong>, and then click <strong>Command Prompt</strong>.</li>
-<li>Type <strong>slmgr.vbs -dli</strong>, and then press ENTER to check the current status of your evaluation period.</li>
-<li>To reset the evaluation period, type <strong>slmgr.vbs -rearm</strong>, and then press ENTER.</li>
-<li>Restart the computer.</li>
-</ol>
-
-<p>This resets the evaluation period to 60 days.</p>
-</blockquote>
-
-<p>在做完延长操作后终于明白了网上关于“当您重置当前60天评估期，丢失以前60天评估期上保留任何时间”译文的意思，也即上面“This resets the evaluation period to 60 days”的意思。它是指不管你当前剩余的评估时间是多少，重置之后都会变成60天。例如，我在重置前的评估期还剩有25天，在重置后就变成了60天，并不是加上60天，变成85天。因此，要想最大化总的评估时间，最好到接近评估时间末尾时再重置评估期。</p>
-
-<p>完整的KB可以查看<a href="http://support.microsoft.com/kb/948472">这里</a>。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/tips-for-windows-server-2008-configuration/">Windows Server 2008配置技巧</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2008-04-11T13:20:39+08:00'><span class='date'><span class='date-month'>Apr</span> <span class='date-day'>11</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>1:20 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><h3 id="如何取消登录时要按ctrl-alt-delete组合键">如何取消登录时要按Ctrl+Alt+Delete组合键</h3>
-
-<p>开始 -&gt; 运行 -&gt; gpedit.msc -&gt; 计算机配置 -&gt; Windows设置 -&gt; 安全设置 -&gt; 本地策略，点击“安全选项”，在右侧的框内找到“交互式登录：不要按CTRL+ALT+DEL” -&gt; 启用。</p>
-
-<h3 id="如何取消关机时出现的关机理由选择项">如何取消关机时出现的关机理由选择项</h3>
-
-<p>开始 -&gt; 运行 -&gt; gpedit.msc -&gt; 计算机配置 -&gt; 管理模板，点击“系统”，在右侧的框内找到“显示关机事件跟踪” -&gt; 禁用。</p>
-
-<h3 id="如何禁止远程用户的匿名访问">如何禁止远程用户的匿名访问</h3>
-
-<p>开始 -&gt; 运行 -&gt; regedit，定位到HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa，修改右侧框内restrictanonymous的值为1。</p>
-
-<h3 id="如何在退出系统时清除最近打开的文档的历史">如何在退出系统时清除最近打开的文档的历史</h3>
-
-<p>开始 -&gt; 运行 -&gt; gpedit.msc -&gt; 用户配置 -&gt; 管理模板 -&gt; 开始菜单和任务栏 -&gt; 在右侧的框内找到“退出系统时清除最近打开文档的历史” -&gt; 启用。</p>
-
-<h3 id="如何取消必须输入密码登录系统">如何取消必须输入密码登录系统</h3>
-
-<p>开始 -&gt; 运行 -&gt; rundll32 netplwiz.dll,UsersRunDll，选中要自动登陆的账户，取消“要使用本机，用户必须输入用户名密码”，输入该帐户的密码即可（前提是要关闭UAC）。</p>
-
-<h3 id="如何关闭uac">如何关闭UAC</h3>
-
-<p>控制面板 -&gt; 用户帐户 -&gt; 打开或关闭用户账户控制 -&gt; 取消“使用用户账户控制(UAC)帮助保护您的计算机”。</p>
-
-<h3 id="如何关闭ie增强安全配置">如何关闭IE增强安全配置</h3>
-
-<p>控制面板 -&gt; 管理工具 -&gt; 服务器管理器 -&gt; 在右侧的框内找到“配置 IE SEC”并打开 -&gt; 禁用。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/features-i-want-to-see-in-java7/">希望能在Java 7中看到的特性</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2008-03-18T13:34:33+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>18</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>1:34 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>1、支持@前缀的字符串，这样就不必再为到底是写几个反斜杠绞尽脑汁了。</p>
-
-<p>2、支持String类型的switch。</p>
-
-<p>3、支持静态equals方法的String类或扩展方法（Extension methods）。不明白为什么Java总是使劲地支持一些丑陋又复杂的语法。像比较两个字符串就偏偏要写成这种样式：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if (str1 != null && !str1.equals(str2))</span></code></pre></td></tr></table></div></figure>
-
-<p>难道就不能写成下面的格式吗？</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if (str1 != str2)</span></code></pre></td></tr></table></div></figure>
-
-<p>或</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>if (!String.equals(str1, str2))</span></code></pre></td></tr></table></div></figure>
-
-<p>其中str1或str2中任何一个值为null时返回false。</p>
-
-<p>4、对泛型进行一些适当的修正。比如：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public class GenericsTest {
-</span><span class='line'>
-</span><span class='line'>//    public void output(List&lt;String&gt; list) {
-</span><span class='line'>//        System.out.println("List&lt;String&gt;");
-</span><span class='line'>//    }
-</span><span class='line'>
-</span><span class='line'>    public void output(List&lt;Object&gt; list) {
-</span><span class='line'>        System.out.println("List&lt;Object&gt;");
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    public static void main(String[] args) {
-</span><span class='line'>        GenericsTest gt = new GenericsTest();
-</span><span class='line'>
-</span><span class='line'>        gt.output(new ArrayList&lt;Object&gt;());
-</span><span class='line'>        gt.output(new ArrayList&lt;String&gt;());    // 竟然不能通过编译，想不通！
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>5、可以通过[]来访问List和Map。然后，下面的代码</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>List content = new LinkedList(10);
-</span><span class='line'>content.add(0, "Fred");
-</span><span class='line'>content.add(1, "Barney");
-</span><span class='line'>String name = content.get(0);</span></code></pre></td></tr></table></div></figure>
-
-<p>就可以写成</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>List content = new LinkedList(10);
-</span><span class='line'>content[0] = "Fred";
-</span><span class='line'>content[1] = "Barney";
-</span><span class='line'>String name = content[0];</span></code></pre></td></tr></table></div></figure>
-
-<p>还有可能的就是允许为列表使用数组初始化程序语法。例如：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>LinkedList content = {"Fred", "Barney", "Wilma", "Betty"};</span></code></pre></td></tr></table></div></figure>
-
-<p>6、添加decimal或money关键字作为原生类型，或者使BigDecimal支持+，-，*，/等运算符。处理金融相关的数据时总是要使用到BigDecimal类型。可由于BigDecimal不支持运算符，在比较大小时就会很繁琐。例如，比较两个金额的大小：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>BigDecimal zero = new BigDecimal(0);
-</span><span class='line'>if (amount.compareTo(zero) &gt; 0) {
-</span><span class='line'>  return true;
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>7、支持ref/out关键字或支持返回Tuples。例如：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>(int, int, int) transform(int x, int y, int z)
-</span><span class='line'>
-</span><span class='line'>(r, g, b) = transform(x, y, z);
-</span><span class='line'>(l, a, b) = transform(transform(x, y, z));</span></code></pre></td></tr></table></div></figure>
-
-<p>当某个方法中有多个返回值或方法需要修改传递进来的String参数并返回修改后的值时，当前的Java语法处理起来就会比较麻烦。</p>
-
-<p>8、重新整理简化I/O和Collection中的API，使之更易使用。</p>
-
-<p>9、简单而强大的Date和Time实现，将java.util包中的Date和Calendar类合并成一个。</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/how-to-vertical-center-align-text-with-icon/">如何使文字与图标垂直居中对齐</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2008-03-15T20:33:09+08:00'><span class='date'><span class='date-month'>Mar</span> <span class='date-day'>15</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>8:33 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在做网页的时候，经常会需要在某段文字前加上一个图标。然后就会发现增加的图标和文字的位置不齐，文字总是比图标低点。</p>
-
-<p><img src="/uploads/smiley-smile.gif" alt="smiley-smile">微笑</p>
-
-<p>解决的方法有两个：一个是设置图标的vertical-align为top；还有就是将margin-bottom设为-3px。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;img style="vertical-align: top" src="/uploads/smiley-smile.gif" border="0" /&gt;微笑
-</span><span class='line'>&lt;img style="margin-bottom: -3px" src="/uploads/smiley-smile.gif" border="0" /&gt;微笑</span></code></pre></td></tr></table></div></figure>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/implement-your-own-annotation-in-java/">实现自己的Java Annotation</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-<time class='entry-date' datetime='2008-02-29T16:44:34+08:00'><span class='date'><span class='date-month'>Feb</span> <span class='date-day'>29</span><span class='date-suffix'>th</span>, <span class='date-year'>2008</span></span> <span class='time'>4:44 pm</span></time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Annotation类型的声明与一般的接口声明极其相似，区别只在于它在interface关键字前面使用“@”符号。下面就是一个简单的例子：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>import java.lang.annotation.Documented;
-</span><span class='line'>import java.lang.annotation.ElementType;
-</span><span class='line'>import java.lang.annotation.Retention;
-</span><span class='line'>import java.lang.annotation.RetentionPolicy;
-</span><span class='line'>import java.lang.annotation.Target;
-</span><span class='line'>
-</span><span class='line'>@Target(ElementType.METHOD)
-</span><span class='line'>@Retention(RetentionPolicy.SOURCE)
-</span><span class='line'>@Documented
-</span><span class='line'>public @interface Event {
+</pre></td><td class='code'><pre><code class=''><span class='line'>/* STANDARD */
+</span><span class='line'>button:hover, .buttons a:hover {
+</span><span class='line'>    background-color: #dff4ff;
+</span><span class='line'>    border: 1px solid #c2e1ef;
+</span><span class='line'>    color: #336699;
 </span><span class='line'>}
-</span><span class='line'>
-</span><span class='line'>public class EventAnonationTest {
-</span><span class='line'>    @Event
-</span><span class='line'>    public void clicked() {
-</span><span class='line'>    }
+</span><span class='line'>.buttons a:active {
+</span><span class='line'>    background-color: #6299c5;
+</span><span class='line'>    border: 1px solid #6299c5;
+</span><span class='line'>    color: #fff;
+</span><span class='line'>}
+</span><span class='line'>/* POSITIVE */
+</span><span class='line'>button.positive, .buttons a.positive {
+</span><span class='line'>    color: #529214;
+</span><span class='line'>}
+</span><span class='line'>.buttons a.positive:hover, button.positive:hover {
+</span><span class='line'>    background-color: #e6efc2;
+</span><span class='line'>    border: 1px solid #c6d880;
+</span><span class='line'>    color: #529214;
+</span><span class='line'>}
+</span><span class='line'>.buttons a.positive:active {
+</span><span class='line'>    background-color: #529214;
+</span><span class='line'>    border: 1px solid #529214;
+</span><span class='line'>    color: #fff;
+</span><span class='line'>}
+</span><span class='line'>/* NEGATIVE */
+</span><span class='line'>.buttons a.negative, button.negative {
+</span><span class='line'>    color: #d12f19;
+</span><span class='line'>}
+</span><span class='line'>.buttons a.negative:hover, button.negative:hover {
+</span><span class='line'>    background: #fbe3e4;
+</span><span class='line'>    border: 1px solid #fbc2c4;
+</span><span class='line'>    color: #d12f19;
+</span><span class='line'>}
+</span><span class='line'>.buttons a.negative:active {
+</span><span class='line'>    background-color: #d12f19;
+</span><span class='line'>    border: 1px solid #d12f19;
+</span><span class='line'>    color: #fff;
 </span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>@Target指定可以应用Annotation类型的程序元素，以防止在其它程序元素中误用Annotation类型：</p>
+<h3 id="总结">总结</h3>
 
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public enum java.lang.annotation.ElementType {
-</span><span class='line'>    TYPE,               // Class, interface, or enum (but not annotation)
-</span><span class='line'>    FIELD,              // Field (including enumerated values)
-</span><span class='line'>    METHOD,             // Method (does not include constructors)
-</span><span class='line'>    PARAMETER,          // Method parameter
-</span><span class='line'>    CONSTRUCTOR,        // Constructor
-</span><span class='line'>    LOCAL_VARIABLE,     // Local variable or catch clause
-</span><span class='line'>    ANNOTATION_TYPE,    // Annotation Types (meta-annotations)
-</span><span class='line'>    PACKAGE             // Java package
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>@Retention设置Java编译器处理Annotation类型的方式：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public enum java.lang.annotation.RetentionPolicy {
-</span><span class='line'>    SOURCE,     // Annotation is discarded by the compiler
-</span><span class='line'>    CLASS,      // Annotation is stored in the class file, but ignored by the VM
-</span><span class='line'>    RUNTIME     // Annotation is stored in the class file and read by the VM
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>@Documented指明需要在Javadoc中包含Annotation（缺省是不包含的）。使用@Documented的一个技巧就是指定Retention为RetentionPolicy.RUNTIME。这样，Annotation就会保留在编译后的类文件中并且由虚拟机加载，然后Javadoc就可以抽取出Annotation并添加到类的HTML文档中。</p>
-
-<p>@Inherited定义了Annotation类型的修饰是否可以由被修饰类的子类继承。</p>
+<p>最后，这只是我们决定如何用Wufoo处理事情，它是为我们制定的开发流程。当然，这不是玩这个游戏的唯一方法。有许多你可以给它添加趣味的方法（使用渐变！）和改变周围的事物（在标记中的图片上使用图片替换）。因为<code>&lt;button&gt;</code>标签几乎可以处理在它里面的任何标记，你可以添加一些<code>&lt;span&gt;</code>标签，然后使用<a href="http://www.oscaralexander.com/tutorials/how-to-make-sexy-buttons-with-css.html">Alex Griffioen最近写的方法</a>来创建真正漂亮的圆角渐变作品。老实说，我希望对于许多与他们应用中可复用表单界面斗争的设计者来说这只是一个很好的起点。或许甚至，我希望你再次看看这个经常被浪费的表单元素，在不经思考就为提交采用输入和PSD之前要二思。</p>
 </div>
   
   
@@ -906,7 +1545,6 @@
 <a style="font-size: 91%" href="/tags/crack/">Crack</a>
 <a style="font-size: 96%" href="/tags/crawler/">Crawler</a>
 <a style="font-size: 96%" href="/tags/database/">Database</a>
-<a style="font-size: 114%" href="/tags/git/">Git</a>
 <a style="font-size: 100%" href="/tags/html/">HTML</a>
 <a style="font-size: 103%" href="/tags/jbookshelf/">JBookShelf</a>
 <a style="font-size: 137%" href="/tags/java/">Java</a>
@@ -923,6 +1561,7 @@
 <a style="font-size: 100%" href="/tags/struts/">Struts</a>
 <a style="font-size: 146%" href="/tags/translation/">Translation</a>
 <a style="font-size: 96%" href="/tags/ubuntu/">Ubuntu</a>
+<a style="font-size: 85%" href="/tags/vs2005/">VS2005</a>
 <a style="font-size: 103%" href="/tags/windows-server-2008/">Windows Server 2008</a>
 <a style="font-size: 106%" href="/tags/wxwidgets/">wxWidgets</a>
 
