@@ -4,7 +4,7 @@
   <title><![CDATA[乐者为王]]></title>
   <link href="http://codemany.com/atom.xml" rel="self"/>
   <link href="http://codemany.com/"/>
-  <updated>2018-07-03T12:28:48+08:00</updated>
+  <updated>2018-10-10T06:51:26+08:00</updated>
   <id>http://codemany.com/</id>
   <author>
     <name><![CDATA[dohkoos]]></name>
@@ -2443,209 +2443,6 @@
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（33）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part33/"/>
-    <updated>2016-12-03T09:22:11+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part33</id>
-    <content type="html"><![CDATA[<p>ANTLR的语法分析器可以生成错误信息，也可以从大量不同情况的错误中恢复。我们还可以自定义错误信息以及将它们重定向到不同的错误监听器。所有这些功能都被封装在指定ANTLR错误处理策略的对象中。接下来我们就将详细研究该策略，以学习更多关于自定义语法分析器如何响应错误的知识。</p>
-
-<h3 id="更改antlr的错误处理策略">更改ANTLR的错误处理策略</h3>
-
-<p>默认的错误处理机制工作得很好，但在有些非典型的情况下我们可能要更改它。首先，我们可能由于运行时开销而想要禁用一些内联错误处理。其次，我们可能希望在出现第一个语法错误时就退出语法分析器。例如，当为类似bash这样的shell解析命令行时，没必要试图从错误中恢复。无论如何我们不能冒险执行该命令，所以语法分析器可以在一遇到麻烦时就推出。</p>
-
-<p>要了解错误处理策略，请查看接口ANTLRErrorStrategy及其具体的实现类DefaultErrorStrategy。这个类持有与默认错误处理行为相关联的一切。ANTLR语法分析器指示该对象报告错误并恢复。例如，下面是在每个ANTLR生成的规则函数里面的捕获块：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>_errHandler.reportError(this, re);
-</span><span class='line'>_errHandler.recover(this, re);</span></code></pre></td></tr></table></div></figure>
-
-<p>_errHandler是一个持有DefaultErrorStrategy实例的引用的变量。方法reportError()和recover()表示错误报告和同步和返回功能。reportError()根据抛出的异常类型将错误报告委托给3个方法的其中之一。</p>
-
-<p>回到第一种非典型的情况，让我们来降低语法分析器上的错误处理在运行时的负担。看看下面这段ANTLR为语法Simple中member+子规则生成的代码：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>_errHandler.sync(this);
-</span><span class='line'>_la = _input.LA(1);
-</span><span class='line'>do {
-</span><span class='line'>    setState(22); member();
-</span><span class='line'>    setState(26);
-</span><span class='line'>    _errHandler.sync(this);
-</span><span class='line'>    _la = _input.LA(1);
-</span><span class='line'>} while ( _la==6 );</span></code></pre></td></tr></table></div></figure>
-
-<p>对于可以安全地假设输入语法是正确的应用程序，比如网络协议，我们最好避免检测并从错误中恢复的开销。我们可以通过继承DefaultErrorStrategy并用空方法覆写sync()来做到这点。Java编译器可能会内联并消除_errHandler.sync(this)调用。我们将在下个例子中阐述如何通知语法分析器使用不同的错误策略。</p>
-
-<p>另一种非典型的情况是在出现第一个语法错误时就退出语法分析器。为使它工作，我们必须覆写3个关键的恢复方法，如下面的代码所示：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>import org.antlr.v4.runtime.*;
-</span><span class='line'>
-</span><span class='line'>public class BailErrorStrategy extends DefaultErrorStrategy {
-</span><span class='line'>    /** Instead of recovering from exception e, rethrow it wrapped
-</span><span class='line'>     *  in a generic RuntimeException so it is not caught by the
-</span><span class='line'>     *  rule function catches. Exception e is the "cause" of the
-</span><span class='line'>     *  RuntimeException.
-</span><span class='line'>     */
-</span><span class='line'>    @Override
-</span><span class='line'>    public void recover(Parser recognizer, RecognitionException e) {
-</span><span class='line'>        throw new RuntimeException(e);
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    /** Make sure we don't attempt to recover inline; if the parser
-</span><span class='line'>     *  successfully recovers, it won't throw an exception.
-</span><span class='line'>     */
-</span><span class='line'>    @Override
-</span><span class='line'>    public Token recoverInline(Parser recognizer) throws RecognitionException {
-</span><span class='line'>        throw new RuntimeException(new InputMismatchException(recognizer));
-</span><span class='line'>    }
-</span><span class='line'>
-</span><span class='line'>    /** Make sure we don't attempt to recover from problems in subrules. */
-</span><span class='line'>    @Override
-</span><span class='line'>    public void sync(Parser recognizer) { }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>对于测试平台，我们可以重复使用我们典型的样板代码。除了创建并启动语法分析器，我们需要创建一个新的BailErrorStrategy实例，并告诉语法分析器使用它替换默认的策略。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>parser.setErrorHandler(new BailErrorStrategy());</span></code></pre></td></tr></table></div></figure>
-
-<p>当我们处理这个问题的时候，我们也应该在出现第一个词汇错误时退出。要做到这点，我们必须重写Lexer中的recover()方法。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>public static class BailSimpleLexer extends SimpleLexer {
-</span><span class='line'>    public BailSimpleLexer(CharStream input) { super(input); }
-</span><span class='line'>
-</span><span class='line'>    public void recover(LexerNoViableAltException e) {
-</span><span class='line'>        throw new RuntimeException(e);    // Bail out
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>让我们先尝试一个词法错误，通过在输入开头插入一个#字符，词法分析器会抛出异常并从控制流中返回到主程序。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>$ antlr Simple.g
-</span><span class='line'>$ compile Simple TestBail
-</span><span class='line'>$ run TestBail
-</span><span class='line'># class T { int i; }
-</span><span class='line'>EOF
-</span><span class='line'>line 1:1 token recognition error at: '#'
-</span><span class='line'>Exception in thread "main"
-</span><span class='line'>java.lang.RuntimeException: LexerNoViableAltException('#')
-</span><span class='line'>at TestBail$BailSimpleLexer.recover(TestBail.java:9)
-</span><span class='line'>at org.antlr.v4.runtime.Lexer.nextToken(Lexer.java:165)
-</span><span class='line'>at org.antlr.v4.runtime.BufferedTokenStream.fetch(BufferedT...Stream.java:139)
-</span><span class='line'>at org.antlr.v4.runtime.BufferedTokenStream.sync(BufferedT...Stream.java:133)
-</span><span class='line'>at org.antlr.v4.runtime.CommonTokenStream.setup(CommonTokenStream.java:129)
-</span><span class='line'>at org.antlr.v4.runtime.CommonTokenStream.LT(CommonTokenStream.java:111)
-</span><span class='line'>at org.antlr.v4.runtime.Parser.enterRule(Parser.java:424)
-</span><span class='line'>at SimpleParser.prog(SimpleParser.java:68)
-</span><span class='line'>at TestBail.main(TestBail.java:23)
-</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
-
-<p>语法分析器也会从第一个语法错误中退出（在这里是缺少类名）。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>$ run TestBail
-</span><span class='line'>class { }
-</span><span class='line'>EOF
-</span><span class='line'>Exception in thread "main" java.lang.RuntimeException:
-</span><span class='line'>org.antlr.v4.runtime.InputMismatchException
-</span><span class='line'>...</span></code></pre></td></tr></table></div></figure>
-
-<p>我们将通过下面更改语法分析器报告错误的方式来演示ANTLRErrorStrategy接口的灵活性。要改变标准的消息“noviable alternative at input X,”，我们可以覆盖reportNoViableAlternative()并将消息更改为其它不同的内容。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>import org.antlr.v4.runtime.*;
-</span><span class='line'>
-</span><span class='line'>public class MyErrorStrategy extends DefaultErrorStrategy {
-</span><span class='line'>    @Override
-</span><span class='line'>    public void reportNoViableAlternative(Parser parser, NoViableAltException e)
-</span><span class='line'>        throws RecognitionException {
-</span><span class='line'>        // ANTLR generates Parser subclasses from grammars and
-</span><span class='line'>        // Parser extends Recognizer. Parameter parser is a
-</span><span class='line'>        // pointer to the parser that detected the error
-</span><span class='line'>        String msg = "can't choose between alternatives";    // nonstandard msg
-</span><span class='line'>        parser.notifyErrorListeners(e.getOffendingToken(), msg, e);
-</span><span class='line'>    }
-</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
-
-<p>到这里，我们已经涵盖了ANTLR内所有重要的错误报告和恢复设施。因为ANTLRErrorListener和ANTLRErrorStategy接口，我们在错误消息发生的地方具有很大的灵活性：这些消息是什么，以及语法分析器如何从错误中恢复。</p>
-]]></content>
-  </entry>
-  
-  <entry>
     <title type="html"><![CDATA[共享代码的风险]]></title>
     <link href="http://codemany.com/blog/the-perils-of-shared-code/"/>
     <updated>2016-11-25T18:51:10+08:00</updated>
@@ -2730,15 +2527,284 @@
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（32）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part32/"/>
-    <updated>2016-11-18T05:58:56+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part32</id>
-    <content type="html"><![CDATA[<p>前面我们介绍过ANTLR的自动错误恢复机制，现在让我们看看手动机制，有些时候它能够提供更好的错误恢复。</p>
+    <title type="html"><![CDATA[协议分析器的威力]]></title>
+    <link href="http://codemany.com/blog/the-power-of-protocol-analyzers/"/>
+    <updated>2016-09-20T18:06:40+08:00</updated>
+    <id>http://codemany.com/blog/the-power-of-protocol-analyzers</id>
+    <content type="html"><![CDATA[<p>英文原文：<a href="http://arstechnica.com/information-technology/2016/09/the-power-of-protocol-analyzers/">http://arstechnica.com/information-technology/2016/09/the-power-of-protocol-analyzers/</a></p>
 
-<h3 id="错误选项">错误选项</h3>
+<p>问题发生在错综复杂的网络世界里。但要在一时激动之下确定一种新型问题的确切原因变得有些冒险。在这种情况下，当Google-fu耗尽的时候甚至其他能干的工程师也可能会被迫去依赖试错法。</p>
 
-<p>某些语法错误非常常见，所以值得特别处理。例如，程序员经常在带有嵌套参数的函数调用结尾处忘记写大括号。特别是处理这些情况，我们所要做的就是添加选项来匹配错误但常见的语法。下面的语法识别单个参数或者可能在参数中使用嵌套括号的函数调用。规则fcall有两个所谓的错误选项。</p>
+<p>幸运的是，有个秘密武器等待乐意的工程师去部署——协议分析器。该工具允许你明确地确定几乎任何错误的根源，给你提供在底层协议上自我学习的能力。现在唯一的问题是，许多工程师因为（毫无根据的）恐惧而完全回避它。</p>
+
+<h3 id="什么是协议分析器？">什么是协议分析器？</h3>
+
+<p>协议分析器，或者数据包嗅探器，是一个用于拦截通信量，存储它们，并以一个已解码的、人类可读的状态呈现它们的工具。现代协议分析器比如Wireshark甚至可以靠自己发现基本的问题，然后使用捕获的数据执行统计分析。</p>
+
+<p>不理会特性，数据包嗅探器都以基本相同的方式工作。它们把自己插入到网络堆栈中，把所有通信量复制到一个缓冲区或文件。大部分还会将网络驱动置于“混杂模式”，该模式从根本上说允许这些工具取回所有进入网络堆栈的通信量，而不是只采集前往系统本身的通信量。</p>
+
+<h3 id="协议分析仪如何帮助">协议分析仪如何帮助</h3>
+
+<p>在很多情况下，解决一个困难的网络问题的最难部分是找到和理解问题的根源。这种困难的部分源于这样的事实，你对大多数问题使用的工具不是正确的对底层问题的工具。</p>
+
+<p>如果你是一个系统管理员，很有可能你经常用于数据采集的工具是某种日志和错误消息。通常，这些都是解释工具。这些实体试图把原始数据总结为对非开发者或非工程师有意义的东西。因为解释工具是从应用层的视角提供问题的汇总数据，它们往往不能帮助你解决底层的问题。</p>
+
+<p>例如，一条事件日志消息可以告诉你应用程序无法连接到服务器。它甚至可以告诉你根本原因是超时。但这条消息不大可能告诉你超时是由一个黑洞路由器丢弃一个大帧引起。它不能，因为事件日志消息服务不知道错误为何发生。为了使工具知道那个，它需要预测（不解释）这个非常问题，在MTU稳步减少的情况下发送数据包，直到一个通过。如果一个事件日志消息服务早就被编写好要做那件事，从一开始你就不会有这个问题。</p>
+
+<p>当使用错误的工具时，你可能会在某处花上几个小时甚至几周的时间，直到你侥幸得到解决方案。然而，通过使用协议分析器和历久弥新的ping命令，你可以非常容易地在大约5分钟内诊断这个问题。就像早在高中时我的汽车技术辅导员就告诉我的，它全都是关于对任务使用恰当的工具。</p>
+
+<p>除了确定错误，协议分析器提供为数不多的方法之一去证实问题的根源。以前我在微软的时候，棘手问题在团队间来回穿梭是很常见的，因为每个组误解由解释工具提供的数据。首先，问题可能被发送到Exchange团队，接着它可能被穿梭到Active Directory团队，然后最后到Networking团队。</p>
+
+<p>通常，这是因为在其它团队的能力范围之内一个问题好像是合理的。然而，烫手山芋的游戏往往停止在Networking团队。为什么？因为Networking团队的头号工具是证实问题根源的救世主。</p>
+
+<p>网络，像所有的计算，其核心是完全合乎逻辑的。一旦你了解它在幕后是如何工作的，你就有能力在底层确定问题，不论问题是多么独特。作为协议分析的一个伟大副作用，你也将学到很多关于网络的知识，它们将帮助你解决各种各样的网络问题（即使那些不需要协议分析）。</p>
+
+<h3 id="wireshark基础">Wireshark基础</h3>
+
+<p>现在，有各种各样的协议分析器可供选择，从免费的和相当功能的微软消息分析器到特性极其丰富但十分昂贵的Savvius Omnipeek。多年来我已经使用过大量的分析器，但我最喜欢的用于常规故障排除的协议分析器是Wireshark。它是免费的，开源的，多平台的具有很多特性的分析器。有个充满活力的社区站在它背后，而且Wireshark也相当容易习惯。这让它成为一个很好的开始的地方。</p>
+
+<p>你可以从 <a href="https://www.wireshark.org/">https://www.wireshark.org/</a> 下载用于你操作系统的Wireshark。安装它没有什么特别的，但如果你是安装在Windows上，确保也安装了捆绑的WinPCAP驱动程序。这允许Wireshark实际上捕获数据包（没有它，你只能观看存档的数据包）。</p>
+
+<p>Wireshark通常将你的NIC置于混杂模式。正常情况下，你的NIC只会保留前往你的MAC或者广播MAC（FF-FF-FF-FF-FF-FF）的帧。启用混杂模式后，不管怎样，你的NIC保留所有它听到的帧。</p>
+
+<p>从理论上讲，这意味着你应该接收所有的在你Ethernet段上的数据包。不过，实际上如今几乎所有的Ethernet网络都是交换网络。如果你想接收所有的通信量，必须多做些工作。</p>
+
+<p>一旦你已经安装了Wireshark，使用它是相当简单的。把它打开，你将看到如下显示的屏幕：</p>
+
+<p><img src="http://codemany.com/uploads/wireshark-network-analyzer.png" alt="wireshark-network-analyzer"></p>
+
+<p>这个屏幕给你展示选择一个在它上面捕获数据包的NIC的选项和输入一个用于只捕获一部分入站数据包的过滤器的选项。如果你选择一个NIC然后点击在文件菜单下面的小鱼翅图标，Wireshark将立即开始捕获数据包。</p>
+
+<p>随着数据包被捕获，Wireshark在主界面中实时地显示它们。当你准备停止时，你只需点击在鱼翅图标旁边的小红方块。</p>
+
+<p><img src="http://codemany.com/uploads/wireshark-main-interface.png" alt="wireshark-main-interface"></p>
+
+<p>数据包列表部分显示在这个点捕获的每件事物，按它们被捕获的顺序排序（默认）。（你可以通过点击要作为排序依据的标题任意地排序这些数据包。）</p>
+
+<p>数据包细节部分显示Wireshark解码的在数据包中的每个报头。基本上，Wireshark有几乎今天在用的每个协议的解码器，并且为了显示分成字段的数据，解码器工具自动应用到每个数据包。</p>
+
+<p>举例来说，如下，我已经为一个典型的HTTP数据包增加了Ethernet II报头。</p>
+
+<p><img src="http://codemany.com/uploads/wireshark-http-header.png" alt="wireshark-http-header"></p>
+
+<p>你可以清楚地看到Wireshark已经析出了Destination和Source的MAC地址，以及Type字段，它是0x0800。Type字段指出下个报头应该是一个IPv4报头，Wireshark很方便告诉你这个。</p>
+
+<p>这个解码特性使你不必自己计算字节和解码它（不过，如果你愿意，你仍然还可以在原始字节部分做）。如果对原始字节部分有兴趣：Wireshark同时为所有数据提供ASCII转换，它有时提供令人惊讶的数据。在下图，你可以在ASCII视图里的这个数据包中清楚地看到HTTP请求发送的细节。</p>
+
+<p><img src="http://codemany.com/uploads/wireshark-ascii-view.png" alt="wireshark-ascii-view"></p>
+
+<p>Wireshark同时也提供一些非常实用的分析和统计特性，包括测量响应时间和往返时间的能力。但到目前为止，最有用的特性是过滤功能。</p>
+
+<p>在数据包列表直接的上方是一个文本框，那里你可以输入显示过滤器。默认不使用过滤器，意味着显示被捕获的所有数据包。然而，你经常最后得到信息过载，而过滤掉噪音是数据包分析的一个非常重要的部分。</p>
+
+<p>Wireshark中的过滤器按照一门简单的语言结合协议字段、比较运算符和逻辑运算符以便过滤掉不匹配条件的数据包。例如，过滤器http将只显示HTTP通信量，而过滤器ip.addr == 192.168.1.10将只显示源或目标的IP地址是192.168.1.10的数据包。</p>
+
+<p>当你是第一次开始的时候，过滤可能会有点令人生畏，但通常在Wireshark中学习过滤器的最简单的方法是使用内建的表达式工具。可以通过点击过滤器文本框右边的Expression按钮访问它。</p>
+
+<p>这个工具允许你寻遍Wireshark本身支持的所有协议，挑选你想过滤的字段而不需要知道过滤器动词或语法。只需选择协议，填写呈现的字段，然后过滤器将会为你而建。这里，我使用表达式工具构建一个仅查找Ethernet广播的过滤器。</p>
+
+<p><img src="http://codemany.com/uploads/wireshark-filter-expression.png" alt="wireshark-filter-expression"></p>
+
+<p>注意工具如何在底部的绿框中显示最终的过滤器语法。通过注意这个字段，你将最终变得熟悉你的最常用的过滤器。</p>
+
+<p>然而，你不能用表达式工具做的一件事是把过滤器串起来。因为那个原因，你需要学习一些逻辑运算符。Wireshark的基本逻辑运算符是and（&amp;&amp;）、or（||）和not（!）。</p>
+
+<p>and被用于结合过滤器，只有满足所有条件的数据包会被显示。例如，过滤器http &amp;&amp; ip.addr == 192.168.1.10将只显示在第7层报头中的HTTP协议和在IP报头中的IP地址192.168.1.10两者都包括的数据包。</p>
+
+<p>or被用于查找两者中的任何一个过滤器，因此满足你输入的任何条件的数据包都会被显示。举例来说，过滤器http || ip.addr == 192.168.1.10将显示在第7层报头中的HTTP协议或在IP报头中的IP地址192.168.1.10的数据包。</p>
+
+<p>not被用于从结果中过滤掉一些东西。例如，过滤器ip.addr == 192.168.1.10 ! http将显示有在IP报头中的IP地址192.168.1.10但没有在第7层报头中的HTTP协议的数据包。</p>
+
+<p>关于基本的Wireshark功能最后要注意的事是，除保存你的原始捕获外，你也有多种多样的选项导出捕获。</p>
+
+<p>首先，你导出当前选择的数据包、所有数据包、你标记的数据包或者一段范围的数据包。在这些选项的每一个中，你可以选择导出所有被捕获的数据包或只是被显示的数据包（考虑当前应用的过滤器）。这些选项让你非常具体地知道你想导出哪些数据包。</p>
+
+<p><img src="http://codemany.com/uploads/wireshark-export-packets.png" alt="wireshark-export-packets"></p>
+
+<p>此外，你可以把数据包导出成几乎任何常用的格式。在Wireshark中用于文档和电子邮件转出的最好的特性之一是以纯文本或CSV格式导出解剖数据包（完整的数据包解码）的能力。要做到这个，只需从文件菜单里选择“Export Packet Dissections”。</p>
+
+<h3 id="理解你所看到的">理解你所看到的</h3>
+
+<p>尽管所有这些功能都很好，底线是如果你不明白在每个报头中字段的目的它们都是无用的。幸运的是，除了少量专有协议，你遇到的几乎每个协议的规格说明都是免费在线的。</p>
+
+<p>例如：Ethernet，你可以直接到IEEE下载标准；802.3标准可以在 <a href="http://standards.ieee.org/about/get/802/802.3.html">http://standards.ieee.org/about/get/802/802.3.html</a> 获得。它是免费的直接来自权威人士。如果你在查找802.3 Ethernet帧格式，你将发现真的只有3个感兴趣的字段：目标MAC地址、源MAC地址和类型/长度字段。下图中在Wireshark解剖体左边的是来自IEEE 802.3规格说明Section 1中Part 3.1.1的Figure 3-1：</p>
+
+<p><img src="http://codemany.com/uploads/wireshark-packet-format.png" alt="wireshark-packet-format"></p>
+
+<p>如果你想知道preamble和SFD发生了什么，它们在帧从NIC到Wireshark向上传递给栈之前被移除。同样地，你通常不会在末尾看到FCS，因为它在向上传递帧之前被剥去。</p>
+
+<p>在第2层上面，所有TPCTCP/IP协议由IETF管理和由RFCs（请求评论）定义。所有这些RFCs可以在站点 <a href="https://www.rfc-editor.org/">https://www.rfc-editor.org/</a> 上即刻地免费地获得。虽然它们有点简洁（并且因为这个原因有时难以理解），它们总是正确的，具体问题的澄清可以使用Google快速搜索获得。</p>
+
+<p>举例来说，通常混淆新手的事情之一是大量TCP重置，或者在TCP报头中数据包有打开的RST标记。浏览RFC 793（TCP），你可能会得到RST总是用信号告知一些坏事情的印象。几乎所有的35个左右提到的RST与某种错误条件有关联。</p>
+
+<p>然而，使用关键词“tcp rst from client”的Google快速搜索将让你得到大量的关于这个现象的很好的讨论。也许最好的是来自Wireshark论坛，在那里他们解释说这很平常，因为客户端应用仅仅被编码去重置链接而不是优雅地关闭它。在这种情况下，服务端已经发送一个FIN。作为回复一个FIN/ACK并等待最终的ACK的替换，客户端只需通过发送一个RST并中止会话来优化过程。在下面的示例中这可以清楚地被看到。</p>
+
+<p><img src="http://codemany.com/uploads/wireshark-pcap-example.png" alt="wireshark-pcap-example"></p>
+
+<p>除了规格说明和Google，另一个学习协议通常如何运转的良好来源是示例跟踪的资料库。这些示例跟踪允许你去查看相当典型的既常见又晦涩的协议操作，以及一些十分罕见的平常可能不会碰到的错误。</p>
+
+<p>一个很好的起点是Wireshark Wiki上的样板捕获：<a href="https://wiki.wireshark.org/SampleCaptures">https://wiki.wireshark.org/SampleCaptures</a> 。在这里有大量非常有用的捕获让你去下载以及用过滤和其它Wireshark特性做实验，包括像广播风暴、病毒和攻击套装这样有意思的错误。如果这些还不够，在这个页面上还有一些其它资源的链接去协助你。但是毫无疑问地，变得擅长协议分析的最快方式是仔细观看大量的捕获并试图理解被使用的协议。</p>
+
+<h3 id="如何得到好的捕获">如何得到好的捕获</h3>
+
+<p>如果不能捕获正确的数据，世界上所有的领悟都无济于事。在最基本的层面，目标是只捕获涉及你试图解决的问题的数据包，有效减少你跟踪里的噪音。</p>
+
+<p>为了做到这点，你可以使用一个捕获过滤器去从捕获中排除那些匹配过滤器外的所有数据。如果你确切地知道你在寻找什么这会工作的很好，但往往这种方法会导致你不能觉察一些重要的事情。大多数时候你只有一个问题是什么的粗略想法，或者你忘了一些潜在的找到错误的关键的过程。如果这种情况发生，使用捕获过滤器就没那么幸运，而且你不能返回和没重设置它就不过滤捕获。</p>
+
+<p>例如，在诊断一个网站的性能问题时，你可能决定使用一个捕获过滤器集从Web服务器自身取得捕获，以便只捕获在其与客户端系统和后台SQL服务器之间往返的数据。然而，这个问题实际上可能仅仅是Web服务器使用的身份验证服务器过载，等待身份验证才是引起整个性能问题的原因。使用你选择的捕获过滤器你将永远不会发现这个问题。</p>
+
+<p>这是我倾向于捕获所有数据并且使用显示过滤器去减少跟踪里的噪音的原因。这不是说捕获过滤器完全不必要。捕获过滤器的一个常见用途是当你有一个非常繁忙的你正在捕获的千兆或万兆连接的时候，捕获过滤器变得有用仅仅是因为大量的数据。不过，你始终需要牢记过滤器的限制。</p>
+
+<p>得到一个好的捕获的第二部分是正确识别你需要捕获的系统。举例来说，在前面关于Web服务器性能问题的例子中，我可能首先会从Web服务器和Web客户端两者取得同时发生的捕获。这样你可以看到两边的正常预期行为的任何偏差，这有助于你将问题隔离到服务器或客户端。</p>
+
+<p>一旦查明延迟是一个与身份验证有关的服务端问题，然后我会从Web服务器和身份验证服务器两者取得其它的跟踪。这样，我可以看到是本地到身份验证服务器的问题还是等待像DNS这样其它服务的问题或者Global Catalog是实际上的罪魁祸首。</p>
+
+<p>得到一个好的捕获的第三步是在成功和失败条件中都使用捕获。举例来说，如果你有一个间歇性的Web服务器性能问题，设法在站点正常和不正常工作时都得到跟踪。这能给你一个好的和坏的比较跟踪，可以使用它去隔离问题。</p>
+
+<p>最后，当处理一个间歇性的问题时，你会发现很难得到一个失败捕获。在这种情况下，Wireshark有一个很重要的特性被称为环形缓冲区，它允许你持续地捕获。</p>
+
+<p>通常，特别在一个繁忙的网络上，持续的捕获将冒填满磁盘的风险。但有了环形缓冲区，Wireshark会写入文件直到它达到指定大小或者经过一段时间，然后它会切换到一个新文件。一旦指定数量的文件已经被写入，程序删除最旧的文件。例如，看看下面我已经定义的设置：</p>
+
+<p><img src="http://codemany.com/uploads/wireshark-capture-interfaces.png" alt="wireshark-capture-interfaces"></p>
+
+<p>这个配置告诉Wireshark不管文件大小每10分钟创建一个新文件，并且确保程序保留总计3个文件，根据需要删除最旧的。这确保从错误被通知的时间起我有30分钟去停止捕获。这是一个非常有用的技术用于捕获极其间歇性的问题。</p>
+
+<p>这些是你需要的以便用Wireshark开始故障排除的所有基本技术。使用这些技术和资源，你会发现你经常能用比几乎任何其它技术更短的时间找到和验证网络问题的原因。快乐的故障排除。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[如何创建有效的图标]]></title>
+    <link href="http://codemany.com/blog/how-to-create-effective-icons/"/>
+    <updated>2016-08-06T12:43:17+08:00</updated>
+    <id>http://codemany.com/blog/how-to-create-effective-icons</id>
+    <content type="html"><![CDATA[<p>英文原文：<a href="http://www.awwwards.com/how-to-create-effective-icons.html">http://www.awwwards.com/how-to-create-effective-icons.html</a></p>
+
+<p>我可能就是你所说的图标爱好者。我喜欢图标，而且我更加喜欢制作它们！作为一个艺术家，我的背景在很大程度上是绘画——我喜欢绘画，并且我已经画了一辈子（甚至远远早于我知道什么是图形设计）。我想，这是我理解创建图标的一个关键。绘画教你看——然后把你所看到的转化成纸上的线条和图形——而这正是如何创建有效的图标。</p>
+
+<h3 id="几何图形">几何图形</h3>
+
+<p>因此，对初学者而言，基本上任何东西都可以用这四种图形组合而成：</p>
+
+<p><img src="http://codemany.com/uploads/effective-icons-1.png" alt="effective-icons-1"></p>
+
+<p>当我想把某事物转换成一个图标时，我观察它然后尽可能地将其拆分为最简单的图形。例如，水滴可以用一个三角形和一个圆形组成。</p>
+
+<p><img src="http://codemany.com/uploads/effective-icons-2.png" alt="effective-icons-2"></p>
+
+<p>心形图标可以由两个圆形和一个三角形构成。</p>
+
+<p><img src="http://codemany.com/uploads/effective-icons-3.png" alt="effective-icons-3"></p>
+
+<p>我每次都是在Adobe Illustrator中创建这些图形。使用矢量图形可以让我控制线条的粗细，以及图形和其锚点的相互作用。Illustrator也可以让我自由地把线条转换成图形，反之亦然。这一切也许看起来十分基础，但它是我用于创建最复杂图标的同样的方法。下面是我最近在做的一个略微更加复杂些的《权利法案》图标的示例，在这里我应用了同样的原则。</p>
+
+<p><img src="http://codemany.com/uploads/effective-icons-4.png" alt="effective-icons-4"></p>
+
+<h3 id="界面图标">界面图标</h3>
+
+<p>我最近有机会为一款超赞的iPhone应用Parker Planner制作一组图标。我很喜欢做这个项目，这个项目其中最重要的一个方面是创建一组易懂的、私有的、实用的和美观的用户界面图标，可以帮助用户浏览操作这款略微复杂的计划应用。</p>
+
+<p><img src="http://codemany.com/uploads/effective-icons-5.png" alt="effective-icons-5"></p>
+
+<p>让我们选取这些图标的其中之一分解看看我如何创建它。例如，垃圾桶图标是由三个圆角矩形和三条线构成。</p>
+
+<p>1、选择圆角矩形工具。</p>
+
+<p><img src="http://codemany.com/uploads/effective-icons-6.png" alt="effective-icons-6"></p>
+
+<p>2、拖动出一个图形。</p>
+
+<p><img src="http://codemany.com/uploads/effective-icons-7.png" alt="effective-icons-7"></p>
+
+<p>3、调整笔划宽度直到你满意。</p>
+
+<p><img src="http://codemany.com/uploads/effective-icons-8.png" alt="effective-icons-8"></p>
+
+<p>我通常选择在整组图标中使用一到两种笔划宽度。</p>
+
+<p><img src="http://codemany.com/uploads/effective-icons-9.png" alt="effective-icons-9"></p>
+
+<p>这使它们看起来更一致和感觉更有整体性。</p>
+
+<p>4、用另一个圆角矩形创建盖子。</p>
+
+<p><img src="http://codemany.com/uploads/effective-icons-10.png" alt="effective-icons-10"></p>
+
+<p>5、再一个圆角矩形创建盖子的把手。</p>
+
+<p><img src="http://codemany.com/uploads/effective-icons-11.png" alt="effective-icons-11"></p>
+
+<p>6、擦除圆角矩形的下半部分。</p>
+
+<p><img src="http://codemany.com/uploads/effective-icons-12.png" alt="effective-icons-12"></p>
+
+<p>7、现在，通过添加三条竖线到桶身上给桶添加条纹。</p>
+
+<p><img src="http://codemany.com/uploads/effective-icons-13.png" alt="effective-icons-13"></p>
+
+<p>8、然后你就获得了它！一个垃圾桶图标……如果你喜欢，你可以用颜色或线条宽度做进一步调整。</p>
+
+<p><img src="http://codemany.com/uploads/effective-icons-14.png" alt="effective-icons-14"></p>
+
+<p>我在创建图标时经常使用的一些其它真正有用的工具是Pathfinder，我使用它来剪切、连接和挖空图形。</p>
+
+<p><img src="http://codemany.com/uploads/effective-icons-15.png" alt="effective-icons-15"></p>
+
+<p>Stroke/Fill工具，它帮助你将图形在填满和笔划间切换。</p>
+
+<p><img src="http://codemany.com/uploads/effective-icons-16.png" alt="effective-icons-16"></p>
+
+<p>以及我非常喜欢的工具Stroke Panel，它帮助你将拐角和线的末端从直角转换到圆角。</p>
+
+<p><img src="http://codemany.com/uploads/effective-icons-17.png" alt="effective-icons-17"></p>
+
+<p>当我完成一组图标，我通常将它们全体紧挨着排成一排，看看是否有哪个看起来很奇怪或不到位。然后我会做任何必要的修改。</p>
+
+<p><img src="http://codemany.com/uploads/effective-icons-18.png" alt="effective-icons-18"></p>
+
+<p>最后，我总是在应用中测试它们以确保它们感觉正确和功能良好。</p>
+
+<p><img src="http://codemany.com/uploads/effective-icons-19.png" alt="effective-icons-19"></p>
+
+<p>最终，我想说创建优秀图标的方法不仅仅是学习Illustrator技巧，尽管它们也是必需的。最好的做法是练习把你周围看到的事物分解成简单图形。你在这点上越是变得更好，你越是能够成为更高超的图标设计师！加油！</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[如何使用Flexbox构建新闻站点布局]]></title>
+    <link href="http://codemany.com/blog/how-to-build-a-news-website-layout-with-flexbox/"/>
+    <updated>2016-06-11T23:31:14+08:00</updated>
+    <id>http://codemany.com/blog/how-to-build-a-news-website-layout-with-flexbox</id>
+    <content type="html"><![CDATA[<p>英文原文：<a href="http://webdesign.tutsplus.com/tutorials/how-to-build-a-news-website-layout-with-flexbox--cms-26611">http://webdesign.tutsplus.com/tutorials/how-to-build-a-news-website-layout-with-flexbox--cms-26611</a></p>
+
+<p><img src="http://codemany.com/uploads/flexbox-preview.png" alt="flexbox-preview"></p>
+
+<p>在投入并开始之前你没有必要理解Flexbox的<em>每个</em>方面。在这篇教程中，我们将介绍一些Flexbox的特性，同时设计一个类似<a href="http://www.theguardian.com/">The Guardian</a>的“新闻布局”。</p>
+
+<p>我们正在使用Flexbox的原因是它提供了非常强大的特性：</p>
+
+<ul>
+<li>我们可以很容易制作响应式列</li>
+<li>我们可以使列等高</li>
+<li>我们可以把内容推到容器的<em>底部</em></li>
+</ul>
+
+<p>那么让我们开始吧！</p>
+
+<h3 id="1-从两个列开始">1. 从两个列开始</h3>
+
+<p>在CSS中创建列一直是个挑战。长期以来，唯一的选项是使用float或者table，但它们都有它们自己的问题。</p>
+
+<p>Flexbox使这个过程更简单，给予我们：</p>
+
+<ul>
+<li><strong>更简洁的代码</strong>：我们只需要一个带有display: flex的容器</li>
+<li>不需要<strong>清除</strong>float，以防止意外的布局行为</li>
+<li><strong>语义化的标记</strong></li>
+<li><strong>灵活性</strong>：我们可以用几行CSS代码来调整列的大小、拉伸或者对齐列</li>
+</ul>
+
+<p>让我们从创建两个列开始：一个是容器宽度的2/3，一个是1/3。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -2748,18 +2814,21 @@
 <span class='line-number'>6</span>
 <span class='line-number'>7</span>
 <span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>stat: fcall ';' ;
-</span><span class='line'>fcall
-</span><span class='line'>    : ID '(' expr ')'
-</span><span class='line'>    | ID '(' expr ')' ')' { notifyErrorListeners("Too many parentheses"); }
-</span><span class='line'>    | ID '(' expr         { notifyErrorListeners("Missing closing ')'"); }
-</span><span class='line'>    ;
-</span><span class='line'>expr: '(' expr ')'
-</span><span class='line'>    | INT
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div class="columns"&gt;
+</span><span class='line'>  &lt;div class="column main-column"&gt;
+</span><span class='line'>    2/3 column
+</span><span class='line'>  &lt;/div&gt;
+</span><span class='line'>  &lt;div class="column"&gt;
+</span><span class='line'>    1/3 column
+</span><span class='line'>  &lt;/div&gt;
+</span><span class='line'>&lt;/div&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p>虽然这些错误选项可能使ANTLR生成的语法分析器在选项之间选择时更困难，但它们不以任何方式混淆语法分析器。就像任何其它选项，如果它们与当前的输入一致，语法分析器就会匹配它们。现在，让我们从一个有效的函数调用开始，尝试一些匹配错误选项的输入序列。</p>
+<p>这里有两个元素：</p>
+
+<ul>
+<li>columns容器</li>
+<li>两个column子容器，其中一个带有附加的名为main-column的class，我们将用它来让该子容器更宽</li>
+</ul>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -2772,61 +2841,21 @@
 <span class='line-number'>9</span>
 <span class='line-number'>10</span>
 <span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>$ antlr Call.g
-</span><span class='line'>$ compile Call
-</span><span class='line'>$ grun Call stat
-</span><span class='line'>f(34);
-</span><span class='line'>EOF
-</span><span class='line'>$ grun Call stat
-</span><span class='line'>f((34);
-</span><span class='line'>EOF
-</span><span class='line'>line 1:6 Missing closing ')'
-</span><span class='line'>$ grun Call stat
-</span><span class='line'>f((34)));
-</span><span class='line'>EOF
-</span><span class='line'>line 1:8 Too many parentheses</span></code></pre></td></tr></table></div></figure>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[ANTLR 4权威参考读书笔记（31）]]></title>
-    <link href="http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part31/"/>
-    <updated>2016-11-12T14:21:50+08:00</updated>
-    <id>http://codemany.com/blog/reading-notes-the-definitive-antlr4-reference-part31</id>
-    <content type="html"><![CDATA[<ul>
-<li>lookahead 前导符</li>
-</ul>
-
-<p>现在我们已经对ANTLR语法分析器生成的消息种类以及如何调整和重定向它们有很好的了解，让我们来探讨错误恢复。</p>
-
-<h3 id="自动错误恢复策略">自动错误恢复策略</h3>
-
-<p>错误恢复是允许语法分析器找到语法错误后还能继续的东西。ANTLR的错误恢复机制是：如果可能的话，语法分析器在不匹配的记号错误上执行单次记号插入和单次记号删除。如果不能，语法分析器会吞掉记号直到它找到可以合理遵循当前规则的记号然后返回它，继续下去，就好像什么事都没发生。在本节中，我们将探讨ANTLR如何在各种情况下从错误中恢复。让我们从ANTLR使用的基本恢复策略开始。</p>
-
-<h4 id="通过扫描后续记号恢复">通过扫描后续记号恢复</h4>
-
-<p>当真正面对残缺的输入时，当前规则不能继续，因此语法分析器通过吞掉记号来恢复，直到它认为它已经重新同步然后返回到调用规则。我们可以称之为“同步和返回策略”。有些人称它是“恐慌模式”，但它工作的非常好。语法分析器知道它不能用当前规则匹配当前输入。它只能抛出记号直到前导符与语法分析器退出规则后应该匹配的内容一致。例如，如果在赋值语句中有个语法错误，在语法分析器看到分号或其它语句终结符之前抛出记号是非常有意义的。激烈但有效。正如我们将看到的，ANTLR试图在规则中恢复，然后在撤回到这个基本策略。</p>
-
-<p>每个ANTLR生成的规则方法都被包裹在try-catch中，通过报告错误并在返回之前尝试恢复来响应语法错误。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>try {
-</span><span class='line'>    ...
-</span><span class='line'>} catch (RecognitionException re) {
-</span><span class='line'>    _errHandler.reportError(this, re);
-</span><span class='line'>    _errHandler.recover(this, re);
+</pre></td><td class='code'><pre><code class=''><span class='line'>.columns {
+</span><span class='line'>  display: flex;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.column {
+</span><span class='line'>  flex: 1;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.main-column {
+</span><span class='line'>  flex: 2;
 </span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>在这里，recover()会消费记号直到它在重新同步集合中找到记号。重新同步集合是所有调用栈上的规则的规则引用跟随集合的并集。规则引用的跟随集合是可以立即匹配引用而无需离开当前规则的跟随引用的记号集合。例如，选项<code>assign &#39;;&#39;</code>，规则引用assign的跟随集合是{&#39;;&#39;}。如果选项仅仅是assign，它的跟随集合就为空。</p>
+<p>作为有一个flex值为2的主列，它将占用其它列的两倍空间。</p>
 
-<p>让我们通过示例来看看重新同步集合中包含什么。考虑以下语法，并设想在每个规则调用中，语法分析器跟踪每个规则调用的跟随集合。</p>
+<p>通过添加一些附加的视觉样式，这里是我们得到的：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -2844,72 +2873,35 @@
 <span class='line-number'>14</span>
 <span class='line-number'>15</span>
 <span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>// Filename: F.g
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>html {
+</span><span class='line'>  font-family: sans-serif;
+</span><span class='line'>}
 </span><span class='line'>
-</span><span class='line'>grammar F;
+</span><span class='line'>.columns {
+</span><span class='line'>  display: flex;
+</span><span class='line'>}
 </span><span class='line'>
-</span><span class='line'>group
-</span><span class='line'>    : '[' expr ']'      // Tokens following ref to expr: {']'}
-</span><span class='line'>    | '(' expr ')'      // Tokens following ref to expr: {')'}
-</span><span class='line'>    ;
-</span><span class='line'>expr: atom '^' INT ;    // Tokens following ref to atom: {'^'}
-</span><span class='line'>atom: ID
-</span><span class='line'>    | INT
-</span><span class='line'>    ;
+</span><span class='line'>.column {
+</span><span class='line'>  background: #eee;
+</span><span class='line'>  border: 5px solid #ccc;
+</span><span class='line'>  flex: 1;
+</span><span class='line'>  padding: 20px;
+</span><span class='line'>}
 </span><span class='line'>
-</span><span class='line'>INT : [0-9]+ ;
-</span><span class='line'>ID  : [a-zA-Z]+ ;
-</span><span class='line'>WS  : [ \t\r\n]+ -&gt; skip ;</span></code></pre></td></tr></table></div></figure>
+</span><span class='line'>.main-column {
+</span><span class='line'>  flex: 2;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>对于输入<code>[1^2]</code>，考虑下图中左边的语法分析树：</p>
+<h3 id="2-让每一列都成为flexbox容器">2. 让每一列都成为Flexbox容器</h3>
 
-<p><img src="http://codemany.com/uploads/syntax-parse-tree.png" alt="syntax-parse-tree"></p>
+<p>这两列中的每一个都将包含若干垂直堆叠的文章，因此我们打算把column元素也转变成Flexbox容器。我们想要：</p>
 
-<p>当在规则atom中匹配记号1时，调用栈是[group, expr, atom]（group调用expr，expr调用atom）。通过查看调用栈，我们可以准确地知道记号集合可以跟随语法分析器调用的任何规则，以便把我们带到当前位置。在当前规则中跟随集合只考虑记号，以至在运行时，我们可以只组合与当前调用栈有关系的集合。换句话说，我们不能同时从group的所有选项到达规则expr。</p>
-
-<p>结合从语法F中的注释里提取的跟随集合，我们得到一个重新同步集合<code>{&#39;^&#39;, &#39;]&#39;}</code>。为什么这是我们想要的，让我们观察当语法分析器遇到错误的输入<code>[]</code>时会发生什么。我们得到上图中显示在右边的语法分析树。在规则atom中，语法分析器发现当前记号<code>]</code>不符合atom的任何选项。要想重新同步，语法分析器需要消费记号直到它在重新同步集合找到记号。在这种情况下，当前记号<code>]</code>作为重新同步集合的成员开始，所以语法分析器不会消费任何记号以便在atom中重新同步。</p>
-
-<p>在规则atom中完成恢复过程之后，语法分析器回到规则expr但是立刻发现它没有<code>^</code>记号。重复同样的过程，语法分析器消费记号直到它在重新同步集合找到记号。expr的重新同步集合是在group的第一个选项中的expr引用的跟随集合：<code>{ &#39;]&#39; }</code>。再次，语法分析器不消费任何东西并退出expr，回到规则group的第一个选项。现在，跟随着expr的引用，语法分析器明确知道它在寻找什么。它成功地匹配规则group中的<code>&#39;]&#39;</code>。语法分析器现在已经正确地同步。</p>
-
-<p>在恢复期间，ANTLR语法分析器避免发出级联错误消息。也就是说，语法分析器为每个语法错误发出单独的错误消息，直到它们从该错误成功地恢复。通过使用一个简单的布尔变量，设置语法错误，语法分析器避免发出更多的错误，直到语法分析器成功匹配记号和重置变量。</p>
-
-<p>在许多情况下，ANTLR可以比单纯消费更智能地恢复，直到重新同步集合并从当前规则返回。尝试“修复”输入并在相同的规则内继续是值得的。在接下来的几个部分，我们将看看语法分析器如何从不匹配的记号以及子规则里的错误中恢复。</p>
-
-<h4 id="从不匹配记号中恢复">从不匹配记号中恢复</h4>
-
-<p>在语法分析过程中最常见的操作之一是“匹配记号”。对于语法中的每个记号引用T，语法分析器调用match(T)。如果当前的记号不是T，match()通知错误监听器并尝试重新同步。要重新同步，它有3个选择。它可以删除一个记号，它可以想象出一个，或者可以放弃并抛出异常以便从事基本的同步和返回机制。</p>
-
-<p>如果这样做有意义的话，删除当前记号是最容易去重新同步的方法。让我们再次讨论来自在语法Simple中的简单类定义语言的规则classDef。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>classDef
-</span><span class='line'>    : 'class' ID '{' member+ '}'    // a class has one or more members
-</span><span class='line'>      { System.out.println("class " + $ID.text); }
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<p>给定输入<code>class 9 T {int i; }</code>，语法分析器将删除9并继续在规则中进行来匹配类体。下图说明了语法分析器消费class后的输入状态：</p>
-
-<p><img src="http://codemany.com/uploads/input-state-1.png" alt="input-state-1"></p>
-
-<p>LA(1)和LA(2)记号前导符号的第一个记号（当前记号）和第二个记号。match(ID)期望LA(1)是一个ID，但它不是。实际上，下一个记号LA(2)才是一个ID。为了恢复分析，我们只需要删除当前记号，消费我们期望的ID并退出match()。</p>
-
-<p>如果语法分析器无法通过删除记号重新同步，则会尝试插入一个记号作为代替。假设我们忘记了ID，以致classDef看到输入<code>class { int i; }</code>。匹配class后，输入状态如下所示：</p>
-
-<p><img src="http://codemany.com/uploads/input-state-2.png" alt="input-state-2"></p>
-
-<p>语法分析器调用match(ID)后发现是{。在这种情况下，语法分析器知道{是下一步需要的记号，因为它在classDef中跟随ID引用。要重新同步，match()可以假装看到标识符并返回，从而允许下一个match(&#39;{&#39;)调用成功。</p>
-
-<p>如果我们忽略嵌入动作（如引用类名标识符的print语句），那么这很有用。print语句通过$ID.text引用缺失的记号，如果记号为空，将导致异常。而不是简单地假装记号存在，由错误处理程序想象出一个。这个想象出的记号有语法分析器期望的记号类型以及从当前输入记号LA(1)中获得的行和字符的位置信息。这个想象出的记号也用于阻止在监听器和访问者中引用缺失记号的异常。</p>
-
-<p>看看发生了什么的最简单的方法是查看语法分析树，它显示语法分析器如何识别所有记号。在出现错误的情况下，
-语法分析树用红色突出显示在重新同步期间语法分析器删除或想象出的记号。对于输入<code>class { int i; }</code>和语法Simple，我们得到以下的语法分析树：</p>
-
-<p><img src="http://codemany.com/uploads/error-parse-tree.png" alt="error-parse-tree"></p>
-
-<p>语法分析器也会执行嵌入print动作而不抛出异常，因为错误恢复会为$ID想象出一个有效的Token对象。</p>
+<ul>
+<li>文章被垂直堆叠</li>
+<li>文章<em>拉伸</em>并填充可用空间</li>
+</ul>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -2917,49 +2909,18 @@
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
 <span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>$ grun Simple prog -gui
-</span><span class='line'>class { int i; }
-</span><span class='line'>EOF
-</span><span class='line'>line 1:6 missing ID at '{'
-</span><span class='line'>var i
-</span><span class='line'>class &lt;missing ID&gt;</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>.column {
+</span><span class='line'>  display: flex;
+</span><span class='line'>  flex-direction: column;  /* 使文章垂直堆叠 */
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article {
+</span><span class='line'>  flex: 1;  /* 拉伸文章以填补剩余的空间 */
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>当然，带有文本<code>&lt;missing ID&gt;</code>的标识符对于任何我们试图完成的目标都不是很有用，但至少错误恢复不会导致一堆空指针异常。现在我们知道ANTLR如何对简单的记号引用进行规则内恢复，下面让我们来探讨如何从以前和子规则识别期间的错误中恢复。</p>
-
-<h4 id="从子规则的错误中恢复">从子规则的错误中恢复</h4>
-
-<p>为避免刚碰到错误就从子规则循环中抽身，对周围规则强制同步和返回恢复，ANTLR v4会在开始和循环继续测试处自动插入同步检查。机制看起来是这样：</p>
-
-<p><em>子规则开始</em> 在任何子规则的开头，语法分析器尝试单个记号删除。但是，与记号匹配不同，语法分析器不会尝试单个记号插入。ANTLR很难想象出一个记号，因为它将不得不猜测几个选项中的哪个最终会成功。</p>
-
-<p><em>循环子规则继续测试</em> 如果子规则是循环结构，<code>(...)*</code>或者<code>(...)+</code>，语法分析器在错误出现时积极尝试恢复以停留在循环中。在成功匹配循环的某个选项后，语法分析器消费直到它找到符合以下这些集合之一的记号：</p>
-
-<ol>
-<li>循环的另个迭代</li>
-<li>循环后面的</li>
-<li>当前的重新同步集合</li>
-</ol>
-
-<p>让我们先来看下子规则前的单个符号删除。考虑规则classDef中的<code>member+</code>循环结构。如果我们不小心输入一个额外的<code>{</code>，<code>member+</code>子规则在跳进member前将会删除这个额外的记号，就像下面语法分析树显示的那样：</p>
-
-<p><img src="http://codemany.com/uploads/member-parse-tree.png" alt="member-parse-tree"></p>
-
-<p>以下的会话可以证实恢复是妥当的，因为它能正确地识别变量i：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>$ grun Simple prog
-</span><span class='line'>class T { { int i; }
-</span><span class='line'>EOF
-</span><span class='line'>line 1:9 extraneous input '{' expecting 'int'
-</span><span class='line'>var i
-</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
-
-<p>现在让我们尝试一些真正混乱的输入，看看<code>member+</code>循环能否恢复并继续寻找member。</p>
+<p>在<em>容器</em>上的flex-direction: column规则结合在<em>子容器</em>上的flex: 1规则确保文章将填补整个垂直空间，保持最初两列具有相同的高度。</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -2973,24 +2934,38 @@
 <span class='line-number'>10</span>
 <span class='line-number'>11</span>
 <span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>$ grun Simple prog
-</span><span class='line'>class T { {
-</span><span class='line'>  int x;
-</span><span class='line'>  y;;;
-</span><span class='line'>  int z;
-</span><span class='line'>}
-</span><span class='line'>EOF
-</span><span class='line'>line 1:9 extraneous input '{' expecting 'int'
-</span><span class='line'>var x
-</span><span class='line'>line 3:2 extraneous input 'y' expecting {'int', '}'}
-</span><span class='line'>var z
-</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
-
-<p>语法分析器重新同步并停留在循环中是因为它确定了变量z。语法分析器消费<code>y;;;</code>直到看到另一个成员的开始（就如前面所说的集合3），然后循环回到member。如果输入不包含<code>int z</code>，语法分析器会一直消费下去直到看到<code>}</code>（前面的集合2）并退出循环。语法分析树突出显示已被删除的记号并说明语法分析器仍然把<code>int z;</code>解释为有效的成员。</p>
-
-<p><img src="http://codemany.com/uploads/parse-tree-10.png" alt="parse-tree-10"></p>
-
-<p>如果提供的规则member有语法错误并且没有<code>}</code>，在语法分析器找到<code>}</code>之前我们不希望它进行扫描。语法分析器重新同步可以为查找<code>}</code>抛出整个下面的类定义。相反，语法分析器如果看到集合3中的记号会停止消费，就如同下面的会话那样：</p>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div class="columns"&gt;
+</span><span class='line'>  &lt;div class="column main-column"&gt;
+</span><span class='line'>    &lt;article class="article"&gt;
+</span><span class='line'>      Hello World
+</span><span class='line'>    &lt;/article&gt;
+</span><span class='line'>    &lt;article class="article"&gt;
+</span><span class='line'>      Hello World
+</span><span class='line'>    &lt;/article&gt;
+</span><span class='line'>  &lt;/div&gt;
+</span><span class='line'>  &lt;div class="column"&gt;
+</span><span class='line'>    &lt;article class="article"&gt;
+</span><span class='line'>      Hello World
+</span><span class='line'>    &lt;/article&gt;
+</span><span class='line'>    &lt;article class="article"&gt;
+</span><span class='line'>      Hello World&lt;br&gt;
+</span><span class='line'>      Foo Bar
+</span><span class='line'>    &lt;/article&gt;
+</span><span class='line'>    &lt;article class="article"&gt;
+</span><span class='line'>      Hello World
+</span><span class='line'>    &lt;/article&gt;
+</span><span class='line'>  &lt;/div&gt;
+</span><span class='line'>&lt;/div&gt;</span></code></pre></td></tr></table></div></figure>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -3003,115 +2978,70 @@
 <span class='line-number'>9</span>
 <span class='line-number'>10</span>
 <span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>$ grun Simple prog
-</span><span class='line'>class T {
-</span><span class='line'>  int x;
-</span><span class='line'>  ;
-</span><span class='line'>class U { int y; }
-</span><span class='line'>EOF
-</span><span class='line'>var x
-</span><span class='line'>line 3:2 extraneous input ';' expecting {'int', '}'}
-</span><span class='line'>class T
-</span><span class='line'>var y
-</span><span class='line'>class U</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>html {
+</span><span class='line'>  font-family: sans-serif;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.columns {
+</span><span class='line'>  display: flex;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.column {
+</span><span class='line'>  background: #eee;
+</span><span class='line'>  border: 5px solid #ccc;
+</span><span class='line'>  display: flex;
+</span><span class='line'>  flex: 1;
+</span><span class='line'>  flex-direction: column;
+</span><span class='line'>  padding: 10px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.main-column {
+</span><span class='line'>  flex: 2;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article {
+</span><span class='line'>  background: mediumseagreen;
+</span><span class='line'>  border: 5px solid seagreen;
+</span><span class='line'>  color: white;
+</span><span class='line'>  flex: 1;
+</span><span class='line'>  margin: 10px;
+</span><span class='line'>  padding: 20px;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>如我们所见，语法分析器在看到关键字class时会停止从语法分析树重新同步。</p>
+<h3 id="3-让每篇文章都成为flexbox容器">3. 让每篇文章都成为Flexbox容器</h3>
 
-<p><img src="http://codemany.com/uploads/parse-tree-11.png" alt="parse-tree-11"></p>
+<p>现在，为了给我们额外的控制，让我们把每篇文章也转变成一个Flexbox容器。每篇文章将包含：</p>
 
-<p>除了记号和子规则的识别之外，语法分析器也可能无法匹配语义谓词。</p>
+<ul>
+<li>一个标题</li>
+<li>一个段落</li>
+<li>一个带有作者和评论数量的信息栏</li>
+<li>一张可选的响应式图片</li>
+</ul>
 
-<h4 id="捕捉失败的语义谓词">捕捉失败的语义谓词</h4>
+<p>我们在这里使用Flexbox是为了把信息栏推到底部。我们的目标文章布局如下图所示：</p>
 
-<p>语义谓词就像断言，它指定在运行时必须为真的条件以便让语法分析器通过它们。如果谓词评估为假，则语法分析器将抛出FailedPredicateException异常，被当前规则的catch所捕获。语法分析器报告错误，并进行通用的同步和返回恢复。</p>
+<p><img src="http://codemany.com/uploads/flexbox-card.png" alt="flexbox-card"></p>
 
-<p>让我们来看一个使用语义谓词限制矢量中的整数数量的例子，规则ints匹配max整数。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>vec4: '[' ints[4] ']' ;
-</span><span class='line'>ints[int max]
-</span><span class='line'>locals [int i=1]
-</span><span class='line'>    : INT ( ',' { $i++; } { $i&lt;=$max }? INT )*
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<p>如果像下面的会话那样，给定一个太多整数的矢量，我们会看到错误消息并得到抛出额外逗号和整数的错误恢复：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>$ antlr Vec.g
-</span><span class='line'>$ compile Vec
-</span><span class='line'>$ grun Vec vec4
-</span><span class='line'>[1,2,3,4,5,6]
-</span><span class='line'>EOF
-</span><span class='line'>line 1:9 rule ints failed predicate: { $i&lt;=$max }?</span></code></pre></td></tr></table></div></figure>
-
-<p>语法分析树显示语法分析器在第5个整数处检测到错误。</p>
-
-<p><img src="http://codemany.com/uploads/parse-tree-12.png" alt="parse-tree-12"></p>
-
-<p>错误消息<code>{ $i &lt;= $max }</code>可能对作为文法设计者的我们有帮助，但对我们的用户肯定没有帮助。我们可以通过使用语义谓词上的失败选项把消息变得更加可读。例如，下面是带有计算可读字符串动作的ints规则：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>ints[int max]
-</span><span class='line'>locals [int i=1]
-</span><span class='line'>    : INT ( ',' { $i++; } { $i&lt;=$max }?&lt;fail={"exceeded max "+$max}&gt; INT )*
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<p>对于相同的输入，现在我们得到一个更好的消息。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>$ antlr VecMsg.g
-</span><span class='line'>$ compile VecMsg
-</span><span class='line'>$ grun VecMsg vec4
-</span><span class='line'>[1,2,3,4,5,6]
-</span><span class='line'>EOF
-</span><span class='line'>line 1:9 rule ints exceeded max 4</span></code></pre></td></tr></table></div></figure>
-
-<p>fail选项使用在双引号中的字符串字面量或者计算结果是字符串的动作。如果你想在谓词失败时执行一个函数，这个动作是很方便的。只需使用一个调用<code>{...}?&lt;fail={failedMaxTest()}&gt;</code>那样的函数的动作。</p>
-
-<p>谨慎使用语义谓词来测试输入有效性。在向量示例中，谓词强制执行语法规则，所以它可以抛出异常并尝试恢复。另一方面，如果我们有一个语法上有效但语义无效的结构，那么使用语义谓词并不是一个好主意。</p>
-
-<p>想象一下，在某种语言中，我们可以给变量赋除0外的任何值。这意味着赋值语句<code>x = 0;</code>在语法上是有效的，但在语义上是无效的。当然，我们必须向用户发出一个错误，但是我们不应该触发错误恢复。<code>x = 0;</code>在语法上是完全合法的。从某种意义上说，语法分析器会从错误中自动执行“恢复”。这是个简单的语法问题：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>assign
-</span><span class='line'>    : ID '=' v=INT {$v.int&gt;0}? ';'
-</span><span class='line'>      { System.out.println("assign "+$ID.text+" to "); }
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
-
-<p>如果规则assign中的谓词抛出异常，则同步和返回行为会在谓词之后抛出<code>;</code>。这可能会进行的很顺利，但我们冒着不完美重新同步的风险。更好的解决办法是手动发出一个出错，并让语法分析器继续匹配正确的语法。所以，我们应该用一个有条件的简单动作而不是谓词。</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>{if ($v.int==0) notifyListeners("values must be &gt; 0");}</span></code></pre></td></tr></table></div></figure>
-
-<p>现在我们已经看过所有可能引发错误恢复的情况。现在需要指出这个机制存在潜在的缺陷。鉴于语法分析器有时在单次恢复尝试期间不消费任何记号，整体恢复可能会陷入无限循环。如果我们能够不消费记号而恢复并回到语法分析器中的相同位置，我们可以再次恢复而不消费记号。在下一节中，我们将会显示ANTLR如何避免这个陷阱。</p>
-
-<h4 id="错误恢复的失效保护">错误恢复的失效保护</h4>
-
-<p>ANTLR语法分析器具有内置的失效保护，以保证错误恢复终止。如果我们到达相同的语法分析器位置并具有相同的输入位置，语法分析器在尝试恢复之前会强制消费一个记号。现在让我们来看一个失效保护的例子。如果我们在字段定义中添加一个额外的int记号，语法分析器检测到错误并尝试恢复。就像我们将在下个测试中看到的那样，语法分析器将调用recover()并在正确重新同步前尝试重新分析多次。</p>
-
-<p><img src="http://codemany.com/uploads/parser-resynchronization.png" alt="parser-resynchronization"></p>
-
-<p>右边的语法分析树显示从classDef到member有3次调用。</p>
+<p>这里是代码：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -3121,18 +3051,30 @@
 <span class='line-number'>6</span>
 <span class='line-number'>7</span>
 <span class='line-number'>8</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>$ grun Simple prog
-</span><span class='line'>class T {
-</span><span class='line'>  int int x;
-</span><span class='line'>}
-</span><span class='line'>EOF
-</span><span class='line'>line 2:6 no viable alternative at input 'intint'
-</span><span class='line'>var x
-</span><span class='line'>class T</span></code></pre></td></tr></table></div></figure>
-
-<p>第一个引用不匹配任何东西，但第二个引用匹配没有直接联系的int记号。匹配member的第三次尝试匹配正确的<code>int x;</code>序列。</p>
-
-<p>我们来看一下事件的确切顺序。当语法分析器检测到第一个错误时它在规则member中。</p>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;a class="article first-article"&gt;
+</span><span class='line'>  &lt;figure class="article-image"&gt;
+</span><span class='line'>    &lt;img src=""&gt;
+</span><span class='line'>  &lt;/figure&gt;
+</span><span class='line'>  &lt;div class="article-body"&gt;
+</span><span class='line'>    &lt;h2 class="article-title"&gt;
+</span><span class='line'>      &lt;!-- 标题 --&gt;
+</span><span class='line'>    &lt;/h2&gt;
+</span><span class='line'>    &lt;p class="article-content"&gt;
+</span><span class='line'>      &lt;!-- 内容 --&gt;
+</span><span class='line'>    &lt;/p&gt;
+</span><span class='line'>    &lt;footer class="article-info"&gt;
+</span><span class='line'>      &lt;!-- 信息 --&gt;
+</span><span class='line'>    &lt;/footer&gt;
+</span><span class='line'>  &lt;/div&gt;
+</span><span class='line'>&lt;/a&gt;</span></code></pre></td></tr></table></div></figure>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -3140,20 +3082,1849 @@
 <span class='line-number'>4</span>
 <span class='line-number'>5</span>
 <span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>member
-</span><span class='line'>    : 'int' ID ';'                          // field definition
-</span><span class='line'>      { System.out.println("var "+$ID.text); }
-</span><span class='line'>    | 'int' f=ID '(' ID ')' '{' stat '}'    // method definition
-</span><span class='line'>      { System.out.println("method: "+$f.text); }
-</span><span class='line'>    ;</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>.article {
+</span><span class='line'>  display: flex;
+</span><span class='line'>  flex-direction: column;
+</span><span class='line'>  flex-basis: auto;  /* 基于其内容设置初始元素大小 */
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-body {
+</span><span class='line'>  display: flex;
+</span><span class='line'>  flex: 1;
+</span><span class='line'>  flex-direction: column;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-content {
+</span><span class='line'>  flex: 1;  /* 这将使内容填补剩余的空间，并因此在底部压入信息栏 */
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
 
-<p>输入<code>int int</code>不适合member的任何选项，所以语法分析器参与同步并返回错误恢复策略。它发出第一个错误信息然后消费记号，直到它在调用栈<code>[prog, classDef, member]</code>的重新同步集合中看到记号为止。</p>
+<p>文章元素被垂直放置归功于flex-direction: column规则。</p>
 
-<p>由于语法中的<code>classDef+</code>和<code>member+</code>循环，计算重新同步集合有点复杂。在调用member之后，语法分析器可以循环回去并找到另一个成员，或退出循环并找到关闭类定义的<code>&#39;}&#39;</code>。在调用classDef之后，语法分析器可以循环回去查看另一个类的开始或简单地退出prog。因此对于调用栈<code>[prog, classDef, member]</code>，重新同步集合是<code>{&#39;int&#39;, &#39;}&#39;, &#39;class&#39;}</code>。</p>
+<p>我们把flex: 1应用到article-content元素以便它填补空白空间，并且把article-info推到底部，无论列的高度如何。</p>
 
-<p>在这点上，语法分析器恢复不消费记号，因为当前输入记号int在重新同步集合中。它只是返回到调用者：classDef中的<code>member+</code>循环。然后循环尝试匹配另一个成员。不幸的是，因为它没有消费任何记号，当语法分析器返回到member时它检测到另一个错误（虽然它凭借errorRecovery标志消除了虚假错误消息）。</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+<span class='line-number'>72</span>
+<span class='line-number'>73</span>
+<span class='line-number'>74</span>
+<span class='line-number'>75</span>
+<span class='line-number'>76</span>
+<span class='line-number'>77</span>
+<span class='line-number'>78</span>
+<span class='line-number'>79</span>
+<span class='line-number'>80</span>
+<span class='line-number'>81</span>
+<span class='line-number'>82</span>
+<span class='line-number'>83</span>
+<span class='line-number'>84</span>
+<span class='line-number'>85</span>
+<span class='line-number'>86</span>
+<span class='line-number'>87</span>
+<span class='line-number'>88</span>
+<span class='line-number'>89</span>
+<span class='line-number'>90</span>
+<span class='line-number'>91</span>
+<span class='line-number'>92</span>
+<span class='line-number'>93</span>
+<span class='line-number'>94</span>
+<span class='line-number'>95</span>
+<span class='line-number'>96</span>
+<span class='line-number'>97</span>
+<span class='line-number'>98</span>
+<span class='line-number'>99</span>
+<span class='line-number'>100</span>
+<span class='line-number'>101</span>
+<span class='line-number'>102</span>
+<span class='line-number'>103</span>
+<span class='line-number'>104</span>
+<span class='line-number'>105</span>
+<span class='line-number'>106</span>
+<span class='line-number'>107</span>
+<span class='line-number'>108</span>
+<span class='line-number'>109</span>
+<span class='line-number'>110</span>
+<span class='line-number'>111</span>
+<span class='line-number'>112</span>
+<span class='line-number'>113</span>
+<span class='line-number'>114</span>
+<span class='line-number'>115</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;main class="main columns"&gt;
+</span><span class='line'>  &lt;section class="column main-column"&gt;
+</span><span class='line'>    &lt;a class="article first-article" href="#"&gt;
+</span><span class='line'>      &lt;figure class="article-image is-4by3"&gt;
+</span><span class='line'>        &lt;img src="https://s3.amazonaws.com/cms-assets.tutsplus.com/uploads/users/1366/posts/26611/attachment/image-01.png" alt=""&gt;
+</span><span class='line'>      &lt;/figure&gt;
+</span><span class='line'>      &lt;div class="article-body"&gt;
+</span><span class='line'>        &lt;h2 class="article-title"&gt;
+</span><span class='line'>          Hello World
+</span><span class='line'>        &lt;/h2&gt;
+</span><span class='line'>        &lt;p class="article-content"&gt;
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>          Proin ornare magna eros, eu pellentesque tortor vestibulum ut.
+</span><span class='line'>          Maecenas non massa sem.
+</span><span class='line'>          Etiam finibus odio quis feugiat facilisis.
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>          Proin ornare magna eros.
+</span><span class='line'>        &lt;/p&gt;
+</span><span class='line'>        &lt;footer class="article-info"&gt;
+</span><span class='line'>          &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>          &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>        &lt;/footer&gt;
+</span><span class='line'>      &lt;/div&gt;
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;a class="article" href="#"&gt;
+</span><span class='line'>      &lt;figure class="article-image is-16by9"&gt;
+</span><span class='line'>        &lt;img src="https://s3.amazonaws.com/cms-assets.tutsplus.com/uploads/users/1366/posts/26611/attachment/image-02.png" alt=""&gt;
+</span><span class='line'>      &lt;/figure&gt;
+</span><span class='line'>      &lt;div class="article-body"&gt;
+</span><span class='line'>        &lt;h2 class="article-title"&gt;
+</span><span class='line'>          Hello World
+</span><span class='line'>        &lt;/h2&gt;
+</span><span class='line'>        &lt;p class="article-content"&gt;
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>          Proin ornare magna eros, eu pellentesque tortor vestibulum ut.
+</span><span class='line'>          Maecenas non massa sem.
+</span><span class='line'>          Etiam finibus odio quis feugiat facilisis.
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>          Proin ornare magna eros, eu pellentesque tortor vestibulum ut.
+</span><span class='line'>          Maecenas non massa sem.
+</span><span class='line'>          Etiam finibus odio quis feugiat facilisis.
+</span><span class='line'>        &lt;/p&gt;
+</span><span class='line'>        &lt;footer class="article-info"&gt;
+</span><span class='line'>          &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>          &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>        &lt;/footer&gt;
+</span><span class='line'>      &lt;/div&gt;
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>  &lt;/section&gt;
+</span><span class='line'>
+</span><span class='line'>  &lt;section class="column"&gt;
+</span><span class='line'>    &lt;a class="article" href="#"&gt;
+</span><span class='line'>      &lt;figure class="article-image is-3by2"&gt;
+</span><span class='line'>        &lt;img src="https://s3.amazonaws.com/cms-assets.tutsplus.com/uploads/users/1366/posts/26611/attachment/image-03.png" alt=""&gt;
+</span><span class='line'>      &lt;/figure&gt;
+</span><span class='line'>      &lt;div class="article-body"&gt;
+</span><span class='line'>        &lt;h2 class="article-title"&gt;
+</span><span class='line'>          Hello World
+</span><span class='line'>        &lt;/h2&gt;
+</span><span class='line'>        &lt;p class="article-content"&gt;
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>        &lt;/p&gt;
+</span><span class='line'>        &lt;footer class="article-info"&gt;
+</span><span class='line'>          &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>          &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>        &lt;/footer&gt;
+</span><span class='line'>      &lt;/div&gt;
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>    &lt;a class="article" href="#"&gt;
+</span><span class='line'>      &lt;div class="article-body"&gt;
+</span><span class='line'>        &lt;h2 class="article-title"&gt;
+</span><span class='line'>          Hello World
+</span><span class='line'>        &lt;/h2&gt;
+</span><span class='line'>        &lt;p class="article-content"&gt;
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>        &lt;/p&gt;
+</span><span class='line'>        &lt;footer class="article-info"&gt;
+</span><span class='line'>          &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>          &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>        &lt;/footer&gt;
+</span><span class='line'>      &lt;/div&gt;
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>    &lt;a class="article" href="#"&gt;
+</span><span class='line'>      &lt;div class="article-body"&gt;
+</span><span class='line'>        &lt;h2 class="article-title"&gt;
+</span><span class='line'>          Hello World
+</span><span class='line'>        &lt;/h2&gt;
+</span><span class='line'>        &lt;p class="article-content"&gt;
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>        &lt;/p&gt;
+</span><span class='line'>        &lt;footer class="article-info"&gt;
+</span><span class='line'>          &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>          &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>        &lt;/footer&gt;
+</span><span class='line'>      &lt;/div&gt;
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>    &lt;a class="article" href="#"&gt;
+</span><span class='line'>      &lt;div class="article-body"&gt;
+</span><span class='line'>        &lt;h2 class="article-title"&gt;
+</span><span class='line'>          Hello World
+</span><span class='line'>        &lt;/h2&gt;
+</span><span class='line'>        &lt;p class="article-content"&gt;
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>        &lt;/p&gt;
+</span><span class='line'>        &lt;footer class="article-info"&gt;
+</span><span class='line'>          &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>          &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>        &lt;/footer&gt;
+</span><span class='line'>      &lt;/div&gt;
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>  &lt;/section&gt;
+</span><span class='line'>&lt;/main&gt;</span></code></pre></td></tr></table></div></figure>
 
-<p>在第2次错误的恢复过程中，语法分析器触发失效保护，因为它已经到达相同的语法分析器位置和输入位置。失效保护在尝试重新同步之前强制记号消费。由于int是在重新同步集合中，它不会消费第2个记号。幸运的是，这正是我们想要的，因为语法分析器现在是正确地同步的。接下来的3个记号表示一个有效的成员定义：<code>int x;</code>。语法分析器再次从member返回到classDef中的循环。第3次，我们回到member，但现在语法分析将会成功。</p>
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+<span class='line-number'>72</span>
+<span class='line-number'>73</span>
+<span class='line-number'>74</span>
+<span class='line-number'>75</span>
+<span class='line-number'>76</span>
+<span class='line-number'>77</span>
+<span class='line-number'>78</span>
+<span class='line-number'>79</span>
+<span class='line-number'>80</span>
+<span class='line-number'>81</span>
+<span class='line-number'>82</span>
+<span class='line-number'>83</span>
+<span class='line-number'>84</span>
+<span class='line-number'>85</span>
+<span class='line-number'>86</span>
+<span class='line-number'>87</span>
+<span class='line-number'>88</span>
+<span class='line-number'>89</span>
+<span class='line-number'>90</span>
+<span class='line-number'>91</span>
+<span class='line-number'>92</span>
+<span class='line-number'>93</span>
+<span class='line-number'>94</span>
+<span class='line-number'>95</span>
+<span class='line-number'>96</span>
+<span class='line-number'>97</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>html {
+</span><span class='line'>  background: mediumseagreen;
+</span><span class='line'>  font-family: sans-serif;
+</span><span class='line'>  font-size: 14px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>a {
+</span><span class='line'>  text-decoration: none;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>div, h2, p, figure {
+</span><span class='line'>  margin: 0;
+</span><span class='line'>  padding: 0;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.main {
+</span><span class='line'>  margin: 0 auto;
+</span><span class='line'>  max-width: 1040px;
+</span><span class='line'>  padding: 20px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.columns {
+</span><span class='line'>  display: flex;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.column {
+</span><span class='line'>  display: flex;
+</span><span class='line'>  flex: 1;
+</span><span class='line'>  flex-direction: column;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.main-column {
+</span><span class='line'>  flex: 2;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article {
+</span><span class='line'>  background: white;
+</span><span class='line'>  color: #666;
+</span><span class='line'>  display: flex;
+</span><span class='line'>  flex: 1;
+</span><span class='line'>  flex-direction: column;
+</span><span class='line'>  flex-basis: auto;
+</span><span class='line'>  margin: 10px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-image {
+</span><span class='line'>  background: #eee;
+</span><span class='line'>  display: block;
+</span><span class='line'>  padding-top: 75%;
+</span><span class='line'>  position: relative;
+</span><span class='line'>  width: 100%;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-image img {
+</span><span class='line'>  display: block;
+</span><span class='line'>  height: 100%;
+</span><span class='line'>  left: 0;
+</span><span class='line'>  position: absolute;
+</span><span class='line'>  top: 0;
+</span><span class='line'>  width: 100%;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-image.is-3by2 {
+</span><span class='line'>  padding-top: 66.6666%;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-image.is-16by9 {
+</span><span class='line'>  padding-top: 56.25%;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-body {
+</span><span class='line'>  display: flex;
+</span><span class='line'>  flex: 1;
+</span><span class='line'>  flex-direction: column;
+</span><span class='line'>  padding: 20px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-title {
+</span><span class='line'>  color: #333;
+</span><span class='line'>  flex-shrink: 0;
+</span><span class='line'>  font-size: 1.4em;
+</span><span class='line'>  font-weight: bold;
+</span><span class='line'>  font-weight: 700;
+</span><span class='line'>  line-height: 1.2;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-content {
+</span><span class='line'>  flex: 1;
+</span><span class='line'>  margin-top: 5px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-info {
+</span><span class='line'>  display: flex;
+</span><span class='line'>  font-size: 0.85em;
+</span><span class='line'>  justify-content: space-between;
+</span><span class='line'>  margin-top: 10px;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<h3 id="4-添加一些嵌套列">4. 添加一些嵌套列</h3>
+
+<p>在左边的列中，我们真正想要的是<em>另一组</em>列。因此我们将以我们已经用过的同样的columns容器代替第二篇文章。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;div class="columns"&gt;
+</span><span class='line'>  &lt;div class="column nested-column"&gt;
+</span><span class='line'>    &lt;a class="article"&gt;
+</span><span class='line'>      &lt;!-- 文章内容 --&gt;
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>  &lt;/div&gt;
+</span><span class='line'>
+</span><span class='line'>  &lt;div class="column"&gt;
+</span><span class='line'>    &lt;a class="article"&gt;
+</span><span class='line'>      &lt;!-- 文章内容 --&gt;
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>    &lt;a class="article"&gt;
+</span><span class='line'>      &lt;!-- 文章内容 --&gt;
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>    &lt;a class="article"&gt;
+</span><span class='line'>      &lt;!-- 文章内容 --&gt;
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>  &lt;/div&gt;
+</span><span class='line'>&lt;/div&gt;</span></code></pre></td></tr></table></div></figure>
+
+<p>因为我们想要第一个嵌套列更宽，我们添加一个带有附加样式的名为nested-column的class：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>.nested-column {
+</span><span class='line'>  flex: 2;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>这将使新列的宽度是其它列的两倍。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+<span class='line-number'>72</span>
+<span class='line-number'>73</span>
+<span class='line-number'>74</span>
+<span class='line-number'>75</span>
+<span class='line-number'>76</span>
+<span class='line-number'>77</span>
+<span class='line-number'>78</span>
+<span class='line-number'>79</span>
+<span class='line-number'>80</span>
+<span class='line-number'>81</span>
+<span class='line-number'>82</span>
+<span class='line-number'>83</span>
+<span class='line-number'>84</span>
+<span class='line-number'>85</span>
+<span class='line-number'>86</span>
+<span class='line-number'>87</span>
+<span class='line-number'>88</span>
+<span class='line-number'>89</span>
+<span class='line-number'>90</span>
+<span class='line-number'>91</span>
+<span class='line-number'>92</span>
+<span class='line-number'>93</span>
+<span class='line-number'>94</span>
+<span class='line-number'>95</span>
+<span class='line-number'>96</span>
+<span class='line-number'>97</span>
+<span class='line-number'>98</span>
+<span class='line-number'>99</span>
+<span class='line-number'>100</span>
+<span class='line-number'>101</span>
+<span class='line-number'>102</span>
+<span class='line-number'>103</span>
+<span class='line-number'>104</span>
+<span class='line-number'>105</span>
+<span class='line-number'>106</span>
+<span class='line-number'>107</span>
+<span class='line-number'>108</span>
+<span class='line-number'>109</span>
+<span class='line-number'>110</span>
+<span class='line-number'>111</span>
+<span class='line-number'>112</span>
+<span class='line-number'>113</span>
+<span class='line-number'>114</span>
+<span class='line-number'>115</span>
+<span class='line-number'>116</span>
+<span class='line-number'>117</span>
+<span class='line-number'>118</span>
+<span class='line-number'>119</span>
+<span class='line-number'>120</span>
+<span class='line-number'>121</span>
+<span class='line-number'>122</span>
+<span class='line-number'>123</span>
+<span class='line-number'>124</span>
+<span class='line-number'>125</span>
+<span class='line-number'>126</span>
+<span class='line-number'>127</span>
+<span class='line-number'>128</span>
+<span class='line-number'>129</span>
+<span class='line-number'>130</span>
+<span class='line-number'>131</span>
+<span class='line-number'>132</span>
+<span class='line-number'>133</span>
+<span class='line-number'>134</span>
+<span class='line-number'>135</span>
+<span class='line-number'>136</span>
+<span class='line-number'>137</span>
+<span class='line-number'>138</span>
+<span class='line-number'>139</span>
+<span class='line-number'>140</span>
+<span class='line-number'>141</span>
+<span class='line-number'>142</span>
+<span class='line-number'>143</span>
+<span class='line-number'>144</span>
+<span class='line-number'>145</span>
+<span class='line-number'>146</span>
+<span class='line-number'>147</span>
+<span class='line-number'>148</span>
+<span class='line-number'>149</span>
+<span class='line-number'>150</span>
+<span class='line-number'>151</span>
+<span class='line-number'>152</span>
+<span class='line-number'>153</span>
+<span class='line-number'>154</span>
+<span class='line-number'>155</span>
+<span class='line-number'>156</span>
+<span class='line-number'>157</span>
+<span class='line-number'>158</span>
+<span class='line-number'>159</span>
+<span class='line-number'>160</span>
+<span class='line-number'>161</span>
+<span class='line-number'>162</span>
+<span class='line-number'>163</span>
+<span class='line-number'>164</span>
+<span class='line-number'>165</span>
+<span class='line-number'>166</span>
+<span class='line-number'>167</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;main class="main columns"&gt;
+</span><span class='line'>  &lt;section class="column main-column"&gt;
+</span><span class='line'>    &lt;a class="article first-article" href="#"&gt;
+</span><span class='line'>      &lt;figure class="article-image is-4by3"&gt;
+</span><span class='line'>        &lt;img src="https://s3.amazonaws.com/cms-assets.tutsplus.com/uploads/users/1366/posts/26611/attachment/image-01.png" alt=""&gt;
+</span><span class='line'>      &lt;/figure&gt;
+</span><span class='line'>      &lt;div class="article-body"&gt;
+</span><span class='line'>        &lt;h2 class="article-title"&gt;
+</span><span class='line'>          Hello World
+</span><span class='line'>        &lt;/h2&gt;
+</span><span class='line'>        &lt;p class="article-content"&gt;
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>          Proin ornare magna eros, eu pellentesque tortor vestibulum ut.
+</span><span class='line'>          Maecenas non massa sem.
+</span><span class='line'>          Etiam finibus odio quis feugiat facilisis.
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>          Proin ornare magna eros.
+</span><span class='line'>        &lt;/p&gt;
+</span><span class='line'>        &lt;footer class="article-info"&gt;
+</span><span class='line'>          &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>          &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>        &lt;/footer&gt;
+</span><span class='line'>      &lt;/div&gt;
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;div class="columns"&gt;
+</span><span class='line'>      &lt;div class="column nested-column"&gt;
+</span><span class='line'>        &lt;a class="article" href="#"&gt;
+</span><span class='line'>          &lt;figure class="article-image is-16by9"&gt;
+</span><span class='line'>            &lt;img src="https://s3.amazonaws.com/cms-assets.tutsplus.com/uploads/users/1366/posts/26611/attachment/image-02.png" alt=""&gt;
+</span><span class='line'>          &lt;/figure&gt;
+</span><span class='line'>          &lt;div class="article-body"&gt;
+</span><span class='line'>            &lt;h2 class="article-title"&gt;
+</span><span class='line'>              Hello World
+</span><span class='line'>            &lt;/h2&gt;
+</span><span class='line'>            &lt;p class="article-content"&gt;
+</span><span class='line'>              Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>              Proin ornare magna eros, eu pellentesque tortor vestibulum ut.
+</span><span class='line'>              Maecenas non massa sem.
+</span><span class='line'>              Etiam finibus odio quis feugiat facilisis.
+</span><span class='line'>              Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>              Proin ornare magna eros, eu pellentesque tortor vestibulum ut.
+</span><span class='line'>              Maecenas non massa sem.
+</span><span class='line'>              Etiam finibus odio quis feugiat facilisis.
+</span><span class='line'>            &lt;/p&gt;
+</span><span class='line'>            &lt;footer class="article-info"&gt;
+</span><span class='line'>              &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>              &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>            &lt;/footer&gt;
+</span><span class='line'>          &lt;/div&gt;
+</span><span class='line'>        &lt;/a&gt;
+</span><span class='line'>      &lt;/div&gt;
+</span><span class='line'>
+</span><span class='line'>      &lt;div class="column"&gt;
+</span><span class='line'>        &lt;a class="article" href="#"&gt;
+</span><span class='line'>          &lt;figure class="article-image is-16by9"&gt;
+</span><span class='line'>            &lt;img src="https://s3.amazonaws.com/cms-assets.tutsplus.com/uploads/users/1366/posts/26611/attachment/image-03.png" alt=""&gt;
+</span><span class='line'>          &lt;/figure&gt;
+</span><span class='line'>          &lt;div class="article-body"&gt;
+</span><span class='line'>            &lt;h2 class="article-title"&gt;
+</span><span class='line'>              Hello World
+</span><span class='line'>            &lt;/h2&gt;
+</span><span class='line'>            &lt;p class="article-content"&gt;
+</span><span class='line'>              Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>            &lt;/p&gt;
+</span><span class='line'>            &lt;footer class="article-info"&gt;
+</span><span class='line'>              &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>              &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>            &lt;/footer&gt;
+</span><span class='line'>          &lt;/div&gt;
+</span><span class='line'>        &lt;/a&gt;
+</span><span class='line'>        &lt;a class="article" href="#"&gt;
+</span><span class='line'>          &lt;div class="article-body"&gt;
+</span><span class='line'>            &lt;h2 class="article-title"&gt;
+</span><span class='line'>              Hello World
+</span><span class='line'>            &lt;/h2&gt;
+</span><span class='line'>            &lt;p class="article-content"&gt;
+</span><span class='line'>              Lorem ipsum dolor sit amet.
+</span><span class='line'>            &lt;/p&gt;
+</span><span class='line'>            &lt;footer class="article-info"&gt;
+</span><span class='line'>              &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>              &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>            &lt;/footer&gt;
+</span><span class='line'>          &lt;/div&gt;
+</span><span class='line'>        &lt;/a&gt;
+</span><span class='line'>        &lt;a class="article" href="#"&gt;
+</span><span class='line'>          &lt;div class="article-body"&gt;
+</span><span class='line'>            &lt;h2 class="article-title"&gt;
+</span><span class='line'>              Hello World
+</span><span class='line'>            &lt;/h2&gt;
+</span><span class='line'>            &lt;p class="article-content"&gt;
+</span><span class='line'>              Lorem ipsum dolor sit amet feugiat facilisis.
+</span><span class='line'>            &lt;/p&gt;
+</span><span class='line'>            &lt;footer class="article-info"&gt;
+</span><span class='line'>              &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>              &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>            &lt;/footer&gt;
+</span><span class='line'>          &lt;/div&gt;
+</span><span class='line'>        &lt;/a&gt;
+</span><span class='line'>      &lt;/div&gt;
+</span><span class='line'>    &lt;/div&gt;
+</span><span class='line'>  &lt;/section&gt;
+</span><span class='line'>
+</span><span class='line'>  &lt;section class="column"&gt;
+</span><span class='line'>    &lt;a class="article" href="#"&gt;
+</span><span class='line'>      &lt;figure class="article-image is-3by2"&gt;
+</span><span class='line'>        &lt;img src="https://s3.amazonaws.com/cms-assets.tutsplus.com/uploads/users/1366/posts/26611/attachment/image-04.png" alt=""&gt;
+</span><span class='line'>      &lt;/figure&gt;
+</span><span class='line'>      &lt;div class="article-body"&gt;
+</span><span class='line'>        &lt;h2 class="article-title"&gt;
+</span><span class='line'>          Hello World
+</span><span class='line'>        &lt;/h2&gt;
+</span><span class='line'>        &lt;p class="article-content"&gt;
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>        &lt;/p&gt;
+</span><span class='line'>        &lt;footer class="article-info"&gt;
+</span><span class='line'>          &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>          &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>        &lt;/footer&gt;
+</span><span class='line'>      &lt;/div&gt;
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>    &lt;a class="article" href="#"&gt;
+</span><span class='line'>      &lt;div class="article-body"&gt;
+</span><span class='line'>        &lt;h2 class="article-title"&gt;
+</span><span class='line'>          Hello World
+</span><span class='line'>        &lt;/h2&gt;
+</span><span class='line'>        &lt;p class="article-content"&gt;
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>        &lt;/p&gt;
+</span><span class='line'>        &lt;footer class="article-info"&gt;
+</span><span class='line'>          &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>          &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>        &lt;/footer&gt;
+</span><span class='line'>      &lt;/div&gt;
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>    &lt;a class="article" href="#"&gt;
+</span><span class='line'>      &lt;div class="article-body"&gt;
+</span><span class='line'>        &lt;h2 class="article-title"&gt;
+</span><span class='line'>          Hello World
+</span><span class='line'>        &lt;/h2&gt;
+</span><span class='line'>        &lt;p class="article-content"&gt;
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>        &lt;/p&gt;
+</span><span class='line'>        &lt;footer class="article-info"&gt;
+</span><span class='line'>          &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>          &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>        &lt;/footer&gt;
+</span><span class='line'>      &lt;/div&gt;
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>    &lt;a class="article" href="#"&gt;
+</span><span class='line'>      &lt;div class="article-body"&gt;
+</span><span class='line'>        &lt;h2 class="article-title"&gt;
+</span><span class='line'>          Hello World
+</span><span class='line'>        &lt;/h2&gt;
+</span><span class='line'>        &lt;p class="article-content"&gt;
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>        &lt;/p&gt;
+</span><span class='line'>        &lt;footer class="article-info"&gt;
+</span><span class='line'>          &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>          &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>        &lt;/footer&gt;
+</span><span class='line'>      &lt;/div&gt;
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>  &lt;/section&gt;
+</span><span class='line'>&lt;/main&gt;</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+<span class='line-number'>72</span>
+<span class='line-number'>73</span>
+<span class='line-number'>74</span>
+<span class='line-number'>75</span>
+<span class='line-number'>76</span>
+<span class='line-number'>77</span>
+<span class='line-number'>78</span>
+<span class='line-number'>79</span>
+<span class='line-number'>80</span>
+<span class='line-number'>81</span>
+<span class='line-number'>82</span>
+<span class='line-number'>83</span>
+<span class='line-number'>84</span>
+<span class='line-number'>85</span>
+<span class='line-number'>86</span>
+<span class='line-number'>87</span>
+<span class='line-number'>88</span>
+<span class='line-number'>89</span>
+<span class='line-number'>90</span>
+<span class='line-number'>91</span>
+<span class='line-number'>92</span>
+<span class='line-number'>93</span>
+<span class='line-number'>94</span>
+<span class='line-number'>95</span>
+<span class='line-number'>96</span>
+<span class='line-number'>97</span>
+<span class='line-number'>98</span>
+<span class='line-number'>99</span>
+<span class='line-number'>100</span>
+<span class='line-number'>101</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>html {
+</span><span class='line'>  background: mediumseagreen;
+</span><span class='line'>  font-family: sans-serif;
+</span><span class='line'>  font-size: 14px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>a {
+</span><span class='line'>  text-decoration: none;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>div, h2, p, figure {
+</span><span class='line'>  margin: 0;
+</span><span class='line'>  padding: 0;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.main {
+</span><span class='line'>  margin: 0 auto;
+</span><span class='line'>  max-width: 1040px;
+</span><span class='line'>  padding: 20px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.columns {
+</span><span class='line'>  display: flex;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.column {
+</span><span class='line'>  display: flex;
+</span><span class='line'>  flex: 1;
+</span><span class='line'>  flex-direction: column;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.main-column {
+</span><span class='line'>  flex: 3;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.nested-column {
+</span><span class='line'>  flex: 2;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article {
+</span><span class='line'>  background: white;
+</span><span class='line'>  color: #666;
+</span><span class='line'>  display: flex;
+</span><span class='line'>  flex: 1;
+</span><span class='line'>  flex-direction: column;
+</span><span class='line'>  flex-basis: auto;
+</span><span class='line'>  margin: 10px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-image {
+</span><span class='line'>  background: #eee;
+</span><span class='line'>  display: block;
+</span><span class='line'>  padding-top: 75%;
+</span><span class='line'>  position: relative;
+</span><span class='line'>  width: 100%;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-image img {
+</span><span class='line'>  display: block;
+</span><span class='line'>  height: 100%;
+</span><span class='line'>  left: 0;
+</span><span class='line'>  position: absolute;
+</span><span class='line'>  top: 0;
+</span><span class='line'>  width: 100%;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-image.is-3by2 {
+</span><span class='line'>  padding-top: 66.6666%;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-image.is-16by9 {
+</span><span class='line'>  padding-top: 56.25%;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-body {
+</span><span class='line'>  display: flex;
+</span><span class='line'>  flex: 1;
+</span><span class='line'>  flex-direction: column;
+</span><span class='line'>  padding: 20px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-title {
+</span><span class='line'>  color: #333;
+</span><span class='line'>  flex-shrink: 0;
+</span><span class='line'>  font-size: 1.4em;
+</span><span class='line'>  font-weight: bold;
+</span><span class='line'>  font-weight: 700;
+</span><span class='line'>  line-height: 1.2;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-content {
+</span><span class='line'>  flex: 1;
+</span><span class='line'>  margin-top: 5px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-info {
+</span><span class='line'>  display: flex;
+</span><span class='line'>  font-size: 0.85em;
+</span><span class='line'>  justify-content: space-between;
+</span><span class='line'>  margin-top: 10px;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<h3 id="5-给第一篇文章一个水平布局">5. 给第一篇文章一个水平布局</h3>
+
+<p>第一篇文章真的很大。为了优化空间的使用，让我们把它的布局切换成水平的。</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>.first-article {
+</span><span class='line'>  flex-direction: row;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.first-article .article-body {
+</span><span class='line'>  flex: 1;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.first-article .article-image {
+</span><span class='line'>  height: 300px;
+</span><span class='line'>  order: 2;
+</span><span class='line'>  padding-top: 0;
+</span><span class='line'>  width: 400px;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>这里的order属性是非常有用的，因为它允许我们改变HTML元素的顺序而不影响HTML标记。在标记中article-image实际上出现在article-body的<em>前面</em>，但它表现的好像出现在<em>后面</em>。</p>
+
+<h3 id="6-使布局可响应">6. 使布局可响应</h3>
+
+<p>这些就是我们想看到的，虽然它有点儿扁平。让我们通过响应式来修复它。</p>
+
+<p>Flexbox一个极好的特性是你只需要移除容器上的display: flex规则就可以完全禁用Flexbox，同时保持所有其它的Flexbox属性（例如align-items或者flex）有效。</p>
+
+<p>结果是，你可以通过仅在某个断点上启用Flexbox来触发一个响应式布局。</p>
+
+<p>我们将从.columns和.column选择器中移除display: flex，而不是用一个Media Query包装它们：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>@media screen and (min-width: 800px) {
+</span><span class='line'>  .columns,
+</span><span class='line'>  .column {
+</span><span class='line'>    display: flex;
+</span><span class='line'>  }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>就是这样！在更小的屏幕上，所有的文章都在彼此的上面。超过800px时，它们将会被放置在两列中。</p>
+
+<h3 id="7-添加最后的润色">7. 添加最后的润色</h3>
+
+<p>为使布局在大屏幕上更具吸引力，让我们添加一些CSS微调：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>@media screen and (min-width: 1000px) {
+</span><span class='line'>  .first-article {
+</span><span class='line'>    flex-direction: row;
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  .first-article .article-body {
+</span><span class='line'>    flex: 1;
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  .first-article .article-image {
+</span><span class='line'>    height: 300px;
+</span><span class='line'>    order: 2;
+</span><span class='line'>    padding-top: 0;
+</span><span class='line'>    width: 400px;
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  .main-column {
+</span><span class='line'>    flex: 3;
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  .nested-column {
+</span><span class='line'>    flex: 2;
+</span><span class='line'>  }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<p>第一篇文章的内容是水平放置的，文本在左边，图片在右边。而且，主列现在更宽（75%），嵌套列也是（66%）。这里是最终结果！</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+<span class='line-number'>72</span>
+<span class='line-number'>73</span>
+<span class='line-number'>74</span>
+<span class='line-number'>75</span>
+<span class='line-number'>76</span>
+<span class='line-number'>77</span>
+<span class='line-number'>78</span>
+<span class='line-number'>79</span>
+<span class='line-number'>80</span>
+<span class='line-number'>81</span>
+<span class='line-number'>82</span>
+<span class='line-number'>83</span>
+<span class='line-number'>84</span>
+<span class='line-number'>85</span>
+<span class='line-number'>86</span>
+<span class='line-number'>87</span>
+<span class='line-number'>88</span>
+<span class='line-number'>89</span>
+<span class='line-number'>90</span>
+<span class='line-number'>91</span>
+<span class='line-number'>92</span>
+<span class='line-number'>93</span>
+<span class='line-number'>94</span>
+<span class='line-number'>95</span>
+<span class='line-number'>96</span>
+<span class='line-number'>97</span>
+<span class='line-number'>98</span>
+<span class='line-number'>99</span>
+<span class='line-number'>100</span>
+<span class='line-number'>101</span>
+<span class='line-number'>102</span>
+<span class='line-number'>103</span>
+<span class='line-number'>104</span>
+<span class='line-number'>105</span>
+<span class='line-number'>106</span>
+<span class='line-number'>107</span>
+<span class='line-number'>108</span>
+<span class='line-number'>109</span>
+<span class='line-number'>110</span>
+<span class='line-number'>111</span>
+<span class='line-number'>112</span>
+<span class='line-number'>113</span>
+<span class='line-number'>114</span>
+<span class='line-number'>115</span>
+<span class='line-number'>116</span>
+<span class='line-number'>117</span>
+<span class='line-number'>118</span>
+<span class='line-number'>119</span>
+<span class='line-number'>120</span>
+<span class='line-number'>121</span>
+<span class='line-number'>122</span>
+<span class='line-number'>123</span>
+<span class='line-number'>124</span>
+<span class='line-number'>125</span>
+<span class='line-number'>126</span>
+<span class='line-number'>127</span>
+<span class='line-number'>128</span>
+<span class='line-number'>129</span>
+<span class='line-number'>130</span>
+<span class='line-number'>131</span>
+<span class='line-number'>132</span>
+<span class='line-number'>133</span>
+<span class='line-number'>134</span>
+<span class='line-number'>135</span>
+<span class='line-number'>136</span>
+<span class='line-number'>137</span>
+<span class='line-number'>138</span>
+<span class='line-number'>139</span>
+<span class='line-number'>140</span>
+<span class='line-number'>141</span>
+<span class='line-number'>142</span>
+<span class='line-number'>143</span>
+<span class='line-number'>144</span>
+<span class='line-number'>145</span>
+<span class='line-number'>146</span>
+<span class='line-number'>147</span>
+<span class='line-number'>148</span>
+<span class='line-number'>149</span>
+<span class='line-number'>150</span>
+<span class='line-number'>151</span>
+<span class='line-number'>152</span>
+<span class='line-number'>153</span>
+<span class='line-number'>154</span>
+<span class='line-number'>155</span>
+<span class='line-number'>156</span>
+<span class='line-number'>157</span>
+<span class='line-number'>158</span>
+<span class='line-number'>159</span>
+<span class='line-number'>160</span>
+<span class='line-number'>161</span>
+<span class='line-number'>162</span>
+<span class='line-number'>163</span>
+<span class='line-number'>164</span>
+<span class='line-number'>165</span>
+<span class='line-number'>166</span>
+<span class='line-number'>167</span>
+<span class='line-number'>168</span>
+<span class='line-number'>169</span>
+<span class='line-number'>170</span>
+<span class='line-number'>171</span>
+<span class='line-number'>172</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;header class="header"&gt;
+</span><span class='line'>  &lt;h1&gt;The Envato Tuts+ Report&lt;/h1&gt;
+</span><span class='line'>  &lt;h2&gt;&lt;a href="http://webdesign.tutsplus.com/tutorials/how-to-build-a-news-website-layout-with-flexbox--cms-26611"&gt;Read tutorial&lt;/a&gt;&lt;/h2&gt;
+</span><span class='line'>&lt;/header&gt;
+</span><span class='line'>
+</span><span class='line'>&lt;main class="main columns"&gt;
+</span><span class='line'>  &lt;section class="column main-column"&gt;
+</span><span class='line'>    &lt;a class="article first-article" href="#"&gt;
+</span><span class='line'>      &lt;figure class="article-image is-4by3"&gt;
+</span><span class='line'>        &lt;img src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/210284/image-01-lo.jpg" alt=""&gt;
+</span><span class='line'>      &lt;/figure&gt;
+</span><span class='line'>      &lt;div class="article-body"&gt;
+</span><span class='line'>        &lt;h2 class="article-title"&gt;
+</span><span class='line'>          Hello World
+</span><span class='line'>        &lt;/h2&gt;
+</span><span class='line'>        &lt;p class="article-content"&gt;
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>          Proin ornare magna eros, eu pellentesque tortor vestibulum ut.
+</span><span class='line'>          Maecenas non massa sem.
+</span><span class='line'>          Etiam finibus odio quis feugiat facilisis.
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>          Proin ornare magna eros.
+</span><span class='line'>        &lt;/p&gt;
+</span><span class='line'>        &lt;footer class="article-info"&gt;
+</span><span class='line'>          &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>          &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>        &lt;/footer&gt;
+</span><span class='line'>      &lt;/div&gt;
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>
+</span><span class='line'>    &lt;div class="columns"&gt;
+</span><span class='line'>      &lt;div class="column nested-column"&gt;
+</span><span class='line'>        &lt;a class="article" href="#"&gt;
+</span><span class='line'>          &lt;figure class="article-image is-16by9"&gt;
+</span><span class='line'>            &lt;img src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/210284/image-02-lo.jpg" alt=""&gt;
+</span><span class='line'>          &lt;/figure&gt;
+</span><span class='line'>          &lt;div class="article-body"&gt;
+</span><span class='line'>            &lt;h2 class="article-title"&gt;
+</span><span class='line'>              Hello World
+</span><span class='line'>            &lt;/h2&gt;
+</span><span class='line'>            &lt;p class="article-content"&gt;
+</span><span class='line'>              Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>              Proin ornare magna eros, eu pellentesque tortor vestibulum ut.
+</span><span class='line'>              Maecenas non massa sem.
+</span><span class='line'>              Etiam finibus odio quis feugiat facilisis.
+</span><span class='line'>              Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>              Proin ornare magna eros, eu pellentesque tortor vestibulum ut.
+</span><span class='line'>              Maecenas non massa sem.
+</span><span class='line'>              Etiam finibus odio quis feugiat facilisis.
+</span><span class='line'>            &lt;/p&gt;
+</span><span class='line'>            &lt;footer class="article-info"&gt;
+</span><span class='line'>              &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>              &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>            &lt;/footer&gt;
+</span><span class='line'>          &lt;/div&gt;
+</span><span class='line'>        &lt;/a&gt;
+</span><span class='line'>      &lt;/div&gt;
+</span><span class='line'>
+</span><span class='line'>      &lt;div class="column"&gt;
+</span><span class='line'>        &lt;a class="article" href="#"&gt;
+</span><span class='line'>          &lt;figure class="article-image is-16by9"&gt;
+</span><span class='line'>            &lt;img src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/210284/image-03-lo.jpg" alt=""&gt;
+</span><span class='line'>          &lt;/figure&gt;
+</span><span class='line'>          &lt;div class="article-body"&gt;
+</span><span class='line'>            &lt;h2 class="article-title"&gt;
+</span><span class='line'>              Hello World
+</span><span class='line'>            &lt;/h2&gt;
+</span><span class='line'>            &lt;p class="article-content"&gt;
+</span><span class='line'>              Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>            &lt;/p&gt;
+</span><span class='line'>            &lt;footer class="article-info"&gt;
+</span><span class='line'>              &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>              &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>            &lt;/footer&gt;
+</span><span class='line'>          &lt;/div&gt;
+</span><span class='line'>        &lt;/a&gt;
+</span><span class='line'>        &lt;a class="article" href="#"&gt;
+</span><span class='line'>          &lt;div class="article-body"&gt;
+</span><span class='line'>            &lt;h2 class="article-title"&gt;
+</span><span class='line'>              Hello World
+</span><span class='line'>            &lt;/h2&gt;
+</span><span class='line'>            &lt;p class="article-content"&gt;
+</span><span class='line'>              Lorem ipsum dolor sit amet.
+</span><span class='line'>            &lt;/p&gt;
+</span><span class='line'>            &lt;footer class="article-info"&gt;
+</span><span class='line'>              &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>              &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>            &lt;/footer&gt;
+</span><span class='line'>          &lt;/div&gt;
+</span><span class='line'>        &lt;/a&gt;
+</span><span class='line'>        &lt;a class="article" href="#"&gt;
+</span><span class='line'>          &lt;div class="article-body"&gt;
+</span><span class='line'>            &lt;h2 class="article-title"&gt;
+</span><span class='line'>              Hello World
+</span><span class='line'>            &lt;/h2&gt;
+</span><span class='line'>            &lt;p class="article-content"&gt;
+</span><span class='line'>              Lorem ipsum dolor sit amet feugiat facilisis.
+</span><span class='line'>            &lt;/p&gt;
+</span><span class='line'>            &lt;footer class="article-info"&gt;
+</span><span class='line'>              &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>              &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>            &lt;/footer&gt;
+</span><span class='line'>          &lt;/div&gt;
+</span><span class='line'>        &lt;/a&gt;
+</span><span class='line'>      &lt;/div&gt;
+</span><span class='line'>    &lt;/div&gt;
+</span><span class='line'>  &lt;/section&gt;
+</span><span class='line'>
+</span><span class='line'>  &lt;section class="column"&gt;
+</span><span class='line'>    &lt;a class="article" href="#"&gt;
+</span><span class='line'>      &lt;figure class="article-image is-3by2"&gt;
+</span><span class='line'>        &lt;img src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/210284/image-04-lo.jpg" alt=""&gt;
+</span><span class='line'>      &lt;/figure&gt;
+</span><span class='line'>      &lt;div class="article-body"&gt;
+</span><span class='line'>        &lt;h2 class="article-title"&gt;
+</span><span class='line'>          Hello World
+</span><span class='line'>        &lt;/h2&gt;
+</span><span class='line'>        &lt;p class="article-content"&gt;
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>        &lt;/p&gt;
+</span><span class='line'>        &lt;footer class="article-info"&gt;
+</span><span class='line'>          &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>          &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>        &lt;/footer&gt;
+</span><span class='line'>      &lt;/div&gt;
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>    &lt;a class="article" href="#"&gt;
+</span><span class='line'>      &lt;div class="article-body"&gt;
+</span><span class='line'>        &lt;h2 class="article-title"&gt;
+</span><span class='line'>          Hello World
+</span><span class='line'>        &lt;/h2&gt;
+</span><span class='line'>        &lt;p class="article-content"&gt;
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>        &lt;/p&gt;
+</span><span class='line'>        &lt;footer class="article-info"&gt;
+</span><span class='line'>          &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>          &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>        &lt;/footer&gt;
+</span><span class='line'>      &lt;/div&gt;
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>    &lt;a class="article" href="#"&gt;
+</span><span class='line'>      &lt;div class="article-body"&gt;
+</span><span class='line'>        &lt;h2 class="article-title"&gt;
+</span><span class='line'>          Hello World
+</span><span class='line'>        &lt;/h2&gt;
+</span><span class='line'>        &lt;p class="article-content"&gt;
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>        &lt;/p&gt;
+</span><span class='line'>        &lt;footer class="article-info"&gt;
+</span><span class='line'>          &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>          &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>        &lt;/footer&gt;
+</span><span class='line'>      &lt;/div&gt;
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>    &lt;a class="article" href="#"&gt;
+</span><span class='line'>      &lt;div class="article-body"&gt;
+</span><span class='line'>        &lt;h2 class="article-title"&gt;
+</span><span class='line'>          Hello World
+</span><span class='line'>        &lt;/h2&gt;
+</span><span class='line'>        &lt;p class="article-content"&gt;
+</span><span class='line'>          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+</span><span class='line'>        &lt;/p&gt;
+</span><span class='line'>        &lt;footer class="article-info"&gt;
+</span><span class='line'>          &lt;span&gt;By Joe Smith&lt;/span&gt;
+</span><span class='line'>          &lt;span&gt;42 comments&lt;/span&gt;
+</span><span class='line'>        &lt;/footer&gt;
+</span><span class='line'>      &lt;/div&gt;
+</span><span class='line'>    &lt;/a&gt;
+</span><span class='line'>  &lt;/section&gt;
+</span><span class='line'>&lt;/main&gt;</span></code></pre></td></tr></table></div></figure>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+<span class='line-number'>72</span>
+<span class='line-number'>73</span>
+<span class='line-number'>74</span>
+<span class='line-number'>75</span>
+<span class='line-number'>76</span>
+<span class='line-number'>77</span>
+<span class='line-number'>78</span>
+<span class='line-number'>79</span>
+<span class='line-number'>80</span>
+<span class='line-number'>81</span>
+<span class='line-number'>82</span>
+<span class='line-number'>83</span>
+<span class='line-number'>84</span>
+<span class='line-number'>85</span>
+<span class='line-number'>86</span>
+<span class='line-number'>87</span>
+<span class='line-number'>88</span>
+<span class='line-number'>89</span>
+<span class='line-number'>90</span>
+<span class='line-number'>91</span>
+<span class='line-number'>92</span>
+<span class='line-number'>93</span>
+<span class='line-number'>94</span>
+<span class='line-number'>95</span>
+<span class='line-number'>96</span>
+<span class='line-number'>97</span>
+<span class='line-number'>98</span>
+<span class='line-number'>99</span>
+<span class='line-number'>100</span>
+<span class='line-number'>101</span>
+<span class='line-number'>102</span>
+<span class='line-number'>103</span>
+<span class='line-number'>104</span>
+<span class='line-number'>105</span>
+<span class='line-number'>106</span>
+<span class='line-number'>107</span>
+<span class='line-number'>108</span>
+<span class='line-number'>109</span>
+<span class='line-number'>110</span>
+<span class='line-number'>111</span>
+<span class='line-number'>112</span>
+<span class='line-number'>113</span>
+<span class='line-number'>114</span>
+<span class='line-number'>115</span>
+<span class='line-number'>116</span>
+<span class='line-number'>117</span>
+<span class='line-number'>118</span>
+<span class='line-number'>119</span>
+<span class='line-number'>120</span>
+<span class='line-number'>121</span>
+<span class='line-number'>122</span>
+<span class='line-number'>123</span>
+<span class='line-number'>124</span>
+<span class='line-number'>125</span>
+<span class='line-number'>126</span>
+<span class='line-number'>127</span>
+<span class='line-number'>128</span>
+<span class='line-number'>129</span>
+<span class='line-number'>130</span>
+<span class='line-number'>131</span>
+<span class='line-number'>132</span>
+<span class='line-number'>133</span>
+<span class='line-number'>134</span>
+<span class='line-number'>135</span>
+<span class='line-number'>136</span>
+<span class='line-number'>137</span>
+<span class='line-number'>138</span>
+<span class='line-number'>139</span>
+<span class='line-number'>140</span>
+<span class='line-number'>141</span>
+<span class='line-number'>142</span>
+<span class='line-number'>143</span>
+<span class='line-number'>144</span>
+<span class='line-number'>145</span>
+<span class='line-number'>146</span>
+<span class='line-number'>147</span>
+<span class='line-number'>148</span>
+<span class='line-number'>149</span>
+<span class='line-number'>150</span>
+<span class='line-number'>151</span>
+<span class='line-number'>152</span>
+<span class='line-number'>153</span>
+<span class='line-number'>154</span>
+<span class='line-number'>155</span>
+<span class='line-number'>156</span>
+<span class='line-number'>157</span>
+<span class='line-number'>158</span>
+<span class='line-number'>159</span>
+<span class='line-number'>160</span>
+<span class='line-number'>161</span>
+<span class='line-number'>162</span>
+<span class='line-number'>163</span>
+<span class='line-number'>164</span>
+<span class='line-number'>165</span>
+<span class='line-number'>166</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>@import url(https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,700);
+</span><span class='line'>@import url(https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css);
+</span><span class='line'>
+</span><span class='line'>html {
+</span><span class='line'>  background: mediumseagreen;
+</span><span class='line'>  font-size: 14px;
+</span><span class='line'>  -moz-osx-font-smoothing: grayscale;
+</span><span class='line'>  -webkit-font-smoothing: antialiased;
+</span><span class='line'>  min-width: 300px;
+</span><span class='line'>  overflow-x: hidden;
+</span><span class='line'>  overflow-y: scroll;
+</span><span class='line'>  text-rendering: optimizeLegibility;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>body {
+</span><span class='line'>  color: #666;
+</span><span class='line'>  font-family: "Source Sans Pro", "Helvetica", "Arial", sans-serif;
+</span><span class='line'>  font-size: 1rem;
+</span><span class='line'>  font-weight: 400;
+</span><span class='line'>  line-height: 1.4;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>a {
+</span><span class='line'>  text-decoration: none;
+</span><span class='line'>  transition: all 0.3s cubic-bezier(.25, .8, .25, 1);
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>div, h2, p, figure {
+</span><span class='line'>  margin: 0;
+</span><span class='line'>  padding: 0;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.header {
+</span><span class='line'>  color: white;
+</span><span class='line'>  padding: 40px 0 20px;
+</span><span class='line'>  text-align: center;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.header h1 {
+</span><span class='line'>  font-size: 40px;
+</span><span class='line'>  font-weight: bold;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.header h2 a {
+</span><span class='line'>  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+</span><span class='line'>  color: white;
+</span><span class='line'>  font-size: 20px;
+</span><span class='line'>  opacity: 0.5;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.header h2 a:hover {
+</span><span class='line'>  border-bottom-color: white;
+</span><span class='line'>  opacity: 1;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.main {
+</span><span class='line'>  margin: 0 auto;
+</span><span class='line'>  max-width: 1040px;
+</span><span class='line'>  padding: 10px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.column {
+</span><span class='line'>  flex: 1;
+</span><span class='line'>  flex-direction: column;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article {
+</span><span class='line'>  background: white;
+</span><span class='line'>  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+</span><span class='line'>  color: #666;
+</span><span class='line'>  display: flex;
+</span><span class='line'>  flex: 1;
+</span><span class='line'>  flex-direction: column;
+</span><span class='line'>  flex-basis: auto;
+</span><span class='line'>  margin: 10px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article:hover,
+</span><span class='line'>.article:focus {
+</span><span class='line'>  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.25), 0 10px 10px rgba(0, 0, 0, 0.22);
+</span><span class='line'>  color: #444;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-image {
+</span><span class='line'>  background: #eee;
+</span><span class='line'>  display: block;
+</span><span class='line'>  padding-top: 75%;
+</span><span class='line'>  position: relative;
+</span><span class='line'>  width: 100%;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-image img {
+</span><span class='line'>  display: block;
+</span><span class='line'>  height: 100%;
+</span><span class='line'>  left: 0;
+</span><span class='line'>  position: absolute;
+</span><span class='line'>  top: 0;
+</span><span class='line'>  width: 100%;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-image.is-3by2 {
+</span><span class='line'>  padding-top: 66.6666%;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-image.is-16by9 {
+</span><span class='line'>  padding-top: 56.25%;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-body {
+</span><span class='line'>  display: flex;
+</span><span class='line'>  flex: 1;
+</span><span class='line'>  flex-direction: column;
+</span><span class='line'>  padding: 20px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-title {
+</span><span class='line'>  color: #333;
+</span><span class='line'>  flex-shrink: 0;
+</span><span class='line'>  font-size: 1.4em;
+</span><span class='line'>  font-weight: 700;
+</span><span class='line'>  line-height: 1.2;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-content {
+</span><span class='line'>  flex: 1;
+</span><span class='line'>  margin-top: 5px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>.article-info {
+</span><span class='line'>  display: flex;
+</span><span class='line'>  font-size: 0.85em;
+</span><span class='line'>  justify-content: space-between;
+</span><span class='line'>  margin-top: 10px;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>@media screen and (min-width: 800px) {
+</span><span class='line'>  .columns,
+</span><span class='line'>  .column {
+</span><span class='line'>    display: flex;
+</span><span class='line'>  }
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>@media screen and (min-width: 1000px) {
+</span><span class='line'>  .first-article {
+</span><span class='line'>    flex-direction: row;
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  .first-article .article-body {
+</span><span class='line'>    flex: 1;
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  .first-article .article-image {
+</span><span class='line'>    height: 300px;
+</span><span class='line'>    order: 2;
+</span><span class='line'>    padding-top: 0;
+</span><span class='line'>    width: 400px;
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  .main-column {
+</span><span class='line'>    flex: 3;
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  .nested-column {
+</span><span class='line'>    flex: 2;
+</span><span class='line'>  }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+<h3 id="总结">总结</h3>
+
+<p>我希望我已经向你展示在投入和开始使用Flexbox前你不需要理解它的每个方面！响应式新闻布局是一个真正有用的模式。拆解它，把玩它，让我们知道你是如何进展的！</p>
 ]]></content>
   </entry>
   
